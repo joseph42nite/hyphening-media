@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
@@ -130,13 +130,41 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Decrypted bank details caching
   const [decryptedBank, setDecryptedBank] = useState({});
 
+  // Refs to avoid closing EventSource connection when selected client / client list changes
+  const selectedClientForReportsRef = useRef(selectedClientForReports);
+  selectedClientForReportsRef.current = selectedClientForReports;
+
+  const selectedChatClientRef = useRef(selectedChatClient);
+  selectedChatClientRef.current = selectedChatClient;
+
+  const clientsRef = useRef(clients);
+  clientsRef.current = clients;
+
+  // 1. Initial Data Fetch Hook
   useEffect(() => {
     if (!auth) {
       navigate('/login');
       return;
     }
     
-    // Connect SSE
+    fetchTasks();
+    if (isAdmin || isSMM) {
+      fetchClients();
+    }
+    if (isAdmin) {
+      fetchFreelancers();
+      fetchAuditLogs();
+      fetchCurationData();
+    }
+    if (isAdmin || isSMM) {
+      fetchReviewQueue();
+    }
+  }, [auth]);
+
+  // 2. SSE Connection Hook
+  useEffect(() => {
+    if (!auth) return;
+
     const es = new EventSource('/api/events');
     es.onopen = () => setSseConnected(true);
     es.onerror = () => setSseConnected(false);
@@ -150,8 +178,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     es.addEventListener('content_approved', (e) => {
       const data = JSON.parse(e.data);
       showToast(`Content approved by client!`, 'success');
-      if (selectedClientForReports) {
-        fetchMarketingData(selectedClientForReports.id);
+      if (selectedClientForReportsRef.current) {
+        fetchMarketingData(selectedClientForReportsRef.current.id);
       }
     });
 
@@ -162,29 +190,17 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
     es.addEventListener('chat_message', (e) => {
       const data = JSON.parse(e.data);
-      if (selectedChatClient && selectedChatClient.id === data.client_id) {
+      if (selectedChatClientRef.current && selectedChatClientRef.current.id === data.client_id) {
         setChatMessages(prev => [...prev, data.message]);
       } else {
-        const client = clients.find(c => c.id === data.client_id);
+        const client = (clientsRef.current || []).find(c => c.id === data.client_id);
         const clientName = client ? client.name : 'Client';
         showToast(`New message in ${clientName} chat: "${data.message.message.substring(0, 30)}..."`, 'info');
       }
     });
 
-    // Load initial data
-    fetchTasks();
-    if (isAdmin) {
-      fetchClients();
-      fetchFreelancers();
-      fetchAuditLogs();
-      fetchCurationData();
-    }
-    if (isAdmin || isSMM) {
-      fetchReviewQueue();
-    }
-
     return () => es.close();
-  }, [auth, selectedClientForReports, selectedChatClient, clients]);
+  }, [auth]);
 
   // Core Data Fetching
   const fetchTasks = async () => {
