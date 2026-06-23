@@ -1,0 +1,24 @@
+# Hyphening Ops Center — Caddy Configuration
+# Replace yourdomain.com with your actual domain name pointing to the EC2 elastic IP
+
+yourdomain.com {
+    reverse_proxy localhost:3000
+    
+    # Enable Gzip compression
+    encode gzip
+    
+    # Custom headers for security
+    header {
+        # Disable FLoC tracking
+        Permissions-Policy "interest-cohort=()"
+        
+        # Prevent Clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        
+        # Prevent MIME Sniffing
+        X-Content-Type-Options "nosniff"
+        
+        # Referrer Policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
