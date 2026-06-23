@@ -4,7 +4,7 @@ import {
   Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
   Search, Share2, FileDown, Eye, HelpCircle, Check, X, ShieldAlert,
-  AlertTriangle, Play, MessageSquare
+  AlertTriangle, Play, MessageSquare, FileText
 } from 'lucide-react';
 
 export default function Dashboard({ auth, setAuth, showToast }) {
@@ -15,7 +15,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const isSMM = userRole === 'ops_social_media_manager';
   
   // Tab states
-  const [activeTab, setActiveTab] = useState(isAdmin ? 'tasks' : (isSMM ? 'review-queue' : 'tasks'));
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'tasks' : (isSMM ? 'scripts' : 'tasks'));
   
   // Data states
   const [tasks, setTasks] = useState([]);
@@ -125,6 +125,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [showMonthlyModal, setShowMonthlyModal] = useState(false);
   const [editingMonthly, setEditingMonthly] = useState(null);
 
+  // Script Tracker states
+  const [selectedScriptClient, setSelectedScriptClient] = useState(null);
+  const [scriptMonth, setScriptMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [scriptDrafts, setScriptDrafts] = useState({});
+  const [scriptStatusDrafts, setScriptStatusDrafts] = useState({});
+
   const [showGigModal, setShowGigModal] = useState(false);
   const [gigFormData, setGigFormData] = useState({
     client_id: '', artist_id: '', venue_id: '', planning_cycle_id: '', gig_date: '', fee_inr: 0, status: 'Pending'
@@ -226,6 +232,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           if (!selectedClientForReports) {
             setSelectedClientForReports(data.clients[0]);
             fetchMarketingData(data.clients[0].id);
+          }
+          if (!selectedScriptClient) {
+            setSelectedScriptClient(data.clients[0]);
           }
           if (!selectedChatClient) {
             setSelectedChatClient(data.clients[0]);
@@ -821,6 +830,36 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
+  const handleUpdateScript = async (itemId, newScript, newStatus) => {
+    if (!selectedScriptClient) return;
+
+    try {
+      const res = await fetch(`/api/clients/${selectedScriptClient.id}/marketing/content/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: newScript, status: newStatus })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update script');
+
+      showToast('Script and status updated successfully', 'success');
+      // Clean drafts for this item so we read fresh from backend
+      setScriptDrafts(prev => {
+        const copy = { ...prev };
+        delete copy[itemId];
+        return copy;
+      });
+      setScriptStatusDrafts(prev => {
+        const copy = { ...prev };
+        delete copy[itemId];
+        return copy;
+      });
+      fetchMarketingData(selectedScriptClient.id);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   // CSV Export helper
   const handleCSVExport = (type) => {
     if (!selectedClientForReports) return;
@@ -1043,8 +1082,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* Social / Admin tabs */}
         {(isAdmin || isSMM) && (
           <>
-            <button onClick={() => setActiveTab('review-queue')} className={`btn ${activeTab === 'review-queue' ? 'btn-primary' : 'btn-secondary'}`}>
-              <RefreshCw size={16} /> Discovery Queue
+            <button onClick={() => {
+              setActiveTab('scripts');
+              if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
+            }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`}>
+              <FileText size={16} /> Script Tracker
             </button>
             <button onClick={() => setActiveTab('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>
               <FileSpreadsheet size={16} /> Marketing Data
@@ -1617,41 +1659,129 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </div>
         )}
 
-        {/* DISCOVERY REVIEW QUEUE TAB */}
-        {activeTab === 'review-queue' && (isAdmin || isSMM) && (
+        {/* SCRIPT TRACKER TAB */}
+        {activeTab === 'scripts' && (isAdmin || isSMM) && (
           <div style={{ textAlign: 'left' }}>
-            <h3 style={{ marginBottom: '16px' }}>Discovered Marketing Media (Review Queue)</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '24px' }}>
-              These assets were automatically discovered on social platforms by client APIs. Approve to track them in performance stats, or discard them.
+            <h3 style={{ marginBottom: '8px' }}>Script Tracker</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '20px' }}>
+              Review and update marketing scripts and statuses for the selected client and month.
             </p>
 
-            {reviewQueue.length === 0 ? (
-              <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                Discovery queue is empty. No new media discovered.
+            <div className="dashboard-toolbar" style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1 }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Client:</label>
+                  <select 
+                    className="form-control"
+                    value={selectedScriptClient?.id || ''}
+                    onChange={(e) => {
+                      const client = clients.find(c => c.id === parseInt(e.target.value));
+                      setSelectedScriptClient(client);
+                      if (client) fetchMarketingData(client.id);
+                    }}
+                    style={{ maxWidth: '200px', padding: '8px' }}
+                  >
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Month:</label>
+                  <input
+                    type="month"
+                    className="form-control"
+                    value={scriptMonth}
+                    onChange={(e) => setScriptMonth(e.target.value)}
+                    style={{ maxWidth: '160px', padding: '8px' }}
+                  />
+                </div>
               </div>
-            ) : (
-              <div className="grid-auto">
-                {reviewQueue.map(item => (
-                  <div key={item.id} className="glass" style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span className="badge badge-info">{item.platform}</span>
-                      <span className="badge badge-muted">{item.post_type}</span>
-                    </div>
-                    <h4 style={{ fontSize: '0.95rem', marginBottom: '8px' }}>{item.title}</h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Views: {item.views?.toLocaleString() || 0}</p>
-                    
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                      <button onClick={() => handleReviewDecision(item.id, true)} className="btn btn-success" style={{ flexGrow: 1, padding: '6px' }}>
-                        Track
-                      </button>
-                      <button onClick={() => handleReviewDecision(item.id, false)} className="btn btn-danger" style={{ flexGrow: 1, padding: '6px' }}>
-                        Discard
-                      </button>
-                    </div>
+            </div>
+
+            {(() => {
+              const filteredScripts = marketingContent.filter(item => {
+                if (!item.date) return false;
+                return item.date.substring(0, 7) === scriptMonth;
+              });
+
+              if (filteredScripts.length === 0) {
+                return (
+                  <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    No script content found for this client and month. Add content tracker rows in the Marketing Data tab to see them here.
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              }
+
+              return (
+                <div className="grid-auto">
+                  {filteredScripts.map(item => (
+                    <div key={item.id} className="glass" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <span className="badge badge-info">{item.platform}</span>
+                          <span className="badge badge-muted">{item.post_type}</span>
+                        </div>
+                        <span className={`badge badge-${
+                          item.status === 'Posted' ? 'success' : 
+                          (item.status === 'Pending Client Approval' ? 'warning' : 'muted')
+                        }`}>
+                          {item.status}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Date: {item.date}</span>
+                        {item.title && <h4 style={{ fontSize: '1rem', margin: '4px 0 0 0' }}>{item.title}</h4>}
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Script</label>
+                        <textarea
+                          className="form-control"
+                          style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', minHeight: '120px', border: '2px solid #000' }}
+                          value={scriptDrafts[item.id] !== undefined ? scriptDrafts[item.id] : (item.script || '')}
+                          onChange={(e) => setScriptDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          placeholder="Enter script text here..."
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Status:</span>
+                          <select
+                            className="form-control"
+                            style={{ padding: '6px', fontSize: '0.8rem', maxWidth: '150px' }}
+                            value={scriptStatusDrafts[item.id] !== undefined ? scriptStatusDrafts[item.id] : (item.status || 'Draft')}
+                            onChange={(e) => setScriptStatusDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          >
+                            <option value="Draft">Draft</option>
+                            <option value="Pending Client Approval">Pending Client Approval</option>
+                            <option value="Client Approved">Client Approved</option>
+                            <option value="Client Rejected">Client Rejected</option>
+                            <option value="Posted">Posted</option>
+                            <option value="Pending">Pending</option>
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            const newScript = scriptDrafts[item.id] !== undefined ? scriptDrafts[item.id] : (item.script || '');
+                            const newStatus = scriptStatusDrafts[item.id] !== undefined ? scriptStatusDrafts[item.id] : (item.status || 'Draft');
+                            handleUpdateScript(item.id, newScript, newStatus);
+                          }}
+                          className="btn btn-primary"
+                          style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 
