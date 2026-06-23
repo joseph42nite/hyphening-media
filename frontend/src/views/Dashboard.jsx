@@ -122,6 +122,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     ai_overview_visible: 'No'
   });
 
+  const [showMonthlyModal, setShowMonthlyModal] = useState(false);
+  const [editingMonthly, setEditingMonthly] = useState(null);
+
   const [showGigModal, setShowGigModal] = useState(false);
   const [gigFormData, setGigFormData] = useState({
     client_id: '', artist_id: '', venue_id: '', planning_cycle_id: '', gig_date: '', fee_inr: 0, status: 'Pending'
@@ -716,6 +719,51 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
+  const openMonthlyModal = (report = null) => {
+    if (report) {
+      setEditingMonthly(report);
+      setMonthlyFormData({
+        month: report.month || '',
+        website_clicks: report.website_clicks !== null && report.website_clicks !== undefined ? String(report.website_clicks) : '',
+        website_traffic: report.website_traffic !== null && report.website_traffic !== undefined ? String(report.website_traffic) : '',
+        gmb_views: report.gmb_views !== null && report.gmb_views !== undefined ? String(report.gmb_views) : '',
+        map_views: report.map_views !== null && report.map_views !== undefined ? String(report.map_views) : '',
+        gmb_clicks: report.gmb_clicks !== null && report.gmb_clicks !== undefined ? String(report.gmb_clicks) : '',
+        on_page_score: report.on_page_score !== null && report.on_page_score !== undefined ? String(report.on_page_score) : '',
+        off_page: report.off_page !== null && report.off_page !== undefined ? String(report.off_page) : '',
+        blogs: report.blogs !== null && report.blogs !== undefined ? String(report.blogs) : '',
+        calls: report.calls !== null && report.calls !== undefined ? String(report.calls) : '',
+        directions: report.directions !== null && report.directions !== undefined ? String(report.directions) : '',
+        reviews: report.reviews !== null && report.reviews !== undefined ? String(report.reviews) : '',
+        avg_rating: report.avg_rating !== null && report.avg_rating !== undefined ? String(report.avg_rating) : '',
+        top_keywords: report.top_keywords || '',
+        da: report.da !== null && report.da !== undefined ? String(report.da) : '',
+        ai_overview_visible: report.ai_overview_visible || 'No'
+      });
+    } else {
+      setEditingMonthly(null);
+      setMonthlyFormData({
+        month: '',
+        website_clicks: '',
+        website_traffic: '',
+        gmb_views: '',
+        map_views: '',
+        gmb_clicks: '',
+        on_page_score: '',
+        off_page: '',
+        blogs: '',
+        calls: '',
+        directions: '',
+        reviews: '',
+        avg_rating: '',
+        top_keywords: '',
+        da: '',
+        ai_overview_visible: 'No'
+      });
+    }
+    setShowMonthlyModal(true);
+  };
+
   const handleMonthlyReportSubmit = async (e) => {
     e.preventDefault();
     if (!selectedClientForReports) return;
@@ -746,7 +794,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save monthly report');
 
-      showToast('Monthly report saved successfully', 'success');
+      showToast(`Monthly report ${editingMonthly ? 'updated' : 'saved'} successfully`, 'success');
+      setShowMonthlyModal(false);
+      setEditingMonthly(null);
       setMonthlyFormData({
         month: '',
         website_clicks: '',
@@ -1800,202 +1850,15 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   </table>
                 </div>
 
-                {/* SEO Monthly Reports Form */}
-                {(isAdmin || isSMM) && (
-                  <form onSubmit={handleMonthlyReportSubmit} className="glass" style={{ padding: '16px', marginBottom: '20px', background: '#fff', border: '2px solid #000', boxShadow: '4px 4px 0px #000' }}>
-                    <h4 style={{ margin: '0 0 16px 0', borderBottom: '2px solid #000', paddingBottom: '8px' }}>Add/Update SEO & GMB Monthly Data</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', alignItems: 'flex-end' }}>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Month (YYYY-MM)</label>
-                        <input 
-                          type="month" 
-                          className="form-control" 
-                          value={monthlyFormData.month}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, month: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Website Clicks</label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder="e.g. 7.89k"
-                          value={monthlyFormData.website_clicks}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, website_clicks: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Website Traffic</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 16000"
-                          value={monthlyFormData.website_traffic}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, website_traffic: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>GMB Views</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 52000"
-                          value={monthlyFormData.gmb_views}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, gmb_views: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Map Views</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 35000"
-                          value={monthlyFormData.map_views}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, map_views: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>GMB Clicks</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 1200"
-                          value={monthlyFormData.gmb_clicks}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, gmb_clicks: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>On Page Score</label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder="e.g. 85/100"
-                          value={monthlyFormData.on_page_score}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, on_page_score: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Off Page</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 45"
-                          value={monthlyFormData.off_page}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, off_page: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Blogs</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 4"
-                          value={monthlyFormData.blogs}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, blogs: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Calls</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 150"
-                          value={monthlyFormData.calls}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, calls: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Directions</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 450"
-                          value={monthlyFormData.directions}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, directions: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Reviews</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 12"
-                          value={monthlyFormData.reviews}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, reviews: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Avg. Rating</label>
-                        <input 
-                          type="number" 
-                          step="0.1" 
-                          min="1" 
-                          max="5"
-                          className="form-control" 
-                          placeholder="e.g. 4.8"
-                          value={monthlyFormData.avg_rating}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, avg_rating: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Top 3 Keywords</label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder="keyword1, keyword2..."
-                          value={monthlyFormData.top_keywords}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, top_keywords: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>DA</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          placeholder="e.g. 32"
-                          value={monthlyFormData.da}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, da: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>AI Overview Visible?</label>
-                        <select 
-                          className="form-control"
-                          value={monthlyFormData.ai_overview_visible}
-                          onChange={e => setMonthlyFormData({ ...monthlyFormData, ai_overview_visible: e.target.value })}
-                          style={{ padding: '6px', fontSize: '0.8rem' }}
-                        >
-                          <option value="No">No</option>
-                          <option value="Yes">Yes</option>
-                        </select>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '10px' }}>
-                          Submit Report
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-                )}
-
                 {/* SEO Monthly Reports Table */}
-                <h3 style={{ marginBottom: '12px', marginTop: '32px' }}>SEO & GMB Monthly Reports</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', marginTop: '32px' }}>
+                  <h3 style={{ margin: 0 }}>SEO & GMB Monthly Reports</h3>
+                  {(isAdmin || isSMM) && (
+                    <button onClick={() => openMonthlyModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                      <Plus size={14} style={{ marginRight: '4px' }} /> Add Monthly Report
+                    </button>
+                  )}
+                </div>
                 <div className="table-container" style={{ marginBottom: '32px' }}>
                   <table>
                     <thead>
@@ -2018,12 +1881,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         <th>MoM Growth – Sessions</th>
                         <th>MoM Growth – GMB Views</th>
                         <th>AI Overview Visible?</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {monthlyReports.length === 0 ? (
                         <tr>
-                          <td colSpan="18" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                          <td colSpan="19" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                             No monthly reports available.
                           </td>
                         </tr>
@@ -2051,6 +1915,17 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                               <span className={`badge badge-${item.ai_overview_visible === 'Yes' ? 'success' : 'muted'}`}>
                                 {item.ai_overview_visible || 'No'}
                               </span>
+                            </td>
+                            <td>
+                              {(isAdmin || isSMM) && (
+                                <button 
+                                  onClick={() => openMonthlyModal(item)} 
+                                  className="btn btn-secondary" 
+                                  style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                >
+                                  Edit
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))
@@ -2815,6 +2690,214 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Save Row
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Report Modal */}
+      {showMonthlyModal && (
+        <div className="modal-overlay" onClick={() => setShowMonthlyModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2>{editingMonthly ? 'Edit Monthly Report' : 'Add Monthly Report'}</h2>
+            <form onSubmit={handleMonthlyReportSubmit} style={{ marginTop: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Month (YYYY-MM)</label>
+                  <input
+                    type="month"
+                    className="form-control"
+                    value={monthlyFormData.month}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, month: e.target.value })}
+                    required
+                    disabled={!!editingMonthly}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Website Clicks</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. 7.89k"
+                    value={monthlyFormData.website_clicks}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, website_clicks: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Website Traffic</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 16000"
+                    value={monthlyFormData.website_traffic}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, website_traffic: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">GMB Views</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 52000"
+                    value={monthlyFormData.gmb_views}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, gmb_views: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Map Views</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 35000"
+                    value={monthlyFormData.map_views}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, map_views: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">GMB Clicks</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 1200"
+                    value={monthlyFormData.gmb_clicks}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, gmb_clicks: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">On Page Score</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. 85/100"
+                    value={monthlyFormData.on_page_score}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, on_page_score: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Off Page</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 45"
+                    value={monthlyFormData.off_page}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, off_page: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Blogs</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 4"
+                    value={monthlyFormData.blogs}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, blogs: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Calls</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 150"
+                    value={monthlyFormData.calls}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, calls: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Directions</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 450"
+                    value={monthlyFormData.directions}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, directions: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Reviews</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 12"
+                    value={monthlyFormData.reviews}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, reviews: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Avg. Rating</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    max="5"
+                    className="form-control"
+                    placeholder="e.g. 4.8"
+                    value={monthlyFormData.avg_rating}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, avg_rating: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">DA</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 32"
+                    value={monthlyFormData.da}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, da: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Top 3 Keywords</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="keyword1, keyword2..."
+                    value={monthlyFormData.top_keywords}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, top_keywords: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">AI Overview Visible?</label>
+                  <select
+                    className="form-control"
+                    value={monthlyFormData.ai_overview_visible}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, ai_overview_visible: e.target.value })}
+                  >
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowMonthlyModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Report
                 </button>
               </div>
             </form>
