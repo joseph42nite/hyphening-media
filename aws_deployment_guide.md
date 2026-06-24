@@ -60,6 +60,22 @@ If you prefer to keep your nameservers with your registrar:
    - **Value/Points to**: Paste your **Elastic IP**.
    - **TTL**: Select the lowest value (e.g. `600` seconds or `Auto`).
 
+### Option C: Configuring DNS inside Wix (If keeping Wix nameservers)
+If your domain is currently connected to Wix and you want to keep your main website on Wix while routing this dashboard to a subdomain (e.g., `ops.yourdomain.com`):
+1. Log into your **Wix Account** and go to the **Domains** page.
+2. Click the **Show More** icon (three dots) next to the domain you want to edit and select **Manage DNS Records**.
+3. Under the **A (Host)** section, click **+ Add Record**.
+4. Enter the following details:
+   - **Host Name**: `ops` (or your chosen subdomain prefix)
+   - **Points to**: Paste your **EC2 Elastic IP**.
+   - **TTL**: Leave as default.
+5. Click **Save** and wait for DNS propagation (takes 10-60 minutes).
+
+### Option D: Migrating completely away from Wix DNS
+If you want to host your main site on AWS and shut down the Wix site:
+1. Log into your **domain registrar** (e.g., GoDaddy, Namecheap) where you originally bought the domain.
+2. Replace the Wix Nameservers with **AWS Route 53 Nameservers** (following **Option A** above) or reset them to the registrar's default nameservers and add a direct root A Record pointing to your **EC2 Elastic IP** (following **Option B** above).
+
 ---
 
 ## 5. Connecting and Setting Up the Server
