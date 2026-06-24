@@ -38,9 +38,27 @@ By default, the IP of an EC2 instance changes when stopped/started. To prevent D
 
 ---
 
-## 4. Configuring DNS
-Go to your domain provider (GoDaddy, Namecheap, Route 53, etc.) and create DNS records:
-- **A Record**: Point `@` (or subdomain like `ops.yourdomain.com`) to your **Elastic IP**.
+## 4. Configuring DNS & Nameservers
+
+To link your domain name (e.g. `yourdomain.com`) to your EC2 instance:
+
+### Option A: Using AWS Route 53 Nameservers (Recommended)
+1. Navigate to **Route 53** in the AWS console.
+2. Click **Create Hosted Zone**. Enter your domain name and choose **Public Hosted Zone**.
+3. AWS will generate 4 **Nameserver (NS) records** (e.g. `ns-xxxx.awsdns-xx.org`).
+4. Log into your domain registrar (GoDaddy, Namecheap, Domain.com, etc.), locate the **Custom Nameservers** section, and replace the default nameservers with the 4 nameservers provided by AWS Route 53.
+5. In the Route 53 console, click **Create Record**:
+   - **Record Type**: `A`
+   - **Value/Alias**: Paste your **Elastic IP**.
+   - Save the record.
+
+### Option B: Using Domain Registrar DNS Settings (Direct A-Record)
+If you prefer to keep your nameservers with your registrar:
+1. Log into your domain registrar's DNS settings panel.
+2. Add an **A Record**:
+   - **Host/Name**: `@` (for root domain) or a subdomain (like `ops`).
+   - **Value/Points to**: Paste your **Elastic IP**.
+   - **TTL**: Select the lowest value (e.g. `600` seconds or `Auto`).
 
 ---
 
@@ -91,7 +109,7 @@ sudo apt install caddy -y
 ---
 
 ## 6. Deploying the Application
-Clone your repository or upload your files to the server. For this example, clone into the home directory:
+Clone your repository or upload your files to the server:
 ```bash
 cd ~
 git clone https://github.com/your-username/hyphening.git
@@ -126,10 +144,15 @@ ARTIST_BANK_KEY=b251e5187d74adbad7c8425f528d05d8...
 PORT=3000
 NODE_ENV=production
 FRONTEND_ORIGIN=https://yourdomain.com
+WEBSITE_URL=https://yourdomain.com
 
-# Integrations
+# Telegram Integrations
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ
 TELEGRAM_ADMIN_CHAT_ID=987654321
+TELEGRAM_VIDEOGRAPHER_CHAT_ID=887654321
+TELEGRAM_SMM_CHAT_ID=787654321
+
+# Webhooks
 OPENCLAW_HMAC_SECRET=your_hmac_secret_here
 ```
 Press `Ctrl+O` then `Enter` to save, and `Ctrl+X` to exit.
@@ -182,4 +205,40 @@ Configure Caddy to bind port 80/443 traffic to the PM2 cluster running on port 3
 ## 9. Verification & Backups
 - Visit `https://yourdomain.com` in your browser. The site will be active under secure SSL.
 - Check server health: `curl https://yourdomain.com/api/health`
-- **Database Backup Warning**: SQLite writes to the `./data/ops_dashboard.db` file. Make sure to download daily copies of this file or configure a cron job to push backups to AWS S3 (free tier includes 5GB S3 storage) using the AWS CLI.
+- **Database Backup**: SQLite writes to the `./data/ops_dashboard.db` file. Make sure to download daily copies of this file or configure a cron job to push backups to AWS S3 (Free Tier includes 5GB S3 storage).
+
+---
+
+## Appendix: How to Push Code from Local Machine to GitHub
+
+To push the codebase changes from your local computer up to GitHub so you can clone/pull them onto the EC2 server:
+
+1. **Verify Git Remote**:
+   Ensure you have a remote pointing to your GitHub repository:
+   ```bash
+   git remote -v
+   ```
+   *(If you don't have one, add it: `git remote add origin https://github.com/your-username/hyphening.git`)*
+
+2. **Stage and Commit Local Changes**:
+   Stage all files and write a commit message:
+   ```bash
+   git add .
+   git commit -m "feat: updated table layouts and added Telegram backlog notifications"
+   ```
+
+3. **Push to GitHub**:
+   Push the changes to your main branch (typically `main` or `master`):
+   ```bash
+   git push origin main
+   ```
+
+4. **Update the EC2 Server**:
+   On your EC2 terminal session, pull down the latest code updates:
+   ```bash
+   cd ~/hyphening
+   git pull origin main
+   npm install
+   cd frontend && npm install && npm run build && cd ..
+   pm2 restart all
+   ```

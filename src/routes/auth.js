@@ -89,6 +89,7 @@ router.post('/login', authLimiter, (req, res) => {
     });
 
     res.json({
+      id: user.id,
       role: user.role,
       name: user.name,
       email: user.email,
@@ -212,6 +213,20 @@ router.get('/me', authenticate, (req, res) => {
     name: req.user.name,
     role: req.user.role,
   });
+});
+
+/**
+ * GET /api/auth/users
+ * List all active staff users.
+ */
+router.get('/users', authenticate, (req, res) => {
+  try {
+    const staff = db.prepare('SELECT id, name, role, email FROM users WHERE is_active = 1 ORDER BY name ASC').all();
+    res.json({ users: staff });
+  } catch (err) {
+    console.error('[AUTH] List users error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 export default router;

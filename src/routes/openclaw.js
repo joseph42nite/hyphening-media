@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
+import { notifyAdmin } from '../services/telegram.js';
 
 const router = Router();
 
@@ -116,6 +117,17 @@ function handleCreateTask(payload) {
     INSERT INTO kanban_tasks (title, description, status, priority, task_type, client_id)
     VALUES (?, ?, 'todo', ?, ?, ?)
   `).run(payload.title, payload.description || null, payload.priority || 'medium', payload.task_type || 'other', payload.client_id || null);
+
+  try {
+    notifyAdmin(`➕ *New Task Created (via OpenClaw)*\n\n` +
+      `*Task:* ${payload.title}\n` +
+      `*Type:* ${payload.task_type || 'other'}\n` +
+      `*Priority:* ${payload.priority || 'medium'}\n` +
+      `*Assignee:* Unassigned\n` +
+      `*Due Date:* N/A`);
+  } catch (telegramErr) {
+    console.error('[TELEGRAM] Notification error during OpenClaw task creation:', telegramErr.message);
+  }
 }
 
 function handleUpdateTask(payload) {

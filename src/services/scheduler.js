@@ -5,7 +5,7 @@
 
 import cron from 'node-cron';
 import db from '../../database.js';
-import { notifyAdmin } from './telegram.js';
+import { notifyAdmin, notifySMM, notifyVideographer } from './telegram.js';
 
 /**
  * Initialize all scheduled jobs.
@@ -19,10 +19,10 @@ export function initScheduler() {
     runDailyCalendarSync();
   });
 
-  // D-5 check — 8 AM daily
+  // Daily backlog check — 8 AM daily
   cron.schedule('0 8 * * *', () => {
-    console.log('[SCHEDULER] Running D-5 deadline check...');
-    runD5Check();
+    console.log('[SCHEDULER] Running daily backlog report...');
+    runDailyBacklogReport();
   });
 
   // API metric fetch — every 6 hours
@@ -63,31 +63,72 @@ async function runDailyCalendarSync() {
 }
 
 /**
- * Check for tasks due within 5 days and send alerts.
+ * Daily backlog check for Videographers, SMMs, and Admins.
  */
-async function runD5Check() {
+async function runDailyBacklogReport() {
   try {
-    const fiveDaysFromNow = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // 1. Fetch incomplete tasks for Videographers (role = 'ops_video_editor')
+    const videoEditors = db.prepare("SELECT id, name, role FROM users WHERE role = 'ops_video_editor' AND is_active = 1").all();
+    for (const editor of videoEditors) {
+      const tasks = db.prepare(`
+        SELECT title, due_date, status 
+        FROM kanban_tasks 
+        WHERE assigned_to = ? AND status NOT IN ('delivered', 'cancelled')
+      `).all(editor.id);
 
-    const urgentTasks = db.prepare(`
-      SELECT t.*, c.name as client_name, f.name as freelancer_name
-      FROM kanban_tasks t
-      LEFT JOIN crm_clients c ON t.client_id = c.id
-      LEFT JOIN freelancers f ON t.assigned_to = f.id
-      WHERE t.due_date IS NOT NULL 
-        AND t.due_date <= ?
-        AND t.status NOT IN ('delivered', 'cancelled')
-      ORDER BY t.due_date ASC
-    `).all(fiveDaysFromNow);
-
-    if (urgentTasks.length > 0) {
-      console.log(`[D5] ${urgentTasks.length} tasks due within 5 days`);
-      for (const task of urgentTasks) {
-        notifyAdmin(`⏰ *D-5 Deadline Warning*\nTask: *"${task.title}"*\nClient: *${task.client_name || 'N/A'}*\nAssignee: *${task.freelancer_name || 'Unassigned'}*\nDue Date: *${task.due_date}*\nStatus: _${task.status}_`);
+      let text = `📅 *Daily Task Backlog*\nHello ${editor.name}, here are your pending tasks:\n\n`;
+      if (tasks.length > 0) {
+        tasks.forEach(t => {
+          text += `• *${t.title}* (Due: ${t.due_date || 'N/A'}) - Status: _${t.status}_\n`;
+        });
+      } else {
+        text += `You have no pending tasks today! 🎉`;
       }
+      await notifyVideographer(text);
     }
+
+    // 2. Fetch incomplete tasks for SMMs (role = 'ops_social_media_manager')
+    const smms = db.prepare("SELECT id, name, role FROM users WHERE role = 'ops_social_media_manager' AND is_active = 1").all();
+    for (const smm of smms) {
+      const tasks = db.prepare(`
+        SELECT title, due_date, status 
+        FROM kanban_tasks 
+        WHERE assigned_to = ? AND status NOT IN ('delivered', 'cancelled')
+      `).all(smm.id);
+
+      let text = `📅 *Daily Task Backlog*\nHello ${smm.name}, here are your pending tasks:\n\n`;
+      if (tasks.length > 0) {
+        tasks.forEach(t => {
+          text += `• *${t.title}* (Due: ${t.due_date || 'N/A'}) - Status: _${t.status}_\n`;
+        });
+      } else {
+        text += `You have no pending tasks today! 🎉`;
+      }
+      await notifySMM(text);
+    }
+
+    // 3. Fetch all incomplete tasks in the system for Admin summary
+    const adminTasks = db.prepare(`
+      SELECT t.title, t.due_date, t.status, u.name as assignee_name, u.role as assignee_role
+      FROM kanban_tasks t
+      LEFT JOIN users u ON t.assigned_to = u.id
+      WHERE t.status NOT IN ('delivered', 'cancelled')
+      ORDER BY t.due_date ASC
+    `).all();
+
+    let adminText = `📅 *Daily Ops Backlog Summary*\nHere is the current system backlog:\n\n`;
+    if (adminTasks.length > 0) {
+      adminTasks.forEach(t => {
+        const assignee = t.assignee_name ? `${t.assignee_name} (${t.assignee_role === 'ops_video_editor' ? 'Videographer' : 'SMM'})` : 'Unassigned';
+        adminText += `• *${t.title}* (Due: ${t.due_date || 'N/A'}) - Status: _${t.status}_ - Assigned: _${assignee}_\n`;
+      });
+    } else {
+      adminText += `All tasks are completed! No pending items. 🎉`;
+    }
+    await notifyAdmin(adminText);
+
   } catch (err) {
-    console.error('[D5] Check error:', err);
+    console.error('[SCHEDULER] Daily backlog report error:', err);
   }
 }
 
@@ -131,7 +172,6 @@ async function runAPIMetricFetch() {
 
         if (failures === 3) {
           console.error(`[METRICS] ⚠️ API fetch failing for ${client.name}. Status set to ERROR.`);
-          notifyAdmin(`⚠️ *API Integration Failure*\nAPI sync is failing for client *${client.name}*. Connection set to ERROR. Please verify/refresh access tokens.`);
         }
 
         console.error(`[METRICS] Failed for ${client.name} (attempt ${failures}):`, err.message);

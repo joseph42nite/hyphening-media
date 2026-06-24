@@ -63,30 +63,43 @@ function computeAdMetrics(row) {
 // CONTENT TRACKER
 // =========================================
 
-/**
- * GET /api/clients/:id/marketing/content
- * List tracked content for a client.
- */
-router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
+    if (req.user.role === 'ops_video_editor') {
+      const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+      if (!hasTask) {
+        return res.status(403).json({ error: 'Access denied: you have no video assignments for this client' });
+      }
+    }
+
     const { is_tracked, platform, status } = req.query;
-    let query = 'SELECT * FROM marketing_content_tracker WHERE client_id = ?';
+    let query = `
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      FROM marketing_content_tracker t
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      WHERE t.client_id = ?
+    `;
     const params = [req.params.id];
 
+    if (req.user.role === 'ops_video_editor') {
+      query += " AND t.post_type IN ('Reel', 'Youtube', 'Short')";
+    }
+
     if (is_tracked !== undefined) {
-      query += ' AND is_tracked = ?';
+      query += ' AND t.is_tracked = ?';
       params.push(parseInt(is_tracked));
     }
     if (platform) {
-      query += ' AND platform = ?';
+      query += ' AND t.platform = ?';
       params.push(platform);
     }
     if (status) {
-      query += ' AND status = ?';
+      query += ' AND t.status = ?';
       params.push(status);
     }
 
-    query += ' ORDER BY date DESC';
+    query += ' ORDER BY t.date DESC';
     res.json({ content: db.prepare(query).all(...params) });
   } catch (err) {
     console.error('[MARKETING] Content list error:', err);
@@ -98,13 +111,84 @@ router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manage
  * POST /api/clients/:id/marketing/content
  * Create draft content plan.
  */
+/**
+ * Automatically creates, updates, or transitions a Kanban task linked to a content row.
+ */
+function syncContentToKanbanTask(contentId, db) {
+  try {
+    const content = db.prepare(`
+      SELECT t.*, r.script_id, s.title AS script_title
+      FROM marketing_content_tracker t
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      WHERE t.id = ?
+    `).get(contentId);
+
+    if (!content) return;
+
+    const pendingStatuses = ['Draft', 'Pending Client Approval', 'Client Approved', 'Pending'];
+    const isPending = pendingStatuses.includes(content.status);
+    const isPosted = content.status === 'Posted';
+
+    if (isPending) {
+      const taskTitle = `Post: ${content.title || ('Content Plan - ' + content.date)} (${content.platform || 'social'})`;
+      const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
+      const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
+      
+      if (content.kanban_task_id) {
+        const taskExists = db.prepare('SELECT id FROM kanban_tasks WHERE id = ?').get(content.kanban_task_id);
+        if (taskExists) {
+          db.prepare(`
+            UPDATE kanban_tasks 
+            SET title = ?, description = ?, client_id = ?, due_date = ?, updated_at = datetime('now')
+            WHERE id = ?
+          `).run(taskTitle, taskDesc, content.client_id, content.date || null, content.kanban_task_id);
+          return;
+        }
+      }
+
+      // Create task (default priority 'medium', task_type 'social', status 'todo')
+      const result = db.prepare(`
+        INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, status, due_date)
+        VALUES (?, ?, ?, 'medium', 'social', 'todo', ?)
+      `).run(content.client_id, taskTitle, taskDesc, content.date || null);
+
+      db.prepare(`
+        UPDATE marketing_content_tracker 
+        SET kanban_task_id = ? 
+        WHERE id = ?
+      `).run(result.lastInsertRowid, contentId);
+
+    } else if (isPosted) {
+      if (content.kanban_task_id) {
+        db.prepare(`
+          UPDATE kanban_tasks 
+          SET status = 'delivered', completed_at = datetime('now'), updated_at = datetime('now')
+          WHERE id = ? AND status != 'delivered'
+        `).run(content.kanban_task_id);
+      }
+    } else if (content.status === 'Client Rejected') {
+      if (content.kanban_task_id) {
+        db.prepare(`
+          UPDATE kanban_tasks 
+          SET status = 'cancelled', updated_at = datetime('now')
+          WHERE id = ? AND status != 'cancelled'
+        `).run(content.kanban_task_id);
+      }
+    }
+  } catch (err) {
+    console.error('[MARKETING-SYNC] Error syncing content to task:', err);
+  }
+}
+
 router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const clientId = req.params.id;
     const {
       platform, date, post_type, title, script, link, time, caption, status,
       views, likes, comments, shares, saves, avg_watch_time_pct, boosted,
-      follows, youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr
+      follows, youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
+      script_id
     } = req.body;
 
     let finalTitle = title;
@@ -163,6 +247,15 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       computed.content_score
     );
 
+    if (script_id) {
+      db.prepare(`
+        INSERT INTO marketing_content_script_relation (content_id, script_id)
+        VALUES (?, ?)
+      `).run(result.lastInsertRowid, script_id);
+    }
+
+    syncContentToKanbanTask(result.lastInsertRowid, db);
+
     logAction({
       actorId: req.user.id,
       actorEmail: req.user.email,
@@ -173,7 +266,15 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       ip: req.ip,
     });
 
-    res.status(201).json(db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ?').get(result.lastInsertRowid));
+    const createdRow = db.prepare(`
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      FROM marketing_content_tracker t
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      WHERE t.id = ?
+    `).get(result.lastInsertRowid);
+
+    res.status(201).json(createdRow);
   } catch (err) {
     console.error('[MARKETING] Content create error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -205,25 +306,38 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       }
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && req.body.script_id === undefined) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
-    // Merge with existing values for metric computation
-    const merged = { ...content, ...updates };
-    merged.views = merged.views || 0;
-    merged.likes = merged.likes || 0;
-    merged.comments = merged.comments || 0;
-    merged.shares = merged.shares || 0;
-    merged.saves = merged.saves || 0;
+    if (Object.keys(updates).length > 0) {
+      // Merge with existing values for metric computation
+      const merged = { ...content, ...updates };
+      merged.views = merged.views || 0;
+      merged.likes = merged.likes || 0;
+      merged.comments = merged.comments || 0;
+      merged.shares = merged.shares || 0;
+      merged.saves = merged.saves || 0;
 
-    const computed = computeContentMetrics(merged);
-    Object.assign(updates, computed);
-    updates.updated_at = new Date().toISOString();
+      const computed = computeContentMetrics(merged);
+      Object.assign(updates, computed);
+      updates.updated_at = new Date().toISOString();
 
-    const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-    db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
-      .run(...Object.values(updates), req.params.contentId);
+      const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+      db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
+        .run(...Object.values(updates), req.params.contentId);
+    }
+
+    const { script_id } = req.body;
+    if (script_id !== undefined) {
+      db.prepare('DELETE FROM marketing_content_script_relation WHERE content_id = ?').run(req.params.contentId);
+      if (script_id && script_id !== null && script_id !== '') {
+        db.prepare('INSERT INTO marketing_content_script_relation (content_id, script_id) VALUES (?, ?)')
+          .run(req.params.contentId, script_id);
+      }
+    }
+
+    syncContentToKanbanTask(req.params.contentId, db);
 
     logAction({
       actorId: req.user.id,
@@ -234,7 +348,15 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       ip: req.ip,
     });
 
-    res.json(db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ?').get(req.params.contentId));
+    const updatedRow = db.prepare(`
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      FROM marketing_content_tracker t
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      WHERE t.id = ?
+    `).get(req.params.contentId);
+
+    res.json(updatedRow);
   } catch (err) {
     console.error('[MARKETING] Content update error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -293,6 +415,9 @@ router.post('/:id/marketing/content/review/:contentId', authorize('admin', 'ops_
       db.prepare('UPDATE marketing_content_tracker SET is_tracked = 1, updated_at = ? WHERE id = ?')
         .run(new Date().toISOString(), req.params.contentId);
     } else {
+      if (content.kanban_task_id) {
+        db.prepare('DELETE FROM kanban_tasks WHERE id = ?').run(content.kanban_task_id);
+      }
       db.prepare('DELETE FROM marketing_content_tracker WHERE id = ?').run(req.params.contentId);
     }
 
@@ -535,6 +660,143 @@ router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manag
     res.json(report);
   } catch (err) {
     console.error('[MARKETING] Monthly create error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// =========================================
+// SCRIPTS
+// =========================================
+
+/**
+ * GET /api/clients/:id/marketing/scripts
+ * List scripts for a client, optionally filtered by month.
+ */
+router.get('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const { month } = req.query;
+    let query = 'SELECT * FROM marketing_scripts WHERE client_id = ?';
+    const params = [req.params.id];
+
+    if (month) {
+      query += ' AND month = ?';
+      params.push(month);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const scripts = db.prepare(query).all(...params);
+    res.json({ scripts });
+  } catch (err) {
+    console.error('[MARKETING] Scripts list error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/marketing/scripts
+ * Create a new script.
+ */
+router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const { title, script_text, month, reference_video_link, reaction_video_link, format } = req.body;
+    if (!title || !script_text || !month) {
+      return res.status(400).json({ error: 'Title, script_text, and month are required' });
+    }
+
+    const result = db.prepare(`
+      INSERT INTO marketing_scripts (client_id, month, title, script_text, reference_video_link, reaction_video_link, format)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(req.params.id, month, title, script_text, reference_video_link || null, reaction_video_link || null, format || 'reel');
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'create',
+      entityType: 'script',
+      entityId: result.lastInsertRowid,
+      diff: { title, month },
+      ip: req.ip,
+    });
+
+    const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json(script);
+  } catch (err) {
+    console.error('[MARKETING] Script create error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/clients/:id/marketing/scripts/:scriptId
+ * Update an existing script.
+ */
+router.patch('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?')
+      .get(req.params.scriptId, req.params.id);
+    if (!script) return res.status(404).json({ error: 'Script not found' });
+
+    const allowedFields = ['title', 'script_text', 'month', 'reference_video_link', 'reaction_video_link', 'format'];
+    const updates = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    db.prepare(`UPDATE marketing_scripts SET ${setClauses} WHERE id = ?`)
+      .run(...Object.values(updates), req.params.scriptId);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'update',
+      entityType: 'script',
+      entityId: parseInt(req.params.scriptId),
+      diff: updates,
+      ip: req.ip,
+    });
+
+    const updatedScript = db.prepare('SELECT * FROM marketing_scripts WHERE id = ?').get(req.params.scriptId);
+    res.json(updatedScript);
+  } catch (err) {
+    console.error('[MARKETING] Script update error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/clients/:id/marketing/scripts/:scriptId
+ * Delete a script.
+ */
+router.delete('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?')
+      .get(req.params.scriptId, req.params.id);
+    if (!script) return res.status(404).json({ error: 'Script not found' });
+
+    db.prepare('DELETE FROM marketing_scripts WHERE id = ?').run(req.params.scriptId);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'delete',
+      entityType: 'script',
+      entityId: parseInt(req.params.scriptId),
+      diff: { title: script.title },
+      ip: req.ip,
+    });
+
+    res.json({ message: 'Script deleted successfully' });
+  } catch (err) {
+    console.error('[MARKETING] Script delete error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

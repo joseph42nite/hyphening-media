@@ -5,6 +5,9 @@
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
+const SMM_CHAT_ID = process.env.TELEGRAM_SMM_CHAT_ID;
+const VIDEOGRAPHER_CHAT_ID = process.env.TELEGRAM_VIDEOGRAPHER_CHAT_ID;
+const WEBSITE_URL = process.env.WEBSITE_URL || 'http://localhost:3000';
 
 /**
  * Send a message to a specific Telegram Chat.
@@ -49,34 +52,46 @@ export async function notifyAdmin(text, replyMarkup = null) {
     console.log(`[TELEGRAM] Admin Chat ID not configured. Admin alert: ${text}`);
     return null;
   }
-  return sendMessage(ADMIN_CHAT_ID, text, replyMarkup);
+  const footer = `\n\n🔗 Open Dashboard: ${WEBSITE_URL}/dashboard`;
+  return sendMessage(ADMIN_CHAT_ID, text + footer, replyMarkup);
 }
 
 /**
- * Send Planning Cycle approval card to Admin.
+ * Send message to the Social Media Manager.
  */
-export async function sendCycleApprovalCard(cycle, gigs) {
-  const text = `
-*Curation Planning Cycle Pending Approval*
-Cycle: _${cycle.cycle_label}_
-Date Range: _${cycle.start_date}_ to _${cycle.end_date}_
-Total Gigs Assigned: *${gigs.length}*
+export async function notifySMM(text) {
+  if (!SMM_CHAT_ID) {
+    console.log(`[TELEGRAM] SMM Chat ID not configured. SMM alert: ${text}`);
+    return null;
+  }
+  const footer = `\n\n🔗 Open Dashboard: ${WEBSITE_URL}/dashboard`;
+  return sendMessage(SMM_CHAT_ID, text + footer);
+}
 
-Click approve below to confirm assignments and dispatch emails to artists.
-  `.trim();
+/**
+ * Send message to the Videographer.
+ */
+export async function notifyVideographer(text) {
+  if (!VIDEOGRAPHER_CHAT_ID) {
+    console.log(`[TELEGRAM] Videographer Chat ID not configured. Videographer alert: ${text}`);
+    return null;
+  }
+  const footer = `\n\n🔗 Open Dashboard: ${WEBSITE_URL}/dashboard`;
+  return sendMessage(VIDEOGRAPHER_CHAT_ID, text + footer);
+}
 
-  const inlineKeyboard = {
-    inline_keyboard: [
-      [
-        {
-          text: '✅ Approve Cycle',
-          callback_data: `approve_cycle:${cycle.id}`
-        }
-      ]
-    ]
-  };
-
-  return notifyAdmin(text, inlineKeyboard);
+/**
+ * Notify assignee by their user role.
+ */
+export async function notifyAssignee(role, text) {
+  if (role === 'ops_video_editor') {
+    return notifyVideographer(text);
+  } else if (role === 'ops_social_media_manager') {
+    return notifySMM(text);
+  } else if (role === 'admin' || role === 'super_admin') {
+    return notifyAdmin(text);
+  }
+  return null;
 }
 
 /**
@@ -96,3 +111,4 @@ export async function sendArtistGigConfirmation(telegramChatId, artistName, gigD
 
   return sendMessage(telegramChatId, text);
 }
+

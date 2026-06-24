@@ -9,13 +9,45 @@ import {
 
 export default function Dashboard({ auth, setAuth, showToast }) {
   const navigate = useNavigate();
+  
+  const formatDateStr = (dateStr) => {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [year, month, day] = parts;
+    const monthName = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ][parseInt(month) - 1];
+    return `${parseInt(day)} ${monthName} ${year}`;
+  };
+
+  const formatMonthStr = (monthStr) => {
+    if (!monthStr) return '-';
+    const parts = monthStr.split('-');
+    if (parts.length !== 2) return monthStr;
+    const [year, month] = parts;
+    const monthName = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ][parseInt(month) - 1];
+    return `${monthName} ${year}`;
+  };
+
+  const isOverdue = (task) => {
+    if (!task.due_date || task.status === 'delivered' || task.status === 'cancelled') return false;
+    const todayStr = new Date().toISOString().split('T')[0];
+    return task.due_date < todayStr;
+  };
+
   const userRole = auth?.role || 'ops_video_editor';
   const isAdmin = ['admin', 'super_admin'].includes(userRole);
   const isSuperAdmin = userRole === 'super_admin';
   const isSMM = userRole === 'ops_social_media_manager';
+  const isVideoEditor = userRole === 'ops_video_editor';
   
   // Tab states
-  const [activeTab, setActiveTab] = useState(isAdmin ? 'tasks' : (isSMM ? 'scripts' : 'tasks'));
+  const [activeTab, setActiveTab] = useState('tasks');
   
   // Data states
   const [tasks, setTasks] = useState([]);
@@ -33,6 +65,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [marketingContent, setMarketingContent] = useState([]);
   const [adCampaigns, setAdCampaigns] = useState([]);
   const [monthlyReports, setMonthlyReports] = useState([]);
+  const [marketingScripts, setMarketingScripts] = useState([]);
+  const [staffUsers, setStaffUsers] = useState([]);
 
   // Chat state
   const [selectedChatClient, setSelectedChatClient] = useState(null);
@@ -54,6 +88,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDateStr, setSelectedDateStr] = useState(localTodayStr);
   const [calendarClientFilter, setCalendarClientFilter] = useState('');
+  const [calendarMarketingContent, setCalendarMarketingContent] = useState([]);
 
   // Modals state
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -71,11 +106,26 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: ''
   });
 
+  const [showFreelancerModal, setShowFreelancerModal] = useState(false);
+  const [editingFreelancer, setEditingFreelancer] = useState(null);
+  const [freelancerFormData, setFreelancerFormData] = useState({
+    name: '', email: '', phone: '', company_name: '', specialization: '', rate_per_video: ''
+  });
+
+  const [showVenueModal, setShowVenueModal] = useState(false);
+  const [editingVenue, setEditingVenue] = useState(null);
+  const [venueFormData, setVenueFormData] = useState({
+    name: '', address: '', city: '', map_link: '', poc_name: '', poc_phone: '', poc_email: '', social_links: '', gig_confirmed_message: '', client_id: ''
+  });
+
   const [showArtistModal, setShowArtistModal] = useState(false);
   const [editingArtist, setEditingArtist] = useState(null);
   const [artistFormData, setArtistFormData] = useState({
-    name: '', category: '', city: '', phone: '', email: '', telegram_chat_id: '', bank_details: ''
+    name: '', category: '', city: '', phone: '', email: '', telegram_chat_id: '', bank_details: '',
+    instruments: '', insta_link: '', description: '', rating: '', notes: ''
   });
+
+  const [editingGig, setEditingGig] = useState(null);
 
   const [showContentModal, setShowContentModal] = useState(false);
   const [editingContent, setEditingContent] = useState(null);
@@ -85,6 +135,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     post_type: 'Reel',
     title: '',
     script: '',
+    script_id: '',
     status: 'Draft',
     link: '',
     time: '',
@@ -130,10 +181,17 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [scriptMonth, setScriptMonth] = useState(new Date().toISOString().substring(0, 7));
   const [scriptDrafts, setScriptDrafts] = useState({});
   const [scriptStatusDrafts, setScriptStatusDrafts] = useState({});
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [editingScript, setEditingScript] = useState(null);
+  const [reelsExpanded, setReelsExpanded] = useState(true);
+  const [longFormatExpanded, setLongFormatExpanded] = useState(true);
+  const [scriptFormData, setScriptFormData] = useState({
+    title: '', script_text: '', month: new Date().toISOString().substring(0, 7), reference_video_link: '', reaction_video_link: '', format: 'reel'
+  });
 
   const [showGigModal, setShowGigModal] = useState(false);
   const [gigFormData, setGigFormData] = useState({
-    client_id: '', artist_id: '', venue_id: '', planning_cycle_id: '', gig_date: '', fee_inr: 0, status: 'Pending'
+    client_id: '', artist_id: '', venue_id: '', planning_cycle_id: '', gig_date: '', fee_inr: 0, advance_paid: 0, status: 'Pending'
   });
 
   // Decrypted bank details caching
@@ -149,6 +207,36 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const clientsRef = useRef(clients);
   clientsRef.current = clients;
 
+  const chatContainerRef = useRef(null);
+
+  // Auto-scroll only the chat messages container (not the page)
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  // Auto-refresh fetch wrapper: handles expired JWT tokens transparently
+  const authFetch = async (url, options = {}) => {
+    let res = await fetch(url, options);
+    if (res.status === 401) {
+      // Try to refresh the access token
+      const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
+      if (refreshRes.ok) {
+        // Retry the original request with the new cookie
+        res = await fetch(url, options);
+      } else {
+        // Refresh failed — session is truly expired
+        localStorage.removeItem('user');
+        setAuth(null);
+        navigate('/login');
+        throw new Error('Session expired. Please log in again.');
+      }
+    }
+    return res;
+  };
+
+
   // 1. Initial Data Fetch Hook
   useEffect(() => {
     if (!auth) {
@@ -157,9 +245,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
     
     fetchTasks();
-    if (isAdmin || isSMM) {
-      fetchClients();
-    }
+    fetchStaffUsers();
+    fetchClients();
     if (isAdmin) {
       fetchFreelancers();
       fetchAuditLogs();
@@ -190,6 +277,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       if (selectedClientForReportsRef.current) {
         fetchMarketingData(selectedClientForReportsRef.current.id);
       }
+      fetchCalendarMarketingContent();
     });
 
     es.addEventListener('client_feedback', (e) => {
@@ -211,10 +299,17 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     return () => es.close();
   }, [auth]);
 
+  // Hook to fetch calendar marketing content
+  useEffect(() => {
+    if (activeTab === 'calendar' && clients.length > 0) {
+      fetchCalendarMarketingContent();
+    }
+  }, [activeTab, calendarClientFilter, clients]);
+
   // Core Data Fetching
   const fetchTasks = async () => {
     try {
-      const res = await fetch('/api/tasks');
+      const res = await authFetch('/api/tasks');
       const data = await res.json();
       if (res.ok) setTasks(data.tasks || []);
     } catch (err) {
@@ -224,17 +319,20 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchClients = async () => {
     try {
-      const res = await fetch('/api/clients');
+      const res = await authFetch('/api/clients');
       const data = await res.json();
       if (res.ok) {
         setClients(data.clients || []);
         if (data.clients?.length > 0) {
-          if (!selectedClientForReports) {
-            setSelectedClientForReports(data.clients[0]);
-            fetchMarketingData(data.clients[0].id);
-          }
-          if (!selectedScriptClient) {
-            setSelectedScriptClient(data.clients[0]);
+          // Video editors don't need marketing reports/scripts data
+          if (!isVideoEditor) {
+            if (!selectedClientForReports) {
+              setSelectedClientForReports(data.clients[0]);
+              fetchMarketingData(data.clients[0].id);
+            }
+            if (!selectedScriptClient) {
+              setSelectedScriptClient(data.clients[0]);
+            }
           }
           if (!selectedChatClient) {
             setSelectedChatClient(data.clients[0]);
@@ -249,7 +347,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchChats = async (clientId) => {
     try {
-      const res = await fetch(`/api/clients/${clientId}/chats`);
+      const res = await authFetch(`/api/clients/${clientId}/chats`);
       const data = await res.json();
       if (res.ok) setChatMessages(data.chats || []);
     } catch (err) {
@@ -262,7 +360,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (!newChatMessage.trim() || !selectedChatClient) return;
 
     try {
-      const res = await fetch(`/api/clients/${selectedChatClient.id}/chats`, {
+      const res = await authFetch(`/api/clients/${selectedChatClient.id}/chats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: newChatMessage })
@@ -281,7 +379,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchFreelancers = async () => {
     try {
-      const res = await fetch('/api/freelancers');
+      const res = await authFetch('/api/freelancers');
       const data = await res.json();
       if (res.ok) setFreelancers(data.freelancers || []);
     } catch (err) {
@@ -289,9 +387,19 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
+  const fetchStaffUsers = async () => {
+    try {
+      const res = await authFetch('/api/auth/users');
+      const data = await res.json();
+      if (res.ok) setStaffUsers(data.users || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchAuditLogs = async () => {
     try {
-      const res = await fetch('/api/audit-logs');
+      const res = await authFetch('/api/audit-logs');
       const data = await res.json();
       if (res.ok) setAuditLogs(data.logs || []);
     } catch (err) {
@@ -301,29 +409,25 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchCurationData = async () => {
     try {
-      // Planning cycles
-      const cycleRes = await fetch('/api/artists/planning-cycles');
+      const cycleRes = await authFetch('/api/artists/planning-cycles');
       if (cycleRes.ok) {
         const cycleData = await cycleRes.json();
         setPlanningCycles(cycleData.planning_cycles || []);
       }
       
-      // Artists
-      const artistRes = await fetch('/api/artists');
+      const artistRes = await authFetch('/api/artists');
       if (artistRes.ok) {
         const artistData = await artistRes.json();
         setArtists(artistData.artists || []);
       }
 
-      // Venues
-      const venueRes = await fetch('/api/artists/venues');
+      const venueRes = await authFetch('/api/artists/venues');
       if (venueRes.ok) {
         const venueData = await venueRes.json();
         setVenues(venueData.venues || []);
       }
 
-      // Gigs
-      const gigRes = await fetch('/api/artists/gigs');
+      const gigRes = await authFetch('/api/artists/gigs');
       if (gigRes.ok) {
         const gigData = await gigRes.json();
         setGigs(gigData.gigs || []);
@@ -335,7 +439,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchReviewQueue = async () => {
     try {
-      const res = await fetch('/api/clients/marketing/review-queue');
+      const res = await authFetch('/api/clients/marketing/review-queue');
       const data = await res.json();
       if (res.ok) setReviewQueue(data.content || []);
     } catch (err) {
@@ -345,23 +449,68 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchMarketingData = async (clientId) => {
     try {
-      const cRes = await fetch(`/api/clients/${clientId}/marketing/content`);
+      const cRes = await authFetch(`/api/clients/${clientId}/marketing/content`);
       if (cRes.ok) {
         const cData = await cRes.json();
         setMarketingContent(cData.content || []);
       }
-      const adRes = await fetch(`/api/clients/${clientId}/marketing/ads`);
-      if (adRes.ok) {
-        const adData = await adRes.json();
-        setAdCampaigns(adData.ads || []);
-      }
-      const rRes = await fetch(`/api/clients/${clientId}/marketing/monthly`);
-      if (rRes.ok) {
-        const rData = await rRes.json();
-        setMonthlyReports(rData.reports || []);
+      // Video editors only have access to content — skip ads, monthly, scripts
+      if (!isVideoEditor) {
+        const adRes = await authFetch(`/api/clients/${clientId}/marketing/ads`);
+        if (adRes.ok) {
+          const adData = await adRes.json();
+          setAdCampaigns(adData.ads || []);
+        }
+        const rRes = await authFetch(`/api/clients/${clientId}/marketing/monthly`);
+        if (rRes.ok) {
+          const rData = await rRes.json();
+          setMonthlyReports(rData.reports || []);
+        }
+        const sRes = await authFetch(`/api/clients/${clientId}/marketing/scripts`);
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          setMarketingScripts(sData.scripts || []);
+        }
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchCalendarMarketingContent = async () => {
+    try {
+      if (calendarClientFilter) {
+        const res = await authFetch(`/api/clients/${calendarClientFilter}/marketing/content`);
+        const data = await res.json();
+        if (res.ok) {
+          const client = clients.find(c => c.id === parseInt(calendarClientFilter));
+          const normalized = (data.content || []).map(item => ({
+            ...item,
+            clientName: client ? client.name : 'Client'
+          }));
+          setCalendarMarketingContent(normalized);
+        }
+      } else {
+        const promises = clients.map(async (c) => {
+          try {
+            const res = await authFetch(`/api/clients/${c.id}/marketing/content`);
+            if (res.ok) {
+              const data = await res.json();
+              return (data.content || []).map(item => ({
+                ...item,
+                clientName: c.name
+              }));
+            }
+          } catch (e) {
+            console.error(`Error fetching calendar content for client ${c.id}:`, e);
+          }
+          return [];
+        });
+        const results = await Promise.all(promises);
+        setCalendarMarketingContent(results.flat());
+      }
+    } catch (err) {
+      console.error('Error fetching calendar marketing content:', err);
     }
   };
 
@@ -436,6 +585,25 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       }
       showToast('Status updated successfully', 'success');
       fetchTasks();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const updateContentStatus = async (itemId, newStatus) => {
+    try {
+      const res = await fetch(`/api/clients/${selectedClientForReports.id}/marketing/content/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update status');
+      }
+      showToast('Status updated successfully', 'success');
+      fetchMarketingData(selectedClientForReports.id);
+      fetchCalendarMarketingContent();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -549,6 +717,124 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
+  // --- FREELANCER CRUD ---
+  const handleFreelancerSubmit = async (e) => {
+    e.preventDefault();
+    const url = editingFreelancer ? `/api/freelancers/${editingFreelancer.id}` : '/api/freelancers';
+    const method = editingFreelancer ? 'PATCH' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...freelancerFormData,
+          rate_per_video: freelancerFormData.rate_per_video ? parseFloat(freelancerFormData.rate_per_video) : null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit freelancer data');
+
+      showToast(`Freelancer ${editingFreelancer ? 'updated' : 'added'} successfully`, 'success');
+      setShowFreelancerModal(false);
+      fetchFreelancers();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const openFreelancerModal = (freelancer = null) => {
+    if (freelancer) {
+      setEditingFreelancer(freelancer);
+      setFreelancerFormData({
+        name: freelancer.name,
+        email: freelancer.email || '',
+        phone: freelancer.phone || '',
+        company_name: freelancer.company_name || '',
+        specialization: freelancer.specialization || '',
+        rate_per_video: freelancer.rate_per_video !== null && freelancer.rate_per_video !== undefined ? String(freelancer.rate_per_video) : ''
+      });
+    } else {
+      setEditingFreelancer(null);
+      setFreelancerFormData({
+        name: '', email: '', phone: '', company_name: '', specialization: '', rate_per_video: ''
+      });
+    }
+    setShowFreelancerModal(true);
+  };
+
+  const toggleFreelancerStatus = async (freelancer) => {
+    const newStatus = freelancer.is_active === 1 ? 0 : 1;
+    const actionStr = newStatus === 1 ? 'activate' : 'deactivate';
+    if (!window.confirm(`Are you sure you want to ${actionStr} this freelancer?`)) return;
+
+    try {
+      const res = await fetch(`/api/freelancers/${freelancer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: newStatus })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update status');
+      }
+      showToast(`Freelancer ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`, 'success');
+      fetchFreelancers();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  // --- VENUE CRUD ---
+  const handleVenueSubmit = async (e) => {
+    e.preventDefault();
+    const url = editingVenue ? `/api/artists/venues/${editingVenue.id}` : '/api/artists/venues';
+    const method = editingVenue ? 'PATCH' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...venueFormData,
+          client_id: venueFormData.client_id ? parseInt(venueFormData.client_id) : null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit venue data');
+
+      showToast(`Venue ${editingVenue ? 'updated' : 'added'} successfully`, 'success');
+      setShowVenueModal(false);
+      fetchCurationData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const openVenueModal = (venue = null) => {
+    if (venue) {
+      setEditingVenue(venue);
+      setVenueFormData({
+        name: venue.name,
+        address: venue.address || '',
+        city: venue.city || '',
+        map_link: venue.map_link || '',
+        poc_name: venue.poc_name || '',
+        poc_phone: venue.poc_phone || '',
+        poc_email: venue.poc_email || '',
+        social_links: venue.social_links || '',
+        gig_confirmed_message: venue.gig_confirmed_message || '',
+        client_id: venue.client_id || ''
+      });
+    } else {
+      setEditingVenue(null);
+      setVenueFormData({
+        name: '', address: '', city: '', map_link: '', poc_name: '', poc_phone: '', poc_email: '', social_links: '', gig_confirmed_message: '', client_id: ''
+      });
+    }
+    setShowVenueModal(true);
+  };
+
   const handleArtistSubmit = async (e) => {
     e.preventDefault();
     const url = editingArtist ? `/api/artists/${editingArtist.id}` : '/api/artists';
@@ -558,7 +844,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(artistFormData)
+        body: JSON.stringify({
+          ...artistFormData,
+          rating: artistFormData.rating ? parseInt(artistFormData.rating) : null
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -581,15 +870,78 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         phone: artist.phone || '',
         email: artist.email || '',
         telegram_chat_id: artist.telegram_chat_id || '',
-        bank_details: '' // Leave blank unless updating
+        bank_details: '', // Leave blank unless updating
+        instruments: artist.instruments || '',
+        insta_link: artist.insta_link || '',
+        description: artist.description || '',
+        rating: artist.rating !== null && artist.rating !== undefined ? String(artist.rating) : '',
+        notes: artist.notes || ''
       });
     } else {
       setEditingArtist(null);
       setArtistFormData({
-        name: '', category: '', city: '', phone: '', email: '', telegram_chat_id: '', bank_details: ''
+        name: '', category: '', city: '', phone: '', email: '', telegram_chat_id: '', bank_details: '',
+        instruments: '', insta_link: '', description: '', rating: '', notes: ''
       });
     }
     setShowArtistModal(true);
+  };
+
+  const openGigModal = (gig = null) => {
+    if (gig) {
+      setEditingGig(gig);
+      setGigFormData({
+        artist_id: gig.artist_id || '',
+        venue_id: gig.venue_id || '',
+        planning_cycle_id: gig.planning_cycle_id || '',
+        gig_date: gig.gig_date || '',
+        fee_inr: gig.fee_inr !== null && gig.fee_inr !== undefined ? String(gig.fee_inr) : '0',
+        advance_paid: gig.advance_paid !== null && gig.advance_paid !== undefined ? String(gig.advance_paid) : '0',
+        status: gig.status || 'Pending'
+      });
+    } else {
+      setEditingGig(null);
+      setGigFormData({
+        artist_id: artists.length > 0 ? String(artists[0].id) : '',
+        venue_id: venues.length > 0 ? String(venues[0].id) : '',
+        planning_cycle_id: planningCycles.length > 0 ? String(planningCycles[0].id) : '',
+        gig_date: new Date().toISOString().split('T')[0],
+        fee_inr: '0',
+        advance_paid: '0',
+        status: 'Pending'
+      });
+    }
+    setShowGigModal(true);
+  };
+
+  const handleGigSubmit = async (e) => {
+    e.preventDefault();
+    const url = editingGig ? `/api/artists/gigs/${editingGig.id}` : '/api/artists/gigs';
+    const method = editingGig ? 'PATCH' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artist_id: parseInt(gigFormData.artist_id),
+          venue_id: gigFormData.venue_id ? parseInt(gigFormData.venue_id) : null,
+          planning_cycle_id: gigFormData.planning_cycle_id ? parseInt(gigFormData.planning_cycle_id) : null,
+          gig_date: gigFormData.gig_date,
+          fee_inr: gigFormData.fee_inr ? parseFloat(gigFormData.fee_inr) : 0,
+          advance_paid: gigFormData.advance_paid ? parseFloat(gigFormData.advance_paid) : 0,
+          status: gigFormData.status
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit gig data');
+
+      showToast(`Gig ${editingGig ? 'updated' : 'added'} successfully`, 'success');
+      setShowGigModal(false);
+      fetchCurationData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   const finalizePlanningCycle = async (cycleId) => {
@@ -623,15 +975,21 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   };
 
   // --- CONTENT TRACKER MANUAL CRUD ---
-  const openContentModal = (content = null) => {
+  const openContentModal = (content = null, defaultDate = null) => {
     if (content) {
       setEditingContent(content);
+      const client = clients.find(c => c.id === content.client_id);
+      if (client) {
+        setSelectedClientForReports(client);
+        fetchMarketingData(client.id);
+      }
       setContentFormData({
         platform: content.platform || 'instagram',
         date: content.date || '',
         post_type: content.post_type || 'Reel',
         title: content.title || '',
         script: content.script || '',
+        script_id: content.script_id || '',
         status: content.status || 'Draft',
         link: content.link || '',
         time: content.time || '',
@@ -651,12 +1009,20 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       });
     } else {
       setEditingContent(null);
+      if (calendarClientFilter) {
+        const client = clients.find(c => c.id === parseInt(calendarClientFilter));
+        if (client) {
+          setSelectedClientForReports(client);
+          fetchMarketingData(client.id);
+        }
+      }
       setContentFormData({
         platform: 'instagram',
-        date: new Date().toISOString().split('T')[0],
+        date: defaultDate || new Date().toISOString().split('T')[0],
         post_type: 'Reel',
         title: '',
         script: '',
+        script_id: '',
         status: 'Draft',
         link: '',
         time: '',
@@ -693,6 +1059,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       post_type: contentFormData.post_type || null,
       title: contentFormData.title || null,
       script: contentFormData.script || null,
+      script_id: contentFormData.script_id || null,
       status: contentFormData.status || 'Draft',
       link: contentFormData.link || null,
       time: contentFormData.time || null,
@@ -723,6 +1090,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       showToast(`Content row ${editingContent ? 'updated' : 'added'} successfully`, 'success');
       setShowContentModal(false);
       fetchMarketingData(selectedClientForReports.id);
+      fetchCalendarMarketingContent();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -830,30 +1198,65 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
-  const handleUpdateScript = async (itemId, newScript, newStatus) => {
+  const handleUpdateScript = async (scriptId, updatedFields) => {
     if (!selectedScriptClient) return;
 
     try {
-      const res = await fetch(`/api/clients/${selectedScriptClient.id}/marketing/content/${itemId}`, {
+      const res = await fetch(`/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: newScript, status: newStatus })
+        body: JSON.stringify(updatedFields)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update script');
 
-      showToast('Script and status updated successfully', 'success');
-      // Clean drafts for this item so we read fresh from backend
-      setScriptDrafts(prev => {
-        const copy = { ...prev };
-        delete copy[itemId];
-        return copy;
+      showToast('Script updated successfully', 'success');
+      fetchMarketingData(selectedScriptClient.id);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleSaveScript = async (e) => {
+    e.preventDefault();
+    if (!selectedScriptClient) return;
+
+    const url = editingScript 
+      ? `/api/clients/${selectedScriptClient.id}/marketing/scripts/${editingScript.id}` 
+      : `/api/clients/${selectedScriptClient.id}/marketing/scripts`;
+    const method = editingScript ? 'PATCH' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scriptFormData)
       });
-      setScriptStatusDrafts(prev => {
-        const copy = { ...prev };
-        delete copy[itemId];
-        return copy;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save script');
+
+      showToast(editingScript ? 'Script updated successfully' : 'Script created successfully', 'success');
+      setShowScriptModal(false);
+      setEditingScript(null);
+      setScriptFormData({ title: '', script_text: '', month: scriptMonth, reference_video_link: '', reaction_video_link: '', format: 'reel' });
+      fetchMarketingData(selectedScriptClient.id);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteScript = async (scriptId) => {
+    if (!selectedScriptClient) return;
+    if (!window.confirm('Are you sure you want to delete this script?')) return;
+
+    try {
+      const res = await fetch(`/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
+        method: 'DELETE'
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete script');
+
+      showToast('Script deleted successfully', 'success');
       fetchMarketingData(selectedScriptClient.id);
     } catch (err) {
       showToast(err.message, 'error');
@@ -876,7 +1279,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   });
 
   // Render Kanban Columns helper
-  const columns = ['backlog', 'todo', 'in_progress', 'review', 'revision', 'approved', 'delivered'];
+  const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
   const getTasksByStatus = (status) => {
     return filteredTasks.filter(t => t.status === status);
   };
@@ -964,6 +1367,21 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         }
       });
       
+      // Marketing Content
+      calendarMarketingContent.forEach(item => {
+        if (item.date === dateStr) {
+          if (!calendarClientFilter || item.client_id === parseInt(calendarClientFilter)) {
+            dateEvents.push({
+              type: 'content',
+              title: `[${item.post_type}] ${item.title || 'Untitled'}`,
+              clientName: item.clientName || 'Client',
+              status: item.status,
+              originalItem: item
+            });
+          }
+        }
+      });
+      
       cells.push({
         dayNum: i,
         dateStr,
@@ -1016,6 +1434,20 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             clientName: g.client_name,
             status: g.status,
             originalItem: g
+          });
+        }
+      }
+    });
+
+    calendarMarketingContent.forEach(item => {
+      if (item.date === selectedDateStr) {
+        if (!calendarClientFilter || item.client_id === parseInt(calendarClientFilter)) {
+          selectedEvents.push({
+            type: 'content',
+            title: `[${item.post_type}] ${item.title || 'Untitled'}`,
+            clientName: item.clientName || 'Client',
+            status: item.status,
+            originalItem: item
           });
         }
       }
@@ -1142,13 +1574,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 
                 {/* Right Top Bento: Chat */}
-                <div className="glass" style={{ display: 'flex', flexDirection: 'column', height: '400px' }}>
+                <div className="glass" style={{ display: 'flex', flexDirection: 'column', height: '600px' }}>
                   <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '12px' }}>
                     Internal Chat — {selectedChatClient.name}
                   </h3>
                   
                   {/* Messages container */}
-                  <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: '#f4f4f5', borderRadius: '8px', border: '2px solid #000', marginBottom: '12px' }}>
+                  <div ref={chatContainerRef} style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: '#f4f4f5', borderRadius: '8px', border: '2px solid #000', marginBottom: '12px' }}>
                     {chatMessages.length === 0 ? (
                       <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '100px' }}>
                         No internal chat messages yet. Start the conversation!
@@ -1180,6 +1612,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         );
                       })
                     )}
+
                   </div>
 
                   {/* Message Input form */}
@@ -1210,17 +1643,18 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                       <thead>
                         <tr>
                           <th>Task / Job</th>
+                          <th>Type</th>
                           <th>Priority</th>
                           <th>Due Date</th>
-                          <th>Freelancer</th>
+                          {!isVideoEditor && <th>Assignee</th>}
                           <th>Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {tasks.filter(t => t.client_id === selectedChatClient.id).length === 0 ? (
                           <tr>
-                            <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                              No tasks assigned to this client.
+                            <td colSpan={isVideoEditor ? 5 : 6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                              {isVideoEditor ? 'No video tasks assigned to you for this client.' : 'No tasks assigned to this client.'}
                             </td>
                           </tr>
                         ) : (
@@ -1228,42 +1662,49 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             <tr key={task.id}>
                               <td style={{ fontWeight: 'bold' }}>{task.title}</td>
                               <td>
+                                <span className="badge badge-muted" style={{ fontSize: '0.7rem' }}>{task.task_type}</span>
+                              </td>
+                              <td>
                                 <span className={`badge badge-${task.priority === 'urgent' || task.priority === 'high' ? 'danger' : 'warning'}`}>
                                   {task.priority}
                                 </span>
                               </td>
-                              <td>{task.due_date || 'No due date'}</td>
-                              <td>
-                                <select
-                                  className="form-control"
-                                  value={task.assigned_to || ''}
-                                  onChange={async (e) => {
-                                    const val = e.target.value ? parseInt(e.target.value) : null;
-                                    try {
-                                      const res = await fetch(`/api/tasks/${task.id}`, {
-                                        method: 'PATCH',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ assigned_to: val })
-                                      });
-                                      if (res.ok) {
-                                        showToast('Freelancer assigned successfully', 'success');
-                                        fetchTasks();
-                                      } else {
-                                        const data = await res.json();
-                                        throw new Error(data.error);
-                                      }
-                                    } catch (err) {
-                                      showToast(err.message, 'error');
-                                    }
-                                  }}
-                                  style={{ padding: '6px', fontSize: '0.8rem' }}
-                                >
-                                  <option value="">Unassigned</option>
-                                  {freelancers.map(f => (
-                                    <option key={f.id} value={f.id}>{f.name} ({f.specialization})</option>
-                                  ))}
-                                </select>
+                              <td style={{ color: isOverdue(task) ? 'var(--danger)' : 'inherit', fontWeight: isOverdue(task) ? 'bold' : 'normal' }}>
+                                {task.due_date ? formatDateStr(task.due_date) : 'No due date'} {isOverdue(task) && '⚠️'}
                               </td>
+                              {!isVideoEditor && (
+                                <td>
+                                  <select
+                                    className="form-control"
+                                    value={task.assigned_to || ''}
+                                    onChange={async (e) => {
+                                      const val = e.target.value ? parseInt(e.target.value) : null;
+                                      try {
+                                        const res = await fetch(`/api/tasks/${task.id}`, {
+                                          method: 'PATCH',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ assigned_to: val })
+                                        });
+                                        if (res.ok) {
+                                          showToast('Freelancer assigned successfully', 'success');
+                                          fetchTasks();
+                                        } else {
+                                          const data = await res.json();
+                                          throw new Error(data.error);
+                                        }
+                                      } catch (err) {
+                                        showToast(err.message, 'error');
+                                      }
+                                    }}
+                                    style={{ padding: '6px', fontSize: '0.8rem' }}
+                                  >
+                                    <option value="">Unassigned</option>
+                                    {staffUsers.map(u => (
+                                      <option key={u.id} value={u.id}>{u.name} ({u.role.replace('ops_', '').replace('_', ' ')})</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              )}
                               <td>
                                 <select
                                   className="form-control"
@@ -1340,12 +1781,19 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
                     <div className="kanban-cards">
                       {columnTasks.map(task => (
-                        <div key={task.id} className="kanban-card" onClick={() => isAdmin && openTaskModal(task)}>
+                        <div key={task.id} className={`kanban-card ${isOverdue(task) ? 'kanban-card-overdue' : ''}`} onClick={() => isAdmin && openTaskModal(task)}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>{task.task_type}</span>
-                            <span className={`badge badge-${task.priority === 'urgent' || task.priority === 'high' ? 'danger' : 'warning'}`} style={{ fontSize: '0.65rem' }}>
-                              {task.priority}
-                            </span>
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                              {isOverdue(task) && (
+                                <span className="badge" style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444', display: 'flex', alignItems: 'center', gap: '2px', padding: '4px 8px' }}>
+                                  <AlertTriangle size={10} /> OVERDUE
+                                </span>
+                              )}
+                              <span className={`badge badge-${task.priority === 'urgent' || task.priority === 'high' ? 'danger' : 'warning'}`} style={{ fontSize: '0.65rem' }}>
+                                {task.priority}
+                              </span>
+                            </div>
                           </div>
                           <div className="kanban-card-title">{task.title}</div>
                           {task.client_name && (
@@ -1354,8 +1802,18 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             </div>
                           )}
                           {task.due_date && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                              Due: {task.due_date}
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              color: isOverdue(task) ? 'var(--danger)' : 'var(--text-muted)', 
+                              fontWeight: isOverdue(task) ? 'bold' : 'normal',
+                              marginTop: '2px' 
+                            }}>
+                              Due: {formatDateStr(task.due_date)} {isOverdue(task) && '⚠️'}
+                            </div>
+                          )}
+                          {task.freelancer_name && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 'bold' }}>
+                              Assigned: {task.freelancer_name}
                             </div>
                           )}
 
@@ -1418,7 +1876,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             <div className="workspace-layout" style={{ gridTemplateColumns: '1fr 320px' }}>
               {/* Calendar Grid */}
               <div className="glass" style={{ padding: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', fontWeight: 'bold', marginBottom: '12px', borderBottom: '2px solid #000', paddingBottom: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '6px', textAlign: 'center', fontWeight: 'bold', marginBottom: '12px', borderBottom: '2px solid #000', paddingBottom: '8px' }}>
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                     <div key={day} style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{day}</div>
                   ))}
@@ -1442,7 +1900,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                           {cell.events.slice(0, 2).map((ev, eIdx) => (
                             <div
                               key={eIdx}
-                              className={`calendar-event-tag ${ev.type === 'task' ? 'calendar-event-task' : 'calendar-event-gig'}`}
+                              className={`calendar-event-tag ${
+                                ev.type === 'task' ? 'calendar-event-task' : 
+                                ev.type === 'gig' ? 'calendar-event-gig' : 'calendar-event-content'
+                              }`}
                               title={ev.title}
                             >
                               {ev.title}
@@ -1462,14 +1923,25 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
               {/* Day Details panel */}
               <div className="glass" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: 0 }}>
-                  Agenda: {selectedDateStr ? new Date(selectedDateStr).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'Select a date'}
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: 0 }}>
+                  <h3 style={{ margin: 0 }}>
+                    Agenda: {selectedDateStr ? formatDateStr(selectedDateStr) : 'Select a date'}
+                  </h3>
+                  {(isAdmin || isSMM) && calendarClientFilter && selectedDateStr && (
+                    <button
+                      onClick={() => openContentModal(null, selectedDateStr)}
+                      className="btn btn-primary"
+                      style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Plus size={12} /> Content
+                    </button>
+                  )}
+                </div>
 
                 <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {getSelectedDateEvents().length === 0 ? (
                     <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '60px', fontSize: '0.9rem' }}>
-                      No tasks or gigs scheduled for this day.
+                      No tasks, gigs, or content scheduled for this day.
                     </div>
                   ) : (
                     getSelectedDateEvents().map((ev, eIdx) => (
@@ -1485,7 +1957,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span className={`badge ${ev.type === 'task' ? 'badge-info' : 'badge-warning'}`}>
+                          <span className={`badge ${
+                            ev.type === 'task' ? 'badge-info' : 
+                            ev.type === 'gig' ? 'badge-warning' : 'badge-success'
+                          }`}>
                             {ev.type.toUpperCase()}
                           </span>
                           {ev.priority && (
@@ -1500,9 +1975,22 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             Client: {ev.clientName}
                           </div>
                         )}
-                         {ev.status && (
+                        {ev.status && (
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             Status: <span style={{ textTransform: 'capitalize' }}>{ev.status === 'todo' ? 'To - Do - Today' : ev.status.replace('_', ' ')}</span>
+                          </div>
+                        )}
+                        {ev.type === 'content' && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            {ev.originalItem.script_title ? (
+                              <div>Linked Script: <strong style={{ color: 'var(--accent)' }}>{ev.originalItem.script_title}</strong></div>
+                            ) : (
+                              ['Reel', 'Youtube', 'Short'].includes(ev.originalItem.post_type) && (
+                                <div style={{ color: 'var(--text-danger)', fontWeight: 'bold' }}>
+                                  ⚠️ No script linked!
+                                </div>
+                              )
+                            )}
                           </div>
                         )}
                         {ev.type === 'task' && isAdmin && (
@@ -1514,12 +2002,20 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             Edit Task
                           </button>
                         )}
+                        {ev.type === 'content' && (isAdmin || isSMM) && (
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '4px 8px', fontSize: '0.7rem', marginTop: '8px', width: '100%' }}
+                            onClick={() => openContentModal(ev.originalItem)}
+                          >
+                            Edit Content Row
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -1550,7 +2046,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     <th>Type</th>
                     <th>Contact Info</th>
                     <th>API Integration</th>
-                    <th>Portal Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -1576,45 +2071,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span className={`badge ${client.portal_enabled ? 'badge-success' : 'badge-muted'}`}>
-                              {client.portal_enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={client.portal_enabled === 1}
-                              onChange={(e) => togglePortal(client, e.target.checked)}
-                            />
-                          </div>
-                          
-                          {client.portal_token && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>URL: /portal/{client.portal_token.substring(0, 8)}...</span>
-                              <button 
-                                className="btn btn-secondary" 
-                                style={{ padding: '2px 4px', fontSize: '0.65rem' }}
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/portal/${client.portal_token}`);
-                                  showToast('Copied portal URL to clipboard!', 'success');
-                                }}
-                              >
-                                Copy
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button onClick={() => openClientModal(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
                             Edit
-                          </button>
-                          <button onClick={() => generatePortalToken(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                            Token
-                          </button>
-                          <button onClick={() => setPortalPin(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                            PIN
                           </button>
                         </div>
                       </td>
@@ -1629,8 +2088,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* FREELANCERS TAB (Admin Only) */}
         {activeTab === 'freelancers' && isAdmin && (
           <div style={{ textAlign: 'left' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3>Freelancer Roster</h3>
+              <button onClick={() => openFreelancerModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} /> Add Freelancer
+              </button>
             </div>
             <div className="table-container">
               <table>
@@ -1639,18 +2101,47 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Company</th>
                     <th>Specialization</th>
                     <th>Rate/Video</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {freelancers.map(free => (
-                    <tr key={free.id}>
+                    <tr key={free.id} style={{ opacity: free.is_active === 1 ? 1 : 0.6 }}>
                       <td style={{ fontWeight: 'bold' }}>{free.name}</td>
-                      <td>{free.email}</td>
-                      <td>{free.phone}</td>
-                      <td>{free.specialization}</td>
-                      <td>₹{free.rate_per_video?.toLocaleString()}</td>
+                      <td>{free.email || '-'}</td>
+                      <td>{free.phone || '-'}</td>
+                      <td>{free.company_name || '-'}</td>
+                      <td>
+                        {free.specialization ? (
+                          <span className="badge badge-muted" style={{ fontSize: '0.75rem' }}>
+                            {free.specialization}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td>{free.rate_per_video !== null && free.rate_per_video !== undefined ? `₹${free.rate_per_video.toLocaleString()}` : '-'}</td>
+                      <td>
+                        <span className={`badge badge-${free.is_active === 1 ? 'success' : 'danger'}`}>
+                          {free.is_active === 1 ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => openFreelancerModal(free)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => toggleFreelancerStatus(free)} 
+                            className={`btn btn-${free.is_active === 1 ? 'secondary' : 'primary'}`} 
+                            style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                          >
+                            {free.is_active === 1 ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1662,7 +2153,27 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* SCRIPT TRACKER TAB */}
         {activeTab === 'scripts' && (isAdmin || isSMM) && (
           <div style={{ textAlign: 'left' }}>
-            <h3 style={{ marginBottom: '8px' }}>Script Tracker</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0 }}>Script Tracker</h3>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setEditingScript(null);
+                  setScriptFormData({
+                    title: '',
+                    script_text: '',
+                    month: scriptMonth,
+                    reference_video_link: '',
+                    reaction_video_link: '',
+                    format: 'reel'
+                  });
+                  setShowScriptModal(true);
+                }}
+                style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Plus size={16} /> Add Script
+              </button>
+            </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '20px' }}>
               Review and update marketing scripts and statuses for the selected client and month.
             </p>
@@ -1701,84 +2212,147 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             </div>
 
             {(() => {
-              const filteredScripts = marketingContent.filter(item => {
-                if (!item.date) return false;
-                return item.date.substring(0, 7) === scriptMonth;
-              });
+              const monthlyScripts = marketingScripts.filter(item => item.month === scriptMonth);
+              const reelsScripts = monthlyScripts.filter(item => item.format !== 'long_format');
+              const longFormatScripts = monthlyScripts.filter(item => item.format === 'long_format');
 
-              if (filteredScripts.length === 0) {
+              if (monthlyScripts.length === 0) {
                 return (
                   <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    No script content found for this client and month. Add content tracker rows in the Marketing Data tab to see them here.
+                    No scripts found for this client and month. Click "Add Script" to create one.
                   </div>
                 );
               }
 
-              return (
-                <div className="grid-auto">
-                  {filteredScripts.map(item => (
+              const renderScriptGrid = (scripts) => (
+                <div className="grid-auto" style={{ marginBottom: '24px' }}>
+                  {scripts.map(item => (
                     <div key={item.id} className="glass" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <span className="badge badge-info">{item.platform}</span>
-                          <span className="badge badge-muted">{item.post_type}</span>
-                        </div>
-                        <span className={`badge badge-${
-                          item.status === 'Posted' ? 'success' : 
-                          (item.status === 'Pending Client Approval' ? 'warning' : 'muted')
-                        }`}>
-                          {item.status}
-                        </span>
-                      </div>
-                      
-                      <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>Date: {item.date}</span>
-                        {item.title && <h4 style={{ fontSize: '1rem', margin: '4px 0 0 0' }}>{item.title}</h4>}
-                      </div>
-
-                      <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Script</label>
-                        <textarea
-                          className="form-control"
-                          style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', minHeight: '120px', border: '2px solid #000' }}
-                          value={scriptDrafts[item.id] !== undefined ? scriptDrafts[item.id] : (item.script || '')}
-                          onChange={(e) => setScriptDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                          placeholder="Enter script text here..."
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Status:</span>
-                          <select
-                            className="form-control"
-                            style={{ padding: '6px', fontSize: '0.8rem', maxWidth: '150px' }}
-                            value={scriptStatusDrafts[item.id] !== undefined ? scriptStatusDrafts[item.id] : (item.status || 'Draft')}
-                            onChange={(e) => setScriptStatusDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                        <h4 style={{ fontSize: '1.1rem', margin: 0, flexGrow: 1, textAlign: 'left' }}>{item.title}</h4>
+                        
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => {
+                              setEditingScript(item);
+                              setScriptFormData({
+                                title: item.title,
+                                script_text: item.script_text,
+                                month: item.month,
+                                reference_video_link: item.reference_video_link || '',
+                                reaction_video_link: item.reaction_video_link || '',
+                                format: item.format || 'reel'
+                              });
+                              setShowScriptModal(true);
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                           >
-                            <option value="Draft">Draft</option>
-                            <option value="Pending Client Approval">Pending Client Approval</option>
-                            <option value="Client Approved">Client Approved</option>
-                            <option value="Client Rejected">Client Rejected</option>
-                            <option value="Posted">Posted</option>
-                            <option value="Pending">Pending</option>
-                          </select>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteScript(item.id)}
+                            className="btn btn-danger"
+                            style={{ padding: '4px 8px', fontSize: '0.75rem', backgroundColor: '#dc3545', color: '#fff', border: 'none' }}
+                          >
+                            Delete
+                          </button>
                         </div>
-
-                        <button
-                          onClick={() => {
-                            const newScript = scriptDrafts[item.id] !== undefined ? scriptDrafts[item.id] : (item.script || '');
-                            const newStatus = scriptStatusDrafts[item.id] !== undefined ? scriptStatusDrafts[item.id] : (item.status || 'Draft');
-                            handleUpdateScript(item.id, newScript, newStatus);
-                          }}
-                          className="btn btn-primary"
-                          style={{ padding: '8px 16px', fontSize: '0.8rem' }}
-                        >
-                          Save
-                        </button>
                       </div>
+
+                      <div style={{ 
+                        maxHeight: '150px', 
+                        overflowY: 'auto', 
+                        padding: '10px', 
+                        borderRadius: '4px', 
+                        backgroundColor: 'rgba(0,0,0,0.1)', 
+                        fontSize: '0.85rem', 
+                        whiteSpace: 'pre-wrap',
+                        textAlign: 'left'
+                      }}>
+                        {item.script_text}
+                      </div>
+
+                      {(item.reference_video_link || item.reaction_video_link) && (
+                        <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', marginTop: '4px', flexWrap: 'wrap' }}>
+                          {item.reference_video_link && (
+                            <a href={item.reference_video_link} target="_blank" rel="noopener noreferrer" className="badge badge-info" style={{ textDecoration: 'none' }}>
+                              🎥 Reference Video
+                            </a>
+                          )}
+                          {item.reaction_video_link && (
+                            <a href={item.reaction_video_link} target="_blank" rel="noopener noreferrer" className="badge badge-warning" style={{ textDecoration: 'none' }}>
+                              🎬 Reaction Video
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
+                </div>
+              );
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Reels Collapsible Header */}
+                  <div 
+                    onClick={() => setReelsExpanded(!reelsExpanded)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '14px 20px',
+                      background: '#fff',
+                      border: '3px solid #000',
+                      borderRadius: 'var(--radius-sm)',
+                      boxShadow: 'var(--shadow-sm)',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                      textTransform: 'uppercase',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <span>Reel Scripts ({reelsScripts.length})</span>
+                    <span style={{ transition: 'transform 0.15s', transform: reelsExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                  </div>
+                  {reelsExpanded && (
+                    reelsScripts.length === 0 ? (
+                      <div className="glass" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No reel format scripts found for this client and month.
+                      </div>
+                    ) : renderScriptGrid(reelsScripts)
+                  )}
+
+                  {/* Long Format Collapsible Header */}
+                  <div 
+                    onClick={() => setLongFormatExpanded(!longFormatExpanded)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '14px 20px',
+                      background: '#fff',
+                      border: '3px solid #000',
+                      borderRadius: 'var(--radius-sm)',
+                      boxShadow: 'var(--shadow-sm)',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                      textTransform: 'uppercase',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <span>Long Format Scripts ({longFormatScripts.length})</span>
+                    <span style={{ transition: 'transform 0.15s', transform: longFormatExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                  </div>
+                  {longFormatExpanded && (
+                    longFormatScripts.length === 0 ? (
+                      <div className="glass" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No long format scripts found for this client and month.
+                      </div>
+                    ) : renderScriptGrid(longFormatScripts)
+                  )}
                 </div>
               );
             })()}
@@ -1831,7 +2405,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     </button>
                   )}
                 </div>
-                <div className="table-container" style={{ marginBottom: '32px' }}>
+                <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
                   <table>
                     <thead>
                       <tr>
@@ -1881,16 +2455,44 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         marketingContent.map(item => (
                           <tr key={item.id}>
                             {/* Metadata */}
-                            <td>{item.date || '-'}</td>
+                            <td>{item.date ? formatDateStr(item.date) : '-'}</td>
                             <td><span className="badge badge-info">{item.post_type}</span></td>
-                            <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script}>{item.script || '-'}</td>
+                            <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script_title || item.script}>{item.script_title || item.script || '-'}</td>
                             <td>
-                              <span className={`badge badge-${
-                                item.status === 'Posted' ? 'success' : 
-                                (item.status === 'Pending Client Approval' ? 'warning' : 'muted')
-                              }`}>
-                                {item.status}
-                              </span>
+                              {['Posted', 'Pending'].includes(item.status) ? (
+                                <select
+                                  value={item.status}
+                                  onChange={(e) => updateContentStatus(item.id, e.target.value)}
+                                  style={{
+                                    padding: '6px 24px 6px 12px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: '800',
+                                    borderRadius: '9999px',
+                                    border: '2px solid #000000',
+                                    textTransform: 'uppercase',
+                                    cursor: 'pointer',
+                                    appearance: 'none',
+                                    WebkitAppearance: 'none',
+                                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'right 8px center',
+                                    backgroundSize: '10px',
+                                    backgroundColor: item.status === 'Posted' ? '#d1fae5' : '#fee2e2',
+                                    color: item.status === 'Posted' ? '#065f46' : '#991b1b',
+                                    boxShadow: 'var(--shadow-sm)'
+                                  }}
+                                >
+                                  <option value="Pending" style={{ color: '#991b1b', background: '#fee2e2', fontWeight: '800' }}>Pending</option>
+                                  <option value="Posted" style={{ color: '#065f46', background: '#d1fae5', fontWeight: '800' }}>Posted</option>
+                                </select>
+                              ) : (
+                                <span className={`badge badge-${
+                                  item.status === 'Posted' ? 'success' : 
+                                  (item.status === 'Pending Client Approval' ? 'warning' : 'muted')
+                                }`}>
+                                  {item.status}
+                                </span>
+                              )}
                             </td>
                             <td>
                               {item.link ? (
@@ -1907,17 +2509,41 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             <td>{item.shares?.toLocaleString() || '0'}</td>
                             <td>{item.saves?.toLocaleString() || '0'}</td>
                             <td>{item.follows?.toLocaleString() || '0'}</td>
-                            <td>{item.avg_watch_time_pct !== null && item.avg_watch_time_pct !== undefined ? `${item.avg_watch_time_pct}%` : '-'}</td>
+                            <td>
+                              {item.avg_watch_time_pct !== null && item.avg_watch_time_pct !== undefined ? (
+                                <span style={{ color: item.avg_watch_time_pct >= 50 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                                  {item.avg_watch_time_pct}%
+                                </span>
+                              ) : '-'}
+                            </td>
                             <td>{item.boosted || 'No'}</td>
-                            <td>{item.engagement_rate_pct !== null && item.engagement_rate_pct !== undefined ? `${item.engagement_rate_pct}%` : '-'}</td>
-                            <td>{item.save_rate_pct !== null && item.save_rate_pct !== undefined ? `${item.save_rate_pct}%` : '-'}</td>
+                            <td>
+                              {item.engagement_rate_pct !== null && item.engagement_rate_pct !== undefined ? (
+                                <span style={{ color: item.engagement_rate_pct >= 10 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                                  {item.engagement_rate_pct}%
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td>
+                              {item.save_rate_pct !== null && item.save_rate_pct !== undefined ? (
+                                <span style={{ color: item.save_rate_pct >= 2 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                                  {item.save_rate_pct}%
+                                </span>
+                              ) : '-'}
+                            </td>
                             <td style={{ fontWeight: 'bold' }}>{item.content_score || '-'}</td>
                             
                             {/* YouTube */}
                             <td>{item.youtube_views?.toLocaleString() || '0'}</td>
                             <td>{item.youtube_watch_time !== null && item.youtube_watch_time !== undefined ? item.youtube_watch_time.toLocaleString() : '0'}</td>
                             <td>{item.youtube_avg_view_duration || '-'}</td>
-                            <td>{item.youtube_ctr !== null && item.youtube_ctr !== undefined ? `${item.youtube_ctr}%` : '0%'}</td>
+                            <td>
+                              {item.youtube_ctr !== null && item.youtube_ctr !== undefined ? (
+                                <span style={{ color: item.youtube_ctr >= 4 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                                  {item.youtube_ctr}%
+                                </span>
+                              ) : '0%'}
+                            </td>
                             
                             {/* Actions */}
                             <td>
@@ -1939,7 +2565,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 </div>
 
                 <h3 style={{ marginBottom: '12px' }}>Ad Campaigns Performance</h3>
-                <div className="table-container" style={{ marginBottom: '32px' }}>
+                <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
                   <table>
                     <thead>
                       <tr>
@@ -1970,7 +2596,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             <td>₹{ad.total_ad_spend_inr?.toLocaleString()}</td>
                             <td>{ad.impressions?.toLocaleString()}</td>
                             <td>{ad.clicks?.toLocaleString()}</td>
-                            <td>{ad.ctr_pct}%</td>
+                            <td>
+                              {ad.ctr_pct !== null && ad.ctr_pct !== undefined ? (
+                                <span style={{ color: ad.ctr_pct >= 2 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                                  {ad.ctr_pct}%
+                                </span>
+                              ) : '-'}
+                            </td>
                             <td>₹{ad.cpl_inr}</td>
                             <td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{ad.roas}x</td>
                           </tr>
@@ -1989,7 +2621,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     </button>
                   )}
                 </div>
-                <div className="table-container" style={{ marginBottom: '32px' }}>
+                <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
                   <table>
                     <thead>
                       <tr>
@@ -2024,7 +2656,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                       ) : (
                         monthlyReports.map(item => (
                           <tr key={item.id}>
-                            <td style={{ fontWeight: 'bold' }}>{item.month}</td>
+                            <td style={{ fontWeight: 'bold' }}>{formatMonthStr(item.month)}</td>
                             <td>{item.website_clicks || '-'}</td>
                             <td>{item.website_traffic?.toLocaleString() || '-'}</td>
                             <td>{item.gmb_views?.toLocaleString() || '-'}</td>
@@ -2039,8 +2671,20 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             <td>{item.avg_rating !== null && item.avg_rating !== undefined ? item.avg_rating.toFixed(1) : '-'}</td>
                             <td>{item.top_keywords || '-'}</td>
                             <td>{item.da !== null && item.da !== undefined ? item.da : '-'}</td>
-                            <td>{item.mom_growth_sessions !== null && item.mom_growth_sessions !== undefined ? `${(item.mom_growth_sessions * 100).toFixed(2)}%` : '-'}</td>
-                            <td>{item.mom_growth_gmb_views !== null && item.mom_growth_gmb_views !== undefined ? `${(item.mom_growth_gmb_views * 100).toFixed(2)}%` : '-'}</td>
+                            <td>
+                              {item.mom_growth_sessions !== null && item.mom_growth_sessions !== undefined ? (
+                                <span style={{ color: item.mom_growth_sessions >= 0 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                                  {item.mom_growth_sessions >= 0 ? '+' : ''}{(item.mom_growth_sessions * 100).toFixed(2)}%
+                                </span>
+                              ) : '-'}
+                            </td>
+                            <td>
+                              {item.mom_growth_gmb_views !== null && item.mom_growth_gmb_views !== undefined ? (
+                                <span style={{ color: item.mom_growth_gmb_views >= 0 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                                  {item.mom_growth_gmb_views >= 0 ? '+' : ''}{(item.mom_growth_gmb_views * 100).toFixed(2)}%
+                                </span>
+                              ) : '-'}
+                            </td>
                             <td>
                               <span className={`badge badge-${item.ai_overview_visible === 'Yes' ? 'success' : 'muted'}`}>
                                 {item.ai_overview_visible || 'No'}
@@ -2073,37 +2717,58 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {activeTab === 'curation' && isAdmin && (
           <div style={{ textAlign: 'left' }}>
             
-            {/* Planning Cycles */}
-            <h3 style={{ marginBottom: '12px' }}>Curation Planning Cycles</h3>
+            {/* Gig Status Tracker */}
+            <div className="dashboard-toolbar">
+              <h3>Gig Status Tracker</h3>
+              <button onClick={() => openGigModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} /> Add Gig
+              </button>
+            </div>
             <div className="table-container" style={{ marginBottom: '32px' }}>
               <table>
                 <thead>
                   <tr>
-                    <th>Cycle Label</th>
-                    <th>Date Range</th>
+                    <th>Artist ID</th>
+                    <th>Artist Name</th>
+                    <th>Date</th>
+                    <th>Location</th>
+                    <th>Payment (₹)</th>
                     <th>Status</th>
+                    <th>Advance Paid</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {planningCycles.map(cycle => (
-                    <tr key={cycle.id}>
-                      <td style={{ fontWeight: 'bold' }}>{cycle.cycle_label}</td>
-                      <td>{cycle.start_date} to {cycle.end_date}</td>
-                      <td>
-                        <span className={`badge badge-${cycle.status === 'completed' || cycle.status === 'finalised' ? 'success' : 'warning'}`}>
-                          {cycle.status}
-                        </span>
-                      </td>
-                      <td>
-                        {cycle.status === 'open' && (
-                          <button onClick={() => finalizePlanningCycle(cycle.id)} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem' }}>
-                            Finalize Assignments
-                          </button>
-                        )}
-                      </td>
+                  {gigs.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No gigs found</td>
                     </tr>
-                  ))}
+                  ) : (
+                    gigs.map(g => (
+                      <tr key={g.id}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>{g.artist_code || '-'}</td>
+                        <td style={{ fontWeight: 'bold' }}>{g.artist_name || '-'}</td>
+                        <td>{formatDateStr(g.gig_date)}</td>
+                        <td>{g.venue_name || '-'}</td>
+                        <td>₹{g.fee_inr !== null ? g.fee_inr.toLocaleString('en-IN') : '0'}</td>
+                        <td>
+                          <span className={`badge badge-${
+                            g.status === 'Paid' || g.status === 'Confirmed' ? 'success' :
+                            g.status === 'Pending' ? 'warning' :
+                            g.status === 'Cancelled' ? 'danger' : 'info'
+                          }`}>
+                            {g.status}
+                          </span>
+                        </td>
+                        <td>₹{g.advance_paid !== null ? g.advance_paid.toLocaleString('en-IN') : '0'}</td>
+                        <td>
+                          <button onClick={() => openGigModal(g)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2115,31 +2780,59 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 <Plus size={16} /> Add Artist
               </button>
             </div>
-            
-            <div className="table-container">
+            <div className="table-container" style={{ marginBottom: '32px' }}>
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Name</th>
+                    <th>Artist Name</th>
                     <th>Category</th>
+                    <th>Phone Number</th>
+                    <th>Instruments</th>
+                    <th>Insta Link</th>
+                    <th>Description</th>
+                    <th>Email</th>
                     <th>City</th>
-                    <th>Contact Info</th>
+                    <th>Total Performances</th>
+                    <th>Perf. with M-</th>
+                    <th>Last Perf. Date</th>
+                    <th>Average Fee (₹)</th>
+                    <th>Payment Status</th>
+                    <th>Rating (1-10)</th>
+                    <th>Reliability Score</th>
+                    <th>Notes</th>
                     <th>Bank Details</th>
-                    <th>Rollups</th>
+                    <th>Total Amount Paid</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {artists.map(art => (
                     <tr key={art.id}>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>{art.artist_id}</td>
                       <td style={{ fontWeight: 'bold' }}>{art.name}</td>
-                      <td>{art.category}</td>
-                      <td>{art.city}</td>
+                      <td>{art.category || '-'}</td>
+                      <td>{art.phone || '-'}</td>
+                      <td>{art.instruments || '-'}</td>
                       <td>
-                        <div>{art.phone}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{art.email}</div>
+                        {art.insta_link ? (
+                          <a href={art.insta_link.startsWith('http') ? art.insta_link : `https://${art.insta_link}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>
+                            {art.insta_link}
+                          </a>
+                        ) : '-'}
+                      </td>
+                      <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={art.description}>
+                        {art.description || '-'}
+                      </td>
+                      <td>{art.email || '-'}</td>
+                      <td>{art.city || '-'}</td>
+                      <td>{art.total_performances}</td>
+                      <td>{art.perf_with_m}</td>
+                      <td>{art.last_perf_date}</td>
+                      <td>₹{art.average_fee_inr ? art.average_fee_inr.toLocaleString('en-IN') : '0'}</td>
+                      <td>{art.payment_status}</td>
+                      <td>{art.rating || '-'}</td>
+                      <td>{art.reliability_score !== null && art.reliability_score !== undefined ? `${art.reliability_score}%` : 'N/A'}</td>
+                      <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={art.notes}>
+                        {art.notes || '-'}
                       </td>
                       <td>
                         {decryptedBank[art.id] ? (
@@ -2156,15 +2849,63 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                           </button>
                         )}
                       </td>
-                      <td>
-                        <div style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span>Gigs: {art.total_performances}</span>
-                          <span>Reliability: {art.reliability_score ? `${art.reliability_score}%` : 'N/A'}</span>
-                          <span>Payment: {art.payment_status}</span>
-                        </div>
-                      </td>
+                      <td>₹{art.total_amount_paid_inr ? art.total_amount_paid_inr.toLocaleString('en-IN') : '0'}</td>
                       <td>
                         <button onClick={() => openArtistModal(art)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Venues Table */}
+            <div className="dashboard-toolbar">
+              <h3>Venue List</h3>
+              <button onClick={() => openVenueModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} /> Add Venue
+              </button>
+            </div>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Client Name</th>
+                    <th>Location Name</th>
+                    <th>Address</th>
+                    <th>Google Maps Link</th>
+                    <th>POC Name</th>
+                    <th>POC Number</th>
+                    <th>POC Email</th>
+                    <th>Social Links</th>
+                    <th>Gig Confirmed Message</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {venues.map(v => (
+                    <tr key={v.id}>
+                      <td>{v.client_name || '-'}</td>
+                      <td style={{ fontWeight: 'bold' }}>{v.name}</td>
+                      <td>{v.address || '-'}</td>
+                      <td>
+                        {v.map_link ? (
+                          <a href={v.map_link} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
+                            View Map
+                          </a>
+                        ) : '-'}
+                      </td>
+                      <td>{v.poc_name || '-'}</td>
+                      <td>{v.poc_phone || '-'}</td>
+                      <td>{v.poc_email || '-'}</td>
+                      <td>{v.social_links || '-'}</td>
+                      <td style={{ fontSize: '0.75rem', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={v.gig_confirmed_message}>
+                        {v.gig_confirmed_message || '-'}
+                      </td>
+                      <td>
+                        <button onClick={() => openVenueModal(v)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
                           Edit
                         </button>
                       </td>
@@ -2194,7 +2935,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 <tbody>
                   {auditLogs.map(log => (
                     <tr key={log.id}>
-                      <td style={{ fontSize: '0.8rem' }}>{log.created_at}</td>
+                      <td style={{ fontSize: '0.8rem' }}>{log.created_at ? formatDateStr(log.created_at.split(' ')[0]) : '-'}</td>
                       <td style={{ fontWeight: '500' }}>{log.actor_email || 'System'}</td>
                       <td><span className="badge badge-info">{log.action}</span></td>
                       <td>{log.entity_type} #{log.entity_id}</td>
@@ -2214,7 +2955,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       {/* Task Modal */}
       {showTaskModal && (
         <div className="modal-overlay" onClick={() => setShowTaskModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '600px' }}>
             <h2>{editingTask ? 'Edit Task' : 'Create Task'}</h2>
             <form onSubmit={handleTaskSubmit} style={{ marginTop: '20px' }}>
               <div className="form-group">
@@ -2238,7 +2979,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Client</label>
                   <select
@@ -2254,16 +2995,32 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Assignee</label>
+                  <label className="form-label">Assignee (Staff)</label>
                   <select
                     className="form-control"
                     value={taskFormData.assigned_to}
                     onChange={e => setTaskFormData({...taskFormData, assigned_to: e.target.value})}
                   >
-                    <option value="">Select Freelancer</option>
-                    {freelancers.map(f => (
-                      <option key={f.id} value={f.id}>{f.name} ({f.specialization})</option>
+                    <option value="">Select Staff</option>
+                    {staffUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role.replace('ops_', '').replace('_', ' ')})</option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Task Type</label>
+                  <select
+                    className="form-control"
+                    value={taskFormData.task_type}
+                    onChange={e => setTaskFormData({...taskFormData, task_type: e.target.value})}
+                    required
+                  >
+                    <option value="video">Video</option>
+                    <option value="script">Script</option>
+                    <option value="graphic">Graphic</option>
+                    <option value="social">Social</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
               </div>
@@ -2321,7 +3078,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       {/* Client Modal */}
       {showClientModal && (
         <div className="modal-overlay" onClick={() => setShowClientModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', maxWidth: '700px' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '700px' }}>
             <h2>{editingClient ? 'Edit Client' : 'Add Client'}</h2>
             <form onSubmit={handleClientSubmit} style={{ marginTop: '20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
@@ -2472,7 +3229,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       {/* Artist Modal */}
       {showArtistModal && (
         <div className="modal-overlay" onClick={() => setShowArtistModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '600px' }}>
             <h2>{editingArtist ? 'Edit Artist Details' : 'Add Artist to Roster'}</h2>
             <form onSubmit={handleArtistSubmit} style={{ marginTop: '20px' }}>
               <div className="form-group">
@@ -2530,6 +3287,54 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 </div>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Instruments</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Guitar, Drums"
+                    value={artistFormData.instruments}
+                    onChange={e => setArtistFormData({...artistFormData, instruments: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Insta Link</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. instagram.com/artist"
+                    value={artistFormData.insta_link}
+                    onChange={e => setArtistFormData({...artistFormData, insta_link: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Description</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Short summary..."
+                    value={artistFormData.description}
+                    onChange={e => setArtistFormData({...artistFormData, description: e.target.value})}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Rating (1-10)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    className="form-control"
+                    placeholder="e.g. 8"
+                    value={artistFormData.rating}
+                    onChange={e => setArtistFormData({...artistFormData, rating: e.target.value})}
+                  />
+                </div>
+              </div>
+
               <div className="form-group">
                 <label className="form-label">Telegram Chat ID</label>
                 <input
@@ -2540,15 +3345,27 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Bank Details (Super Admin only can decrypt)</label>
-                <textarea
-                  className="form-control"
-                  placeholder="Enter Bank Details..."
-                  value={artistFormData.bank_details}
-                  onChange={e => setArtistFormData({...artistFormData, bank_details: e.target.value})}
-                  rows={2}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Bank Details (Super Admin only can decrypt)</label>
+                  <textarea
+                    className="form-control"
+                    placeholder="Enter Bank Details..."
+                    value={artistFormData.bank_details}
+                    onChange={e => setArtistFormData({...artistFormData, bank_details: e.target.value})}
+                    rows={2}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
+                  <textarea
+                    className="form-control"
+                    placeholder="Onboarding notes..."
+                    value={artistFormData.notes}
+                    onChange={e => setArtistFormData({...artistFormData, notes: e.target.value})}
+                    rows={2}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
@@ -2567,7 +3384,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       {/* Content Modal */}
       {showContentModal && (
         <div className="modal-overlay" onClick={() => setShowContentModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>{editingContent ? 'Edit Content Row' : 'Add Content Row'}</h2>
             <form onSubmit={handleContentSubmit} style={{ marginTop: '20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -2662,13 +3479,44 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
-                  <label className="form-label">Script</label>
-                  <textarea
+                  <label className="form-label">Linked Script</label>
+                  <select
                     className="form-control"
-                    rows={2}
-                    value={contentFormData.script}
-                    onChange={e => setContentFormData({ ...contentFormData, script: e.target.value })}
-                  />
+                    value={contentFormData.script_id || ''}
+                    onChange={e => setContentFormData({ ...contentFormData, script_id: e.target.value })}
+                  >
+                    <option value="">-- None --</option>
+                    {(() => {
+                      const selectedMonth = contentFormData.date ? contentFormData.date.slice(0, 7) : '';
+                      const filteredScripts = selectedMonth 
+                        ? marketingScripts.filter(s => s.month === selectedMonth)
+                        : marketingScripts;
+                      
+                      return filteredScripts.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.title} ({s.month})
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                  {marketingScripts.length === 0 ? (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      No scripts found. Create one in the Script Tracker tab.
+                    </span>
+                  ) : (
+                    (() => {
+                      const selectedMonth = contentFormData.date ? contentFormData.date.slice(0, 7) : '';
+                      const filtered = selectedMonth ? marketingScripts.filter(s => s.month === selectedMonth) : marketingScripts;
+                      if (filtered.length === 0 && selectedMonth) {
+                        return (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-warning)' }}>
+                            No scripts found for {selectedMonth}. Create one in the Script Tracker tab.
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Caption</label>
@@ -2827,10 +3675,112 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         </div>
       )}
 
+      {/* Script Modal */}
+      {showScriptModal && (
+        <div className="modal-overlay" onClick={() => {
+          setShowScriptModal(false);
+          setEditingScript(null);
+        }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2>{editingScript ? 'Edit Script' : 'Add Script'}</h2>
+            <form onSubmit={handleSaveScript} style={{ marginTop: '20px' }}>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Title</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={scriptFormData.title}
+                  onChange={e => setScriptFormData({ ...scriptFormData, title: e.target.value })}
+                  placeholder="e.g. Intro to Espresso Brewing"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Month</label>
+                  <input
+                    type="month"
+                    className="form-control"
+                    value={scriptFormData.month}
+                    onChange={e => setScriptFormData({ ...scriptFormData, month: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Format Type</label>
+                  <select
+                    className="form-control"
+                    value={scriptFormData.format || 'reel'}
+                    onChange={e => setScriptFormData({ ...scriptFormData, format: e.target.value })}
+                    required
+                  >
+                    <option value="reel">Reel Format</option>
+                    <option value="long_format">Long Format</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Reference Video Link (Optional)</label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    value={scriptFormData.reference_video_link}
+                    onChange={e => setScriptFormData({ ...scriptFormData, reference_video_link: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Reaction Video Link (Optional)</label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    value={scriptFormData.reaction_video_link}
+                    onChange={e => setScriptFormData({ ...scriptFormData, reaction_video_link: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label className="form-label">Script Text</label>
+                <textarea
+                  className="form-control"
+                  rows={16}
+                  value={scriptFormData.script_text}
+                  onChange={e => setScriptFormData({ ...scriptFormData, script_text: e.target.value })}
+                  placeholder="Paste or write script contents here..."
+                  required
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', minHeight: '350px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowScriptModal(false);
+                    setEditingScript(null);
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Script
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Monthly Report Modal */}
       {showMonthlyModal && (
         <div className="modal-overlay" onClick={() => setShowMonthlyModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>{editingMonthly ? 'Edit Monthly Report' : 'Add Monthly Report'}</h2>
             <form onSubmit={handleMonthlyReportSubmit} style={{ marginTop: '20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -3028,6 +3978,333 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Save Report
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showFreelancerModal && (
+        <div className="modal-overlay" onClick={() => setShowFreelancerModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '600px' }}>
+            <h2>{editingFreelancer ? 'Edit Freelancer' : 'Add Freelancer'}</h2>
+            <form onSubmit={handleFreelancerSubmit} style={{ marginTop: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Full Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={freelancerFormData.name}
+                    onChange={e => setFreelancerFormData({ ...freelancerFormData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={freelancerFormData.email}
+                    onChange={e => setFreelancerFormData({ ...freelancerFormData, email: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Phone</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={freelancerFormData.phone}
+                    onChange={e => setFreelancerFormData({ ...freelancerFormData, phone: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Company Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={freelancerFormData.company_name}
+                    onChange={e => setFreelancerFormData({ ...freelancerFormData, company_name: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Specialization</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Editor, Camera Guy, Motion Graphics"
+                    value={freelancerFormData.specialization}
+                    onChange={e => setFreelancerFormData({ ...freelancerFormData, specialization: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Rate per Video (INR)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={freelancerFormData.rate_per_video}
+                    onChange={e => setFreelancerFormData({ ...freelancerFormData, rate_per_video: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowFreelancerModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Freelancer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showVenueModal && (
+        <div className="modal-overlay" onClick={() => setShowVenueModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2>{editingVenue ? 'Edit Venue Details' : 'Add Venue'}</h2>
+            <form onSubmit={handleVenueSubmit} style={{ marginTop: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Client Name (Association)</label>
+                  <select
+                    className="form-control"
+                    value={venueFormData.client_id}
+                    onChange={e => setVenueFormData({ ...venueFormData, client_id: e.target.value })}
+                  >
+                    <option value="">Select Client (None)</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Location / Venue Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={venueFormData.name}
+                    onChange={e => setVenueFormData({ ...venueFormData, name: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Address</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={venueFormData.address}
+                    onChange={e => setVenueFormData({ ...venueFormData, address: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">City</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={venueFormData.city}
+                    onChange={e => setVenueFormData({ ...venueFormData, city: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Google Maps Link</label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    value={venueFormData.map_link}
+                    onChange={e => setVenueFormData({ ...venueFormData, map_link: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Social Links (Instagram/Website/Other)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. instagram.com/venue"
+                    value={venueFormData.social_links}
+                    onChange={e => setVenueFormData({ ...venueFormData, social_links: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Point of Contact (POC)</h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">POC Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={venueFormData.poc_name}
+                    onChange={e => setVenueFormData({ ...venueFormData, poc_name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">POC Number</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={venueFormData.poc_phone}
+                    onChange={e => setVenueFormData({ ...venueFormData, poc_phone: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">POC Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={venueFormData.poc_email}
+                    onChange={e => setVenueFormData({ ...venueFormData, poc_email: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Gig Confirmed Message (Telegram DM Template)</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  placeholder="Hey {{artist_name}}! Confirmed: {{gig_date}} at {{venue_name}}..."
+                  value={venueFormData.gig_confirmed_message}
+                  onChange={e => setVenueFormData({ ...venueFormData, gig_confirmed_message: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowVenueModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Venue
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {showGigModal && (
+        <div className="modal-overlay" onClick={() => setShowGigModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '600px' }}>
+            <h2>{editingGig ? 'Edit Gig Status' : 'Add Gig Status'}</h2>
+            <form onSubmit={handleGigSubmit} style={{ marginTop: '20px' }}>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Artist</label>
+                  <select
+                    className="form-control"
+                    value={gigFormData.artist_id}
+                    onChange={e => setGigFormData({ ...gigFormData, artist_id: e.target.value })}
+                    required
+                  >
+                    <option value="">Select Artist</option>
+                    {artists.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.category || 'No Category'})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Location / Venue</label>
+                  <select
+                    className="form-control"
+                    value={gigFormData.venue_id}
+                    onChange={e => setGigFormData({ ...gigFormData, venue_id: e.target.value })}
+                  >
+                    <option value="">Select Venue (None)</option>
+                    {venues.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Gig Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={gigFormData.gig_date}
+                    onChange={e => setGigFormData({ ...gigFormData, gig_date: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Planning Cycle</label>
+                  <select
+                    className="form-control"
+                    value={gigFormData.planning_cycle_id}
+                    onChange={e => setGigFormData({ ...gigFormData, planning_cycle_id: e.target.value })}
+                  >
+                    <option value="">Select Cycle (None)</option>
+                    {planningCycles.map(c => (
+                      <option key={c.id} value={c.id}>{c.cycle_label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Payment Fee (₹)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 15000"
+                    value={gigFormData.fee_inr}
+                    onChange={e => setGigFormData({ ...gigFormData, fee_inr: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Advance Paid (₹)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 5000"
+                    value={gigFormData.advance_paid}
+                    onChange={e => setGigFormData({ ...gigFormData, advance_paid: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label className="form-label">Status</label>
+                <select
+                  className="form-control"
+                  value={gigFormData.status}
+                  onChange={e => setGigFormData({ ...gigFormData, status: e.target.value })}
+                  required
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Advance Paid">Advance Paid</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Hold">Hold</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowGigModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Gig Status
                 </button>
               </div>
             </form>

@@ -18,22 +18,45 @@ router.use(authenticate);
  * GET /api/clients
  * List all clients. Admins and super_admins only.
  */
-router.get('/', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const { client_type, is_active } = req.query;
-    let query = 'SELECT * FROM crm_clients WHERE 1=1';
+    let query;
     const params = [];
 
-    if (client_type) {
-      query += ' AND client_type = ?';
-      params.push(client_type);
-    }
-    if (is_active !== undefined) {
-      query += ' AND is_active = ?';
-      params.push(parseInt(is_active));
-    }
+    if (req.user.role === 'ops_video_editor') {
+      query = `
+        SELECT DISTINCT c.* 
+        FROM crm_clients c
+        JOIN kanban_tasks t ON t.client_id = c.id
+        WHERE t.assigned_to = ? AND t.task_type = 'video'
+      `;
+      params.push(req.user.id);
 
-    query += ' ORDER BY created_at DESC';
+      if (client_type) {
+        query += ' AND c.client_type = ?';
+        params.push(client_type);
+      }
+      if (is_active !== undefined) {
+        query += ' AND c.is_active = ?';
+        params.push(parseInt(is_active));
+      }
+
+      query += ' ORDER BY c.created_at DESC';
+    } else {
+      query = 'SELECT * FROM crm_clients WHERE 1=1';
+
+      if (client_type) {
+        query += ' AND client_type = ?';
+        params.push(client_type);
+      }
+      if (is_active !== undefined) {
+        query += ' AND is_active = ?';
+        params.push(parseInt(is_active));
+      }
+
+      query += ' ORDER BY created_at DESC';
+    }
     const clients = db.prepare(query).all(...params);
 
     // Strip encrypted fields from response
@@ -58,10 +81,17 @@ router.get('/', authorize('admin', 'ops_social_media_manager'), (req, res) => {
  * GET /api/clients/:id
  * Get single client details.
  */
-router.get('/:id', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.get('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const client = db.prepare('SELECT * FROM crm_clients WHERE id = ?').get(req.params.id);
     if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    if (req.user.role === 'ops_video_editor') {
+      const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+      if (!hasTask) {
+        return res.status(403).json({ error: 'Access denied: you have no video assignments for this client' });
+      }
+    }
 
     const { instagram_access_token_enc, youtube_api_key_enc, portal_pin, ...safe } = client;
     res.json({
@@ -216,6 +246,13 @@ router.patch('/:id', authorize('admin'), (req, res) => {
  */
 router.get('/:id/chats', (req, res) => {
   try {
+    if (req.user.role === 'ops_video_editor') {
+      const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+      if (!hasTask) {
+        return res.status(403).json({ error: 'Access denied: you have no video assignments for this client' });
+      }
+    }
+
     const chats = db.prepare(
       'SELECT * FROM internal_chat_messages WHERE client_id = ? ORDER BY created_at ASC'
     ).all(req.params.id);
@@ -232,6 +269,13 @@ router.get('/:id/chats', (req, res) => {
  */
 router.post('/:id/chats', (req, res) => {
   try {
+    if (req.user.role === 'ops_video_editor') {
+      const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+      if (!hasTask) {
+        return res.status(403).json({ error: 'Access denied: you have no video assignments for this client' });
+      }
+    }
+
     const { message } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });

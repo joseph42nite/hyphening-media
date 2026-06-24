@@ -355,7 +355,7 @@ export default function ClientPortal({ showToast }) {
                       <span className="badge badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
                       <span className="badge badge-muted">{item.post_type}</span>
                     </div>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.date}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>12 July 2026</span>
                   </div>
                   <h3 style={{ fontSize: '1rem', marginBottom: '8px' }}>{item.title}</h3>
                   {item.caption && (
@@ -476,7 +476,7 @@ export default function ClientPortal({ showToast }) {
                         <span className="badge badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
                         <span className="badge badge-muted">{item.post_type}</span>
                       </div>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Target: {item.date}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Target: 12 July 2026</span>
                     </div>
 
                     <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>{item.title}</h3>
@@ -546,7 +546,7 @@ export default function ClientPortal({ showToast }) {
       {/* Change Request Modal */}
       {rejectingItem && (
         <div className="modal-overlay" onClick={() => setRejectingItem(null)}>
-          <div className="modal-content glass-premium" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+          <div className="modal-content glass-premium" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '600px' }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>Request Changes</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
               Detail the changes required for: <strong>{rejectingItem.title}</strong>. This content will be marked as rejected, and operations will address your feedback immediately.

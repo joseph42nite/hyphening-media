@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './views/Login.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import ClientPortal from './views/ClientPortal.jsx';
+import Landing from './views/Landing.jsx';
 import Toast from './components/Toast.jsx';
 
 function App() {
@@ -29,6 +30,12 @@ function App() {
     <Router>
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <Routes>
+          {/* Public Landing Page */}
+          <Route 
+            path="/" 
+            element={<Landing />} 
+          />
+
           {/* Main Workspace Ops Login */}
           <Route 
             path="/login" 
@@ -54,7 +61,7 @@ function App() {
           {/* Fallback routes */}
           <Route 
             path="*" 
-            element={<Navigate to={auth ? "/dashboard" : "/login"} replace />} 
+            element={<Navigate to={auth ? "/dashboard" : "/"} replace />} 
           />
         </Routes>
 

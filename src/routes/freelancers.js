@@ -57,14 +57,14 @@ router.get('/:id', authorize('admin', 'ops_video_editor'), (req, res) => {
  */
 router.post('/', authorize('admin'), (req, res) => {
   try {
-    const { name, email, phone, telegram_chat_id, specialization, rate_per_video } = req.body;
+    const { name, email, phone, company_name, specialization, rate_per_video } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Freelancer name is required' });
 
     const result = db.prepare(`
-      INSERT INTO freelancers (name, email, phone, telegram_chat_id, specialization, rate_per_video)
+      INSERT INTO freelancers (name, email, phone, company_name, specialization, rate_per_video)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, email || null, phone || null, telegram_chat_id || null, specialization || null, rate_per_video || null);
+    `).run(name, email || null, phone || null, company_name || null, specialization || null, rate_per_video || null);
 
     logAction({
       actorId: req.user.id,
@@ -92,7 +92,7 @@ router.patch('/:id', authorize('admin'), (req, res) => {
     const freelancer = db.prepare('SELECT * FROM freelancers WHERE id = ?').get(req.params.id);
     if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
 
-    const allowedFields = ['name', 'email', 'phone', 'telegram_chat_id', 'specialization', 'rate_per_video', 'is_active'];
+    const allowedFields = ['name', 'email', 'phone', 'company_name', 'specialization', 'rate_per_video', 'is_active'];
     const updates = {};
     const diff = {};
 
