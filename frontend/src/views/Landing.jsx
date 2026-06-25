@@ -998,6 +998,13 @@ function Landing() {
 
               <div className="step">
                 <div className="step-icon">
+                  <Sword size={20} strokeWidth={2.5} style={{ transform: 'rotate(-45deg)' }} />
+                </div>
+                <p>Slice it</p>
+              </div>
+
+              <div className="step">
+                <div className="step-icon">
                   <Bomb size={20} strokeWidth={2.5} />
                 </div>
                 <p>Avoid bombs</p>
