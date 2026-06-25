@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, Film, BarChart3, PenTool, Globe, Users, Play, Sparkles, TrendingUp, Menu, X, Code, Smartphone, Megaphone } from 'lucide-react';
+import { ArrowRight, Zap, Film, BarChart3, PenTool, Globe, Users, Play, Sparkles, TrendingUp, Menu, X, Code, Smartphone, Megaphone, Mouse, Sword, Bomb } from 'lucide-react';
 import { EncryptedText } from "@/components/ui/encrypted-text";
 import japaneseImg from '../assets/japenese-image.webp';
 import logoImg from '../assets/logo.png';
@@ -11,8 +11,12 @@ import logoImg from '../assets/logo.png';
    — Moving the mouse fast leaves a thick glowing blade trail.
    — Blade slices shapes in half; halves tumble away with particle bursts.
    ========================================================================== */
-const SlashCanvas = ({ onScore }) => {
+const SlashCanvas = ({ score, onScore }) => {
   const canvasRef = useRef(null);
+  const scoreRef = useRef(score);
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
   const animRef = useRef(null);
   const mouse = useRef({ x: -999, y: -999, px: -999, py: -999 });
   const fruits = useRef([]);       // active shapes in the air
@@ -21,6 +25,7 @@ const SlashCanvas = ({ onScore }) => {
   const flashes = useRef([]);      // cut-point flash circles
   const slashLines = useRef([]);   // full-screen anime katana cut lines
   const screenFlash = useRef(0);   // screen-wide white flash timer
+  const screenFlashColor = useRef('rgba(255, 255, 255, 0.15)');
   const trail = useRef([]);        // blade trail points
   const spawnTimer = useRef(0);
 
@@ -47,23 +52,60 @@ const SlashCanvas = ({ onScore }) => {
     const TYPES = ['circle', 'square', 'hexagon', 'diamond'];
 
     const spawnWave = () => {
-      const count = 2 + Math.floor(Math.random() * 3); // 2-4 per wave
-      for (let i = 0; i < count; i++) {
-        const type = TYPES[Math.floor(Math.random() * TYPES.length)];
-        const size = 32 + Math.random() * 38;
-        const x = 80 + Math.random() * (W - 160);
+      if (scoreRef.current === 0) {
+        if (fruits.current.some(f => f.alive)) return;
         fruits.current.push({
-          x,
-          y: H + size,
-          size,
-          type,
-          vx: (Math.random() - 0.5) * 3,
-          vy: -(11 + Math.random() * 5),   // strong upward launch
-          rot: Math.random() * Math.PI * 2,
-          rotV: (Math.random() - 0.5) * 0.06,
+          x: W / 2,
+          y: H + 35,
+          size: 70,
+          type: "circle",
+          vx: 0,
+          vy: -13,
+          rot: 0,
+          rotV: 0.02,
           alive: true,
-          filled: Math.random() > 0.35,     // 65% filled, 35% outline-only
+          filled: true,
+          tutorial: true
         });
+      } else {
+        const count = 2 + Math.floor(Math.random() * 3); // 2-4 per wave
+        for (let i = 0; i < count; i++) {
+          // 18% chance to spawn a bomb (only if score > 2)
+          const isBomb = scoreRef.current > 2 && Math.random() < 0.18;
+          
+          if (isBomb) {
+            const size = 38;
+            const x = 80 + Math.random() * (W - 160);
+            fruits.current.push({
+              x,
+              y: H + size,
+              size,
+              type: 'bomb',
+              vx: (Math.random() - 0.5) * 2.5,
+              vy: -(10 + Math.random() * 4),
+              rot: Math.random() * Math.PI * 2,
+              rotV: (Math.random() - 0.5) * 0.04,
+              alive: true,
+              filled: true
+            });
+          } else {
+            const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+            const size = 32 + Math.random() * 38;
+            const x = 80 + Math.random() * (W - 160);
+            fruits.current.push({
+              x,
+              y: H + size,
+              size,
+              type,
+              vx: (Math.random() - 0.5) * 3,
+              vy: -(11 + Math.random() * 5),   // strong upward launch
+              rot: Math.random() * Math.PI * 2,
+              rotV: (Math.random() - 0.5) * 0.06,
+              alive: true,
+              filled: Math.random() > 0.35,     // 65% filled, 35% outline-only
+            });
+          }
+        }
       }
     };
     // Initial wave
@@ -103,7 +145,34 @@ const SlashCanvas = ({ onScore }) => {
 
         // --- KATANA CUT! ---
         f.alive = false;
+
+        if (f.type === 'bomb') {
+          if (onScore) onScore(0);
+          screenFlash.current = 15;
+          screenFlashColor.current = 'rgba(239, 68, 68, 0.45)'; // Red flash
+          
+          // Spawn explosion particles
+          const n = 35 + Math.floor(Math.random() * 15);
+          for (let j = 0; j < n; j++) {
+            const ang = Math.random() * Math.PI * 2;
+            const vel = 3 + Math.random() * 9;
+            particles.current.push({
+              x: f.x, y: f.y,
+              vx: Math.cos(ang) * vel,
+              vy: Math.sin(ang) * vel - 2,
+              sz: 2 + Math.random() * 5,
+              age: 0,
+              life: 30 + Math.random() * 20,
+              purple: false,
+              spark: true,
+              customColor: Math.random() > 0.4 ? '#f97316' : '#ef4444'
+            });
+          }
+          return;
+        }
+
         if (onScore) onScore();
+        screenFlashColor.current = 'rgba(255, 255, 255, 0.15)'; // Reset to white
 
         // Spawn two halves — fly apart fast
         const halfSize = f.size * 0.55;
@@ -124,7 +193,7 @@ const SlashCanvas = ({ onScore }) => {
           });
         }
 
-        // Juice splatter particles — more dramatic
+        // Juice splatter particles — more dramatic Sumi ink drops
         const n = 22 + Math.floor(Math.random() * 10);
         for (let j = 0; j < n; j++) {
           const ang = Math.random() * Math.PI * 2;
@@ -133,9 +202,9 @@ const SlashCanvas = ({ onScore }) => {
             x: f.x, y: f.y,
             vx: Math.cos(ang) * vel + dx * 0.25,
             vy: Math.sin(ang) * vel + dy * 0.25 - 1.5,
-            sz: 1.5 + Math.random() * 5,
+            sz: 2 + Math.random() * 6,
             age: 0,
-            life: 30 + Math.random() * 25,
+            life: 35 + Math.random() * 25,
             purple: Math.random() > 0.45,
             spark: false,
           });
@@ -220,25 +289,97 @@ const SlashCanvas = ({ onScore }) => {
         if (f.y > H + f.size * 2) { f.alive = false; return; }
 
         const r = f.size / 2;
-        ctx.save();
-        ctx.translate(f.x, f.y);
-        ctx.rotate(f.rot);
 
-        if (f.filled) {
-          shapePath(ctx, f.type, r);
-          ctx.fillStyle = '#000000';
+        // Draw very soft ink shadow behind fruit/bomb to mimic paper smudge
+        ctx.save();
+        const shadowGrad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.size * 0.7);
+        shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.12)');
+        shadowGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.04)');
+        shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = shadowGrad;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.size * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        if (f.type === 'bomb') {
+          ctx.save();
+          ctx.translate(f.x, f.y);
+          ctx.rotate(f.rot);
+          
+          // Draw bomb body (black circle)
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fillStyle = '#1e1b4b'; // very dark indigo/black
           ctx.fill();
-          // Inner highlight
-          shapePath(ctx, f.type, r * 0.55);
-          ctx.fillStyle = '#27272a';
-          ctx.fill();
-        } else {
-          shapePath(ctx, f.type, r);
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = 3;
           ctx.stroke();
+          
+          // Draw fuse cap
+          ctx.fillStyle = '#4b5563';
+          ctx.fillRect(-r * 0.25, -r - 4, r * 0.5, 6);
+          ctx.strokeRect(-r * 0.25, -r - 4, r * 0.5, 6);
+          
+          ctx.restore();
+          
+          // Draw fuse cord (curved line, outside rotation so it stays up)
+          ctx.save();
+          ctx.translate(f.x, f.y);
+          ctx.beginPath();
+          ctx.moveTo(0, -r - 4);
+          ctx.quadraticCurveTo(r * 0.4, -r - 12, r * 0.2, -r - 20);
+          ctx.strokeStyle = '#b45309'; // brown fuse
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          
+          // Draw spark at the end of the fuse
+          const sparkX = r * 0.2;
+          const sparkY = -r - 20;
+          ctx.beginPath();
+          ctx.arc(sparkX, sparkY, 4 + Math.sin(Date.now() * 0.05) * 2, 0, Math.PI * 2);
+          ctx.fillStyle = '#f97316'; // orange glow
+          ctx.fill();
+          
+          ctx.beginPath();
+          ctx.arc(sparkX, sparkY, 2 + Math.cos(Date.now() * 0.08) * 1, 0, Math.PI * 2);
+          ctx.fillStyle = '#facc15'; // yellow core
+          ctx.fill();
+          
+          ctx.restore();
+        } else {
+          ctx.save();
+          ctx.translate(f.x, f.y);
+          ctx.rotate(f.rot);
+
+          if (f.filled) {
+            shapePath(ctx, f.type, r);
+            ctx.fillStyle = '#000000';
+            ctx.fill();
+            // Inner highlight
+            shapePath(ctx, f.type, r * 0.55);
+            ctx.fillStyle = '#27272a';
+            ctx.fill();
+          } else {
+            shapePath(ctx, f.type, r);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          // Draw pulse around tutorial fruit
+          if (f.tutorial) {
+            ctx.save();
+            ctx.strokeStyle = '#a855f7';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            const pulse = 10 + Math.sin(Date.now() * 0.008) * 8;
+            ctx.arc(f.x, f.y, (f.size / 2) + pulse, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
         }
-        ctx.restore();
       });
       fruits.current = fruits.current.filter((f) => f.alive || f.y <= H + f.size * 2);
 
@@ -361,20 +502,21 @@ const SlashCanvas = ({ onScore }) => {
         if (a <= 0) return;
         ctx.globalAlpha = a;
         if (p.spark) {
-          // Bright white spark with motion trail
-          ctx.fillStyle = '#ffffff';
+          // Bright white spark or custom color spark with motion trail
+          ctx.fillStyle = p.customColor || '#ffffff';
           const sz = p.sz * a;
           ctx.beginPath();
           ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
           ctx.fill();
           // Spark glow
-          ctx.fillStyle = `rgba(168, 85, 247, ${a * 0.5})`;
+          ctx.fillStyle = p.customColor ? `rgba(239, 68, 68, ${a * 0.5})` : `rgba(168, 85, 247, ${a * 0.5})`;
           ctx.beginPath();
           ctx.arc(p.x, p.y, sz * 3, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          ctx.fillStyle = p.purple ? '#a855f7' : '#000000';
-          const sz = p.sz * (0.5 + a * 0.5);
+          // Traditional Sumi-e charcoal and black ink wash droplets
+          ctx.fillStyle = p.purple ? 'rgba(9, 9, 11, 0.9)' : 'rgba(39, 39, 42, 0.8)';
+          const sz = p.sz * (0.6 + a * 0.4);
           ctx.beginPath();
           ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
           ctx.fill();
@@ -459,11 +601,14 @@ const SlashCanvas = ({ onScore }) => {
       });
       flashes.current = flashes.current.filter((fl) => fl.age < 16);
 
-      // ===== SCREEN FLASH (brief white overlay on cut) =====
+      // ===== SCREEN FLASH (brief white/red overlay on cut) =====
       if (screenFlash.current > 0) {
-        const fa = screenFlash.current / 8;
-        ctx.fillStyle = `rgba(255, 255, 255, ${fa * 0.15})`;
+        const fa = screenFlash.current / 15;
+        ctx.save();
+        ctx.globalAlpha = fa;
+        ctx.fillStyle = screenFlashColor.current;
         ctx.fillRect(0, 0, W, H);
+        ctx.restore();
         screenFlash.current--;
       }
 
@@ -656,6 +801,33 @@ function Landing() {
   const navigate = useNavigate();
   const heroRef = useRef(null);
   const [score, setScore] = useState(0);
+  const [gameMode, setGameMode] = useState(false);
+
+  const handlePointerDown = () => {
+    setGameMode(true);
+  };
+
+  const exitGame = (e) => {
+    e.stopPropagation();
+    setGameMode(false);
+    document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (!gameMode) {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, [gameMode]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', company: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
@@ -750,55 +922,101 @@ function Landing() {
       </div>
 
       {/* ===== Hero Section ===== */}
-      <section className="landing-hero" ref={heroRef}>
-        <SlashCanvas onScore={() => setScore(s => s + 1)} />
+      <section className={`landing-hero ${gameMode ? "game-active" : ""}`} ref={heroRef}>
+        <div className="hero-bento">
+          {/* Main Game Area */}
+          <div className="hero-main" onPointerDown={handlePointerDown}>
+            <SlashCanvas score={score} onScore={(val) => { if (val === 0) setScore(0); else setScore(s => s + 1); }} />
 
-        {/* Score HUD */}
-        <div className="slash-score-hud" onClick={() => setScore(0)} title="Click to Reset Score">
-          <span className="slash-score-number">{score}</span>
-          <span className="slash-score-label">Sliced</span>
-          <span style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginTop: '4px', fontWeight: 700 }}>Reset Here</span>
-        </div>
+            {gameMode && (
+              <div className="game-score-overlay">
+                Score: {score}
+              </div>
+            )}
 
-        {/* Minimal brand text */}
-        <div className="landing-hero-content">
-          <h1 className="hero-headline">
-            <span style={{
-              position: 'absolute',
-              width: '1px',
-              height: '1px',
-              padding: '0',
-              margin: '-1px',
-              overflow: 'hidden',
-              clip: 'rect(0, 0, 0, 0)',
-              whiteSpace: 'nowrap',
-              border: '0'
-            }}>
-              Welcome to HYPHENING MEDIA, Seeker! Creative Operations & Marketing Performance Agency.
+            {gameMode && (
+              <button
+                className="exit-game"
+                onClick={exitGame}
+                aria-label="Exit Game"
+              >
+                ✕ Exit
+              </button>
+            )}
+
+            <div className="hero-overlay">
+              <h1 className="hero-headline hero-title">
+                <span style={{
+                  position: 'absolute',
+                  width: '1px',
+                  height: '1px',
+                  padding: '0',
+                  margin: '-1px',
+                  overflow: 'hidden',
+                  clip: 'rect(0, 0, 0, 0)',
+                  whiteSpace: 'nowrap',
+                  border: '0'
+                }}>
+                  Welcome to HYPHENING MEDIA, Seeker! Creative Operations & Marketing Performance Agency.
+                </span>
+                <span aria-hidden="true">
+                  <EncryptedText
+                    text="Welcome to HYPHENING MEDIA, Seeker!"
+                    className="hero-welcome-title"
+                    encryptedClassName="text-neutral-500"
+                    revealedClassName="text-black"
+                    revealDelayMs={50}
+                    loop={true}
+                    loopDelayMs={6000}
+                  />
+                </span>
+              </h1>
+
+              <p className="hero-desc">
+                Every slice reveals a secret about us.
+              </p>
+
+              <button className="play-btn" onClick={(e) => { e.stopPropagation(); setGameMode(true); }} style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
+                <span>ENTER GAME MODE</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tutorial Card */}
+          <div className="hero-card tutorial">
+            <div className="card-label">
+              HOW TO PLAY
+            </div>
+
+            <div className="steps">
+              <div className="step">
+                <div className="step-icon">
+                  <Mouse size={20} strokeWidth={2.5} />
+                </div>
+                <p>Move mouse</p>
+              </div>
+
+              <div className="step">
+                <div className="step-icon">
+                  <Bomb size={20} strokeWidth={2.5} />
+                </div>
+                <p>Avoid bombs</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Score Card */}
+          <div className="hero-card score-card" onClick={() => setScore(0)} style={{ cursor: 'pointer' }} title="Click to Reset Score">
+            <span className="score-label">
+              DISCOVERED
             </span>
-            <span className="word" aria-hidden="true">
-              <span className="word-inner" style={{ animationDelay: '0.15s' }}>
-                <EncryptedText
-                  text="Welcome to HYPHENING MEDIA, Seeker!"
-                  className="hero-welcome-text"
-                  encryptedClassName="text-neutral-500"
-                  revealedClassName="text-black"
-                  revealDelayMs={50}
-                  loop={true}
-                  loopDelayMs={6000}
-                />
-              </span>
-            </span>
-          </h1>
-        </div>
 
-        {/* Stop playing CTA */}
-        <div className="stop-playing-cta-wrap">
-          <div 
-            className="stop-playing-cta" 
-            onClick={() => document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' })}
-          >
-            Stop playing, click here
+            <div key={score} className={`score-number ${score > 0 ? "score-pop" : ""}`}>
+              {score}
+            </div>
+
+            <p>Secrets Found</p>
+            <span style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginTop: '8px', fontWeight: 700 }}>Reset Here</span>
           </div>
         </div>
       </section>
