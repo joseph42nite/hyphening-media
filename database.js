@@ -26,6 +26,11 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.pragma('busy_timeout = 5000');
+db.pragma('synchronous = NORMAL');
+db.pragma('cache_size = -64000'); // 64MB memory cache
+db.pragma('temp_store = MEMORY');
+db.pragma('mmap_size = 268435456'); // 256MB memory mapping
+
 
 /**
  * Run all pending SQL migration files in order.
