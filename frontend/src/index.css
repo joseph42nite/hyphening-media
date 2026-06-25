@@ -973,17 +973,18 @@ tr:hover td {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 120px 48px 80px;
+  padding: 140px 24px 60px;
   overflow: hidden;
+  width: 100%;
 }
 
 .hero-bento {
   display: grid;
-  grid-template-columns: 1fr 240px;
+  grid-template-columns: 1fr 280px;
   grid-template-rows: 1fr auto;
   gap: 24px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 100%;
   min-height: 82vh;
 }
 
@@ -1293,42 +1294,7 @@ tr:hover td {
   background: #000000;
 }
 
-.reveal-secret-btn {
-  width: 100%;
-  padding: 10px 16px;
-  font-family: var(--font-heading);
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: #f4f4f5; /* Zinc 100 */
-  color: #a1a1aa; /* Zinc 400 */
-  border: 2px dashed #a1a1aa;
-  border-radius: 999px;
-  cursor: not-allowed;
-  transition: all 0.2s ease;
-  margin-top: 10px;
-  margin-bottom: 4px;
-}
 
-.reveal-secret-btn.active {
-  background: #000000;
-  color: #ffffff;
-  border: 2px solid #000000;
-  box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-}
-
-.reveal-secret-btn.active:hover {
-  transform: translateY(-2px);
-  box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.25);
-  background: #18181b; /* zinc-900 */
-}
-
-.reveal-secret-btn.active:active {
-  transform: translateY(1px);
-  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
-}
 
 /* Responsive bento styling */
 @media (max-width: 992px) {
