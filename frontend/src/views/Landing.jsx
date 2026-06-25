@@ -1046,7 +1046,7 @@ function Landing() {
               </h1>
 
               <p className="hero-desc">
-                Every slice reveals a secret about us.
+                Slice shapes to earn points and reveal our secrets.
               </p>
 
               <button className="play-btn" onClick={(e) => { e.stopPropagation(); setGameMode(true); }} style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
@@ -1088,14 +1088,14 @@ function Landing() {
           {/* Score Card */}
           <div className="hero-card score-card">
             <span className="score-label">
-              DISCOVERED
+              SCORE
             </span>
 
             <div key={score} className={`score-number ${score > 0 ? "score-pop" : ""}`}>
               {score}
             </div>
 
-            <p>Secrets Found</p>
+            <p>Points</p>
 
             {/* Indicator dots (Outline by default, filled black when score threshold reached) */}
             <div className="secret-dots">
