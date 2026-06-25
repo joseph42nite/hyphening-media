@@ -794,6 +794,21 @@ const LinkedinIcon = ({ size = 24, className }) => (
   </svg>
 );
 
+const COMPANY_SECRETS = [
+  "We generated over 1.2B+ organic views for our client partners!",
+  "We scaled a D2C beverage brand from 0 to 250K followers in 5 months.",
+  "Our creative campaigns maintain a 98% client retention rate.",
+  "We drive a 3X average growth multiplier for client social channels.",
+  "We shoot, script, and edit 120+ custom high-retention reels every 60 days.",
+  "We've repositioned a SaaS startup to drive 3X inbound lead growth.",
+  "We manage multi-platform operations across IG, YouTube, TikTok, and LinkedIn.",
+  "We build custom dashboards & client portals for real-time task tracking.",
+  "We execute PR campaigns with placements in top-tier news media publications.",
+  "We secure an average 8.2% engagement rate on scaling brand accounts.",
+  "We've hit over 52M combined views for trending fitness creators.",
+  "We grow local restaurant chain foot traffic by 40% using regional content blitzes."
+];
+
 /* ==========================================================================
    LANDING PAGE — Main Component
    ========================================================================== */
@@ -802,6 +817,7 @@ function Landing() {
   const heroRef = useRef(null);
   const [score, setScore] = useState(0);
   const [gameMode, setGameMode] = useState(false);
+  const [lastSecret, setLastSecret] = useState("");
 
   const handlePointerDown = () => {
     setGameMode(true);
@@ -810,6 +826,8 @@ function Landing() {
   const exitGame = (e) => {
     e.stopPropagation();
     setGameMode(false);
+    setScore(0);
+    setLastSecret("");
     document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -926,11 +944,33 @@ function Landing() {
         <div className="hero-bento">
           {/* Main Game Area */}
           <div className="hero-main" onPointerDown={handlePointerDown}>
-            <SlashCanvas score={score} onScore={(val) => { if (val === 0) setScore(0); else setScore(s => s + 1); }} />
+            <SlashCanvas
+              score={score}
+              onScore={(val) => {
+                if (val === 0) {
+                  setScore(0);
+                  setLastSecret("");
+                } else {
+                  setScore(s => {
+                    const next = s + 1;
+                    const secretIdx = (next - 1) % COMPANY_SECRETS.length;
+                    setLastSecret(COMPANY_SECRETS[secretIdx]);
+                    return next;
+                  });
+                }
+              }}
+            />
 
             {gameMode && (
               <div className="game-score-overlay">
                 Score: {score}
+              </div>
+            )}
+
+            {gameMode && lastSecret && (
+              <div className="game-secret-notification">
+                <span className="secret-tag">Revealed Fact:</span>
+                <p className="secret-text">{lastSecret}</p>
               </div>
             )}
 
@@ -1013,7 +1053,7 @@ function Landing() {
           </div>
 
           {/* Score Card */}
-          <div className="hero-card score-card" onClick={() => setScore(0)} style={{ cursor: 'pointer' }} title="Click to Reset Score">
+          <div className="hero-card score-card" onClick={() => { setScore(0); setLastSecret(""); }} style={{ cursor: 'pointer' }} title="Click to Reset Score">
             <span className="score-label">
               DISCOVERED
             </span>

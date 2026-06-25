@@ -1858,3 +1858,52 @@ tr:hover td {
     width: 100vw;
   }
 }
+
+/* Floating Game Secrets Overlay */
+.game-secret-notification {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  color: black;
+  border: 3px solid black;
+  box-shadow: 4px 4px 0 black;
+  padding: 14px 24px;
+  border-radius: 20px;
+  max-width: 85%;
+  width: 440px;
+  z-index: 10000;
+  text-align: center;
+  pointer-events: none;
+  animation: secretPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes secretPop {
+  0% {
+    transform: translateX(-50%) translateY(24px) scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-50%) translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.game-secret-notification .secret-tag {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #a855f7;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+.game-secret-notification .secret-text {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
