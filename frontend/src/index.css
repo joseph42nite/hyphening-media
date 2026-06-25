@@ -1879,6 +1879,7 @@ tr:hover td {
     border-radius: 0;
     border: none;
     height: 100vh;
+    height: 100dvh;
     width: 100vw;
   }
 }
@@ -1886,7 +1887,7 @@ tr:hover td {
 /* Floating Game Secrets Overlay */
 .game-secret-notification {
   position: absolute;
-  bottom: 32px;
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   background: white;
@@ -1901,6 +1902,13 @@ tr:hover td {
   text-align: center;
   pointer-events: none;
   animation: secretPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@media (max-width: 576px) {
+  .game-secret-notification {
+    bottom: calc(120px + env(safe-area-inset-bottom));
+    max-width: 90%;
+  }
 }
 
 @keyframes secretPop {
