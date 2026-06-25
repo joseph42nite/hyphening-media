@@ -817,7 +817,8 @@ function Landing() {
   const heroRef = useRef(null);
   const [score, setScore] = useState(0);
   const [gameMode, setGameMode] = useState(false);
-  const [lastSecret, setLastSecret] = useState("");
+  const [revealSecretChecked, setRevealSecretChecked] = useState(false);
+  const [unlockedSecret, setUnlockedSecret] = useState("");
 
   const handlePointerDown = () => {
     setGameMode(true);
@@ -827,7 +828,8 @@ function Landing() {
     e.stopPropagation();
     setGameMode(false);
     setScore(0);
-    setLastSecret("");
+    setRevealSecretChecked(false);
+    setUnlockedSecret("");
     document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -949,14 +951,10 @@ function Landing() {
               onScore={(val) => {
                 if (val === 0) {
                   setScore(0);
-                  setLastSecret("");
+                  setRevealSecretChecked(false);
+                  setUnlockedSecret("");
                 } else {
-                  setScore(s => {
-                    const next = s + 1;
-                    const secretIdx = (next - 1) % COMPANY_SECRETS.length;
-                    setLastSecret(COMPANY_SECRETS[secretIdx]);
-                    return next;
-                  });
+                  setScore(s => s + 1);
                 }
               }}
             />
@@ -964,13 +962,6 @@ function Landing() {
             {gameMode && (
               <div className="game-score-overlay">
                 Score: {score}
-              </div>
-            )}
-
-            {gameMode && lastSecret && (
-              <div className="game-secret-notification">
-                <span className="secret-tag">Revealed Fact:</span>
-                <p className="secret-text">{lastSecret}</p>
               </div>
             )}
 
@@ -1053,7 +1044,7 @@ function Landing() {
           </div>
 
           {/* Score Card */}
-          <div className="hero-card score-card" onClick={() => { setScore(0); setLastSecret(""); }} style={{ cursor: 'pointer' }} title="Click to Reset Score">
+          <div className="hero-card score-card">
             <span className="score-label">
               DISCOVERED
             </span>
@@ -1063,7 +1054,56 @@ function Landing() {
             </div>
 
             <p>Secrets Found</p>
-            <span style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginTop: '8px', fontWeight: 700 }}>Reset Here</span>
+
+            {/* Radio-style button to reveal a secret once score >= 3 */}
+            <div className="reveal-secret-container" onClick={(e) => e.stopPropagation()}>
+              <label className={`radio-label ${score >= 3 ? "active" : "disabled"}`}>
+                <input
+                  type="radio"
+                  name="reveal-secret"
+                  checked={revealSecretChecked}
+                  disabled={score < 3}
+                  onChange={() => {
+                    if (score >= 3 && !revealSecretChecked) {
+                      setRevealSecretChecked(true);
+                      const secretIdx = Math.floor(Math.random() * COMPANY_SECRETS.length);
+                      setUnlockedSecret(COMPANY_SECRETS[secretIdx]);
+                    }
+                  }}
+                />
+                <span className="radio-design"></span>
+                <span className="radio-text">Reveal Secret</span>
+              </label>
+            </div>
+
+            {/* Display the secret if unlocked and checked */}
+            {revealSecretChecked && unlockedSecret && (
+              <div className="unlocked-secret-box">
+                <span className="unlocked-label">Hyphening Secret:</span>
+                <p className="unlocked-text">{unlockedSecret}</p>
+              </div>
+            )}
+
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                setScore(0);
+                setRevealSecretChecked(false);
+                setUnlockedSecret("");
+              }}
+              style={{
+                fontSize: '0.55rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#a855f7',
+                marginTop: '12px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+              className="reset-score-trigger"
+            >
+              Reset Here
+            </span>
           </div>
         </div>
       </section>
