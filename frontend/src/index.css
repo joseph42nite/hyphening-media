@@ -993,7 +993,7 @@ tr:hover td {
   overflow: hidden;
   border: 3px solid #000;
   border-radius: 32px;
-  background: #fafafa;
+  background: #fafafa url('./assets/background.webp') no-repeat center/cover;
   grid-row: span 2;
 }
 

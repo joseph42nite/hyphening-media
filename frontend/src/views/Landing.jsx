@@ -826,8 +826,6 @@ function Landing() {
   const exitGame = (e) => {
     e.stopPropagation();
     setGameMode(false);
-    setScore(0);
-    setLastSecret("");
     document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -951,7 +949,14 @@ function Landing() {
                   setScore(0);
                   setLastSecret("");
                 } else {
-                  setScore(s => s + 1);
+                  setScore(s => {
+                    const next = s + 1;
+                    if (next > 0 && next % 12 === 0) {
+                      const secretIdx = Math.floor(Math.random() * COMPANY_SECRETS.length);
+                      setLastSecret(COMPANY_SECRETS[secretIdx]);
+                    }
+                    return next;
+                  });
                 }
               }}
             />
@@ -1055,7 +1060,7 @@ function Landing() {
                 <div className="step-icon">
                   <Sword size={20} strokeWidth={2.5} style={{ transform: 'rotate(-45deg)' }} />
                 </div>
-                <p>Slice it</p>
+                <p>Slice, Ninja</p>
               </div>
 
               <div className="step">
@@ -1081,24 +1086,19 @@ function Landing() {
 
             {/* Indicator dots (Outline by default, filled black when score threshold reached) */}
             <div className="secret-dots">
-              <span className={`dot ${score >= 3 ? "filled" : ""}`} title="3 pts"></span>
-              <span className={`dot ${score >= 6 ? "filled" : ""}`} title="6 pts"></span>
-              <span className={`dot ${score >= 9 ? "filled" : ""}`} title="9 pts"></span>
-              <span className={`dot ${score >= 12 ? "filled" : ""}`} title="12 pts"></span>
+              {(() => {
+                const currentProgress = score % 12;
+                const isFull = currentProgress === 0 && score > 0;
+                return (
+                  <>
+                    <span className={`dot ${isFull || currentProgress >= 3 ? "filled" : ""}`} title="3 pts"></span>
+                    <span className={`dot ${isFull || currentProgress >= 6 ? "filled" : ""}`} title="6 pts"></span>
+                    <span className={`dot ${isFull || currentProgress >= 9 ? "filled" : ""}`} title="9 pts"></span>
+                    <span className={`dot ${isFull ? "filled" : ""}`} title="12 pts"></span>
+                  </>
+                );
+              })()}
             </div>
-
-            {/* Reveal Secret Button */}
-            <button
-              className={`reveal-secret-btn ${score >= 12 ? "active" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                const secretIdx = Math.floor(Math.random() * COMPANY_SECRETS.length);
-                setLastSecret(COMPANY_SECRETS[secretIdx]);
-              }}
-              disabled={score < 12}
-            >
-              Reveal Secret
-            </button>
 
             <span 
               style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginTop: '12px', fontWeight: 700, cursor: 'pointer' }}
