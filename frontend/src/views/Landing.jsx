@@ -817,8 +817,7 @@ function Landing() {
   const heroRef = useRef(null);
   const [score, setScore] = useState(0);
   const [gameMode, setGameMode] = useState(false);
-  const [revealSecretChecked, setRevealSecretChecked] = useState(false);
-  const [unlockedSecret, setUnlockedSecret] = useState("");
+  const [lastSecret, setLastSecret] = useState("");
 
   const handlePointerDown = () => {
     setGameMode(true);
@@ -828,8 +827,7 @@ function Landing() {
     e.stopPropagation();
     setGameMode(false);
     setScore(0);
-    setRevealSecretChecked(false);
-    setUnlockedSecret("");
+    setLastSecret("");
     document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -951,8 +949,7 @@ function Landing() {
               onScore={(val) => {
                 if (val === 0) {
                   setScore(0);
-                  setRevealSecretChecked(false);
-                  setUnlockedSecret("");
+                  setLastSecret("");
                 } else {
                   setScore(s => s + 1);
                 }
@@ -962,6 +959,33 @@ function Landing() {
             {gameMode && (
               <div className="game-score-overlay">
                 Score: {score}
+              </div>
+            )}
+
+            {lastSecret && (
+              <div className="game-secret-notification" style={{ pointerEvents: 'auto' }}>
+                <span className="secret-tag">Revealed Fact:</span>
+                <p className="secret-text" style={{ paddingRight: '24px' }}>{lastSecret}</p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLastSecret("");
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '16px',
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    color: '#a1a1aa'
+                  }}
+                  title="Close"
+                >
+                  ✕
+                </button>
               </div>
             )}
 
@@ -1055,52 +1079,34 @@ function Landing() {
 
             <p>Secrets Found</p>
 
-            {/* Radio-style button to reveal a secret once score >= 3 */}
-            <div className="reveal-secret-container" onClick={(e) => e.stopPropagation()}>
-              <label className={`radio-label ${score >= 3 ? "active" : "disabled"}`}>
-                <input
-                  type="radio"
-                  name="reveal-secret"
-                  checked={revealSecretChecked}
-                  disabled={score < 3}
-                  onChange={() => {
-                    if (score >= 3 && !revealSecretChecked) {
-                      setRevealSecretChecked(true);
-                      const secretIdx = Math.floor(Math.random() * COMPANY_SECRETS.length);
-                      setUnlockedSecret(COMPANY_SECRETS[secretIdx]);
-                    }
-                  }}
-                />
-                <span className="radio-design"></span>
-                <span className="radio-text">Reveal Secret</span>
-              </label>
+            {/* Indicator dots (Outline by default, filled black when score threshold reached) */}
+            <div className="secret-dots">
+              <span className={`dot ${score >= 3 ? "filled" : ""}`} title="3 pts"></span>
+              <span className={`dot ${score >= 6 ? "filled" : ""}`} title="6 pts"></span>
+              <span className={`dot ${score >= 9 ? "filled" : ""}`} title="9 pts"></span>
+              <span className={`dot ${score >= 12 ? "filled" : ""}`} title="12 pts"></span>
             </div>
 
-            {/* Display the secret if unlocked and checked */}
-            {revealSecretChecked && unlockedSecret && (
-              <div className="unlocked-secret-box">
-                <span className="unlocked-label">Hyphening Secret:</span>
-                <p className="unlocked-text">{unlockedSecret}</p>
-              </div>
-            )}
+            {/* Reveal Secret Button */}
+            <button
+              className={`reveal-secret-btn ${score >= 12 ? "active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                const secretIdx = Math.floor(Math.random() * COMPANY_SECRETS.length);
+                setLastSecret(COMPANY_SECRETS[secretIdx]);
+              }}
+              disabled={score < 12}
+            >
+              Reveal Secret
+            </button>
 
-            <span
+            <span 
+              style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginTop: '12px', fontWeight: 700, cursor: 'pointer' }}
               onClick={(e) => {
                 e.stopPropagation();
                 setScore(0);
-                setRevealSecretChecked(false);
-                setUnlockedSecret("");
+                setLastSecret("");
               }}
-              style={{
-                fontSize: '0.55rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                color: '#a855f7',
-                marginTop: '12px',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-              className="reset-score-trigger"
             >
               Reset Here
             </span>

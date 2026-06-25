@@ -1272,6 +1272,64 @@ tr:hover td {
   margin-bottom: 0;
 }
 
+/* Dots and Milestone Buttons inside Score Card */
+.secret-dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0 6px 0;
+}
+
+.secret-dots .dot {
+  width: 12px;
+  height: 12px;
+  border: 2.5px solid #000000;
+  border-radius: 50%;
+  background: transparent;
+  transition: background-color 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.secret-dots .dot.filled {
+  background: #000000;
+}
+
+.reveal-secret-btn {
+  width: 100%;
+  padding: 10px 16px;
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: #f4f4f5; /* Zinc 100 */
+  color: #a1a1aa; /* Zinc 400 */
+  border: 2px dashed #a1a1aa;
+  border-radius: 999px;
+  cursor: not-allowed;
+  transition: all 0.2s ease;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.reveal-secret-btn.active {
+  background: #000000;
+  color: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.reveal-secret-btn.active:hover {
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.25);
+  background: #18181b; /* zinc-900 */
+}
+
+.reveal-secret-btn.active:active {
+  transform: translateY(1px);
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
+}
+
 /* Responsive bento styling */
 @media (max-width: 992px) {
   .landing-hero {
@@ -1859,116 +1917,51 @@ tr:hover td {
   }
 }
 
-/* Reveal secret radio styling */
-.reveal-secret-container {
-  margin-top: 18px;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.radio-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.radio-label.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  color: #71717a;
-}
-
-.radio-label.active {
-  color: #000000;
-}
-
-.radio-label input[type="radio"] {
-  display: none;
-}
-
-/* Custom styled radio button to look like neo-brutalist radio */
-.radio-design {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #000000;
-  border-radius: 50%;
-  display: inline-block;
-  position: relative;
-  background: white;
-  transition: transform 0.15s, background-color 0.15s;
-  box-shadow: 1.5px 1.5px 0px #000;
-}
-
-.radio-label.active:hover .radio-design {
-  transform: scale(1.12);
-}
-
-.radio-label input[type="radio"]:checked + .radio-design {
-  background: #a855f7;
-  box-shadow: 1.5px 1.5px 0px #000;
-}
-
-.radio-label input[type="radio"]:checked + .radio-design::after {
-  content: "";
+/* Floating Game Secrets Overlay */
+.game-secret-notification {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 6px;
-  height: 6px;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
   background: white;
-  border-radius: 50%;
+  color: black;
+  border: 3px solid black;
+  box-shadow: 4px 4px 0 black;
+  padding: 14px 24px;
+  border-radius: 20px;
+  max-width: 85%;
+  width: 440px;
+  z-index: 10000;
+  text-align: center;
+  pointer-events: none;
+  animation: secretPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
-/* Secrets Box inside Score Card */
-.unlocked-secret-box {
-  margin-top: 16px;
-  padding: 14px;
-  background: #fafafa;
-  border: 2px dashed #000000;
-  border-radius: 16px;
-  width: 100%;
-  text-align: left;
-  animation: unlockFadeIn 0.35s cubic-bezier(0.165, 0.84, 0.44, 1) both;
+@keyframes secretPop {
+  0% {
+    transform: translateX(-50%) translateY(24px) scale(0.92);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-50%) translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
-.unlocked-label {
+.game-secret-notification .secret-tag {
   display: block;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 900;
-  color: #a855f7;
   text-transform: uppercase;
+  color: #a855f7;
+  letter-spacing: 0.1em;
   margin-bottom: 6px;
-  letter-spacing: 0.08em;
 }
 
-.unlocked-text {
+.game-secret-notification .secret-text {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  color: #000000;
   line-height: 1.45;
-}
-
-@keyframes unlockFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
