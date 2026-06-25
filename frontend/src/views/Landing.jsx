@@ -37,6 +37,7 @@ const SlashCanvas = ({ score, onScore }) => {
     const resize = () => {
       dpr = window.devicePixelRatio || 1;
       const parent = cvs.parentElement;
+      if (!parent) return;
       W = parent.offsetWidth;
       H = parent.offsetHeight;
       cvs.width = W * dpr;
@@ -47,6 +48,13 @@ const SlashCanvas = ({ score, onScore }) => {
     };
     resize();
     window.addEventListener('resize', resize);
+
+    const resizeObserver = new ResizeObserver(() => {
+      resize();
+    });
+    if (cvs.parentElement) {
+      resizeObserver.observe(cvs.parentElement);
+    }
 
     /* ---------- Shape types ---------- */
     const TYPES = ['circle', 'square', 'hexagon', 'diamond'];
@@ -118,6 +126,10 @@ const SlashCanvas = ({ score, onScore }) => {
       const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
       if (cx < -20 || cy < -20 || cx > W + 20 || cy > H + 20) return;
 
+      if (mouse.current.x === -999) {
+        mouse.current.x = cx;
+        mouse.current.y = cy;
+      }
       mouse.current.px = mouse.current.x;
       mouse.current.py = mouse.current.y;
       mouse.current.x = cx;
@@ -621,6 +633,7 @@ const SlashCanvas = ({ score, onScore }) => {
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('touchmove', onMove);
+      resizeObserver.disconnect();
     };
   }, []);
 
