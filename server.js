@@ -189,17 +189,37 @@ app.get('/api/audit-logs', (req, res) => {
     }
 
     const { entity_type, entity_id, limit = 50, offset = 0 } = req.query;
-    let query = 'SELECT * FROM audit_logs WHERE 1=1';
+    
+    // Construct base query and params for count & select
+    let filterQuery = ' FROM audit_logs WHERE 1=1';
     const params = [];
 
-    if (entity_type) { query += ' AND entity_type = ?'; params.push(entity_type); }
-    if (entity_id) { query += ' AND entity_id = ?'; params.push(parseInt(entity_id)); }
+    if (entity_type) { 
+      filterQuery += ' AND entity_type = ?'; 
+      params.push(entity_type); 
+    }
+    if (entity_id) { 
+      filterQuery += ' AND entity_id = ?'; 
+      params.push(parseInt(entity_id)); 
+    }
 
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
+    // Get total matching logs count
+    const countQuery = `SELECT COUNT(*) as total${filterQuery}`;
+    const total = db.prepare(countQuery).get(...params).total;
 
-    res.json({ logs: db.prepare(query).all(...params) });
+    // Get paginated logs
+    const selectQuery = `SELECT *${filterQuery} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`;
+    const logsParams = [...params, parseInt(limit), parseInt(offset)];
+    const logs = db.prepare(selectQuery).all(...logsParams);
+
+    res.json({ 
+      logs, 
+      total, 
+      limit: parseInt(limit), 
+      offset: parseInt(offset) 
+    });
   } catch (err) {
+    console.error('[AUDIT_API] Error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

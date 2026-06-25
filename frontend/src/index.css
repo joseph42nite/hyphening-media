@@ -530,6 +530,25 @@ tr:hover td {
   text-align: left;
 }
 
+.workspace-layout > div {
+  min-width: 0;
+}
+
+.calendar-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  text-align: left;
+}
+
+.calendar-layout > div {
+  min-width: 0;
+}
+
+.workspace-chat-box {
+  height: 600px;
+}
+
 .dashboard-toolbar {
   display: flex;
   justify-content: space-between;
@@ -677,6 +696,46 @@ tr:hover td {
   .workspace-layout {
     grid-template-columns: 1fr;
   }
+
+  .workspace-layout > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .calendar-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .calendar-layout > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .workspace-client-list {
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    padding-bottom: 8px;
+    gap: 8px !important;
+    scrollbar-width: thin;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .workspace-client-list > div {
+    flex: 0 0 auto !important;
+    padding: 8px 14px !important;
+    font-size: 0.85rem !important;
+    white-space: nowrap !important;
+  }
+
+  .workspace-chat-box {
+    height: 550px !important;
+  }
+
+  /* Reduce mobile bento padding */
+  .glass, .glass-premium, .kanban-column, .kanban-card, .card-metric {
+    padding: 16px !important;
+  }
   
   .dashboard-toolbar {
     flex-direction: column;
@@ -766,8 +825,11 @@ tr:hover td {
   cursor: pointer;
   user-select: none;
 }
-
 .landing-nav-links {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 32px;
@@ -1472,6 +1534,19 @@ tr:hover td {
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(8px);
   animation: fadeSlideDown 0.5s 0.8s ease-out both;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.slash-score-hud:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0px #a855f7;
+  background: rgba(15, 15, 15, 0.95);
+}
+
+.slash-score-hud:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0px 0px 0px #000;
 }
 
 .slash-score-number {

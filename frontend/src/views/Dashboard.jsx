@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import logoImg from '../assets/logo.png';
 import { 
   Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
@@ -54,6 +55,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [clients, setClients] = useState([]);
   const [freelancers, setFreelancers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditLimit, setAuditLimit] = useState(25);
+  const [totalAuditLogs, setTotalAuditLogs] = useState(0);
+  const [assignmentsPage, setAssignmentsPage] = useState(1);
+  const [assignmentsLimit, setAssignmentsLimit] = useState(5);
   const [planningCycles, setPlanningCycles] = useState([]);
   const [artists, setArtists] = useState([]);
   const [venues, setVenues] = useState([]);
@@ -212,9 +218,19 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Auto-scroll only the chat messages container (not the page)
   useEffect(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      const container = chatContainerRef.current;
+      container.scrollTop = container.scrollHeight;
+      const timer = setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 50);
+      return () => clearTimeout(timer);
     }
-  }, [chatMessages]);
+  }, [chatMessages, activeTab, selectedChatClient]);
+
+  // Reset job assignments page when selected client changes
+  useEffect(() => {
+    setAssignmentsPage(1);
+  }, [selectedChatClient]);
 
   // Auto-refresh fetch wrapper: handles expired JWT tokens transparently
   const authFetch = async (url, options = {}) => {
@@ -249,13 +265,19 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     fetchClients();
     if (isAdmin) {
       fetchFreelancers();
-      fetchAuditLogs();
       fetchCurationData();
     }
     if (isAdmin || isSMM) {
       fetchReviewQueue();
     }
   }, [auth]);
+
+  // 1b. Audit Logs Fetch Hook
+  useEffect(() => {
+    if (auth && isAdmin && activeTab === 'audit') {
+      fetchAuditLogs(auditPage, auditLimit);
+    }
+  }, [auth, isAdmin, activeTab, auditPage, auditLimit]);
 
   // 2. SSE Connection Hook
   useEffect(() => {
@@ -397,11 +419,15 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (page = 1, limit = 25) => {
     try {
-      const res = await authFetch('/api/audit-logs');
+      const offset = (page - 1) * limit;
+      const res = await authFetch(`/api/audit-logs?limit=${limit}&offset=${offset}`);
       const data = await res.json();
-      if (res.ok) setAuditLogs(data.logs || []);
+      if (res.ok) {
+        setAuditLogs(data.logs || []);
+        setTotalAuditLogs(data.total || 0);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -1462,9 +1488,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       {/* Top Navbar */}
       <header className="dashboard-header">
         <div className="dashboard-header-left">
-          <h2 style={{ fontSize: '1.4rem', margin: 0, background: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Hyphening Ops
-          </h2>
+          <span
+            onClick={() => navigate('/dashboard')}
+            style={{ display: 'flex', alignItems: 'center', height: '40px', cursor: 'pointer' }}
+          >
+            <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
+          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: sseConnected ? 'var(--success)' : 'var(--danger)' }} />
             {sseConnected ? 'SSE Connected' : 'SSE Disconnected'}
@@ -1544,7 +1573,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             {/* Left Bento: Client selector */}
             <div className="glass" style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: 'fit-content' }}>
               <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '8px' }}>Clients</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="workspace-client-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {clients.map(c => (
                   <div 
                     key={c.id} 
@@ -1574,7 +1603,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 
                 {/* Right Top Bento: Chat */}
-                <div className="glass" style={{ display: 'flex', flexDirection: 'column', height: '600px' }}>
+                <div className="glass workspace-chat-box" style={{ display: 'flex', flexDirection: 'column' }}>
                   <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '12px' }}>
                     Internal Chat — {selectedChatClient.name}
                   </h3>
@@ -1651,14 +1680,21 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {tasks.filter(t => t.client_id === selectedChatClient.id).length === 0 ? (
-                          <tr>
-                            <td colSpan={isVideoEditor ? 5 : 6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                              {isVideoEditor ? 'No video tasks assigned to you for this client.' : 'No tasks assigned to this client.'}
-                            </td>
-                          </tr>
-                        ) : (
-                          tasks.filter(t => t.client_id === selectedChatClient.id).map(task => (
+                        {(() => {
+                          const clientTasks = tasks.filter(t => t.client_id === selectedChatClient.id);
+                          if (clientTasks.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={isVideoEditor ? 5 : 6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                                  {isVideoEditor ? 'No video tasks assigned to you for this client.' : 'No tasks assigned to this client.'}
+                                </td>
+                              </tr>
+                            );
+                          }
+                          const startIndex = (assignmentsPage - 1) * assignmentsLimit;
+                          const paginatedTasks = clientTasks.slice(startIndex, startIndex + assignmentsLimit);
+                          
+                          return paginatedTasks.map(task => (
                             <tr key={task.id}>
                               <td style={{ fontWeight: 'bold' }}>{task.title}</td>
                               <td>
@@ -1718,11 +1754,153 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                                 </select>
                               </td>
                             </tr>
-                          ))
-                        )}
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Pagination Controls */}
+                  {(() => {
+                    const clientTasks = tasks.filter(t => t.client_id === selectedChatClient.id);
+                    if (clientTasks.length === 0) return null;
+                    return (
+                      <div 
+                        style={{ 
+                          marginTop: '16px', 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          flexWrap: 'wrap', 
+                          gap: '16px',
+                          borderTop: '2px solid #000',
+                          paddingTop: '16px'
+                        }}
+                      >
+                        {/* Left: Summary */}
+                        <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+                          Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((assignmentsPage - 1) * assignmentsLimit + 1, clientTasks.length)}</span> to{' '}
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(assignmentsPage * assignmentsLimit, clientTasks.length)}</span> of{' '}
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>{clientTasks.length}</span> entries
+                        </div>
+
+                        {/* Right: Controls */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          {/* Entries selector */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
+                            <select
+                              className="form-control"
+                              value={assignmentsLimit}
+                              onChange={(e) => {
+                                setAssignmentsLimit(parseInt(e.target.value));
+                                setAssignmentsPage(1); // reset to page 1 on limit change
+                              }}
+                              style={{ 
+                                width: 'auto', 
+                                padding: '8px 16px 8px 12px', 
+                                height: 'auto', 
+                                fontSize: '0.85rem',
+                                borderWidth: '2px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <option value={5}>5</option>
+                              <option value={10}>10</option>
+                              <option value={25}>25</option>
+                              <option value={50}>50</option>
+                            </select>
+                            <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
+                          </div>
+
+                          {/* Page numbers/buttons */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              className="btn"
+                              style={{ 
+                                padding: '8px 14px', 
+                                fontSize: '0.75rem', 
+                                borderWidth: '2px', 
+                                boxShadow: '2px 2px 0px #000' 
+                              }}
+                              disabled={assignmentsPage === 1}
+                              onClick={() => setAssignmentsPage(1)}
+                            >
+                              First
+                            </button>
+                            <button
+                              className="btn"
+                              style={{ 
+                                padding: '8px 14px', 
+                                fontSize: '0.75rem', 
+                                borderWidth: '2px', 
+                                boxShadow: '2px 2px 0px #000' 
+                              }}
+                              disabled={assignmentsPage === 1}
+                              onClick={() => setAssignmentsPage(assignmentsPage - 1)}
+                            >
+                              Prev
+                            </button>
+
+                            {/* Dynamic Page Buttons */}
+                            {(() => {
+                              const totalPages = Math.ceil(clientTasks.length / assignmentsLimit);
+                              const buttons = [];
+                              const startPage = Math.max(1, assignmentsPage - 2);
+                              const endPage = Math.min(totalPages, assignmentsPage + 2);
+
+                              for (let i = startPage; i <= endPage; i++) {
+                                buttons.push(
+                                  <button
+                                    key={i}
+                                    className={`btn ${assignmentsPage === i ? 'btn-primary' : ''}`}
+                                    style={{ 
+                                      padding: '8px 12px', 
+                                      fontSize: '0.75rem', 
+                                      borderWidth: '2px', 
+                                      boxShadow: assignmentsPage === i ? 'none' : '2px 2px 0px #000',
+                                      minWidth: '32px'
+                                    }}
+                                    onClick={() => setAssignmentsPage(i)}
+                                  >
+                                    {i}
+                                  </button>
+                                );
+                              }
+                              return buttons;
+                            })()}
+
+                            <button
+                              className="btn"
+                              style={{ 
+                                padding: '8px 14px', 
+                                fontSize: '0.75rem', 
+                                borderWidth: '2px', 
+                                boxShadow: '2px 2px 0px #000' 
+                              }}
+                              disabled={assignmentsPage >= Math.ceil(clientTasks.length / assignmentsLimit)}
+                              onClick={() => setAssignmentsPage(assignmentsPage + 1)}
+                            >
+                              Next
+                            </button>
+                            <button
+                              className="btn"
+                              style={{ 
+                                padding: '8px 14px', 
+                                fontSize: '0.75rem', 
+                                borderWidth: '2px', 
+                                boxShadow: '2px 2px 0px #000' 
+                              }}
+                              disabled={assignmentsPage >= Math.ceil(clientTasks.length / assignmentsLimit)}
+                              onClick={() => setAssignmentsPage(Math.ceil(clientTasks.length / assignmentsLimit))}
+                            >
+                              Last
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
               </div>
@@ -1873,7 +2051,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
               </div>
             </div>
 
-            <div className="workspace-layout" style={{ gridTemplateColumns: '1fr 320px' }}>
+            <div className="calendar-layout">
               {/* Calendar Grid */}
               <div className="glass" style={{ padding: '16px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '6px', textAlign: 'center', fontWeight: 'bold', marginBottom: '12px', borderBottom: '2px solid #000', paddingBottom: '8px' }}>
@@ -2225,11 +2403,34 @@ export default function Dashboard({ auth, setAuth, showToast }) {
               }
 
               const renderScriptGrid = (scripts) => (
-                <div className="grid-auto" style={{ marginBottom: '24px' }}>
+                <div 
+                  style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', 
+                    gap: '24px', 
+                    marginBottom: '24px' 
+                  }}
+                >
                   {scripts.map(item => (
-                    <div key={item.id} className="glass" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                        <h4 style={{ fontSize: '1.1rem', margin: 0, flexGrow: 1, textAlign: 'left' }}>{item.title}</h4>
+                    <div key={item.id} className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                        <h4 style={{ fontSize: '1.2rem', margin: 0, flexGrow: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {item.title}
+                          <span 
+                            className={`badge badge-${item.format === 'long_format' ? 'info' : 'success'}`} 
+                            style={{ 
+                              fontSize: '0.6rem', 
+                              padding: '2px 8px', 
+                              borderWidth: '1.5px',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase',
+                              lineHeight: '1',
+                              boxShadow: 'none'
+                            }}
+                          >
+                            {item.format === 'long_format' ? 'Long Format' : 'Reel'}
+                          </span>
+                        </h4>
                         
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
@@ -2259,20 +2460,20 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                           </button>
                         </div>
                       </div>
-
+ 
                       <div style={{ 
-                        maxHeight: '150px', 
+                        maxHeight: '350px', 
                         overflowY: 'auto', 
-                        padding: '10px', 
+                        padding: '14px', 
                         borderRadius: '4px', 
                         backgroundColor: 'rgba(0,0,0,0.1)', 
-                        fontSize: '0.85rem', 
+                        fontSize: '0.9rem', 
                         whiteSpace: 'pre-wrap',
                         textAlign: 'left'
                       }}>
                         {item.script_text}
                       </div>
-
+ 
                       {(item.reference_video_link || item.reaction_video_link) && (
                         <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', marginTop: '4px', flexWrap: 'wrap' }}>
                           {item.reference_video_link && (
@@ -2291,70 +2492,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   ))}
                 </div>
               );
-
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Reels Collapsible Header */}
-                  <div 
-                    onClick={() => setReelsExpanded(!reelsExpanded)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '14px 20px',
-                      background: '#fff',
-                      border: '3px solid #000',
-                      borderRadius: 'var(--radius-sm)',
-                      boxShadow: 'var(--shadow-sm)',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '1rem',
-                      textTransform: 'uppercase',
-                      userSelect: 'none'
-                    }}
-                  >
-                    <span>Reel Scripts ({reelsScripts.length})</span>
-                    <span style={{ transition: 'transform 0.15s', transform: reelsExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-                  </div>
-                  {reelsExpanded && (
-                    reelsScripts.length === 0 ? (
-                      <div className="glass" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        No reel format scripts found for this client and month.
-                      </div>
-                    ) : renderScriptGrid(reelsScripts)
-                  )}
-
-                  {/* Long Format Collapsible Header */}
-                  <div 
-                    onClick={() => setLongFormatExpanded(!longFormatExpanded)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '14px 20px',
-                      background: '#fff',
-                      border: '3px solid #000',
-                      borderRadius: 'var(--radius-sm)',
-                      boxShadow: 'var(--shadow-sm)',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '1rem',
-                      textTransform: 'uppercase',
-                      userSelect: 'none'
-                    }}
-                  >
-                    <span>Long Format Scripts ({longFormatScripts.length})</span>
-                    <span style={{ transition: 'transform 0.15s', transform: longFormatExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-                  </div>
-                  {longFormatExpanded && (
-                    longFormatScripts.length === 0 ? (
-                      <div className="glass" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        No long format scripts found for this client and month.
-                      </div>
-                    ) : renderScriptGrid(longFormatScripts)
-                  )}
-                </div>
-              );
+ 
+              return renderScriptGrid(monthlyScripts);
             })()}
           </div>
         )}
@@ -2459,40 +2598,36 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                             <td><span className="badge badge-info">{item.post_type}</span></td>
                             <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script_title || item.script}>{item.script_title || item.script || '-'}</td>
                             <td>
-                              {['Posted', 'Pending'].includes(item.status) ? (
-                                <select
-                                  value={item.status}
-                                  onChange={(e) => updateContentStatus(item.id, e.target.value)}
-                                  style={{
-                                    padding: '6px 24px 6px 12px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: '800',
-                                    borderRadius: '9999px',
-                                    border: '2px solid #000000',
-                                    textTransform: 'uppercase',
-                                    cursor: 'pointer',
-                                    appearance: 'none',
-                                    WebkitAppearance: 'none',
-                                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                                    backgroundRepeat: 'no-repeat',
-                                    backgroundPosition: 'right 8px center',
-                                    backgroundSize: '10px',
-                                    backgroundColor: item.status === 'Posted' ? '#d1fae5' : '#fee2e2',
-                                    color: item.status === 'Posted' ? '#065f46' : '#991b1b',
-                                    boxShadow: 'var(--shadow-sm)'
-                                  }}
-                                >
-                                  <option value="Pending" style={{ color: '#991b1b', background: '#fee2e2', fontWeight: '800' }}>Pending</option>
-                                  <option value="Posted" style={{ color: '#065f46', background: '#d1fae5', fontWeight: '800' }}>Posted</option>
-                                </select>
-                              ) : (
-                                <span className={`badge badge-${
-                                  item.status === 'Posted' ? 'success' : 
-                                  (item.status === 'Pending Client Approval' ? 'warning' : 'muted')
-                                }`}>
-                                  {item.status}
-                                </span>
-                              )}
+                              <select
+                                value={item.status === 'Pending Client Approval' || item.status === 'Client Approved' ? 'Pending' : (item.status === 'Client Rejected' ? 'Draft' : item.status)}
+                                onChange={(e) => updateContentStatus(item.id, e.target.value)}
+                                style={{
+                                  padding: '6px 24px 6px 12px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  borderRadius: '9999px',
+                                  border: '2px solid #000000',
+                                  textTransform: 'uppercase',
+                                  cursor: 'pointer',
+                                  appearance: 'none',
+                                  WebkitAppearance: 'none',
+                                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundPosition: 'right 8px center',
+                                  backgroundSize: '10px',
+                                  backgroundColor: 
+                                    item.status === 'Posted' ? '#d1fae5' : 
+                                    (['Pending', 'Pending Client Approval', 'Client Approved'].includes(item.status) ? '#fee2e2' : '#f4f4f5'),
+                                  color: 
+                                    item.status === 'Posted' ? '#065f46' : 
+                                    (['Pending', 'Pending Client Approval', 'Client Approved'].includes(item.status) ? '#991b1b' : '#52525b'),
+                                  boxShadow: 'var(--shadow-sm)'
+                                }}
+                              >
+                                <option value="Draft" style={{ color: '#52525b', background: '#f4f4f5', fontWeight: '800' }}>Draft</option>
+                                <option value="Pending" style={{ color: '#991b1b', background: '#fee2e2', fontWeight: '800' }}>Pending</option>
+                                <option value="Posted" style={{ color: '#065f46', background: '#d1fae5', fontWeight: '800' }}>Posted</option>
+                              </select>
                             </td>
                             <td>
                               {item.link ? (
@@ -2933,18 +3068,162 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {auditLogs.map(log => (
-                    <tr key={log.id}>
-                      <td style={{ fontSize: '0.8rem' }}>{log.created_at ? formatDateStr(log.created_at.split(' ')[0]) : '-'}</td>
-                      <td style={{ fontWeight: '500' }}>{log.actor_email || 'System'}</td>
-                      <td><span className="badge badge-info">{log.action}</span></td>
-                      <td>{log.entity_type} #{log.entity_id}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{log.diff}</td>
+                  {auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                        No audit logs available.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    auditLogs.map(log => (
+                      <tr key={log.id}>
+                        <td style={{ fontSize: '0.8rem' }}>{log.created_at ? formatDateStr(log.created_at.split(' ')[0]) : '-'}</td>
+                        <td style={{ fontWeight: '500' }}>{log.actor_email || 'System'}</td>
+                        <td><span className="badge badge-info">{log.action}</span></td>
+                        <td>{log.entity_type} #{log.entity_id}</td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{log.diff}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalAuditLogs > 0 && (
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginTop: '20px', 
+                  flexWrap: 'wrap', 
+                  gap: '16px' 
+                }}
+              >
+                {/* Left: Summary */}
+                <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+                  Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((auditPage - 1) * auditLimit + 1, totalAuditLogs)}</span> to{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(auditPage * auditLimit, totalAuditLogs)}</span> of{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{totalAuditLogs}</span> entries
+                </div>
+
+                {/* Right: Controls */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  {/* Entries selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
+                    <select
+                      className="form-control"
+                      value={auditLimit}
+                      onChange={(e) => {
+                        setAuditLimit(parseInt(e.target.value));
+                        setAuditPage(1); // reset to page 1 on limit change
+                      }}
+                      style={{ 
+                        width: 'auto', 
+                        padding: '8px 16px 8px 12px', 
+                        height: 'auto', 
+                        fontSize: '0.85rem',
+                        borderWidth: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
+                  </div>
+
+                  {/* Page numbers/buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={auditPage === 1}
+                      onClick={() => setAuditPage(1)}
+                    >
+                      First
+                    </button>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={auditPage === 1}
+                      onClick={() => setAuditPage(auditPage - 1)}
+                    >
+                      Prev
+                    </button>
+
+                    {/* Dynamic Page Buttons */}
+                    {(() => {
+                      const totalPages = Math.ceil(totalAuditLogs / auditLimit);
+                      const buttons = [];
+                      const startPage = Math.max(1, auditPage - 2);
+                      const endPage = Math.min(totalPages, auditPage + 2);
+
+                      for (let i = startPage; i <= endPage; i++) {
+                        buttons.push(
+                          <button
+                            key={i}
+                            className={`btn ${auditPage === i ? 'btn-primary' : ''}`}
+                            style={{ 
+                              padding: '8px 12px', 
+                              fontSize: '0.75rem', 
+                              borderWidth: '2px', 
+                              boxShadow: auditPage === i ? 'none' : '2px 2px 0px #000',
+                              minWidth: '32px'
+                            }}
+                            onClick={() => setAuditPage(i)}
+                          >
+                            {i}
+                          </button>
+                        );
+                      }
+                      return buttons;
+                    })()}
+
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={auditPage >= Math.ceil(totalAuditLogs / auditLimit)}
+                      onClick={() => setAuditPage(auditPage + 1)}
+                    >
+                      Next
+                    </button>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={auditPage >= Math.ceil(totalAuditLogs / auditLimit)}
+                      onClick={() => setAuditPage(Math.ceil(totalAuditLogs / auditLimit))}
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -3435,11 +3714,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     onChange={e => setContentFormData({ ...contentFormData, status: e.target.value })}
                   >
                     <option value="Draft">Draft</option>
-                    <option value="Pending Client Approval">Pending Client Approval</option>
-                    <option value="Client Approved">Client Approved</option>
-                    <option value="Client Rejected">Client Rejected</option>
-                    <option value="Posted">Posted</option>
                     <option value="Pending">Pending</option>
+                    <option value="Posted">Posted</option>
                   </select>
                 </div>
               </div>

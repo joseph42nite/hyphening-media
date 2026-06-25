@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export default function Login({ setAuth, showToast }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -53,19 +56,53 @@ export default function Login({ setAuth, showToast }) {
         maxWidth: '420px',
         padding: '40px',
         textAlign: 'center',
-        animation: 'fadeIn 0.4s ease-out'
+        animation: 'fadeIn 0.4s ease-out',
+        position: 'relative'
       }}>
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ 
-            fontSize: '2.5rem', 
-            margin: '0 0 8px',
-            background: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            fontWeight: 700
-          }}>
-            Hyphening
-          </h1>
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            position: 'absolute',
+            top: '24px',
+            left: '24px',
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            border: '3px solid #000000',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#ffffff',
+            cursor: 'pointer',
+            boxShadow: '3px 3px 0px #000000',
+            transition: 'all 0.15s ease',
+            padding: 0
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translate(-1px, -1px)';
+            e.currentTarget.style.boxShadow = '4px 4px 0px #000000';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translate(0px, 0px)';
+            e.currentTarget.style.boxShadow = '3px 3px 0px #000000';
+          }}
+          title="Back to Landing Page"
+        >
+          <ArrowLeft size={16} strokeWidth={3} />
+        </button>
+
+        <div style={{ marginBottom: '32px', marginTop: '16px' }}>
+          <img 
+            src={logoImg} 
+            alt="Hyphening Media Logo" 
+            style={{ 
+              height: '80px', 
+              width: 'auto', 
+              display: 'block', 
+              margin: '0 auto 12px' 
+            }} 
+          />
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             Marketing Ops Command Center
           </p>
@@ -86,14 +123,40 @@ export default function Login({ setAuth, showToast }) {
 
           <div className="form-group" style={{ marginBottom: '28px' }}>
             <label className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-control"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-control"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ paddingRight: '48px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '8px',
+                  color: 'var(--text-muted)',
+                  transition: 'color 0.15s ease'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button 

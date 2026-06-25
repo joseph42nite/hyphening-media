@@ -683,15 +683,24 @@ function Landing() {
     <div className="landing-root">
       {/* ===== Fixed Navigation ===== */}
       <nav className="landing-nav">
-        <span className="landing-nav-logo" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
+        <span
+          className="landing-nav-logo"
+          onClick={(e) => {
+            e.preventDefault();
+            heroRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          style={{ display: 'flex', alignItems: 'center', height: '40px', cursor: 'pointer' }}
+        >
           <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
         </span>
         
         {/* Middle Links (Visible on desktop) */}
         <div className="landing-nav-links">
+          <a href="#our-story" onClick={(e) => { e.preventDefault(); document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' }); }}>Our story</a>
           <a href="#capabilities" onClick={(e) => { e.preventDefault(); document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' }); }}>Services</a>
           <a href="#portfolio" onClick={(e) => { e.preventDefault(); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }}>Portfolio</a>
-          <a href="mailto:hello@hyphening.com">Contact</a>
+          <a href="#faq" onClick={(e) => { e.preventDefault(); document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }); }}>FAQ</a>
+          <a href="#contact" onClick={(e) => { e.preventDefault(); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Contact</a>
         </div>
 
         {/* Hamburger button on the right */}
@@ -709,7 +718,15 @@ function Landing() {
         <div className="landing-drawer-overlay" onClick={() => setMenuOpen(false)} />
         <div className="landing-drawer-content">
           <div className="landing-drawer-header">
-            <span className="landing-nav-logo" style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
+            <span
+              className="landing-nav-logo"
+              onClick={(e) => {
+                e.preventDefault();
+                setMenuOpen(false);
+                heroRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{ display: 'flex', alignItems: 'center', height: '40px', cursor: 'pointer' }}
+            >
               <img src={logoImg} alt="Hyphening Media" style={{ height: '70px', width: 'auto' }} />
             </span>
             <button className="landing-nav-hamburger close-btn" onClick={() => setMenuOpen(false)}>
@@ -717,9 +734,11 @@ function Landing() {
             </button>
           </div>
           <div className="landing-drawer-links">
+            <a href="#our-story" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' }); }}>Our story</a>
             <a href="#capabilities" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' }); }}>Services</a>
             <a href="#portfolio" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }}>Portfolio</a>
-            <a href="mailto:hello@hyphening.com" onClick={() => setMenuOpen(false)}>Contact</a>
+            <a href="#faq" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }); }}>FAQ</a>
+            <a href="#contact" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Contact</a>
             
             <div className="landing-drawer-divider" />
             
@@ -735,15 +754,29 @@ function Landing() {
         <SlashCanvas onScore={() => setScore(s => s + 1)} />
 
         {/* Score HUD */}
-        <div className="slash-score-hud">
+        <div className="slash-score-hud" onClick={() => setScore(0)} title="Click to Reset Score">
           <span className="slash-score-number">{score}</span>
           <span className="slash-score-label">Sliced</span>
+          <span style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginTop: '4px', fontWeight: 700 }}>Reset Here</span>
         </div>
 
         {/* Minimal brand text */}
         <div className="landing-hero-content">
           <h1 className="hero-headline">
-            <span className="word">
+            <span style={{
+              position: 'absolute',
+              width: '1px',
+              height: '1px',
+              padding: '0',
+              margin: '-1px',
+              overflow: 'hidden',
+              clip: 'rect(0, 0, 0, 0)',
+              whiteSpace: 'nowrap',
+              border: '0'
+            }}>
+              Welcome to HYPHENING MEDIA, Seeker! Creative Operations & Marketing Performance Agency.
+            </span>
+            <span className="word" aria-hidden="true">
               <span className="word-inner" style={{ animationDelay: '0.15s' }}>
                 <EncryptedText
                   text="Welcome to HYPHENING MEDIA, Seeker!"
@@ -781,7 +814,19 @@ function Landing() {
       </div>
 
       {/* ===== Japanese Image ===== */}
-      <div className="japanese-image-wrapper" style={{ width: '100%', maxWidth: '1200px', margin: '60px auto', padding: '0 20px', display: 'flex', justifyContent: 'center' }}>
+      <div 
+        id="our-story" 
+        className="japanese-image-wrapper" 
+        style={{ 
+          width: '100%', 
+          maxWidth: '1200px', 
+          margin: '60px auto', 
+          padding: '0 20px', 
+          display: 'flex', 
+          justifyContent: 'center',
+          scrollMarginTop: '120px'
+        }}
+      >
         <img src={japaneseImg} alt="Japanese Art" style={{ maxWidth: '100%', height: 'auto', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
       </div>
 
@@ -851,13 +896,123 @@ function Landing() {
                   {name}
                 </span>
               ))}
-            </div>
-          </div>
         </div>
       </div>
+    </div>
+  </div>
+
+      {/* ===== FAQ Section (SEO & AEO Optimized) ===== */}
+      <section className="landing-section" id="faq" style={{ background: '#ffffff', borderTop: '3px solid #000000', borderBottom: '3px solid #000000', padding: '80px 24px', scrollMarginTop: '120px' }}>
+        <div className="section-label"><Users size={12} style={{ marginRight: '6px' }} /> FAQ</div>
+        <h2 className="section-heading">Frequently Asked Questions</h2>
+        
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          maxWidth: '800px',
+          margin: '40px auto 0 auto',
+          textAlign: 'left'
+        }}>
+          {[
+            {
+              q: "What is Hyphening Media?",
+              a: "Hyphening Media is a premium creative operations and marketing agency that scales D2C, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development."
+            },
+            {
+              q: "What services does Hyphening Media offer?",
+              a: "Hyphening Media offers comprehensive services including content strategy, short and long form video production, multi-platform social media operations, custom high-performance web development, mobile app development, performance analytics, conversion-optimized campaign management, visual brand identity development, and news media PR."
+            },
+            {
+              q: "How does Hyphening Media scale D2C and F&B brands?",
+              a: "Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, and operational automation dashboards. We focus on real performance metrics like CTR, conversions, and organic views rather than vanity metrics."
+            },
+            {
+              q: "Does Hyphening Media provide custom analytics and client portals?",
+              a: "Yes, Hyphening Media provides all client partners with an automated secure Client Portal where they can review marketing scripts, track active video and design tasks in real-time, view platform-specific performance analytics, and manage creative campaigns."
+            }
+          ].map((item, idx) => (
+            <div key={idx} className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <h3 style={{ fontSize: '1.15rem', margin: 0, textTransform: 'none', letterSpacing: 'normal', fontFamily: 'var(--font-heading)', fontWeight: '800' }}>
+                {item.q}
+              </h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6', fontWeight: 500 }}>
+                {item.a}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* JSON-LD Structured Data Schema for SEO & AEO */}
+      <script 
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "FAQPage",
+                "@id": "https://hyphening.com/#faq",
+                "mainEntity": [
+                  {
+                    "@type": "Question",
+                    "name": "What is Hyphening Media?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "Hyphening Media is a premium creative operations and marketing agency that scales D2C, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development."
+                    }
+                  },
+                  {
+                    "@type": "Question",
+                    "name": "What services does Hyphening Media offer?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "Hyphening Media offers comprehensive services including content strategy, short and long form video production, multi-platform social media operations, custom high-performance web development, mobile app development, performance analytics, conversion-optimized campaign management, visual brand identity development, and news media PR."
+                    }
+                  },
+                  {
+                    "@type": "Question",
+                    "name": "How does Hyphening Media scale D2C and F&B brands?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, and operational automation dashboards. We focus on real performance metrics like CTR, conversions, and organic views rather than vanity metrics."
+                    }
+                  },
+                  {
+                    "@type": "Question",
+                    "name": "Does Hyphening Media provide custom analytics and client portals?",
+                    "acceptedAnswer": {
+                      "@type": "Answer",
+                      "text": "Yes, Hyphening Media provides all client partners with an automated secure Client Portal where they can review marketing scripts, track active video and design tasks in real-time, view platform-specific performance analytics, and manage creative campaigns."
+                    }
+                  }
+                ]
+              },
+              {
+                "@type": "ProfessionalService",
+                "@id": "https://hyphening.com/#organization",
+                "name": "Hyphening Media",
+                "url": "https://hyphening.com",
+                "image": "https://hyphening.com/favicon.png",
+                "address": {
+                  "@type": "PostalAddress",
+                  "addressLocality": "Mumbai",
+                  "addressRegion": "Maharashtra",
+                  "addressCountry": "IN"
+                },
+                "sameAs": [
+                  "https://instagram.com/hyphening",
+                  "https://linkedin.com/company/hyphening"
+                ]
+              }
+            ]
+          })
+        }}
+      />
 
       {/* ===== Footer CTA ===== */}
-      <div className="landing-footer-cta">
+      <div className="landing-footer-cta" id="contact">
         <h2>Ready to Scale Your Brand?</h2>
         <p>
           Let's build a content engine that works while you sleep. Tell us about your brand 
