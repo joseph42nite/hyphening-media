@@ -25,7 +25,7 @@ export const authLimiter = rateLimit({
   max: process.env.NODE_ENV === 'production' ? 100 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many authentication attempts, please try again later.' },
+  message: { error: "Too many authentication attempts, please try again later." },
 });
 
 /**
