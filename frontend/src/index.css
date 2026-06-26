@@ -338,6 +338,7 @@ tr:hover td {
   line-height: 1;
   background: none;
   -webkit-background-clip: unset;
+  background-clip: unset;
   -webkit-text-fill-color: unset;
 }
 
