@@ -37,8 +37,28 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const isOverdue = (task) => {
     if (!task.due_date || task.status === 'delivered') return false;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     return task.due_date < todayStr;
+  };
+
+  const getTaskPriority = (task) => {
+    if (task.task_type === 'social') {
+      if (task.due_date) {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        if (task.due_date < todayStr) return 'high';
+        if (task.due_date === todayStr) return 'medium';
+        if (task.due_date > todayStr) return 'low';
+      }
+      return 'medium';
+    }
+    return task.priority || 'medium';
+  };
+
+  const getPriorityBadgeClass = (priority) => {
+    if (priority === 'urgent' || priority === 'high') return 'danger';
+    if (priority === 'medium') return 'warning';
+    if (priority === 'low') return 'muted';
+    return 'muted';
   };
 
   const userRole = auth?.role || 'ops_video_editor';
@@ -1736,8 +1756,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                                 <span className="badge badge-muted" style={{ fontSize: '0.7rem' }}>{task.task_type}</span>
                               </td>
                               <td>
-                                <span className={`badge badge-${task.priority === 'urgent' || task.priority === 'high' ? 'danger' : 'warning'}`}>
-                                  {task.priority}
+                                <span className={`badge badge-${getPriorityBadgeClass(getTaskPriority(task))}`}>
+                                  {getTaskPriority(task)}
                                 </span>
                               </td>
                               <td style={{ color: isOverdue(task) ? 'var(--danger)' : 'inherit', fontWeight: isOverdue(task) ? 'bold' : 'normal' }}>
@@ -2003,8 +2023,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                                   <AlertTriangle size={10} /> OVERDUE
                                 </span>
                               )}
-                              <span className={`badge badge-${task.priority === 'urgent' || task.priority === 'high' ? 'danger' : 'warning'}`} style={{ fontSize: '0.65rem' }}>
-                                {task.priority}
+                              <span className={`badge badge-${getPriorityBadgeClass(getTaskPriority(task))}`} style={{ fontSize: '0.65rem' }}>
+                                {getTaskPriority(task)}
                               </span>
                             </div>
                           </div>
