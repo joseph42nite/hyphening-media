@@ -1986,7 +1986,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                               fontWeight: isOverdue(task) ? 'bold' : 'normal',
                               marginTop: '2px' 
                             }}>
-                              Due: {formatDateStr(task.due_date)} {isOverdue(task) && '⚠️'}
+                              {formatDateStr(task.due_date)} {isOverdue(task) && '⚠️'}
                             </div>
                           )}
                           {task.freelancer_name && (
