@@ -88,6 +88,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [gigs, setGigs] = useState([]);
   const [gigsPage, setGigsPage] = useState(1);
   const [gigsLimit, setGigsLimit] = useState(10);
+  const [artistSearch, setArtistSearch] = useState('');
+  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
+  const [venueSearch, setVenueSearch] = useState('');
+  const [showVenueDropdown, setShowVenueDropdown] = useState(false);
   const [reviewQueue, setReviewQueue] = useState([]);
   
   // Selected client for marketing reports
@@ -975,17 +979,25 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         advance_paid: gig.advance_paid !== null && gig.advance_paid !== undefined ? String(gig.advance_paid) : '0',
         status: gig.status || 'Pending'
       });
+      const artist = artists.find(a => a.id === gig.artist_id);
+      setArtistSearch(artist ? `${artist.name} (${artist.category || 'No Category'})` : '');
+      const venue = venues.find(v => v.id === gig.venue_id);
+      setVenueSearch(venue ? venue.name : '');
     } else {
       setEditingGig(null);
+      const defaultArtist = artists.length > 0 ? artists[0] : null;
+      const defaultVenue = venues.length > 0 ? venues[0] : null;
       setGigFormData({
-        artist_id: artists.length > 0 ? String(artists[0].id) : '',
-        venue_id: venues.length > 0 ? String(venues[0].id) : '',
+        artist_id: defaultArtist ? String(defaultArtist.id) : '',
+        venue_id: defaultVenue ? String(defaultVenue.id) : '',
         planning_cycle_id: planningCycles.length > 0 ? String(planningCycles[0].id) : '',
         gig_date: new Date().toISOString().split('T')[0],
         fee_inr: '0',
         advance_paid: '0',
         status: 'Pending'
       });
+      setArtistSearch(defaultArtist ? `${defaultArtist.name} (${defaultArtist.category || 'No Category'})` : '');
+      setVenueSearch(defaultVenue ? defaultVenue.name : '');
     }
     setShowGigModal(true);
   };
@@ -4877,32 +4889,146 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             <form onSubmit={handleGigSubmit} style={{ marginTop: '20px' }}>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Artist</label>
-                  <select
+                  <input
+                    type="text"
                     className="form-control"
-                    value={gigFormData.artist_id}
-                    onChange={e => setGigFormData({ ...gigFormData, artist_id: e.target.value })}
+                    placeholder="Search artist..."
+                    value={artistSearch}
+                    onChange={e => {
+                      setArtistSearch(e.target.value);
+                      setShowArtistDropdown(true);
+                      const match = artists.find(a => 
+                        `${a.name} (${a.category || 'No Category'})` === e.target.value ||
+                        a.name === e.target.value
+                      );
+                      if (match) {
+                        setGigFormData(prev => ({ ...prev, artist_id: String(match.id) }));
+                      } else {
+                        setGigFormData(prev => ({ ...prev, artist_id: '' }));
+                      }
+                    }}
+                    onFocus={() => setShowArtistDropdown(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowArtistDropdown(false), 200);
+                    }}
                     required
-                  >
-                    <option value="">Select Artist</option>
-                    {artists.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} ({a.category || 'No Category'})</option>
-                    ))}
-                  </select>
+                  />
+                  {showArtistDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 1000,
+                      background: '#fff',
+                      border: '3px solid #000',
+                      borderRadius: '8px',
+                      boxShadow: '4px 4px 0 #000',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      marginTop: '4px'
+                    }}>
+                      {(() => {
+                        const filtered = artists.filter(a => 
+                          a.name.toLowerCase().includes(artistSearch.toLowerCase()) || 
+                          (a.category && a.category.toLowerCase().includes(artistSearch.toLowerCase()))
+                        );
+                        if (filtered.length === 0) {
+                          return <div style={{ padding: '8px 12px', color: '#888', fontWeight: 'bold' }}>No artists found</div>;
+                        }
+                        return filtered.map(a => (
+                          <div
+                            key={a.id}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setGigFormData(prev => ({ ...prev, artist_id: String(a.id) }));
+                              setArtistSearch(`${a.name} (${a.category || 'No Category'})`);
+                              setShowArtistDropdown(false);
+                            }}
+                            className="dropdown-item-hover"
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              borderBottom: '1px solid #eee'
+                            }}
+                          >
+                            {a.name} ({a.category || 'No Category'})
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Location / Venue</label>
-                  <select
+                  <input
+                    type="text"
                     className="form-control"
-                    value={gigFormData.venue_id}
-                    onChange={e => setGigFormData({ ...gigFormData, venue_id: e.target.value })}
-                  >
-                    <option value="">Select Venue (None)</option>
-                    {venues.map(v => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
-                    ))}
-                  </select>
+                    placeholder="Search venue..."
+                    value={venueSearch}
+                    onChange={e => {
+                      setVenueSearch(e.target.value);
+                      setShowVenueDropdown(true);
+                      const match = venues.find(v => v.name === e.target.value);
+                      if (match) {
+                        setGigFormData(prev => ({ ...prev, venue_id: String(match.id) }));
+                      } else {
+                        setGigFormData(prev => ({ ...prev, venue_id: '' }));
+                      }
+                    }}
+                    onFocus={() => setShowVenueDropdown(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowVenueDropdown(false), 200);
+                    }}
+                  />
+                  {showVenueDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 1000,
+                      background: '#fff',
+                      border: '3px solid #000',
+                      borderRadius: '8px',
+                      boxShadow: '4px 4px 0 #000',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      marginTop: '4px'
+                    }}>
+                      {(() => {
+                        const filtered = venues.filter(v => 
+                          v.name.toLowerCase().includes(venueSearch.toLowerCase())
+                        );
+                        if (filtered.length === 0) {
+                          return <div style={{ padding: '8px 12px', color: '#888', fontWeight: 'bold' }}>No venues found</div>;
+                        }
+                        return filtered.map(v => (
+                          <div
+                            key={v.id}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setGigFormData(prev => ({ ...prev, venue_id: String(v.id) }));
+                              setVenueSearch(v.name);
+                              setShowVenueDropdown(false);
+                            }}
+                            className="dropdown-item-hover"
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              borderBottom: '1px solid #eee'
+                            }}
+                          >
+                            {v.name}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
 

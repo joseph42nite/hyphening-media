@@ -1940,3 +1940,9 @@ tr:hover td {
   font-weight: 700;
   line-height: 1.45;
 }
+
+/* Custom Dropdown Suggestion Combobox Hover */
+.dropdown-item-hover:hover {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
