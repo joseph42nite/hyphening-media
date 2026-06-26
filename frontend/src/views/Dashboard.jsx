@@ -1471,14 +1471,17 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     tasks.forEach(t => {
       if (t.due_date === selectedDateStr) {
         if (!calendarClientFilter || t.client_id === parseInt(calendarClientFilter)) {
-          selectedEvents.push({
-            type: 'task',
-            title: t.title,
-            clientName: t.client_name,
-            priority: t.priority,
-            status: t.status,
-            originalItem: t
-          });
+          // Synced tasks are already represented by 'content' events, so we exclude 'social' tasks to prevent duplication
+          if (t.task_type !== 'social') {
+            selectedEvents.push({
+              type: 'task',
+              title: t.title,
+              clientName: t.client_name,
+              priority: t.priority,
+              status: t.status,
+              originalItem: t
+            });
+          }
         }
       }
     });
