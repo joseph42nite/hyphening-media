@@ -5,6 +5,9 @@
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
+const ADMIN_CHAT_IDS = ADMIN_CHAT_ID
+  ? ADMIN_CHAT_ID.split(',').map(id => id.trim()).filter(Boolean)
+  : [];
 const SMM_CHAT_ID = process.env.TELEGRAM_SMM_CHAT_ID;
 const VIDEOGRAPHER_CHAT_ID = process.env.TELEGRAM_VIDEOGRAPHER_CHAT_ID;
 const WEBSITE_URL = process.env.WEBSITE_URL || 'http://localhost:3000';
@@ -45,15 +48,22 @@ export async function sendMessage(chatId, text, replyMarkup = null) {
 }
 
 /**
- * Send alert message directly to the Admin.
+ * Send alert message directly to the Admin(s).
  */
 export async function notifyAdmin(text, replyMarkup = null) {
-  if (!ADMIN_CHAT_ID) {
+  if (ADMIN_CHAT_IDS.length === 0) {
     console.log(`[TELEGRAM] Admin Chat ID not configured. Admin alert: ${text}`);
     return null;
   }
   const footer = `\n\n🔗 Open Dashboard: ${WEBSITE_URL}/dashboard`;
-  return sendMessage(ADMIN_CHAT_ID, text + footer, replyMarkup);
+  const results = [];
+  for (const chatId of ADMIN_CHAT_IDS) {
+    const result = await sendMessage(chatId, text + footer, replyMarkup);
+    if (result) {
+      results.push({ chat_id: chatId, message_id: result.message_id });
+    }
+  }
+  return results.length === 1 ? results[0] : results;
 }
 
 /**

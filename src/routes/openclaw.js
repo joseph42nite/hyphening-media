@@ -119,10 +119,11 @@ async function stageAction(eventType, payload) {
 
   const result = await notifyAdmin(message, replyMarkup);
 
-  // Store the Telegram message ID so we can edit it later
-  if (result && result.message_id) {
+  // Store the Telegram message IDs as a JSON string so we can edit them later
+  if (result) {
+    const resultsArray = Array.isArray(result) ? result : [result];
     db.prepare('UPDATE openclaw_pending_actions SET telegram_message_id = ? WHERE action_id = ?')
-      .run(String(result.message_id), actionId);
+      .run(JSON.stringify(resultsArray), actionId);
   }
 
   return actionId;
@@ -220,6 +221,17 @@ router.post('/telegram-callback', async (req, res) => {
       return res.json({ ok: true });
     }
 
+    // Authorization check to ensure the user clicking the button is an authorized admin
+    const userTelegramId = String(callback_query.from?.id || '');
+    const authorizedAdminIds = process.env.TELEGRAM_ADMIN_CHAT_ID
+      ? process.env.TELEGRAM_ADMIN_CHAT_ID.split(',').map(id => id.trim()).filter(Boolean)
+      : [];
+
+    if (authorizedAdminIds.length > 0 && !authorizedAdminIds.includes(userTelegramId)) {
+      await answerCallbackQuery(callback_query.id, '❌ You are not authorized to perform this action.');
+      return res.json({ ok: true });
+    }
+
     const [action, actionId] = callbackData.split(':');
 
     // Lookup the pending action
@@ -236,6 +248,17 @@ router.post('/telegram-callback', async (req, res) => {
     const eventType = pendingAction.event_type;
     const payload = JSON.parse(pendingAction.payload);
 
+    // Get all sent messages to update them all
+    let sentMessages = [];
+    try {
+      const parsed = JSON.parse(pendingAction.telegram_message_id || '[]');
+      sentMessages = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      if (pendingAction.telegram_message_id && pendingAction.telegram_chat_id) {
+        sentMessages = [{ chat_id: pendingAction.telegram_chat_id, message_id: pendingAction.telegram_message_id }];
+      }
+    }
+
     if (action === 'openclaw_accept') {
       // Execute the action
       const result = executeEvent(eventType, payload);
@@ -244,9 +267,16 @@ router.post('/telegram-callback', async (req, res) => {
       db.prepare('UPDATE openclaw_pending_actions SET status = ?, resolved_at = datetime(?) WHERE action_id = ?')
         .run('accepted', new Date().toISOString(), actionId);
 
-      // Edit the Telegram message to show it was accepted
+      // Edit the Telegram message to show it was accepted in all admin chats
       const entityName = eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      await editMessageText(chatId, messageId, `✅ *Done!* ${entityName} has been executed.\n\n${result.summary || ''}`);
+      const updatedText = `✅ *Done!* ${entityName} has been executed.\n\n${result.summary || ''}`;
+      
+      for (const msg of sentMessages) {
+        if (msg && msg.chat_id && msg.message_id) {
+          await editMessageText(msg.chat_id, msg.message_id, updatedText);
+        }
+      }
+
       await answerCallbackQuery(callback_query.id, '✅ Action executed!');
 
       logAction({
@@ -260,7 +290,13 @@ router.post('/telegram-callback', async (req, res) => {
       db.prepare('UPDATE openclaw_pending_actions SET status = ?, resolved_at = datetime(?) WHERE action_id = ?')
         .run('rejected', new Date().toISOString(), actionId);
 
-      await editMessageText(chatId, messageId, `❌ *Action Cancelled.* No changes were made.\n\nOriginal request: ${eventType}`);
+      const updatedText = `❌ *Action Cancelled.* No changes were made.\n\nOriginal request: ${eventType}`;
+      for (const msg of sentMessages) {
+        if (msg && msg.chat_id && msg.message_id) {
+          await editMessageText(msg.chat_id, msg.message_id, updatedText);
+        }
+      }
+
       await answerCallbackQuery(callback_query.id, '❌ Action rejected.');
 
       logAction({

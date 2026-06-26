@@ -53,7 +53,7 @@ Tap a button below to proceed:
 ```
 
 ### Step 2 — Send Telegram Message with Inline Buttons
-Send the summary to the admin Telegram chat with three inline keyboard buttons:
+Send the summary to the admin Telegram chat(s) with three inline keyboard buttons:
 
 ```json
 {
@@ -70,6 +70,9 @@ Send the summary to the admin Telegram chat with three inline keyboard buttons:
 ```
 
 The `{action_id}` is a unique UUID generated for each pending action.
+
+> [!NOTE]
+> If multiple administrators are configured in the `TELEGRAM_ADMIN_CHAT_ID` environment variable, the system will automatically broadcast the confirmation query to all administrators. When any authorized administrator accepts or rejects the action, the message is updated and resolved across all admin chats simultaneously to prevent duplicate operations.
 
 ### Step 3 — Wait for Response
 - **✅ Accept** → Execute the webhook call with the prepared payload. Send a follow-up confirmation: `"✅ Done! {Entity} has been {created/updated}."`
@@ -172,7 +175,7 @@ Used to audit video content after pulling metrics from `marketing_content_tracke
 You are the Reel Performance Analyst for Hyphening Media. Analyze Reel metrics to identify top-performing creative patterns.
 
 INPUT DATA:
-- Content Data: [JSON array from GET /api/clients/:id/marketing/content with fields: id, title, platform, post_type, views, likes, comments, shares, saves, avg_watch_time_pct, script, caption, engagement_rate_pct, save_rate_pct, content_score]
+- Content Data: [JSON array from GET /api/clients/:id/marketing/content with fields: id, title, platform, post_type, views, likes, comments, shares, saves, avg_watch_time_pct, script, caption, engagement_rate_pct, save_rate_pct, content_score, facebook_post_id, instagram_media_id, youtube_video_id]
 
 ANALYSIS TASKS:
 1. Calculate Skip Rate: skip_rate_pct = 100 - avg_watch_time_pct
@@ -380,7 +383,11 @@ For each planned content piece, prepare TWO webhook calls:
     "script": "[Hook line only]",
     "caption": "[Full caption with hashtags]",
     "time": "18:30",
-    "status": "Draft"
+    "status": "Draft",
+    "script_id": [ID of the script created in step 1, or null],
+    "facebook_post_id": [Unique Facebook post ID, or null],
+    "instagram_media_id": [Unique Instagram media ID, or null],
+    "youtube_video_id": [Unique YouTube video ID, or null]
   }
 }
 
@@ -414,8 +421,10 @@ For each proposed booking, prepare a webhook call:
   "payload": {
     "artist_id": [ID],
     "venue_id": [ID],
+    "planning_cycle_id": [ID of planning cycle, or null],
     "gig_date": "YYYY-MM-DD",
     "fee_inr": [Amount],
+    "advance_paid": [Amount or 0],
     "status": "Hold"
   }
 }
