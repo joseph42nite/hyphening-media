@@ -432,8 +432,9 @@ function handleCreateContent(payload) {
       client_id, platform, date, post_type, title, script, link, time, caption, status, source,
       views, likes, comments, shares, saves, avg_watch_time_pct, boosted, follows,
       youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
-      engagement_rate_pct, save_rate_pct, content_score
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      engagement_rate_pct, save_rate_pct, content_score,
+      facebook_post_id, instagram_media_id, youtube_video_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payload.client_id,
     payload.platform || null,
@@ -453,7 +454,10 @@ function handleCreateContent(payload) {
     payload.youtube_watch_time || 0.0,
     payload.youtube_avg_view_duration || null,
     payload.youtube_ctr || 0.0,
-    engagement_rate_pct, save_rate_pct, content_score
+    engagement_rate_pct, save_rate_pct, content_score,
+    payload.facebook_post_id || null,
+    payload.instagram_media_id || null,
+    payload.youtube_video_id || null
   );
 
   // Link script if provided
@@ -467,17 +471,44 @@ function handleCreateContent(payload) {
 }
 
 function handleUpdateContent(payload) {
-  if (!payload?.client_id || !payload?.content_id) return { success: false, summary: 'client_id and content_id are required' };
+  if (!payload?.client_id) return { success: false, summary: 'client_id is required' };
 
-  const content = db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ?')
-    .get(payload.content_id, payload.client_id);
-  if (!content) return { success: false, summary: `Content #${payload.content_id} not found for client ${payload.client_id}` };
+  let content = null;
+  let identifierUsed = '';
+
+  if (payload.content_id) {
+    content = db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ?')
+      .get(payload.content_id, payload.client_id);
+    identifierUsed = `id #${payload.content_id}`;
+  } else if (payload.facebook_post_id) {
+    content = db.prepare('SELECT * FROM marketing_content_tracker WHERE facebook_post_id = ? AND client_id = ?')
+      .get(payload.facebook_post_id, payload.client_id);
+    identifierUsed = `facebook_post_id "${payload.facebook_post_id}"`;
+  } else if (payload.instagram_media_id) {
+    content = db.prepare('SELECT * FROM marketing_content_tracker WHERE instagram_media_id = ? AND client_id = ?')
+      .get(payload.instagram_media_id, payload.client_id);
+    identifierUsed = `instagram_media_id "${payload.instagram_media_id}"`;
+  } else if (payload.youtube_video_id) {
+    content = db.prepare('SELECT * FROM marketing_content_tracker WHERE youtube_video_id = ? AND client_id = ?')
+      .get(payload.youtube_video_id, payload.client_id);
+    identifierUsed = `youtube_video_id "${payload.youtube_video_id}"`;
+  }
+
+  if (!content) {
+    return {
+      success: false,
+      summary: `Content row not found for client ${payload.client_id} using supplied identifiers.`
+    };
+  }
+
+  const targetContentId = content.id;
 
   const allowedFields = [
     'platform', 'date', 'post_type', 'title', 'script', 'status',
     'views', 'likes', 'comments', 'shares', 'saves', 'avg_watch_time_pct',
     'boosted', 'link', 'time', 'caption', 'follows',
-    'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr'
+    'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr',
+    'facebook_post_id', 'instagram_media_id', 'youtube_video_id'
   ];
 
   const updates = {};
@@ -507,20 +538,20 @@ function handleUpdateContent(payload) {
     updates.updated_at = new Date().toISOString();
     const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
     db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
-      .run(...Object.values(updates), payload.content_id);
+      .run(...Object.values(updates), targetContentId);
   }
 
   // Handle script linking
   if (payload.script_id !== undefined) {
-    db.prepare('DELETE FROM marketing_content_script_relation WHERE content_id = ?').run(payload.content_id);
+    db.prepare('DELETE FROM marketing_content_script_relation WHERE content_id = ?').run(targetContentId);
     if (payload.script_id) {
       db.prepare('INSERT INTO marketing_content_script_relation (content_id, script_id) VALUES (?, ?)')
-        .run(payload.content_id, payload.script_id);
+        .run(targetContentId, payload.script_id);
     }
   }
 
-  logAction({ action: 'update', entityType: 'content', entityId: payload.content_id, diff: { ...updates, source: 'openclaw' } });
-  return { success: true, summary: `Content #${payload.content_id} updated.` };
+  logAction({ action: 'update', entityType: 'content', entityId: targetContentId, diff: { ...updates, source: 'openclaw' } });
+  return { success: true, summary: `Content #${targetContentId} (found via ${identifierUsed}) updated.` };
 }
 
 function handleCreateAdCampaign(payload) {

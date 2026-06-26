@@ -164,7 +164,10 @@ Creates a new entry in the marketing content tracker (content plan / post).
     "youtube_watch_time": 0.0,
     "youtube_avg_view_duration": null,
     "youtube_ctr": 0.0,
-    "script_id": null
+    "script_id": null,
+    "facebook_post_id": null,
+    "instagram_media_id": null,
+    "youtube_video_id": null
   }
 }
 ```
@@ -194,6 +197,9 @@ Creates a new entry in the marketing content tracker (content plan / post).
 | `youtube_avg_view_duration` | String | No | e.g. `"3:42"` | `null` |
 | `youtube_ctr` | Float | No | Percentage | `0.0` |
 | `script_id` | Integer | No | Valid `marketing_scripts.id` | `null` |
+| `facebook_post_id` | String | No | Unique ID for Facebook Post | `null` |
+| `instagram_media_id` | String | No | Unique ID for Instagram Media | `null` |
+| `youtube_video_id` | String | No | Unique ID for YouTube Video | `null` |
 
 > **Auto-computed fields** (do NOT send these — the backend calculates them):
 > `engagement_rate_pct`, `save_rate_pct`, `content_score`, `skip_rate_pct`
@@ -202,14 +208,14 @@ Creates a new entry in the marketing content tracker (content plan / post).
 
 ### D. Update Content (`update_content`)
 
-Updates an existing content tracker row.
+Updates an existing content tracker row. You must provide `client_id` and either `content_id` OR one of the unique platform IDs (`facebook_post_id`, `instagram_media_id`, or `youtube_video_id`) to identify the row to update.
 
 ```json
 {
   "event_type": "update_content",
   "payload": {
     "client_id": 1,
-    "content_id": 42,
+    "instagram_media_id": "ig_1234567890",
     "status": "Posted",
     "views": 15200,
     "likes": 890,
@@ -225,7 +231,10 @@ Updates an existing content tracker row.
 | Parameter | Type | Required | Allowed Values | Default |
 | :--- | :--- | :--- | :--- | :--- |
 | `client_id` | Integer | ✅ Yes | Valid `crm_clients.id` | — |
-| `content_id` | Integer | ✅ Yes | Valid `marketing_content_tracker.id` | — |
+| `content_id` | Integer | No* | Valid `marketing_content_tracker.id` (*either this or a unique platform ID is required) | — |
+| `facebook_post_id` | String | No* | Unique ID for Facebook Post (*either this, another platform ID, or content_id is required) | — |
+| `instagram_media_id` | String | No* | Unique ID for Instagram Media (*either this, another platform ID, or content_id is required) | — |
+| `youtube_video_id` | String | No* | Unique ID for YouTube Video (*either this, another platform ID, or content_id is required) | — |
 | `platform` | String | No | `instagram`, `youtube` | — |
 | `date` | String | No | `YYYY-MM-DD` | — |
 | `post_type` | String | No | `Story`, `Static`, `Carousel`, `Reel`, `Youtube`, `Short` | — |
@@ -903,6 +912,9 @@ Reserved for task queue reordering.
 | `youtube_watch_time` | REAL | Default: 0.0 |
 | `youtube_avg_view_duration` | TEXT | — |
 | `youtube_ctr` | REAL | Default: 0.0 |
+| `facebook_post_id` | TEXT | Unique ID for Facebook Post |
+| `instagram_media_id` | TEXT | Unique ID for Instagram Media |
+| `youtube_video_id` | TEXT | Unique ID for YouTube Video |
 | `kanban_task_id` | INTEGER FK | → `kanban_tasks.id` |
 | `source` | TEXT | `manual`, `api_discovered`, `migration` |
 

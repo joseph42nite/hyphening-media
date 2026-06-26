@@ -197,7 +197,8 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       platform, date, post_type, title, script, link, time, caption, status,
       views, likes, comments, shares, saves, avg_watch_time_pct, boosted,
       follows, youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
-      script_id
+      script_id,
+      facebook_post_id, instagram_media_id, youtube_video_id
     } = req.body;
 
     let finalTitle = title;
@@ -226,8 +227,9 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
         client_id, platform, date, post_type, title, script, link, time, caption, status, source,
         views, likes, comments, shares, saves, avg_watch_time_pct, boosted, follows,
         youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
-        engagement_rate_pct, save_rate_pct, content_score
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        engagement_rate_pct, save_rate_pct, content_score,
+        facebook_post_id, instagram_media_id, youtube_video_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       clientId,
       platform || null,
@@ -253,7 +255,10 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       youtube_ctr || 0.0,
       computed.engagement_rate_pct,
       computed.save_rate_pct,
-      computed.content_score
+      computed.content_score,
+      facebook_post_id || null,
+      instagram_media_id || null,
+      youtube_video_id || null
     );
 
     if (script_id) {
@@ -337,7 +342,8 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       'views', 'likes', 'comments', 'shares', 'saves', 'avg_watch_time_pct',
       'boosted', 'metric_override',
       'link', 'time', 'caption', 'follows',
-      'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr'
+      'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr',
+      'facebook_post_id', 'instagram_media_id', 'youtube_video_id'
     ];
 
     const updates = {};

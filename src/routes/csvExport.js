@@ -66,7 +66,10 @@ router.get('/:id/export/content', authorize('admin', 'ops_social_media_manager')
         youtube_views AS [Youtube Views],
         youtube_watch_time AS [Youtube Watch Time (hrs)],
         youtube_avg_view_duration AS [Youtube Avg View Duration],
-        youtube_ctr AS [Youtube CTR%]
+        youtube_ctr AS [Youtube CTR%],
+        facebook_post_id AS [Facebook Post ID],
+        instagram_media_id AS [Instagram Media ID],
+        youtube_video_id AS [Youtube Video ID]
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1
       ORDER BY [Date] DESC
@@ -76,7 +79,8 @@ router.get('/:id/export/content', authorize('admin', 'ops_social_media_manager')
       'Date', 'Post Type', 'Script', 'Status', 'Link', 'Time', 'Caption',
       'Insta Views', 'Insta Likes', 'Insta Comments', 'Insta Shares', 'Insta Saves', 'Follows (from post)', 'Avg Watch Time %', 'Boosted? (Yes/No + Spend ₹)',
       'Engagement Rate % (auto)', 'Save Rate % (auto)', 'Content Score (auto)',
-      'Youtube Views', 'Youtube Watch Time (hrs)', 'Youtube Avg View Duration', 'Youtube CTR%'
+      'Youtube Views', 'Youtube Watch Time (hrs)', 'Youtube Avg View Duration', 'Youtube CTR%',
+      'Facebook Post ID', 'Instagram Media ID', 'Youtube Video ID'
     ];
 
     const csv = toCSV(rows, columns);

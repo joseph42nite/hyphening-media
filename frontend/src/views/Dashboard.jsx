@@ -177,7 +177,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     youtube_views: '',
     youtube_watch_time: '',
     youtube_avg_view_duration: '',
-    youtube_ctr: ''
+    youtube_ctr: '',
+    facebook_post_id: '',
+    instagram_media_id: '',
+    youtube_video_id: ''
   });
 
   const [monthlyFormData, setMonthlyFormData] = useState({
@@ -1074,7 +1077,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         youtube_views: content.youtube_views !== null && content.youtube_views !== undefined ? String(content.youtube_views) : '',
         youtube_watch_time: content.youtube_watch_time !== null && content.youtube_watch_time !== undefined ? String(content.youtube_watch_time) : '',
         youtube_avg_view_duration: content.youtube_avg_view_duration || '',
-        youtube_ctr: content.youtube_ctr !== null && content.youtube_ctr !== undefined ? String(content.youtube_ctr) : ''
+        youtube_ctr: content.youtube_ctr !== null && content.youtube_ctr !== undefined ? String(content.youtube_ctr) : '',
+        facebook_post_id: content.facebook_post_id || '',
+        instagram_media_id: content.instagram_media_id || '',
+        youtube_video_id: content.youtube_video_id || ''
       });
     } else {
       setEditingContent(null);
@@ -1107,7 +1113,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         youtube_views: '',
         youtube_watch_time: '',
         youtube_avg_view_duration: '',
-        youtube_ctr: ''
+        youtube_ctr: '',
+        facebook_post_id: '',
+        instagram_media_id: '',
+        youtube_video_id: ''
       });
     }
     setShowContentModal(true);
@@ -1144,7 +1153,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       youtube_views: contentFormData.youtube_views !== '' ? parseInt(contentFormData.youtube_views) : null,
       youtube_watch_time: contentFormData.youtube_watch_time !== '' ? parseFloat(contentFormData.youtube_watch_time) : null,
       youtube_avg_view_duration: contentFormData.youtube_avg_view_duration || null,
-      youtube_ctr: contentFormData.youtube_ctr !== '' ? parseFloat(contentFormData.youtube_ctr) : null
+      youtube_ctr: contentFormData.youtube_ctr !== '' ? parseFloat(contentFormData.youtube_ctr) : null,
+      facebook_post_id: contentFormData.facebook_post_id || null,
+      instagram_media_id: contentFormData.instagram_media_id || null,
+      youtube_video_id: contentFormData.youtube_video_id || null
     };
 
     try {
@@ -3885,6 +3897,39 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     rows={2}
                     value={contentFormData.caption}
                     onChange={e => setContentFormData({ ...contentFormData, caption: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Facebook Post ID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="fb_..."
+                    value={contentFormData.facebook_post_id}
+                    onChange={e => setContentFormData({ ...contentFormData, facebook_post_id: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Instagram Media ID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="ig_..."
+                    value={contentFormData.instagram_media_id}
+                    onChange={e => setContentFormData({ ...contentFormData, instagram_media_id: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">YouTube Video ID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="yt_..."
+                    value={contentFormData.youtube_video_id}
+                    onChange={e => setContentFormData({ ...contentFormData, youtube_video_id: e.target.value })}
                   />
                 </div>
               </div>
