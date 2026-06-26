@@ -15,10 +15,10 @@ router.use(authenticate);
 
 // Valid status transitions
 const STATUS_TRANSITIONS = {
-  backlog: ['todo'],
-  todo: ['in_progress', 'backlog'],
-  in_progress: ['delivered', 'todo'],
-  delivered: ['in_progress'],
+  backlog: ['todo', 'in_progress', 'delivered'],
+  todo: ['in_progress', 'backlog', 'delivered'],
+  in_progress: ['delivered', 'todo', 'backlog'],
+  delivered: ['in_progress', 'todo', 'backlog'],
 };
 
 /**

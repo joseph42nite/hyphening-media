@@ -2034,7 +2034,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                           <div className="kanban-card-footer" onClick={e => e.stopPropagation()}>
                             <select 
                               className="form-control" 
-                              value={task.status} 
+                              value={col} 
                               onChange={(e) => updateTaskStatus(task.id, e.target.value)}
                               style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'auto', background: 'var(--bg-input)' }}
                             >
