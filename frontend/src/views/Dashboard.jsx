@@ -82,8 +82,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [assignmentsLimit, setAssignmentsLimit] = useState(5);
   const [planningCycles, setPlanningCycles] = useState([]);
   const [artists, setArtists] = useState([]);
+  const [artistsPage, setArtistsPage] = useState(1);
+  const [artistsLimit, setArtistsLimit] = useState(10);
   const [venues, setVenues] = useState([]);
   const [gigs, setGigs] = useState([]);
+  const [gigsPage, setGigsPage] = useState(1);
+  const [gigsLimit, setGigsLimit] = useState(10);
   const [reviewQueue, setReviewQueue] = useState([]);
   
   // Selected client for marketing reports
@@ -2955,7 +2959,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 <Plus size={16} /> Add Gig
               </button>
             </div>
-            <div className="table-container" style={{ marginBottom: '32px' }}>
+            <div className="table-container table-scrollable-y" style={{ marginBottom: '20px' }}>
               <table>
                 <thead>
                   <tr>
@@ -2975,7 +2979,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                       <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No gigs found</td>
                     </tr>
                   ) : (
-                    gigs.map(g => (
+                    gigs.slice((gigsPage - 1) * gigsLimit, gigsPage * gigsLimit).map(g => (
                       <tr key={g.id}>
                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>{g.artist_code || '-'}</td>
                         <td style={{ fontWeight: 'bold' }}>{g.artist_name || '-'}</td>
@@ -3004,6 +3008,138 @@ export default function Dashboard({ auth, setAuth, showToast }) {
               </table>
             </div>
 
+            {/* Pagination Controls for Gigs */}
+            {gigs.length > 0 && (
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginTop: '12px', 
+                  marginBottom: '32px',
+                  flexWrap: 'wrap', 
+                  gap: '16px' 
+                }}
+              >
+                <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+                  Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((gigsPage - 1) * gigsLimit + 1, gigs.length)}</span> to{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(gigsPage * gigsLimit, gigs.length)}</span> of{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{gigs.length}</span> entries
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
+                    <select
+                      className="form-control"
+                      value={gigsLimit}
+                      onChange={(e) => {
+                        setGigsLimit(parseInt(e.target.value));
+                        setGigsPage(1);
+                      }}
+                      style={{ 
+                        width: 'auto', 
+                        padding: '8px 16px 8px 12px', 
+                        height: 'auto', 
+                        fontSize: '0.85rem',
+                        borderWidth: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={gigsPage === 1}
+                      onClick={() => setGigsPage(1)}
+                    >
+                      First
+                    </button>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={gigsPage === 1}
+                      onClick={() => setGigsPage(gigsPage - 1)}
+                    >
+                      Prev
+                    </button>
+
+                    {(() => {
+                      const totalPages = Math.ceil(gigs.length / gigsLimit);
+                      const buttons = [];
+                      const startPage = Math.max(1, gigsPage - 2);
+                      const endPage = Math.min(totalPages, gigsPage + 2);
+
+                      for (let i = startPage; i <= endPage; i++) {
+                        buttons.push(
+                          <button
+                            key={i}
+                            className={`btn ${gigsPage === i ? 'btn-primary' : ''}`}
+                            style={{ 
+                              padding: '8px 12px', 
+                              fontSize: '0.75rem', 
+                              borderWidth: '2px', 
+                              boxShadow: gigsPage === i ? 'none' : '2px 2px 0px #000',
+                              minWidth: '32px'
+                            }}
+                            onClick={() => setGigsPage(i)}
+                          >
+                            {i}
+                          </button>
+                        );
+                      }
+                      return buttons;
+                    })()}
+
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)}
+                      onClick={() => setGigsPage(gigsPage + 1)}
+                    >
+                      Next
+                    </button>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)}
+                      onClick={() => setGigsPage(Math.ceil(gigs.length / gigsLimit))}
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Roster & Encrypted Details */}
             <div className="dashboard-toolbar">
               <h3>Artist Roster (Client Specific)</h3>
@@ -3011,7 +3147,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 <Plus size={16} /> Add Artist
               </button>
             </div>
-            <div className="table-container" style={{ marginBottom: '32px' }}>
+            <div className="table-container table-scrollable-y" style={{ marginBottom: '20px' }}>
               <table>
                 <thead>
                   <tr>
@@ -3037,7 +3173,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {artists.map(art => (
+                  {artists.slice((artistsPage - 1) * artistsLimit, artistsPage * artistsLimit).map(art => (
                     <tr key={art.id}>
                       <td style={{ fontWeight: 'bold' }}>{art.name}</td>
                       <td>{art.category || '-'}</td>
@@ -3091,6 +3227,138 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls for Artists */}
+            {artists.length > 0 && (
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginTop: '12px', 
+                  marginBottom: '32px',
+                  flexWrap: 'wrap', 
+                  gap: '16px' 
+                }}
+              >
+                <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+                  Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((artistsPage - 1) * artistsLimit + 1, artists.length)}</span> to{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(artistsPage * artistsLimit, artists.length)}</span> of{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{artists.length}</span> entries
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
+                    <select
+                      className="form-control"
+                      value={artistsLimit}
+                      onChange={(e) => {
+                        setArtistsLimit(parseInt(e.target.value));
+                        setArtistsPage(1);
+                      }}
+                      style={{ 
+                        width: 'auto', 
+                        padding: '8px 16px 8px 12px', 
+                        height: 'auto', 
+                        fontSize: '0.85rem',
+                        borderWidth: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={artistsPage === 1}
+                      onClick={() => setArtistsPage(1)}
+                    >
+                      First
+                    </button>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={artistsPage === 1}
+                      onClick={() => setArtistsPage(artistsPage - 1)}
+                    >
+                      Prev
+                    </button>
+
+                    {(() => {
+                      const totalPages = Math.ceil(artists.length / artistsLimit);
+                      const buttons = [];
+                      const startPage = Math.max(1, artistsPage - 2);
+                      const endPage = Math.min(totalPages, artistsPage + 2);
+
+                      for (let i = startPage; i <= endPage; i++) {
+                        buttons.push(
+                          <button
+                            key={i}
+                            className={`btn ${artistsPage === i ? 'btn-primary' : ''}`}
+                            style={{ 
+                              padding: '8px 12px', 
+                              fontSize: '0.75rem', 
+                              borderWidth: '2px', 
+                              boxShadow: artistsPage === i ? 'none' : '2px 2px 0px #000',
+                              minWidth: '32px'
+                            }}
+                            onClick={() => setArtistsPage(i)}
+                          >
+                            {i}
+                          </button>
+                        );
+                      }
+                      return buttons;
+                    })()}
+
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={artistsPage >= Math.ceil(artists.length / artistsLimit)}
+                      onClick={() => setArtistsPage(artistsPage + 1)}
+                    >
+                      Next
+                    </button>
+                    <button
+                      className="btn"
+                      style={{ 
+                        padding: '8px 14px', 
+                        fontSize: '0.75rem', 
+                        borderWidth: '2px', 
+                        boxShadow: '2px 2px 0px #000' 
+                      }}
+                      disabled={artistsPage >= Math.ceil(artists.length / artistsLimit)}
+                      onClick={() => setArtistsPage(Math.ceil(artists.length / artistsLimit))}
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Venues Table */}
             <div className="dashboard-toolbar">
