@@ -1305,7 +1305,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   });
 
   // Render Kanban Columns helper
-  const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
+  const columns = ['backlog', 'todo', 'in_progress', 'review', 'revision', 'approved', 'delivered'];
   const getTasksByStatus = (status) => {
     return filteredTasks.filter(t => t.status === status);
   };
