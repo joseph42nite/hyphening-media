@@ -158,6 +158,7 @@ function recalculateRollups(artistId) {
       SUM(CASE WHEN status = 'Pending' OR status = 'Advance Paid' THEN 1 ELSE 0 END) as pending_gigs,
       ROUND(AVG(CASE WHEN status = 'Paid' THEN fee_inr END), 0) as average_fee_inr,
       COALESCE(SUM(CASE WHEN status = 'Paid' THEN fee_inr ELSE 0 END), 0) as total_amount_paid_inr,
+      COALESCE(SUM(CASE WHEN status = 'Paid' THEN 0 ELSE fee_inr - advance_paid END), 0) as total_amount_pending_inr,
       MAX(gig_date) as latest_gig_date
     FROM gig_status 
     WHERE artist_id = ?
@@ -183,12 +184,12 @@ function recalculateRollups(artistId) {
   db.prepare(`
     UPDATE artists SET 
       total_performances = ?, average_fee_inr = ?, total_amount_paid_inr = ?,
-      payment_status = ?, reliability_score = ?, perf_with_m = ?,
+      total_amount_pending_inr = ?, payment_status = ?, reliability_score = ?, perf_with_m = ?,
       last_perf_date = ?, updated_at = ?
     WHERE id = ?
   `).run(
     stats.total_gigs, stats.average_fee_inr || 0, stats.total_amount_paid_inr,
-    payment_status, reliability_score, stats.paid_gigs || 0,
+    stats.total_amount_pending_inr, payment_status, reliability_score, stats.paid_gigs || 0,
     last_perf_date, new Date().toISOString(), artistId
   );
 }

@@ -3183,6 +3183,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     <th>Notes</th>
                     <th>Bank Details</th>
                     <th>Total Amount Paid</th>
+                    <th>Total Amount Pending</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -3231,6 +3232,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         )}
                       </td>
                       <td>₹{art.total_amount_paid_inr ? art.total_amount_paid_inr.toLocaleString('en-IN') : '0'}</td>
+                      <td>₹{art.total_amount_pending_inr ? art.total_amount_pending_inr.toLocaleString('en-IN') : '0'}</td>
                       <td>
                         <button onClick={() => openArtistModal(art)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
                           Edit
