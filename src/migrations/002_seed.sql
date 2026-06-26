@@ -2,14 +2,6 @@
 -- Migration: 002_seed.sql
 -- Passwords are bcrypt hashes of the word after "Password: " in each comment
 
--- admin: Password: Admin123!
-INSERT OR IGNORE INTO users (email, password_hash, name, role) VALUES (
-  'admin@hyphening.com',
-  '$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
-  'Jomy George',
-  'admin'
-);
-
 -- ops_video_editor: Password: VideoEditor123!
 INSERT OR IGNORE INTO users (email, password_hash, name, role) VALUES (
   'editor@hyphening.com',
