@@ -375,21 +375,23 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       const res = await authFetch('/api/clients');
       const data = await res.json();
       if (res.ok) {
-        setClients(data.clients || []);
-        if (data.clients?.length > 0) {
+        const allClients = data.clients || [];
+        setClients(allClients);
+        if (allClients.length > 0) {
+          const marketingClients = allClients.filter(c => c.client_type !== 'artist_curation');
           // Video editors don't need marketing reports/scripts data
-          if (!isVideoEditor) {
+          if (!isVideoEditor && marketingClients.length > 0) {
             if (!selectedClientForReports) {
-              setSelectedClientForReports(data.clients[0]);
-              fetchMarketingData(data.clients[0].id);
+              setSelectedClientForReports(marketingClients[0]);
+              fetchMarketingData(marketingClients[0].id);
             }
             if (!selectedScriptClient) {
-              setSelectedScriptClient(data.clients[0]);
+              setSelectedScriptClient(marketingClients[0]);
             }
           }
           if (!selectedChatClient) {
-            setSelectedChatClient(data.clients[0]);
-            fetchChats(data.clients[0].id);
+            setSelectedChatClient(allClients[0]);
+            fetchChats(allClients[0].id);
           }
         }
       }
@@ -548,7 +550,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           setCalendarMarketingContent(normalized);
         }
       } else {
-        const promises = clients.map(async (c) => {
+        const promises = clients.filter(c => c.client_type !== 'artist_curation').map(async (c) => {
           try {
             const res = await authFetch(`/api/clients/${c.id}/marketing/content`);
             if (res.ok) {
@@ -2482,7 +2484,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     }}
                     style={{ maxWidth: '200px', padding: '8px' }}
                   >
-                    {clients.map(c => (
+                    {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -2626,7 +2628,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   }}
                   style={{ maxWidth: '250px' }}
                 >
-                  {clients.map(c => (
+                  {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
