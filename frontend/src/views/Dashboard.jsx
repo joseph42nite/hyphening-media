@@ -1308,23 +1308,20 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
   const getTasksByStatus = (status) => {
     if (status === 'todo') {
-      // TO - DO - TODAY: pending tasks due today or explicitly status 'todo' (if not overdue or in future)
+      // TO - DO - TODAY: pending tasks due today or explicitly status 'todo' with no due date
       return filteredTasks.filter(t => 
         t.status !== 'delivered' && 
         t.status !== 'in_progress' && 
-        (t.due_date === localTodayStr || (t.status === 'todo' && (!t.due_date || t.due_date >= localTodayStr)))
+        (t.due_date === localTodayStr || (t.status === 'todo' && !t.due_date))
       );
     }
     if (status === 'backlog') {
-      // BACKLOG: pending tasks that are overdue (due_date < localTodayStr) OR future tasks OR backlog status tasks not due today
+      // BACKLOG: pending tasks that are overdue (due_date < localTodayStr)
       return filteredTasks.filter(t => 
         t.status !== 'delivered' && 
         t.status !== 'in_progress' && 
-        (
-          (t.due_date && t.due_date < localTodayStr) || // Overdue tasks ("was to be delivered but wasn't done on due date")
-          (t.due_date && t.due_date > localTodayStr) || // Future tasks
-          (!t.due_date && t.status !== 'todo')          // No due date, not todo
-        )
+        t.due_date && 
+        t.due_date < localTodayStr
       );
     }
     if (status === 'in_progress') {
