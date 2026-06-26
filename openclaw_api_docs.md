@@ -547,7 +547,7 @@ Adds a new artist to the curation roster.
 | `rating` | Integer | No | 1–5 | `null` |
 | `notes` | String | No | Internal notes | `null` |
 
-> **Auto-generated**: `artist_id` (from name + phone). **Auto-computed rollups**: `total_performances`, `average_fee_inr`, `total_amount_paid_inr`, `payment_status`, `reliability_score`.
+> **Auto-generated**: `artist_id` (from name + phone). **Auto-computed rollups**: `total_performances`, `average_fee_inr`, `total_amount_paid_inr`, `total_amount_pending_inr`, `payment_status`, `reliability_score`.
 
 ---
 
@@ -976,6 +976,7 @@ Reserved for task queue reordering.
 | `total_performances` | INTEGER | Auto-computed |
 | `average_fee_inr` | REAL | Auto-computed |
 | `total_amount_paid_inr` | REAL | Auto-computed |
+| `total_amount_pending_inr` | REAL | Auto-computed |
 | `payment_status` | TEXT | Auto-computed |
 | `reliability_score` | REAL | Auto-computed |
 
