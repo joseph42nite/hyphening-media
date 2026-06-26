@@ -15,14 +15,10 @@ router.use(authenticate);
 
 // Valid status transitions
 const STATUS_TRANSITIONS = {
-  backlog: ['todo', 'cancelled'],
-  todo: ['in_progress', 'backlog', 'cancelled'],
-  in_progress: ['review', 'todo', 'cancelled'],
-  review: ['approved', 'revision', 'in_progress'],
-  revision: ['in_progress', 'cancelled'],
-  approved: ['delivered'],
-  delivered: [],
-  cancelled: ['backlog'],
+  backlog: ['todo'],
+  todo: ['in_progress', 'backlog'],
+  in_progress: ['delivered', 'todo'],
+  delivered: ['in_progress'],
 };
 
 /**
@@ -242,15 +238,6 @@ const statusHandler = (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    // Handle revision increment
-    if (status === 'revision') {
-      if (task.revision_count >= task.max_revisions) {
-        return res.status(400).json({
-          error: `Maximum revisions (${task.max_revisions}) reached. Cannot request more revisions.`,
-        });
-      }
-      updates.revision_count = task.revision_count + 1;
-    }
 
     // Mark completion
     if (status === 'delivered') {

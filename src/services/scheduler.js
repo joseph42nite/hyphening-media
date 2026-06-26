@@ -73,7 +73,7 @@ async function runDailyBacklogReport() {
       const tasks = db.prepare(`
         SELECT title, due_date, status 
         FROM kanban_tasks 
-        WHERE assigned_to = ? AND status NOT IN ('delivered', 'cancelled')
+        WHERE assigned_to = ? AND status != 'delivered'
       `).all(editor.id);
 
       let text = `📅 *Daily Task Backlog*\nHello ${editor.name}, here are your pending tasks:\n\n`;
@@ -93,7 +93,7 @@ async function runDailyBacklogReport() {
       const tasks = db.prepare(`
         SELECT title, due_date, status 
         FROM kanban_tasks 
-        WHERE assigned_to = ? AND status NOT IN ('delivered', 'cancelled')
+        WHERE assigned_to = ? AND status != 'delivered'
       `).all(smm.id);
 
       let text = `📅 *Daily Task Backlog*\nHello ${smm.name}, here are your pending tasks:\n\n`;
@@ -112,7 +112,7 @@ async function runDailyBacklogReport() {
       SELECT t.title, t.due_date, t.status, u.name as assignee_name, u.role as assignee_role
       FROM kanban_tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.status NOT IN ('delivered', 'cancelled')
+      WHERE t.status != 'delivered'
       ORDER BY t.due_date ASC
     `).all();
 

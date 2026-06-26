@@ -147,10 +147,10 @@ function syncContentToKanbanTask(contentId, db) {
         }
       }
 
-      // Create task (default priority 'medium', task_type 'social', status 'todo')
+      // Create task (default priority 'medium', task_type 'social', status 'backlog')
       const result = db.prepare(`
         INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, status, due_date)
-        VALUES (?, ?, ?, 'medium', 'social', 'todo', ?)
+        VALUES (?, ?, ?, 'medium', 'social', 'backlog', ?)
       `).run(content.client_id, taskTitle, taskDesc, content.date || null);
 
       db.prepare(`
@@ -169,11 +169,8 @@ function syncContentToKanbanTask(contentId, db) {
       }
     } else if (content.status === 'Client Rejected') {
       if (content.kanban_task_id) {
-        db.prepare(`
-          UPDATE kanban_tasks 
-          SET status = 'cancelled', updated_at = datetime('now')
-          WHERE id = ? AND status != 'cancelled'
-        `).run(content.kanban_task_id);
+        db.prepare('DELETE FROM kanban_tasks WHERE id = ?').run(content.kanban_task_id);
+        db.prepare('UPDATE marketing_content_tracker SET kanban_task_id = NULL WHERE id = ?').run(contentId);
       }
     }
   } catch (err) {

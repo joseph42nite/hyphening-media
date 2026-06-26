@@ -91,7 +91,82 @@ function runMigrations() {
   }
 }
 
+/**
+ * Sync any existing marketing content tracker entries that don't have corresponding kanban tasks.
+ * Run on server startup to handle seeded data and direct database insertions.
+ */
+function syncExistingContentTracker(dbInstance) {
+  try {
+    // Check if tables exist first
+    const tableCheck = dbInstance.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='marketing_content_tracker'").get();
+    if (!tableCheck) return;
+
+    const unsynced = dbInstance.prepare(`
+      SELECT t.*, r.script_id, s.title AS script_title
+      FROM marketing_content_tracker t
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      WHERE t.kanban_task_id IS NULL
+    `).all();
+
+    if (unsynced.length === 0) return;
+
+    console.log(`[DB] Found ${unsynced.length} unsynced content tracker entries. Syncing to Kanban board...`);
+
+    const insertTask = dbInstance.prepare(`
+      INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, status, due_date, completed_at)
+      VALUES (?, ?, ?, 'medium', 'social', ?, ?, ?)
+    `);
+
+    const updateContent = dbInstance.prepare(`
+      UPDATE marketing_content_tracker 
+      SET kanban_task_id = ? 
+      WHERE id = ?
+    `);
+
+    const runSync = dbInstance.transaction(() => {
+      for (const content of unsynced) {
+        // If content is Client Rejected, it shouldn't show on board, keep kanban_task_id null
+        if (content.status === 'Client Rejected') continue;
+
+        const pendingStatuses = ['Draft', 'Pending Client Approval', 'Client Approved', 'Pending'];
+        const isPending = pendingStatuses.includes(content.status);
+        const isPosted = content.status === 'Posted';
+
+        const taskTitle = `Post: ${content.title || ('Content Plan - ' + content.date)} (${content.platform || 'social'})`;
+        const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
+        const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
+
+        let status = 'backlog'; // Pending content maps to backlog
+        let completedAt = null;
+
+        if (isPosted) {
+          status = 'delivered';
+          completedAt = content.date ? content.date + 'T12:00:00.000Z' : new Date().toISOString();
+        }
+
+        const result = insertTask.run(
+          content.client_id,
+          taskTitle,
+          taskDesc,
+          status,
+          content.date || null,
+          completedAt
+        );
+
+        updateContent.run(result.lastInsertRowid, content.id);
+      }
+    });
+
+    runSync();
+    console.log(`[DB] ✓ Synced content tracker entries to Kanban.`);
+  } catch (err) {
+    console.error('[DB] Error syncing existing content tracker entries:', err);
+  }
+}
+
 // Run migrations on import
 runMigrations();
+syncExistingContentTracker(db);
 
 export default db;

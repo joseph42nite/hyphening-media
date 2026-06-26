@@ -36,7 +36,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   };
 
   const isOverdue = (task) => {
-    if (!task.due_date || task.status === 'delivered' || task.status === 'cancelled') return false;
+    if (!task.due_date || task.status === 'delivered') return false;
     const todayStr = new Date().toISOString().split('T')[0];
     return task.due_date < todayStr;
   };
@@ -1305,7 +1305,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   });
 
   // Render Kanban Columns helper
-  const columns = ['backlog', 'todo', 'in_progress', 'review', 'revision', 'approved', 'delivered'];
+  const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
   const getTasksByStatus = (status) => {
     return filteredTasks.filter(t => t.status === status);
   };
