@@ -133,7 +133,7 @@ function syncExistingContentTracker(dbInstance) {
         const isPending = pendingStatuses.includes(content.status);
         const isPosted = content.status === 'Posted';
 
-        const taskTitle = `Post: ${content.title || ('Content Plan - ' + content.date)} (${content.platform || 'social'})`;
+        const taskTitle = `Post: ${content.title || ('Content Plan - ' + formatDateStr(content.date))} (${content.platform || 'social'})`;
         const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
         const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
 
@@ -165,8 +165,49 @@ function syncExistingContentTracker(dbInstance) {
   }
 }
 
+function formatDateStr(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  const monthName = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ][parseInt(month, 10) - 1];
+  return `${parseInt(day, 10)} ${monthName} ${year}`;
+}
+
+/**
+ * Scan existing tasks in the database and fix any titles that contain raw YYYY-MM-DD dates.
+ */
+function fixExistingTaskTitles(dbInstance) {
+  try {
+    const tasks = dbInstance.prepare("SELECT id, title FROM kanban_tasks WHERE title LIKE 'Post: Content Plan - %'").all();
+    const updateStmt = dbInstance.prepare("UPDATE kanban_tasks SET title = ? WHERE id = ?");
+
+    const runFix = dbInstance.transaction(() => {
+      for (const task of tasks) {
+        // e.g. "Post: Content Plan - 2026-07-01 (youtube)"
+        // Match YYYY-MM-DD pattern
+        const match = task.title.match(/Content Plan - (\d{4}-\d{2}-\d{2})/);
+        if (match) {
+          const rawDate = match[1];
+          const formattedDate = formatDateStr(rawDate);
+          const newTitle = task.title.replace(rawDate, formattedDate);
+          updateStmt.run(newTitle, task.id);
+        }
+      }
+    });
+    runFix();
+    console.log(`[DB] ✓ Verified and formatted existing task titles.`);
+  } catch (err) {
+    console.error('[DB] Error fixing existing task titles:', err);
+  }
+}
+
 // Run migrations on import
 runMigrations();
 syncExistingContentTracker(db);
+fixExistingTaskTitles(db);
 
 export default db;

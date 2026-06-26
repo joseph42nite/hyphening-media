@@ -114,6 +114,18 @@ router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manage
 /**
  * Automatically creates, updates, or transitions a Kanban task linked to a content row.
  */
+function formatDateStr(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  const monthName = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ][parseInt(month, 10) - 1];
+  return `${parseInt(day, 10)} ${monthName} ${year}`;
+}
+
 function syncContentToKanbanTask(contentId, db) {
   try {
     const content = db.prepare(`
@@ -131,7 +143,7 @@ function syncContentToKanbanTask(contentId, db) {
     const isPosted = content.status === 'Posted';
 
     if (isPending) {
-      const taskTitle = `Post: ${content.title || ('Content Plan - ' + content.date)} (${content.platform || 'social'})`;
+      const taskTitle = `Post: ${content.title || ('Content Plan - ' + formatDateStr(content.date))} (${content.platform || 'social'})`;
       const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
       const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
       
