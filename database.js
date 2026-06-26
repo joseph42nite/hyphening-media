@@ -137,7 +137,7 @@ function syncExistingContentTracker(dbInstance) {
         const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
         const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
 
-        let status = 'backlog'; // Pending content maps to backlog
+        let status = 'todo'; // Pending content maps to todo
         let completedAt = null;
 
         if (isPosted) {

@@ -1390,12 +1390,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       );
     }
     if (status === 'backlog') {
-      // BACKLOG: pending tasks that are overdue (due_date < localTodayStr)
+      // BACKLOG: pending tasks that are not due today (overdue, future, or explicitly backlog)
       return filteredTasks.filter(t => 
         t.status !== 'delivered' && 
         t.status !== 'in_progress' && 
-        t.due_date && 
-        t.due_date < localTodayStr
+        t.due_date !== localTodayStr &&
+        !(t.status === 'todo' && !t.due_date)
       );
     }
     if (status === 'in_progress') {

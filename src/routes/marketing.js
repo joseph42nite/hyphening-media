@@ -159,10 +159,10 @@ function syncContentToKanbanTask(contentId, db) {
         }
       }
 
-      // Create task (default priority 'medium', task_type 'social', status 'backlog')
+      // Create task (default priority 'medium', task_type 'social', status 'todo')
       const result = db.prepare(`
         INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, status, due_date)
-        VALUES (?, ?, ?, 'medium', 'social', 'backlog', ?)
+        VALUES (?, ?, ?, 'medium', 'social', 'todo', ?)
       `).run(content.client_id, taskTitle, taskDesc, content.date || null);
 
       db.prepare(`
