@@ -5,7 +5,7 @@
 -- ops_video_editor: Password: VideoEditor123!
 INSERT OR IGNORE INTO users (email, password_hash, name, role) VALUES (
   'editor@hyphening.com',
-  '$2a$12$wApztrzPmSUmfbyNNBW5G.0GZ.6Y5VPOjTh/gEbFCp3cI/7PvfuCy',
+  '$2a$12$Rr8lgeutS.83rqC0R3YhjeAOp52Es/8PSPtHp0IJ7pNXdRI5sx1Ki',
   'Video Editor',
   'ops_video_editor'
 );
@@ -13,8 +13,9 @@ INSERT OR IGNORE INTO users (email, password_hash, name, role) VALUES (
 -- ops_social_media_manager: Password: SocialManager123!
 INSERT OR IGNORE INTO users (email, password_hash, name, role) VALUES (
   'social@hyphening.com',
-  '$2a$12$dT3XjYB9rXnGYK1uHnW7KeaYKfR6vXqW3Zx4YN9mG5pYHVBcN2dNy',
+  '$2a$12$soVThyCnic35pQGPUgBLX.Epcy8pMrBVoyByJlSyZfPhxBebkX/zS',
   'Social Media Manager',
   'ops_social_media_manager'
 );
+
 
