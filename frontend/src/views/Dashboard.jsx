@@ -618,6 +618,28 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     setShowTaskModal(true);
   };
 
+  const handleKanbanCardClick = async (task) => {
+    if (task.content_id) {
+      if (isAdmin || isSMM) {
+        try {
+          const res = await authFetch(`/api/clients/${task.client_id}/marketing/content/${task.content_id}`);
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || 'Failed to fetch content details');
+          }
+          const contentData = await res.json();
+          openContentModal(contentData);
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      }
+    } else {
+      if (isAdmin) {
+        openTaskModal(task);
+      }
+    }
+  };
+
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
       const res = await fetch(`/api/tasks/${taskId}/status`, {
@@ -650,6 +672,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       showToast('Status updated successfully', 'success');
       fetchMarketingData(selectedClientForReports.id);
       fetchCalendarMarketingContent();
+      fetchTasks();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1137,6 +1160,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       setShowContentModal(false);
       fetchMarketingData(selectedClientForReports.id);
       fetchCalendarMarketingContent();
+      fetchTasks();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -2014,7 +2038,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
                     <div className="kanban-cards">
                       {columnTasks.map(task => (
-                        <div key={task.id} className={`kanban-card ${isOverdue(task) ? 'kanban-card-overdue' : ''}`} onClick={() => isAdmin && openTaskModal(task)}>
+                        <div 
+                          key={task.id} 
+                          className={`kanban-card ${isOverdue(task) ? 'kanban-card-overdue' : ''}`} 
+                          onClick={() => handleKanbanCardClick(task)}
+                          style={{ cursor: ((task.content_id && (isAdmin || isSMM)) || (!task.content_id && isAdmin)) ? 'pointer' : 'default' }}
+                        >
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>{task.task_type}</span>
                             <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>

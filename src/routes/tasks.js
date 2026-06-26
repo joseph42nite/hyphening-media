@@ -32,7 +32,8 @@ router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager
       SELECT t.*, 
         c.name as client_name,
         f.name as freelancer_name,
-        u.name as created_by_name
+        u.name as created_by_name,
+        (SELECT id FROM marketing_content_tracker WHERE kanban_task_id = t.id) as content_id
       FROM kanban_tasks t
       LEFT JOIN crm_clients c ON t.client_id = c.id
       LEFT JOIN users f ON t.assigned_to = f.id
@@ -65,7 +66,8 @@ router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager
 router.get('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
   try {
     const task = db.prepare(`
-      SELECT t.*, c.name as client_name, f.name as freelancer_name
+      SELECT t.*, c.name as client_name, f.name as freelancer_name,
+        (SELECT id FROM marketing_content_tracker WHERE kanban_task_id = t.id) as content_id
       FROM kanban_tasks t
       LEFT JOIN crm_clients c ON t.client_id = c.id
       LEFT JOIN users f ON t.assigned_to = f.id
@@ -253,6 +255,18 @@ const statusHandler = (req, res) => {
 
     const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
     db.prepare(`UPDATE kanban_tasks SET ${setClauses} WHERE id = ?`).run(...Object.values(updates), req.params.id);
+
+    // Sync status change back to marketing content tracker if linked
+    const contentRow = db.prepare('SELECT id, status FROM marketing_content_tracker WHERE kanban_task_id = ?').get(req.params.id);
+    if (contentRow) {
+      if (status === 'delivered') {
+        db.prepare("UPDATE marketing_content_tracker SET status = 'Posted', updated_at = datetime('now') WHERE id = ?").run(contentRow.id);
+      } else {
+        if (contentRow.status === 'Posted') {
+          db.prepare("UPDATE marketing_content_tracker SET status = 'Pending', updated_at = datetime('now') WHERE id = ?").run(contentRow.id);
+        }
+      }
+    }
 
     logAction({
       actorId: req.user.id,

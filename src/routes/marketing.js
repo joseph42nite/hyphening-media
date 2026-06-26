@@ -291,6 +291,38 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
 });
 
 /**
+ * GET /api/clients/:id/marketing/content/:contentId
+ * Fetch details of a single content tracker item.
+ */
+router.get('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
+  try {
+    if (req.user.role === 'ops_video_editor') {
+      const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+      if (!hasTask) {
+        return res.status(403).json({ error: 'Access denied: you have no video assignments for this client' });
+      }
+    }
+
+    const row = db.prepare(`
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      FROM marketing_content_tracker t
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      WHERE t.client_id = ? AND t.id = ?
+    `).get(req.params.id, req.params.contentId);
+
+    if (!row) {
+      return res.status(404).json({ error: 'Content item not found' });
+    }
+
+    res.json(row);
+  } catch (err) {
+    console.error('[MARKETING] Content get single error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * PATCH /api/clients/:id/marketing/content/:contentId
  * Update content fields and recalculate derived metrics.
  */
