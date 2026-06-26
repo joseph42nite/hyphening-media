@@ -6,7 +6,8 @@
 import bcrypt from 'bcryptjs';
 
 const users = [
-  { email: 'admin@hyphening.com', password: 'Admin123!', name: 'Jomy George', role: 'admin' },
+  { email: 'joseph@hyphening.com', password: 'JosephPassword123!', name: 'Joseph', role: 'admin' },
+  { email: 'deepanjan@hyphening.com', password: 'DeepanjanPassword123!', name: 'Deepanjan', role: 'admin' },
   { email: 'editor@hyphening.com', password: 'VideoEditor123!', name: 'Video Editor', role: 'ops_video_editor' },
   { email: 'social@hyphening.com', password: 'SocialManager123!', name: 'Social Media Manager', role: 'ops_social_media_manager' },
 ];
