@@ -1995,21 +1995,21 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* KANBAN TASKS TAB */}
         {activeTab === 'tasks' && (
           <div style={{ textAlign: 'left' }}>
-            <div className="dashboard-toolbar">
-              <div className="dashboard-toolbar-search" style={{ display: 'flex', gap: '12px', flexGrow: 1, flexWrap: 'wrap', maxWidth: 'none' }}>
+            <div className="dashboard-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
                   type="text"
                   className="form-control"
                   placeholder="Search tasks or client..."
                   value={taskSearch}
                   onChange={(e) => setTaskSearch(e.target.value)}
-                  style={{ flexGrow: 1, minWidth: '200px' }}
+                  style={{ width: '260px' }}
                 />
                 <select
                   className="form-control"
                   value={taskClientFilter}
                   onChange={(e) => setTaskClientFilter(e.target.value)}
-                  style={{ width: 'auto', minWidth: '180px' }}
+                  style={{ width: '200px' }}
                 >
                   <option value="">All Clients</option>
                   {clients.map(c => (
