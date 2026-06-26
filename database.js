@@ -171,35 +171,55 @@ function formatDateStr(dateStr) {
   if (parts.length !== 3) return dateStr;
   const [year, month, day] = parts;
   const monthName = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ][parseInt(month, 10) - 1];
   return `${parseInt(day, 10)} ${monthName} ${year}`;
 }
 
 /**
- * Scan existing tasks in the database and fix any titles that contain raw YYYY-MM-DD dates.
+ * Scan existing tasks in the database and fix any titles that contain raw YYYY-MM-DD dates or full month names.
  */
 function fixExistingTaskTitles(dbInstance) {
   try {
-    const tasks = dbInstance.prepare("SELECT id, title FROM kanban_tasks WHERE title LIKE 'Post: Content Plan - %'").all();
+    const tasks = dbInstance.prepare("SELECT id, title FROM kanban_tasks").all();
     const updateStmt = dbInstance.prepare("UPDATE kanban_tasks SET title = ? WHERE id = ?");
+
+    const fullMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const shortMonths = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
 
     const runFix = dbInstance.transaction(() => {
       for (const task of tasks) {
-        // e.g. "Post: Content Plan - 2026-07-01 (youtube)"
-        // Match YYYY-MM-DD pattern
-        const match = task.title.match(/Content Plan - (\d{4}-\d{2}-\d{2})/);
+        let newTitle = task.title;
+
+        // 1. Convert any raw YYYY-MM-DD dates to short formatted dates (if they were somehow missed)
+        const match = newTitle.match(/Content Plan - (\d{4}-\d{2}-\d{2})/);
         if (match) {
           const rawDate = match[1];
           const formattedDate = formatDateStr(rawDate);
-          const newTitle = task.title.replace(rawDate, formattedDate);
+          newTitle = newTitle.replace(rawDate, formattedDate);
+        }
+
+        // 2. Convert full month names to short 3-letter month names
+        for (let i = 0; i < fullMonths.length; i++) {
+          if (newTitle.includes(` ${fullMonths[i]} `)) {
+            newTitle = newTitle.replace(` ${fullMonths[i]} `, ` ${shortMonths[i]} `);
+          }
+        }
+
+        if (newTitle !== task.title) {
           updateStmt.run(newTitle, task.id);
         }
       }
     });
     runFix();
-    console.log(`[DB] ✓ Verified and formatted existing task titles.`);
+    console.log(`[DB] ✓ Verified and formatted existing task titles to 3-letter months.`);
   } catch (err) {
     console.error('[DB] Error fixing existing task titles:', err);
   }

@@ -17,8 +17,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (parts.length !== 3) return dateStr;
     const [year, month, day] = parts;
     const monthName = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ][parseInt(month) - 1];
     return `${parseInt(day)} ${monthName} ${year}`;
   };
