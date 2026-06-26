@@ -19,7 +19,7 @@ Evaluate monthly report metrics:
 4. **AI Visibility Optimization**: Assess if client pages are optimized to appear in Google Search AI Overviews.
 
 ## Input Context
-- Monthly SEO Data: [JSON array containing website_traffic, map_views, on_page_score, blogs, calls, reviews, top_3_keywords, da, and ai_overview_visible for the current and prior months]
+- Monthly SEO Data: [JSON array containing website_clicks, website_traffic, gmb_views, map_views, gmb_clicks, on_page_score, off_page, blogs, calls, directions, reviews, avg_rating, top_keywords, da, mom_growth_sessions, mom_growth_gmb_views, and ai_overview_visible for the current and prior months]
 
 ## Output Format
 Generate your output strictly in JSON format matching this schema:

@@ -14,7 +14,7 @@ When pulling content metrics, segregate the reels into two distinct categories:
    - Analysis Focus: Identify drop-off points. Did the hook fail? Was the visual pacing too slow?
 
 ## Input Context
-- Reels Data: [JSON array of posts containing views, likes, comments, shares, saves, avg_watch_time_pct, skip_rate_pct, and script hooks]
+- Reels Data: [JSON array of posts containing views, likes, comments, shares, saves, avg_watch_time_pct, skip_rate_pct, script hooks, facebook_post_id, instagram_media_id, and youtube_video_id]
 
 ## Output Format
 Generate your output strictly in JSON format matching this schema:
@@ -27,7 +27,9 @@ Generate your output strictly in JSON format matching this schema:
   },
   "top_working_reels": [
     {
-      "media_id": "178412345",
+      "instagram_media_id": "178412345",
+      "youtube_video_id": null,
+      "facebook_post_id": null,
       "views": 45000,
       "skip_rate_pct": 22.5,
       "hook_style": "Shock-value curiosity hook",
@@ -36,7 +38,9 @@ Generate your output strictly in JSON format matching this schema:
   ],
   "rest_reels": [
     {
-      "media_id": "178498765",
+      "instagram_media_id": null,
+      "youtube_video_id": "dQw4w9WgXcQ",
+      "facebook_post_id": null,
       "views": 2500,
       "skip_rate_pct": 45.0,
       "hook_style": "Generic introduction hook",
@@ -44,7 +48,7 @@ Generate your output strictly in JSON format matching this schema:
     }
   ],
   "recommendations": [
-    "Replicate hook style from media_id 178412345 across upcoming scripts.",
+    "Replicate hook style from instagram_media_id 178412345 across upcoming scripts.",
     "Eliminate 3-second logo animations at the start of underperforming videos."
   ]
 }
