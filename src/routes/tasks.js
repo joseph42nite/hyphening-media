@@ -238,6 +238,13 @@ const statusHandler = (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
+    // If status is updated to 'todo' and task has a past due date, update due date to today
+    if (status === 'todo' && task.due_date) {
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      if (task.due_date < todayStr) {
+        updates.due_date = todayStr;
+      }
+    }
 
     // Mark completion
     if (status === 'delivered') {

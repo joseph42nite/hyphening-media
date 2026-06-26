@@ -1307,7 +1307,39 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Render Kanban Columns helper
   const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
   const getTasksByStatus = (status) => {
-    return filteredTasks.filter(t => t.status === status);
+    if (status === 'todo') {
+      // TO - DO - TODAY: pending tasks due today or explicitly status 'todo' (if not overdue or in future)
+      return filteredTasks.filter(t => 
+        t.status !== 'delivered' && 
+        t.status !== 'in_progress' && 
+        (t.due_date === localTodayStr || (t.status === 'todo' && (!t.due_date || t.due_date >= localTodayStr)))
+      );
+    }
+    if (status === 'backlog') {
+      // BACKLOG: pending tasks that are overdue (due_date < localTodayStr) OR future tasks OR backlog status tasks not due today
+      return filteredTasks.filter(t => 
+        t.status !== 'delivered' && 
+        t.status !== 'in_progress' && 
+        (
+          (t.due_date && t.due_date < localTodayStr) || // Overdue tasks ("was to be delivered but wasn't done on due date")
+          (t.due_date && t.due_date > localTodayStr) || // Future tasks
+          (!t.due_date && t.status !== 'todo')          // No due date, not todo
+        )
+      );
+    }
+    if (status === 'in_progress') {
+      return filteredTasks.filter(t => t.status === 'in_progress');
+    }
+    if (status === 'delivered') {
+      const deliveredTasks = filteredTasks.filter(t => t.status === 'delivered');
+      // Sort: most recently completed/updated first, limit to 10
+      return deliveredTasks.sort((a, b) => {
+        const timeA = new Date(a.completed_at || a.updated_at || 0).getTime();
+        const timeB = new Date(b.completed_at || b.updated_at || 0).getTime();
+        return timeB - timeA;
+      }).slice(0, 10);
+    }
+    return [];
   };
 
   const handlePrevMonth = () => {
