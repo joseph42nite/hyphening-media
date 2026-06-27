@@ -188,7 +188,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     youtube_ctr: '',
     facebook_post_id: '',
     instagram_media_id: '',
-    youtube_video_id: ''
+    youtube_video_id: '',
+    assigned_to: ''
   });
 
   const [monthlyFormData, setMonthlyFormData] = useState({
@@ -1098,7 +1099,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         youtube_ctr: content.youtube_ctr !== null && content.youtube_ctr !== undefined ? String(content.youtube_ctr) : '',
         facebook_post_id: content.facebook_post_id || '',
         instagram_media_id: content.instagram_media_id || '',
-        youtube_video_id: content.youtube_video_id || ''
+        youtube_video_id: content.youtube_video_id || '',
+        assigned_to: content.assigned_to !== null && content.assigned_to !== undefined ? String(content.assigned_to) : ''
       });
     } else {
       setEditingContent(null);
@@ -1109,6 +1111,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           fetchMarketingData(client.id);
         }
       }
+      const videoEditor = staffUsers.find(u => u.role === 'ops_video_editor');
       setContentFormData({
         platform: 'instagram',
         date: defaultDate || new Date().toISOString().split('T')[0],
@@ -1134,7 +1137,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         youtube_ctr: '',
         facebook_post_id: '',
         instagram_media_id: '',
-        youtube_video_id: ''
+        youtube_video_id: '',
+        assigned_to: videoEditor ? String(videoEditor.id) : ''
       });
     }
     setShowContentModal(true);
@@ -1174,7 +1178,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       youtube_ctr: contentFormData.youtube_ctr !== '' ? parseFloat(contentFormData.youtube_ctr) : null,
       facebook_post_id: contentFormData.facebook_post_id || null,
       instagram_media_id: contentFormData.instagram_media_id || null,
-      youtube_video_id: contentFormData.youtube_video_id || null
+      youtube_video_id: contentFormData.youtube_video_id || null,
+      assigned_to: contentFormData.assigned_to !== '' ? parseInt(contentFormData.assigned_to) : null
     };
 
     try {
@@ -2662,7 +2667,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   <table>
                     <thead>
                       <tr>
-                        <th colSpan="7" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5' }}>Metadata</th>
+                        <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5' }}>Metadata</th>
                         <th colSpan="11" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#fee2e2' }}>Instagram Metrics</th>
                         <th colSpan="4" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#dbeafe' }}>YouTube Metrics</th>
                         <th style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5' }}>Actions</th>
@@ -2673,6 +2678,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                         <th>Post Type</th>
                         <th>Script</th>
                         <th>Status</th>
+                        <th>Assignee</th>
                         <th>Link</th>
                         <th>Time</th>
                         <th>Caption</th>
@@ -2700,7 +2706,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     <tbody>
                       {marketingContent.length === 0 ? (
                         <tr>
-                          <td colSpan="23" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                          <td colSpan="24" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                             No content items tracked yet.
                           </td>
                         </tr>
@@ -2743,6 +2749,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                                 <option value="Posted" style={{ color: '#065f46', background: '#d1fae5', fontWeight: '800' }}>Posted</option>
                               </select>
                             </td>
+                            <td>{item.assignee_name || '-'}</td>
                             <td>
                               {item.link ? (
                                 <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Link</a>
@@ -4076,7 +4083,17 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   <select
                     className="form-control"
                     value={contentFormData.post_type}
-                    onChange={e => setContentFormData({ ...contentFormData, post_type: e.target.value })}
+                    onChange={e => {
+                      const newType = e.target.value;
+                      let updatedAssignedTo = contentFormData.assigned_to;
+                      if (['Reel', 'Youtube', 'Short'].includes(newType)) {
+                        const videoEditor = staffUsers.find(u => u.role === 'ops_video_editor');
+                        if (videoEditor) {
+                          updatedAssignedTo = String(videoEditor.id);
+                        }
+                      }
+                      setContentFormData({ ...contentFormData, post_type: newType, assigned_to: updatedAssignedTo });
+                    }}
                   >
                     <option value="Reel">Reel</option>
                     <option value="Story">Story</option>
@@ -4182,6 +4199,24 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     value={contentFormData.caption}
                     onChange={e => setContentFormData({ ...contentFormData, caption: e.target.value })}
                   />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Assignee (Staff)</label>
+                  <select
+                    className="form-control"
+                    value={contentFormData.assigned_to || ''}
+                    onChange={e => setContentFormData({ ...contentFormData, assigned_to: e.target.value })}
+                  >
+                    <option value="">Select Staff</option>
+                    {staffUsers.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role.replace('ops_', '').replace('_', ' ')})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

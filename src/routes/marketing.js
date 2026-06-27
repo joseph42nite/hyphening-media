@@ -74,10 +74,12 @@ router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manage
 
     const { is_tracked, platform, status } = req.query;
     let query = `
-      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
+             u.name AS assignee_name
       FROM marketing_content_tracker t
       LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
       LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.client_id = ?
     `;
     const params = [req.params.id];
@@ -147,23 +149,34 @@ function syncContentToKanbanTask(contentId, db) {
       const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
       const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
       
+      const isVideo = ['reel', 'youtube', 'short'].includes((content.post_type || '').toLowerCase());
+      const taskType = isVideo ? 'video' : 'social';
+      
+      let assignedTo = content.assigned_to || null;
+      if (!assignedTo && isVideo) {
+        const videoEditor = db.prepare("SELECT id FROM users WHERE role = 'ops_video_editor' AND is_active = 1 LIMIT 1").get();
+        if (videoEditor) {
+          assignedTo = videoEditor.id;
+        }
+      }
+
       if (content.kanban_task_id) {
         const taskExists = db.prepare('SELECT id FROM kanban_tasks WHERE id = ?').get(content.kanban_task_id);
         if (taskExists) {
           db.prepare(`
             UPDATE kanban_tasks 
-            SET title = ?, description = ?, client_id = ?, due_date = ?, updated_at = datetime('now')
+            SET title = ?, description = ?, client_id = ?, due_date = ?, task_type = ?, assigned_to = ?, updated_at = datetime('now')
             WHERE id = ?
-          `).run(taskTitle, taskDesc, content.client_id, content.date || null, content.kanban_task_id);
+          `).run(taskTitle, taskDesc, content.client_id, content.date || null, taskType, assignedTo, content.kanban_task_id);
           return;
         }
       }
 
-      // Create task (default priority 'medium', task_type 'social', status 'todo')
+      // Create task (default priority 'medium', status 'todo')
       const result = db.prepare(`
-        INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, status, due_date)
-        VALUES (?, ?, ?, 'medium', 'social', 'todo', ?)
-      `).run(content.client_id, taskTitle, taskDesc, content.date || null);
+        INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, assigned_to, status, due_date)
+        VALUES (?, ?, ?, 'medium', ?, ?, 'todo', ?)
+      `).run(content.client_id, taskTitle, taskDesc, taskType, assignedTo, content.date || null);
 
       db.prepare(`
         UPDATE marketing_content_tracker 
@@ -198,7 +211,8 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       views, likes, comments, shares, saves, avg_watch_time_pct, boosted,
       follows, youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
       script_id,
-      facebook_post_id, instagram_media_id, youtube_video_id
+      facebook_post_id, instagram_media_id, youtube_video_id,
+      assigned_to
     } = req.body;
 
     let finalTitle = title;
@@ -209,6 +223,14 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
         finalTitle = caption.slice(0, 30) + (caption.length > 30 ? '...' : '');
       } else {
         finalTitle = `Content Plan - ${date || new Date().toISOString().split('T')[0]}`;
+      }
+    }
+
+    let finalAssignedTo = assigned_to || null;
+    if (!finalAssignedTo && ['reel', 'youtube', 'short'].includes((post_type || '').toLowerCase())) {
+      const videoEditor = db.prepare("SELECT id FROM users WHERE role = 'ops_video_editor' AND is_active = 1 LIMIT 1").get();
+      if (videoEditor) {
+        finalAssignedTo = videoEditor.id;
       }
     }
 
@@ -228,8 +250,8 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
         views, likes, comments, shares, saves, avg_watch_time_pct, boosted, follows,
         youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
         engagement_rate_pct, save_rate_pct, content_score,
-        facebook_post_id, instagram_media_id, youtube_video_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        facebook_post_id, instagram_media_id, youtube_video_id, assigned_to
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       clientId,
       platform || null,
@@ -258,7 +280,8 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       computed.content_score,
       facebook_post_id || null,
       instagram_media_id || null,
-      youtube_video_id || null
+      youtube_video_id || null,
+      finalAssignedTo
     );
 
     if (script_id) {
@@ -281,10 +304,12 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
     });
 
     const createdRow = db.prepare(`
-      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
+             u.name AS assignee_name
       FROM marketing_content_tracker t
       LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
       LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = ?
     `).get(result.lastInsertRowid);
 
@@ -309,10 +334,12 @@ router.get('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_m
     }
 
     const row = db.prepare(`
-      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
+             u.name AS assignee_name
       FROM marketing_content_tracker t
       LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
       LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.client_id = ? AND t.id = ?
     `).get(req.params.id, req.params.contentId);
 
@@ -343,7 +370,7 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       'boosted', 'metric_override',
       'link', 'time', 'caption', 'follows',
       'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr',
-      'facebook_post_id', 'instagram_media_id', 'youtube_video_id'
+      'facebook_post_id', 'instagram_media_id', 'youtube_video_id', 'assigned_to'
     ];
 
     const updates = {};
@@ -355,6 +382,15 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
 
     if (Object.keys(updates).length === 0 && req.body.script_id === undefined) {
       return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    if (updates.post_type !== undefined && ['reel', 'youtube', 'short'].includes((updates.post_type || '').toLowerCase())) {
+      if (updates.assigned_to === undefined && !content.assigned_to) {
+        const videoEditor = db.prepare("SELECT id FROM users WHERE role = 'ops_video_editor' AND is_active = 1 LIMIT 1").get();
+        if (videoEditor) {
+          updates.assigned_to = videoEditor.id;
+        }
+      }
     }
 
     if (Object.keys(updates).length > 0) {
@@ -396,10 +432,12 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
     });
 
     const updatedRow = db.prepare(`
-      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text 
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
+             u.name AS assignee_name
       FROM marketing_content_tracker t
       LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
       LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = ?
     `).get(req.params.contentId);
 
