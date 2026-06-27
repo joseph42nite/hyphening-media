@@ -153,13 +153,13 @@ function generateArtistId(name, phone) {
 function recalculateRollups(artistId) {
   const stats = db.prepare(`
     SELECT 
-      COUNT(*) as total_gigs,
+      SUM(CASE WHEN status != 'Cancelled' THEN 1 ELSE 0 END) as total_gigs,
       SUM(CASE WHEN status = 'Paid' THEN 1 ELSE 0 END) as paid_gigs,
       SUM(CASE WHEN status = 'Pending' OR status = 'Advance Paid' THEN 1 ELSE 0 END) as pending_gigs,
       ROUND(AVG(CASE WHEN status = 'Paid' THEN fee_inr END), 0) as average_fee_inr,
       COALESCE(SUM(CASE WHEN status = 'Paid' THEN fee_inr ELSE 0 END), 0) as total_amount_paid_inr,
-      COALESCE(SUM(CASE WHEN status = 'Paid' THEN 0 ELSE fee_inr - advance_paid END), 0) as total_amount_pending_inr,
-      MAX(gig_date) as latest_gig_date
+      COALESCE(SUM(CASE WHEN status = 'Paid' OR status = 'Cancelled' THEN 0 ELSE fee_inr - advance_paid END), 0) as total_amount_pending_inr,
+      MAX(CASE WHEN status != 'Cancelled' THEN gig_date END) as latest_gig_date
     FROM gig_status 
     WHERE artist_id = ?
   `).get(artistId);
