@@ -6,10 +6,10 @@
 import bcrypt from 'bcryptjs';
 
 const users = [
-  { email: 'joseph@hyphening.com', password: 'JosephPassword123!', name: 'Joseph', role: 'admin' },
-  { email: 'deepanjan@hyphening.com', password: 'DeepanjanPassword123!', name: 'Deepanjan', role: 'admin' },
-  { email: 'editor@hyphening.com', password: 'VideoEditor123!', name: 'Video Editor', role: 'ops_video_editor' },
-  { email: 'social@hyphening.com', password: 'SocialManager123!', name: 'Social Media Manager', role: 'ops_social_media_manager' },
+  { email: 'joseph@hyphening.com', password: process.env.SEED_JOSEPH_PASSWORD || 'SetupTemporaryPassword123!', name: 'Joseph', role: 'admin' },
+  { email: 'deepanjan@hyphening.com', password: process.env.SEED_DEEPANJAN_PASSWORD || 'SetupTemporaryPassword123!', name: 'Deepanjan', role: 'admin' },
+  { email: 'editor@hyphening.com', password: process.env.SEED_EDITOR_PASSWORD || 'SetupTemporaryPassword123!', name: 'Video Editor', role: 'ops_video_editor' },
+  { email: 'social@hyphening.com', password: process.env.SEED_SMM_PASSWORD || 'SetupTemporaryPassword123!', name: 'Social Media Manager', role: 'ops_social_media_manager' },
 ];
 
 async function generateHashes() {
@@ -22,7 +22,7 @@ async function generateHashes() {
   }
   
   console.log('\nTo seed manually, run the server once — it will execute 002_seed.sql.');
-  console.log('For production, update the hashes in 002_seed.sql with the above values.');
+  console.log('For production, set custom passwords in your environment variables before seeding.');
 }
 
 generateHashes();
