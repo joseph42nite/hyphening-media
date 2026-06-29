@@ -299,10 +299,13 @@ router.get('/:token/content-plan', portalAuth, (req, res) => {
 router.get('/:token/scripts', portalAuth, (req, res) => {
   try {
     const scripts = db.prepare(`
-      SELECT id, month, title, script_text, status, format, reference_video_link, reaction_video_link, updated_at
-      FROM marketing_scripts
-      WHERE client_id = ?
-      ORDER BY month DESC, created_at DESC
+      SELECT s.id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.updated_at,
+             t.status AS content_status
+      FROM marketing_scripts s
+      LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
+      LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
+      WHERE s.client_id = ?
+      ORDER BY s.month DESC, s.created_at DESC
     `).all(req.portalClient.id);
 
     res.json({ scripts });

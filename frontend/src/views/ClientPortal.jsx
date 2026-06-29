@@ -1391,6 +1391,7 @@ export default function ClientPortal({ showToast }) {
                   ) : (
                     scripts.filter(s => s.month === selectedMonth).map(s => {
                       const isExpanded = expandedItems[s.id];
+                      const scriptStatus = s.content_status || 'Script Made';
                       return (
                         <div key={s.id} className="portal-bento-card" style={{ padding: '24px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -1399,11 +1400,11 @@ export default function ClientPortal({ showToast }) {
                                 {s.format === 'long_format' ? 'Long Format' : 'Reel'}
                               </span>
                               <span className={`portal-badge ${
-                                s.status === 'Posted' ? 'portal-badge-success' :
-                                s.status === 'Edited' ? 'portal-badge-info' :
-                                s.status === 'Shot' ? 'portal-badge-warning' : 'portal-badge-muted'
+                                scriptStatus === 'Posted' || scriptStatus === 'Client Approved' ? 'portal-badge-success' :
+                                scriptStatus === 'Pending Client Approval' ? 'portal-badge-warning' :
+                                scriptStatus === 'Client Rejected' ? 'portal-badge-danger' : 'portal-badge-muted'
                               }`}>
-                                {s.status}
+                                {scriptStatus}
                               </span>
                             </div>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>
