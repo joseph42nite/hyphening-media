@@ -144,12 +144,15 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     `).all(clientId);
 
     const viewsTrend = db.prepare(`
-      SELECT date, title, views, engagement_rate_pct
+      SELECT date, title, (COALESCE(views, 0) + COALESCE(youtube_views, 0)) AS views, COALESCE(engagement_rate_pct, 0.0) AS engagement_rate_pct
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1 AND status IN ('Posted', 'Client Approved')
-      ORDER BY date ASC
+      ORDER BY date DESC
       LIMIT 8
     `).all(clientId);
+
+    // Reverse array to render chronologically (oldest to newest) from left to right
+    viewsTrend.reverse();
 
     // Get sister companies (all clients in the family hierarchy, excluding the client itself)
     const parentId = req.portalClient.parent_id || clientId;
@@ -311,6 +314,26 @@ router.get('/:token/scripts', portalAuth, (req, res) => {
     res.json({ scripts });
   } catch (err) {
     console.error('[PORTAL] Scripts error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/portal/:token/seo-reports
+ * Retrieve monthly SEO reports for the client.
+ */
+router.get('/:token/seo-reports', portalAuth, (req, res) => {
+  try {
+    const reports = db.prepare(`
+      SELECT *
+      FROM marketing_monthly_report
+      WHERE client_id = ?
+      ORDER BY month DESC
+    `).all(req.portalClient.id);
+
+    res.json({ reports });
+  } catch (err) {
+    console.error('[PORTAL] SEO Reports error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

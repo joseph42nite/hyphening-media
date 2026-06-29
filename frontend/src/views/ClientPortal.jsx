@@ -311,6 +311,7 @@ body.portal-active {
   background: #ffffff;
   box-shadow: var(--shadow-md);
   width: 100%;
+  margin-bottom: 8px;
 }
 
 .portal-table {
@@ -321,20 +322,21 @@ body.portal-active {
 
 .portal-table th {
   background: #f4f4f5;
-  padding: 16px 20px;
+  padding: 14px 18px;
   font-weight: 800;
   color: #000000;
   border-bottom: var(--border-width) solid var(--border-color);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .portal-table td {
-  padding: 16px 20px;
+  padding: 14px 18px;
   border-bottom: 2px solid var(--border-color);
   color: var(--text-secondary);
   font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .portal-table tr:last-child td {
@@ -604,7 +606,7 @@ function PerformanceTrendChart({ data }) {
                 strokeWidth="2.5"
                 style={{ cursor: 'pointer' }}
               >
-                <title>{`${p.title}\n${isViews ? 'Views' : 'Engagement'}: ${isViews ? p.val.toLocaleString() : p.val.toFixed(2) + '%'}\nDate: ${p.date}`}</title>
+                <title>{`${p.title || 'Post'}\n${isViews ? 'Views' : 'Engagement'}: ${isViews ? p.val.toLocaleString() : p.val.toFixed(2) + '%'}\nDate: ${p.date}`}</title>
               </circle>
               {/* Date labels */}
               <text 
@@ -639,6 +641,7 @@ export default function ClientPortal({ showToast }) {
   const [overview, setOverview] = useState(null);
   const [contentList, setContentList] = useState([]);
   const [adCampaigns, setAdCampaigns] = useState([]);
+  const [seoReports, setSeoReports] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [scripts, setScripts] = useState([]);
@@ -711,7 +714,7 @@ export default function ClientPortal({ showToast }) {
         
         if (data.client_type === 'artist_curation') {
           setActiveTab('bookings');
-        } else if (activeTab !== 'approval' && activeTab !== 'content' && activeTab !== 'bookings') {
+        } else if (activeTab !== 'reports' && activeTab !== 'approval' && activeTab !== 'content' && activeTab !== 'bookings') {
           setActiveTab('overview');
         }
         
@@ -765,6 +768,11 @@ export default function ClientPortal({ showToast }) {
         const resAds = await fetch(`${API_BASE}/api/portal/${token}/ads`, { credentials: 'include' });
         const dataAds = await resAds.json();
         if (resAds.ok) setAdCampaigns(dataAds.ads || []);
+
+        // SEO monthly reports
+        const resSEO = await fetch(`${API_BASE}/api/portal/${token}/seo-reports`, { credentials: 'include' });
+        const dataSEO = await resSEO.json();
+        if (resSEO.ok) setSeoReports(dataSEO.reports || []);
 
         // Content plan pending approval
         const resPlan = await fetch(`${API_BASE}/api/portal/${token}/content-plan`, { credentials: 'include' });
@@ -864,6 +872,8 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
+  const uniqueMonths = [...new Set(scripts.map(s => s.month))].sort((a, b) => b.localeCompare(a));
+
   if (pinRequired) {
     return (
       <div className="client-portal-wrapper">
@@ -944,6 +954,12 @@ export default function ClientPortal({ showToast }) {
                 className={`portal-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
               >
                 <BarChart2 size={16} /> Overview
+              </button>
+              <button 
+                onClick={() => setActiveTab('reports')} 
+                className={`portal-tab-btn ${activeTab === 'reports' ? 'active' : ''}`}
+              >
+                <TrendingUp size={16} /> Reports
               </button>
               <button 
                 onClick={() => setActiveTab('approval')} 
@@ -1137,116 +1153,6 @@ export default function ClientPortal({ showToast }) {
               </div>
             </div>
 
-            {/* Detailed Performance List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
-              <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Tracked Performance Detail</h2>
-              
-              {contentList.length === 0 ? (
-                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No tracked posts found yet.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {contentList.map(item => (
-                    <div key={item.id} className="portal-bento-card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div>
-                          <span className="portal-badge portal-badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
-                          <span className="portal-badge portal-badge-muted">{item.post_type}</span>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>{formatDateStr(item.date)}</span>
-                      </div>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase' }}>{item.title}</h3>
-                      {item.caption && (
-                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '4px 0 12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontWeight: '500' }} title={item.caption}>
-                          {item.caption}
-                        </p>
-                      )}
-                      {item.link && (
-                        <div style={{ marginBottom: '12px' }}>
-                          <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ color: '#000000', textDecoration: 'none', fontWeight: 800 }}>
-                            <ExternalLink size={12} style={{ marginRight: '2px' }} /> View Live Post
-                          </a>
-                        </div>
-                      )}
-                      
-                      {item.platform === 'youtube' ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '0.8rem', marginTop: '12px', background: '#f4f4f5', border: '2px solid #000000', padding: '12px', borderRadius: '8px' }}>
-                          <div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Views</div>
-                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.youtube_views?.toLocaleString() || 0}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Watch Time</div>
-                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.youtube_watch_time || 0}h</div>
-                          </div>
-                          <div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Duration</div>
-                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px', whiteSpace: 'nowrap' }}>{item.youtube_avg_view_duration || 'N/A'}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>CTR</div>
-                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.youtube_ctr || 0}%</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '0.8rem', marginTop: '12px', background: '#f4f4f5', border: '2px solid #000000', padding: '12px', borderRadius: '8px' }}>
-                          <div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Views</div>
-                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.views?.toLocaleString() || 0}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Engagement</div>
-                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Quality Score</div>
-                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.content_score || 0}</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Ad Campaigns List */}
-            {adCampaigns.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h2 style={{ fontSize: '1.25rem', marginTop: '8px', textTransform: 'uppercase', fontWeight: 800 }}>Active Campaigns</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {adCampaigns.map((ad, idx) => (
-                    <div key={idx} className="portal-bento-card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span className="portal-badge portal-badge-success">{ad.platform}</span>
-                        <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#000000' }}>{ad.roas ? `${ad.roas}x ROAS` : 'Leads Focused'}</span>
-                      </div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{ad.ad_campaign_name}</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', fontSize: '0.8rem', background: '#f4f4f5', border: '2px solid #000000', padding: '12px', borderRadius: '8px' }}>
-                        <div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>Leads</div>
-                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{ad.leads}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>Spend</div>
-                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>₹{ad.total_ad_spend_inr?.toLocaleString() || 0}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>Clicks</div>
-                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{ad.clicks}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>CPL</div>
-                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>₹{ad.cpl_inr || 0}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Assist Feedback form */}
             <div className="portal-bento-card" style={{ padding: '24px', marginTop: '12px' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase' }}>Need assistance or request changes?</h3>
@@ -1268,6 +1174,160 @@ export default function ClientPortal({ showToast }) {
                 </button>
               </form>
             </div>
+          </div>
+        )}
+
+        {/* Reports Tab (Tab 2) */}
+        {activeTab === 'reports' && (clientType === 'marketing' || clientType === 'both') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* SEO Reports Table */}
+            <div>
+              <h2 style={{ fontSize: '1.25rem', margin: '4px 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>SEO Monthly Reports</h2>
+              {seoReports.length === 0 ? (
+                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                  No SEO reports found yet.
+                </div>
+              ) : (
+                <div className="portal-table-container">
+                  <table className="portal-table">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>Traffic</th>
+                        <th>Clicks</th>
+                        <th>Map Views</th>
+                        <th>GMB Views</th>
+                        <th>GMB Clicks</th>
+                        <th>Calls</th>
+                        <th>Directions</th>
+                        <th>DA</th>
+                        <th>Blogs</th>
+                        <th>AI Overview</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {seoReports.map(r => (
+                        <tr key={r.id}>
+                          <td style={{ fontWeight: '800', color: '#000000', whiteSpace: 'nowrap' }}>{formatMonthName(r.month)}</td>
+                          <td>{r.website_traffic?.toLocaleString() || '-'}</td>
+                          <td>{r.website_clicks || '-'}</td>
+                          <td>{r.map_views?.toLocaleString() || '-'}</td>
+                          <td>{r.gmb_views?.toLocaleString() || '-'}</td>
+                          <td>{r.gmb_clicks?.toLocaleString() || '-'}</td>
+                          <td>{r.calls?.toLocaleString() || '-'}</td>
+                          <td>{r.directions?.toLocaleString() || '-'}</td>
+                          <td>{r.da || '-'}</td>
+                          <td>{r.blogs || '-'}</td>
+                          <td>
+                            <span className={`portal-badge ${r.ai_overview_visible === 'Yes' ? 'portal-badge-success' : 'portal-badge-muted'}`}>
+                              {r.ai_overview_visible || 'No'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Content Tracker Table */}
+            <div>
+              <h2 style={{ fontSize: '1.25rem', margin: '4px 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>Tracked Content Performance</h2>
+              {contentList.length === 0 ? (
+                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                  No tracked posts found yet.
+                </div>
+              ) : (
+                <div className="portal-table-container">
+                  <table className="portal-table">
+                    <thead>
+                      <tr>
+                        <th>Platform</th>
+                        <th>Post Type</th>
+                        <th>Title</th>
+                        <th>Views</th>
+                        <th>Engagement %</th>
+                        <th>Quality Score</th>
+                        <th>Date</th>
+                        <th>Link</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contentList.map(item => (
+                        <tr key={item.id}>
+                          <td>
+                            <span className={`portal-badge ${item.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>
+                              {item.platform}
+                            </span>
+                          </td>
+                          <td style={{ textTransform: 'capitalize' }}>{item.post_type}</td>
+                          <td style={{ fontWeight: '800', color: '#000000' }}>{item.title || 'Untitled Post'}</td>
+                          <td>
+                            {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
+                          </td>
+                          <td>
+                            {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
+                          </td>
+                          <td>{item.content_score || 0}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{formatDateStr(item.date)}</td>
+                          <td>
+                            {item.link ? (
+                              <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#000000', fontWeight: '800' }}>
+                                <ExternalLink size={12} />
+                              </a>
+                            ) : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Ads Campaigns Table */}
+            <div>
+              <h2 style={{ fontSize: '1.25rem', margin: '4px 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>Ads Campaigns</h2>
+              {adCampaigns.length === 0 ? (
+                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                  No active campaigns to analyze.
+                </div>
+              ) : (
+                <div className="portal-table-container">
+                  <table className="portal-table">
+                    <thead>
+                      <tr>
+                        <th>Campaign Name</th>
+                        <th>Platform</th>
+                        <th>Total Spend</th>
+                        <th>Leads</th>
+                        <th>Clicks</th>
+                        <th>CPL</th>
+                        <th>ROAS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adCampaigns.map((ad, idx) => (
+                        <tr key={idx}>
+                          <td style={{ fontWeight: '800', color: '#000000' }}>{ad.ad_campaign_name}</td>
+                          <td>
+                            <span className="portal-badge portal-badge-success">{ad.platform}</span>
+                          </td>
+                          <td>₹{ad.total_ad_spend_inr?.toLocaleString() || 0}</td>
+                          <td>{ad.leads}</td>
+                          <td>{ad.clicks}</td>
+                          <td>₹{ad.cpl_inr || 0}</td>
+                          <td>{ad.roas ? `${ad.roas}x` : 'Leads Focused'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
@@ -1355,7 +1415,7 @@ export default function ClientPortal({ showToast }) {
           </div>
         )}
 
-        {/* Content Tab (3rd Tab) */}
+        {/* Content Tab (4th Tab) */}
         {activeTab === 'content' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Monthly Content Plans</h2>
