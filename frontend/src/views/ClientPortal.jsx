@@ -272,6 +272,11 @@ export default function ClientPortal({ showToast }) {
           )}
         </div>
         <h1 style={{ fontSize: '1.8rem', margin: '4px 0 0' }}>{clientName}</h1>
+        {overview.sister_companies && overview.sister_companies.length > 0 && (
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Group Locations: <strong style={{ color: 'var(--accent)' }}>{clientName}</strong>, {overview.sister_companies.join(', ')}
+          </div>
+        )}
       </header>
 
       {/* Tabs Menu */}
@@ -725,7 +730,7 @@ export default function ClientPortal({ showToast }) {
                   <tr>
                     <th>Artist</th>
                     <th>Date</th>
-                    <th>Location</th>
+                    <th>Company & Venue</th>
                     <th>Booking Status</th>
                   </tr>
                 </thead>
@@ -736,7 +741,10 @@ export default function ClientPortal({ showToast }) {
                         {b.artist_name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>({b.artist_code})</span>
                       </td>
                       <td>{formatDateStr(b.gig_date)}</td>
-                      <td>{b.venue_name || '-'}</td>
+                      <td>
+                        <div style={{ fontWeight: 'bold' }}>{b.client_name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{b.venue_name || '-'}</div>
+                      </td>
                       <td>
                         <span className={`badge badge-${
                           b.status === 'Paid' || b.status === 'Confirmed' ? 'success' :

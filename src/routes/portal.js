@@ -143,6 +143,18 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       GROUP BY platform
     `).all(clientId);
 
+    // Get sister companies (all clients in the family hierarchy, excluding the client itself)
+    const parentId = req.portalClient.parent_id || clientId;
+    const familyClients = db.prepare(`
+      SELECT id, name 
+      FROM crm_clients 
+      WHERE id = ? OR parent_id = ?
+    `).all(parentId, parentId);
+
+    const sisterCompanies = familyClients
+      .filter(c => c.id !== clientId)
+      .map(c => c.name);
+
     res.json({
       client_name: req.portalClient.name,
       client_type: req.portalClient.client_type,
@@ -150,7 +162,8 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       ads: adStats,
       pending_approvals: pendingApprovals.count,
       platform_breakdown: platformBreakdown,
-      ads_breakdown: adsBreakdown
+      ads_breakdown: adsBreakdown,
+      sister_companies: sisterCompanies
     });
   } catch (err) {
     console.error('[PORTAL] Overview error:', err);
@@ -160,23 +173,45 @@ router.get('/:token/overview', portalAuth, (req, res) => {
 
 /**
  * GET /api/portal/:token/bookings
- * Booked gigs for the client (with pricing hidden).
+ * Booked gigs for the client and their sister companies (with pricing hidden).
  */
 router.get('/:token/bookings', portalAuth, (req, res) => {
   try {
     const clientId = req.portalClient.id;
 
-    // Retrieve gigs. Strictly omit fee_inr and advance_paid to secure pricing info.
+    // Find the parent ID
+    const parentId = req.portalClient.parent_id || clientId;
+
+    // Find all clients in the family (parent + children)
+    const familyClients = db.prepare(`
+      SELECT id 
+      FROM crm_clients 
+      WHERE id = ? OR parent_id = ?
+    `).all(parentId, parentId);
+
+    const clientIds = familyClients.map(c => c.id);
+
+    if (clientIds.length === 0) {
+      return res.json({ bookings: [] });
+    }
+
+    // Build placeholders for IN clause
+    const placeholders = clientIds.map(() => '?').join(',');
+
+    // Retrieve gigs for all family clients. Strictly omit fee_inr and advance_paid.
     const bookings = db.prepare(`
       SELECT g.id, g.gig_date, g.status, 
         a.name as artist_name, a.artist_id as artist_code,
-        v.name as venue_name
+        v.name as venue_name,
+        COALESCE(c.name, vc.name) as client_name
       FROM gig_status g
       LEFT JOIN artists a ON g.artist_id = a.id
       LEFT JOIN venues v ON g.venue_id = v.id
-      WHERE g.client_id = ? OR v.client_id = ?
+      LEFT JOIN crm_clients c ON g.client_id = c.id
+      LEFT JOIN crm_clients vc ON v.client_id = vc.id
+      WHERE g.client_id IN (${placeholders}) OR v.client_id IN (${placeholders})
       ORDER BY g.gig_date DESC
-    `).all(clientId, clientId);
+    `).all(...clientIds, ...clientIds);
 
     res.json({ bookings });
   } catch (err) {
