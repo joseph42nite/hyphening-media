@@ -1,0 +1,16 @@
+{
+  "appId": "com.hyphening.ops",
+  "appName": "Hyphening Ops",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http"
+  },
+  "plugins": {
+    "CapacitorCookies": {
+      "enabled": true
+    },
+    "CapacitorHttp": {
+      "enabled": false
+    }
+  }
+}

@@ -4,6 +4,7 @@ import {
   TrendingUp, BarChart2, MessageSquare, ThumbsUp, 
   Check, X, Eye, FileText, Send, Lock
 } from 'lucide-react';
+import { API_BASE } from '../api.js';
 
 export default function ClientPortal({ showToast }) {
   const { token } = useParams();
@@ -44,7 +45,7 @@ export default function ClientPortal({ showToast }) {
 
   const checkPortalAuth = async () => {
     try {
-      const response = await fetch(`/api/portal/${token}/overview`);
+      const response = await fetch(`${API_BASE}/api/portal/${token}/overview`, { credentials: 'include' });
       const data = await response.json();
       
       if (response.status === 401 && data.requires_pin) {
@@ -67,10 +68,11 @@ export default function ClientPortal({ showToast }) {
   const verifyPin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`/api/portal/${token}/verify-pin`, {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/verify-pin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin })
+        body: JSON.stringify({ pin }),
+        credentials: 'include'
       });
       const data = await response.json();
       if (!response.ok) {
@@ -89,17 +91,17 @@ export default function ClientPortal({ showToast }) {
   const fetchData = async () => {
     try {
       // Content list
-      const resContent = await fetch(`/api/portal/${token}/content`);
+      const resContent = await fetch(`${API_BASE}/api/portal/${token}/content`, { credentials: 'include' });
       const dataContent = await resContent.json();
       if (resContent.ok) setContentList(dataContent.content || []);
 
       // Ad campaigns
-      const resAds = await fetch(`/api/portal/${token}/ads`);
+      const resAds = await fetch(`${API_BASE}/api/portal/${token}/ads`, { credentials: 'include' });
       const dataAds = await resAds.json();
       if (resAds.ok) setAdCampaigns(dataAds.ads || []);
 
       // Content plan pending approval
-      const resPlan = await fetch(`/api/portal/${token}/content-plan`);
+      const resPlan = await fetch(`${API_BASE}/api/portal/${token}/content-plan`, { credentials: 'include' });
       const dataPlan = await resPlan.json();
       if (resPlan.ok) setPendingPlan(dataPlan.content_plan || []);
     } catch (err) {
@@ -110,8 +112,9 @@ export default function ClientPortal({ showToast }) {
   const handleApprove = async (id) => {
     if (!window.confirm('Are you sure you want to approve this content?')) return;
     try {
-      const response = await fetch(`/api/portal/${token}/content-plan/${id}/approve`, {
-        method: 'POST'
+      const response = await fetch(`${API_BASE}/api/portal/${token}/content-plan/${id}/approve`, {
+        method: 'POST',
+        credentials: 'include'
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to approve');
@@ -139,10 +142,11 @@ export default function ClientPortal({ showToast }) {
     
     setSubmittingDecision(true);
     try {
-      const response = await fetch(`/api/portal/${token}/content-plan/${rejectingItem.id}/reject`, {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/content-plan/${rejectingItem.id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: rejectionComment })
+        body: JSON.stringify({ comment: rejectionComment }),
+        credentials: 'include'
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to request changes');
@@ -164,10 +168,11 @@ export default function ClientPortal({ showToast }) {
 
     setSubmittingFeedback(true);
     try {
-      const response = await fetch(`/api/portal/${token}/feedback`, {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: feedbackMsg })
+        body: JSON.stringify({ message: feedbackMsg }),
+        credentials: 'include'
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to submit feedback');

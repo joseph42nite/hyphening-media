@@ -20,11 +20,20 @@ const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+// Origins used by Capacitor on Android
+const CAPACITOR_ORIGINS = ['http://localhost', 'capacitor://localhost'];
+
+// Detect if a request originates from the mobile app
+function isMobileRequest(req) {
+  const origin = req.get('origin') || '';
+  return CAPACITOR_ORIGINS.some(o => origin.startsWith(o));
+}
+
 // Cookie options
 const cookieOptions = (maxAge) => ({
   httpOnly: true,
   secure: IS_PROD,
-  sameSite: IS_PROD ? 'strict' : 'lax',
+  sameSite: IS_PROD ? 'lax' : 'lax',
   maxAge,
   path: '/',
 });
@@ -54,6 +63,13 @@ router.post('/login', authLimiter, (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Mobile gets 90-day session; web gets 7-day session
+    const isMobile = isMobileRequest(req);
+    const refreshExpiry = isMobile ? '90d' : REFRESH_TOKEN_EXPIRY;
+    const refreshMaxAge = isMobile
+      ? 90 * 24 * 60 * 60 * 1000   // 90 days
+      : 7 * 24 * 60 * 60 * 1000;   // 7 days
+
     // Generate tokens
     const accessToken = jwt.sign(
       { userId: user.id, role: user.role },
@@ -64,12 +80,12 @@ router.post('/login', authLimiter, (req, res) => {
     const refreshToken = jwt.sign(
       { userId: user.id, tokenType: 'refresh' },
       JWT_REFRESH_SECRET,
-      { expiresIn: REFRESH_TOKEN_EXPIRY }
+      { expiresIn: refreshExpiry }
     );
 
     // Store hashed refresh token in sessions table
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + refreshMaxAge).toISOString();
 
     db.prepare('INSERT INTO sessions (user_id, token_hash, expires_at) VALUES (?, ?, ?)').run(
       user.id, tokenHash, expiresAt
@@ -77,7 +93,7 @@ router.post('/login', authLimiter, (req, res) => {
 
     // Set HttpOnly cookies
     res.cookie('access_token', accessToken, cookieOptions(15 * 60 * 1000)); // 15 min
-    res.cookie('refresh_token', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
+    res.cookie('refresh_token', refreshToken, cookieOptions(refreshMaxAge));
 
     // Audit log
     logAction({
@@ -141,6 +157,13 @@ router.post('/refresh', authLimiter, (req, res) => {
       return res.status(401).json({ error: 'User account deactivated' });
     }
 
+    // Mobile gets 90-day session; web gets 7-day session
+    const isMobile = isMobileRequest(req);
+    const refreshExpiry = isMobile ? '90d' : REFRESH_TOKEN_EXPIRY;
+    const refreshMaxAge = isMobile
+      ? 90 * 24 * 60 * 60 * 1000
+      : 7 * 24 * 60 * 60 * 1000;
+
     // Issue new tokens
     const newAccessToken = jwt.sign(
       { userId: user.id, role: user.role },
@@ -151,18 +174,18 @@ router.post('/refresh', authLimiter, (req, res) => {
     const newRefreshToken = jwt.sign(
       { userId: user.id, tokenType: 'refresh' },
       JWT_REFRESH_SECRET,
-      { expiresIn: REFRESH_TOKEN_EXPIRY }
+      { expiresIn: refreshExpiry }
     );
 
     const newTokenHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + refreshMaxAge).toISOString();
 
     db.prepare('INSERT INTO sessions (user_id, token_hash, expires_at) VALUES (?, ?, ?)').run(
       user.id, newTokenHash, expiresAt
     );
 
     res.cookie('access_token', newAccessToken, cookieOptions(15 * 60 * 1000));
-    res.cookie('refresh_token', newRefreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie('refresh_token', newRefreshToken, cookieOptions(refreshMaxAge));
 
     res.json({ role: user.role, name: user.name });
   } catch (err) {

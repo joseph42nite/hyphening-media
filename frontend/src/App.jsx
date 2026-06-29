@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { isNative } from './api.js';
 import Login from './views/Login.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import ClientPortal from './views/ClientPortal.jsx';
-import Landing from './views/Landing.jsx';
 import Toast from './components/Toast.jsx';
+
+// Lazy-load Landing page — never fetched on mobile (saves ~60KB + game canvas)
+const Landing = React.lazy(() => import('./views/Landing.jsx'));
+
+// WebViews need HashRouter — no server-side routing fallback for client-side routes
+const Router = isNative ? HashRouter : BrowserRouter;
 
 function App() {
   const [auth, setAuth] = useState(null);
@@ -30,10 +36,15 @@ function App() {
     <Router>
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <Routes>
-          {/* Public Landing Page */}
+          {/* On mobile: skip landing, go straight to login or dashboard */}
+          {/* On web: show the public landing page */}
           <Route 
             path="/" 
-            element={<Landing />} 
+            element={
+              isNative
+                ? <Navigate to={auth ? "/dashboard" : "/login"} replace />
+                : <React.Suspense fallback={null}><Landing /></React.Suspense>
+            } 
           />
 
           {/* Main Workspace Ops Login */}
@@ -61,7 +72,7 @@ function App() {
           {/* Fallback routes */}
           <Route 
             path="*" 
-            element={<Navigate to={auth ? "/dashboard" : "/"} replace />} 
+            element={<Navigate to={auth ? "/dashboard" : (isNative ? "/login" : "/")} replace />} 
           />
         </Routes>
 

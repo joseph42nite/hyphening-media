@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Hyphening Ops</string>
+    <string name="title_activity_main">Hyphening Ops</string>
+    <string name="package_name">com.hyphening.ops</string>
+    <string name="custom_url_scheme">com.hyphening.ops</string>
+</resources>

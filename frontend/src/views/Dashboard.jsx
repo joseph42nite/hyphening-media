@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../api.js';
 import logoImg from '../assets/logo.png';
 import { 
   Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
@@ -137,7 +138,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [clientFormData, setClientFormData] = useState({
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
     calendar_sync_link: '', drive_folder_link: '', instagram_business_account_id: '',
-    instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: ''
+    instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: '',
+    parent_id: ''
   });
 
   const [showFreelancerModal, setShowFreelancerModal] = useState(false);
@@ -266,13 +268,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   // Auto-refresh fetch wrapper: handles expired JWT tokens transparently
   const authFetch = async (url, options = {}) => {
-    let res = await fetch(url, options);
+    let res = await fetch(`${API_BASE}${url}`, { ...options, credentials: 'include' });
     if (res.status === 401) {
       // Try to refresh the access token
-      const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
+      const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
       if (refreshRes.ok) {
         // Retry the original request with the new cookie
-        res = await fetch(url, options);
+        res = await fetch(`${API_BASE}${url}`, { ...options, credentials: 'include' });
       } else {
         // Refresh failed — session is truly expired
         localStorage.removeItem('user');
@@ -315,7 +317,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   useEffect(() => {
     if (!auth) return;
 
-    const es = new EventSource('/api/events');
+    const es = new EventSource(`${API_BASE}/api/events`, { withCredentials: true });
     es.onopen = () => setSseConnected(true);
     es.onerror = () => setSseConnected(false);
     
@@ -577,7 +579,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Logout
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
       localStorage.removeItem('user');
       setAuth(null);
       navigate('/login');
@@ -593,10 +595,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingTask ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskFormData)
+        body: JSON.stringify(taskFormData),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -656,10 +659,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
-      const res = await fetch(`/api/tasks/${taskId}/status`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus }),
+        credentials: 'include'
       });
       if (!res.ok) {
         const data = await res.json();
@@ -674,10 +678,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const updateContentStatus = async (itemId, newStatus) => {
     try {
-      const res = await fetch(`/api/clients/${selectedClientForReports.id}/marketing/content/${itemId}`, {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/content/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus }),
+        credentials: 'include'
       });
       if (!res.ok) {
         const data = await res.json();
@@ -699,10 +704,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingClient ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clientFormData)
+        body: JSON.stringify(clientFormData),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -730,14 +736,16 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         instagram_access_token: '', // Leave blank unless editing
         youtube_channel_id: client.youtube_channel_id || '',
         youtube_api_key: '', // Leave blank unless editing
-        google_ads_customer_id: client.google_ads_customer_id || ''
+        google_ads_customer_id: client.google_ads_customer_id || '',
+        parent_id: client.parent_id || ''
       });
     } else {
       setEditingClient(null);
       setClientFormData({
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
         calendar_sync_link: '', drive_folder_link: '', instagram_business_account_id: '',
-        instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: ''
+        instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: '',
+        parent_id: ''
       });
     }
     setShowClientModal(true);
@@ -745,10 +753,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const togglePortal = async (client, enable) => {
     try {
-      const res = await fetch(`/api/clients/${client.id}/portal`, {
+      const res = await fetch(`${API_BASE}/api/clients/${client.id}/portal`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portal_enabled: enable ? 1 : 0 })
+        body: JSON.stringify({ portal_enabled: enable ? 1 : 0 }),
+        credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to update portal state');
       showToast(`Portal ${enable ? 'enabled' : 'disabled'}`, 'success');
@@ -760,7 +769,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const generatePortalToken = async (client) => {
     try {
-      const res = await fetch(`/api/clients/${client.id}/portal/token`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/clients/${client.id}/portal/token`, { method: 'POST', credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       showToast('New secure token generated', 'success');
@@ -775,10 +784,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (pin === null) return;
     
     try {
-      const res = await fetch(`/api/clients/${client.id}/portal/pin`, {
+      const res = await fetch(`${API_BASE}/api/clients/${client.id}/portal/pin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pin || null })
+        body: JSON.stringify({ pin: pin || null }),
+        credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to set PIN');
       showToast(pin ? 'PIN updated successfully' : 'PIN protection removed', 'success');
@@ -791,7 +801,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // --- ARTIST MIGRATION & BANK DECRYPTION ---
   const decryptBankDetails = async (artistId) => {
     try {
-      const res = await fetch(`/api/artists/${artistId}/bank`);
+      const res = await fetch(`${API_BASE}/api/artists/${artistId}/bank`, { credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setDecryptedBank(prev => ({ ...prev, [artistId]: data.bank_details }));
@@ -807,13 +817,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingFreelancer ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...freelancerFormData,
           rate_per_video: freelancerFormData.rate_per_video ? parseFloat(freelancerFormData.rate_per_video) : null
-        })
+        }),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit freelancer data');
@@ -852,10 +863,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (!window.confirm(`Are you sure you want to ${actionStr} this freelancer?`)) return;
 
     try {
-      const res = await fetch(`/api/freelancers/${freelancer.id}`, {
+      const res = await fetch(`${API_BASE}/api/freelancers/${freelancer.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: newStatus })
+        body: JSON.stringify({ is_active: newStatus }),
+        credentials: 'include'
       });
       if (!res.ok) {
         const data = await res.json();
@@ -875,13 +887,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingVenue ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...venueFormData,
           client_id: venueFormData.client_id ? parseInt(venueFormData.client_id) : null
-        })
+        }),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit venue data');
@@ -924,13 +937,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingArtist ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...artistFormData,
           rating: artistFormData.rating ? parseInt(artistFormData.rating) : null
-        })
+        }),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -1011,7 +1025,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingGig ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1022,7 +1036,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           fee_inr: gigFormData.fee_inr ? parseFloat(gigFormData.fee_inr) : 0,
           advance_paid: gigFormData.advance_paid ? parseFloat(gigFormData.advance_paid) : 0,
           status: gigFormData.status
-        })
+        }),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit gig data');
@@ -1038,7 +1053,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const finalizePlanningCycle = async (cycleId) => {
     if (!window.confirm('Finalize this cycle? This will lock curation assignments and notify the admin telegram bot.')) return;
     try {
-      const res = await fetch(`/api/artists/planning-cycles/${cycleId}/finalize`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/artists/planning-cycles/${cycleId}/finalize`, { method: 'POST', credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       showToast('Cycle finalized and sent for approval', 'success');
@@ -1051,10 +1066,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // --- SOCIAL REVIEW QUEUE ---
   const handleReviewDecision = async (contentId, track) => {
     try {
-      const res = await fetch(`/api/clients/marketing/review/${contentId}`, {
+      const res = await fetch(`${API_BASE}/api/clients/marketing/review/${contentId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_tracked: track ? 1 : 0 })
+        body: JSON.stringify({ is_tracked: track ? 1 : 0 }),
+        credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to submit decision');
       showToast(track ? 'Item added to performance tracker' : 'Item discarded', 'success');
@@ -1183,10 +1199,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     };
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData)
+        body: JSON.stringify(bodyData),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save content row');
@@ -1251,7 +1268,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (!selectedClientForReports) return;
 
     try {
-      const res = await fetch(`/api/clients/${selectedClientForReports.id}/marketing/monthly`, {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/monthly`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1271,7 +1288,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           top_keywords: monthlyFormData.top_keywords || null,
           da: monthlyFormData.da !== '' ? parseInt(monthlyFormData.da) : null,
           ai_overview_visible: monthlyFormData.ai_overview_visible || 'No'
-        })
+        }),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save monthly report');
@@ -1307,10 +1325,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (!selectedScriptClient) return;
 
     try {
-      const res = await fetch(`/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedFields)
+        body: JSON.stringify(updatedFields),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update script');
@@ -1332,10 +1351,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingScript ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(scriptFormData)
+        body: JSON.stringify(scriptFormData),
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save script');
@@ -1355,8 +1375,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (!window.confirm('Are you sure you want to delete this script?')) return;
 
     try {
-      const res = await fetch(`/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
-        method: 'DELETE'
+      const res = await fetch(`${API_BASE}/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
+        method: 'DELETE',
+        credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete script');
@@ -1720,7 +1741,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    {c.name}
+                    {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
                   </div>
                 ))}
               </div>
@@ -1844,10 +1865,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                                     onChange={async (e) => {
                                       const val = e.target.value ? parseInt(e.target.value) : null;
                                       try {
-                                        const res = await fetch(`/api/tasks/${task.id}`, {
+                                        const res = await fetch(`${API_BASE}/api/tasks/${task.id}`, {
                                           method: 'PATCH',
                                           headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ assigned_to: val })
+                                          body: JSON.stringify({ assigned_to: val }),
+                                          credentials: 'include'
                                         });
                                         if (res.ok) {
                                           showToast('Freelancer assigned successfully', 'success');
@@ -2062,7 +2084,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 >
                   <option value="">All Clients</option>
                   {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -2178,7 +2202,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 >
                   <option value="">All Clients</option>
                   {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -2363,7 +2389,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                 <tbody>
                   {filteredClients.map(client => (
                     <tr key={client.id}>
-                      <td style={{ fontWeight: 'bold' }}>{client.name}</td>
+                      <td style={{ fontWeight: 'bold' }}>
+                        {client.name}
+                        {client.parent_name && (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '2px' }}>
+                            Company: <span style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{client.parent_name}</span>
+                          </div>
+                        )}
+                      </td>
                       <td>
                         <span className="badge badge-info">{client.client_type}</span>
                       </td>
@@ -2648,7 +2681,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   style={{ maxWidth: '250px' }}
                 >
                   {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -3669,7 +3704,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   >
                     <option value="">Select Client</option>
                     {clients.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -3784,6 +3821,24 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     <option value="both">Both</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Parent Company / Group</label>
+                <select
+                  className="form-control"
+                  value={clientFormData.parent_id || ''}
+                  onChange={e => setClientFormData({...clientFormData, parent_id: e.target.value})}
+                >
+                  <option value="">None (Standalone Client)</option>
+                  {clients
+                    .filter(c => !editingClient || c.id !== editingClient.id)
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
@@ -4821,7 +4876,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                   >
                     <option value="">Select Client (None)</option>
                     {clients.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
+                      </option>
                     ))}
                   </select>
                 </div>

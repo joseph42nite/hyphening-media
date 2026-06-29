@@ -26,9 +26,10 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
 
     if (req.user.role === 'ops_video_editor') {
       query = `
-        SELECT DISTINCT c.* 
+        SELECT DISTINCT c.*, p.name AS parent_name
         FROM crm_clients c
         JOIN kanban_tasks t ON t.client_id = c.id
+        LEFT JOIN crm_clients p ON c.parent_id = p.id
         WHERE t.assigned_to = ? AND t.task_type = 'video'
       `;
       params.push(req.user.id);
@@ -44,18 +45,23 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
 
       query += ' ORDER BY c.created_at DESC';
     } else {
-      query = 'SELECT * FROM crm_clients WHERE 1=1';
+      query = `
+        SELECT c.*, p.name AS parent_name
+        FROM crm_clients c
+        LEFT JOIN crm_clients p ON c.parent_id = p.id
+        WHERE 1=1
+      `;
 
       if (client_type) {
-        query += ' AND client_type = ?';
+        query += ' AND c.client_type = ?';
         params.push(client_type);
       }
       if (is_active !== undefined) {
-        query += ' AND is_active = ?';
+        query += ' AND c.is_active = ?';
         params.push(parseInt(is_active));
       }
 
-      query += ' ORDER BY created_at DESC';
+      query += ' ORDER BY c.created_at DESC';
     }
     const clients = db.prepare(query).all(...params);
 
@@ -83,7 +89,12 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
  */
 router.get('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
-    const client = db.prepare('SELECT * FROM crm_clients WHERE id = ?').get(req.params.id);
+    const client = db.prepare(`
+      SELECT c.*, p.name AS parent_name
+      FROM crm_clients c
+      LEFT JOIN crm_clients p ON c.parent_id = p.id
+      WHERE c.id = ?
+    `).get(req.params.id);
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
     if (req.user.role === 'ops_video_editor') {
@@ -117,7 +128,7 @@ router.post('/', authorize('admin'), (req, res) => {
       calendar_sync_link, drive_folder_link,
       instagram_access_token, instagram_business_account_id,
       youtube_channel_id, youtube_api_key,
-      google_ads_customer_id
+      google_ads_customer_id, parent_id
     } = req.body;
 
     if (!name) {
@@ -132,8 +143,8 @@ router.post('/', authorize('admin'), (req, res) => {
         calendar_sync_link, drive_folder_link,
         instagram_access_token_enc, instagram_business_account_id,
         youtube_channel_id, youtube_api_key_enc,
-        google_ads_customer_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        google_ads_customer_id, parent_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       client_type || 'marketing',
@@ -146,7 +157,8 @@ router.post('/', authorize('admin'), (req, res) => {
       instagram_business_account_id || null,
       youtube_channel_id || null,
       youtube_api_key && apiKey ? encrypt(youtube_api_key, apiKey) : null,
-      google_ads_customer_id || null
+      google_ads_customer_id || null,
+      parent_id && !isNaN(parseInt(parent_id)) ? parseInt(parent_id) : null
     );
 
     logAction({
@@ -155,11 +167,16 @@ router.post('/', authorize('admin'), (req, res) => {
       action: 'create',
       entityType: 'client',
       entityId: result.lastInsertRowid,
-      diff: { name, client_type },
+      diff: { name, client_type, parent_id },
       ip: req.ip,
     });
 
-    const newClient = db.prepare('SELECT * FROM crm_clients WHERE id = ?').get(result.lastInsertRowid);
+    const newClient = db.prepare(`
+      SELECT c.*, p.name AS parent_name
+      FROM crm_clients c
+      LEFT JOIN crm_clients p ON c.parent_id = p.id
+      WHERE c.id = ?
+    `).get(result.lastInsertRowid);
     const { instagram_access_token_enc, youtube_api_key_enc, portal_pin, ...safe } = newClient;
 
     res.status(201).json(safe);
@@ -182,7 +199,7 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       'name', 'client_type', 'contact_person', 'contact_email', 'contact_phone',
       'calendar_sync_link', 'drive_folder_link',
       'instagram_business_account_id', 'youtube_channel_id', 'google_ads_customer_id',
-      'is_active', 'portal_enabled'
+      'is_active', 'portal_enabled', 'parent_id'
     ];
 
     const updates = {};
@@ -190,8 +207,12 @@ router.patch('/:id', authorize('admin'), (req, res) => {
 
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
-        diff[field] = { from: client[field], to: req.body[field] };
+        let val = req.body[field];
+        if (field === 'parent_id') {
+          val = val && !isNaN(parseInt(val)) ? parseInt(val) : null;
+        }
+        updates[field] = val;
+        diff[field] = { from: client[field], to: val };
       }
     }
 
@@ -231,7 +252,12 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       ip: req.ip,
     });
 
-    const updated = db.prepare('SELECT * FROM crm_clients WHERE id = ?').get(req.params.id);
+    const updated = db.prepare(`
+      SELECT c.*, p.name AS parent_name
+      FROM crm_clients c
+      LEFT JOIN crm_clients p ON c.parent_id = p.id
+      WHERE c.id = ?
+    `).get(req.params.id);
     const { instagram_access_token_enc, youtube_api_key_enc, portal_pin, ...safe } = updated;
     res.json(safe);
   } catch (err) {

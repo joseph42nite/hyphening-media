@@ -64,15 +64,18 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "http://localhost", "capacitor://localhost"],
     },
   } : false,
   hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true } : false,
 }));
 
 // 2. CORS — allow frontend origin
+const CAPACITOR_ORIGINS = ['http://localhost', 'capacitor://localhost'];
 app.use(cors({
-  origin: IS_PROD ? FRONTEND_ORIGIN : [FRONTEND_ORIGIN, 'http://localhost:3000', 'http://localhost:5173'],
+  origin: IS_PROD 
+    ? [FRONTEND_ORIGIN, ...CAPACITOR_ORIGINS] 
+    : [FRONTEND_ORIGIN, 'http://localhost:3000', 'http://localhost:5173', ...CAPACITOR_ORIGINS],
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

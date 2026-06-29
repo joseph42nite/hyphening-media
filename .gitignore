@@ -10,3 +10,14 @@ data/*
 dist/
 .DS_Store
 *.pem
+
+# Android / Capacitor build artifacts
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/.idea/
+frontend/android/local.properties
+
+# IDE settings
+.idea/
+

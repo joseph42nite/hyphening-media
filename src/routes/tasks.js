@@ -30,12 +30,13 @@ router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager
     const { status, client_id, assigned_to, priority } = req.query;
     let query = `
       SELECT t.*, 
-        c.name as client_name,
+        COALESCE(p.name || ' - ', '') || c.name as client_name,
         f.name as freelancer_name,
         u.name as created_by_name,
         (SELECT id FROM marketing_content_tracker WHERE kanban_task_id = t.id) as content_id
       FROM kanban_tasks t
       LEFT JOIN crm_clients c ON t.client_id = c.id
+      LEFT JOIN crm_clients p ON c.parent_id = p.id
       LEFT JOIN users f ON t.assigned_to = f.id
       LEFT JOIN users u ON t.created_by = u.id
       WHERE 1=1
@@ -66,10 +67,13 @@ router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager
 router.get('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
   try {
     const task = db.prepare(`
-      SELECT t.*, c.name as client_name, f.name as freelancer_name,
+      SELECT t.*, 
+        COALESCE(p.name || ' - ', '') || c.name as client_name, 
+        f.name as freelancer_name,
         (SELECT id FROM marketing_content_tracker WHERE kanban_task_id = t.id) as content_id
       FROM kanban_tasks t
       LEFT JOIN crm_clients c ON t.client_id = c.id
+      LEFT JOIN crm_clients p ON c.parent_id = p.id
       LEFT JOIN users f ON t.assigned_to = f.id
       WHERE t.id = ?
     `).get(req.params.id);

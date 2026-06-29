@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { API_BASE, isNative } from '../api.js';
 import logoImg from '../assets/logo.png';
 
 export default function Login({ setAuth, showToast }) {
@@ -19,10 +20,11 @@ export default function Login({ setAuth, showToast }) {
 
     setLoading(true);
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -59,8 +61,8 @@ export default function Login({ setAuth, showToast }) {
         animation: 'fadeIn 0.4s ease-out',
         position: 'relative'
       }}>
-        {/* Back Button */}
-        <button
+        {/* Back Button — hidden on mobile (no landing page) */}
+        {!isNative && <button
           onClick={() => navigate('/')}
           style={{
             position: 'absolute',
@@ -90,7 +92,7 @@ export default function Login({ setAuth, showToast }) {
           title="Back to Landing Page"
         >
           <ArrowLeft size={16} strokeWidth={3} />
-        </button>
+        </button>}
 
         <div style={{ marginBottom: '32px', marginTop: '16px' }}>
           <img 
