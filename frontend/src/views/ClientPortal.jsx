@@ -646,6 +646,19 @@ export default function ClientPortal({ showToast }) {
   const [bookings, setBookings] = useState([]);
   const [scripts, setScripts] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState('');
+
+  // Pagination states
+  const [contentPage, setContentPage] = useState(1);
+  const [seoPage, setSeoPage] = useState(1);
+  const [adsPage, setAdsPage] = useState(1);
+
+  const ITEMS_PER_PAGE_CONTENT = 10;
+  const ITEMS_PER_PAGE_SEO = 5;
+  const ITEMS_PER_PAGE_ADS = 5;
+
+  useEffect(() => { setContentPage(1); }, [contentList]);
+  useEffect(() => { setSeoPage(1); }, [seoReports]);
+  useEffect(() => { setAdsPage(1); }, [adCampaigns]);
   
   // Feedback form
   const [feedbackMsg, setFeedbackMsg] = useState('');
@@ -873,6 +886,37 @@ export default function ClientPortal({ showToast }) {
   };
 
   const uniqueMonths = [...new Set(scripts.map(s => s.month))].sort((a, b) => b.localeCompare(a));
+
+  const renderPagination = (currentPage, totalItems, itemsPerPage, onPageChange) => {
+    const totalPages = Math.max(Math.ceil(totalItems / itemsPerPage), 1);
+    if (totalPages <= 1) return null;
+
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap', gap: '12px' }}>
+        <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+          Page {currentPage} of {totalPages} ({totalItems} items)
+        </span>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="portal-btn"
+            style={{ padding: '6px 14px', fontSize: '0.75rem', fontWeight: '800' }}
+          >
+            Prev
+          </button>
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="portal-btn"
+            style={{ padding: '6px 14px', fontSize: '0.75rem', fontWeight: '800' }}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   if (pinRequired) {
     return (
@@ -1189,46 +1233,49 @@ export default function ClientPortal({ showToast }) {
                   No SEO reports found yet.
                 </div>
               ) : (
-                <div className="portal-table-container">
-                  <table className="portal-table">
-                    <thead>
-                      <tr>
-                        <th>Month</th>
-                        <th>Traffic</th>
-                        <th>Clicks</th>
-                        <th>Map Views</th>
-                        <th>GMB Views</th>
-                        <th>GMB Clicks</th>
-                        <th>Calls</th>
-                        <th>Directions</th>
-                        <th>DA</th>
-                        <th>Blogs</th>
-                        <th>AI Overview</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {seoReports.map(r => (
-                        <tr key={r.id}>
-                          <td style={{ fontWeight: '800', color: '#000000', whiteSpace: 'nowrap' }}>{formatMonthName(r.month)}</td>
-                          <td>{r.website_traffic?.toLocaleString() || '-'}</td>
-                          <td>{r.website_clicks || '-'}</td>
-                          <td>{r.map_views?.toLocaleString() || '-'}</td>
-                          <td>{r.gmb_views?.toLocaleString() || '-'}</td>
-                          <td>{r.gmb_clicks?.toLocaleString() || '-'}</td>
-                          <td>{r.calls?.toLocaleString() || '-'}</td>
-                          <td>{r.directions?.toLocaleString() || '-'}</td>
-                          <td>{r.da || '-'}</td>
-                          <td>{r.blogs || '-'}</td>
-                          <td>
-                            <span className={`portal-badge ${r.ai_overview_visible === 'Yes' ? 'portal-badge-success' : 'portal-badge-muted'}`}>
-                              {r.ai_overview_visible || 'No'}
-                            </span>
-                          </td>
+                <>
+                  <div className="portal-table-container">
+                    <table className="portal-table">
+                      <thead>
+                        <tr>
+                          <th>Month</th>
+                          <th>Traffic</th>
+                          <th>Clicks</th>
+                          <th>Map Views</th>
+                          <th>GMB Views</th>
+                          <th>GMB Clicks</th>
+                          <th>Calls</th>
+                          <th>Directions</th>
+                          <th>DA</th>
+                          <th>Blogs</th>
+                          <th>AI Overview</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {seoReports.slice((seoPage - 1) * ITEMS_PER_PAGE_SEO, seoPage * ITEMS_PER_PAGE_SEO).map(r => (
+                          <tr key={r.id}>
+                            <td style={{ fontWeight: '800', color: '#000000', whiteSpace: 'nowrap' }}>{formatMonthName(r.month)}</td>
+                            <td>{r.website_traffic?.toLocaleString() || '-'}</td>
+                            <td>{r.website_clicks || '-'}</td>
+                            <td>{r.map_views?.toLocaleString() || '-'}</td>
+                            <td>{r.gmb_views?.toLocaleString() || '-'}</td>
+                            <td>{r.gmb_clicks?.toLocaleString() || '-'}</td>
+                            <td>{r.calls?.toLocaleString() || '-'}</td>
+                            <td>{r.directions?.toLocaleString() || '-'}</td>
+                            <td>{r.da || '-'}</td>
+                            <td>{r.blogs || '-'}</td>
+                            <td>
+                              <span className={`portal-badge ${r.ai_overview_visible === 'Yes' ? 'portal-badge-success' : 'portal-badge-muted'}`}>
+                                {r.ai_overview_visible || 'No'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {renderPagination(seoPage, seoReports.length, ITEMS_PER_PAGE_SEO, setSeoPage)}
+                </>
               )}
             </div>
 
@@ -1240,50 +1287,53 @@ export default function ClientPortal({ showToast }) {
                   No tracked posts found yet.
                 </div>
               ) : (
-                <div className="portal-table-container">
-                  <table className="portal-table">
-                    <thead>
-                      <tr>
-                        <th>Platform</th>
-                        <th>Post Type</th>
-                        <th>Title</th>
-                        <th>Views</th>
-                        <th>Engagement %</th>
-                        <th>Quality Score</th>
-                        <th>Date</th>
-                        <th>Link</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {contentList.map(item => (
-                        <tr key={item.id}>
-                          <td>
-                            <span className={`portal-badge ${item.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>
-                              {item.platform}
-                            </span>
-                          </td>
-                          <td style={{ textTransform: 'capitalize' }}>{item.post_type}</td>
-                          <td style={{ fontWeight: '800', color: '#000000' }}>{item.title || 'Untitled Post'}</td>
-                          <td>
-                            {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
-                          </td>
-                          <td>
-                            {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
-                          </td>
-                          <td>{item.content_score || 0}</td>
-                          <td style={{ whiteSpace: 'nowrap' }}>{formatDateStr(item.date)}</td>
-                          <td>
-                            {item.link ? (
-                              <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#000000', fontWeight: '800' }}>
-                                <ExternalLink size={12} />
-                              </a>
-                            ) : '-'}
-                          </td>
+                <>
+                  <div className="portal-table-container">
+                    <table className="portal-table">
+                      <thead>
+                        <tr>
+                          <th>Platform</th>
+                          <th>Post Type</th>
+                          <th>Title</th>
+                          <th>Views</th>
+                          <th>Engagement %</th>
+                          <th>Quality Score</th>
+                          <th>Date</th>
+                          <th>Link</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {contentList.slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT).map(item => (
+                          <tr key={item.id}>
+                            <td>
+                              <span className={`portal-badge ${item.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>
+                                {item.platform}
+                              </span>
+                            </td>
+                            <td style={{ textTransform: 'capitalize' }}>{item.post_type}</td>
+                            <td style={{ fontWeight: '800', color: '#000000' }}>{item.title || 'Untitled Post'}</td>
+                            <td>
+                              {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
+                            </td>
+                            <td>
+                              {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
+                            </td>
+                            <td>{item.content_score || 0}</td>
+                            <td style={{ whiteSpace: 'nowrap' }}>{formatDateStr(item.date)}</td>
+                            <td>
+                              {item.link ? (
+                                <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#000000', fontWeight: '800' }}>
+                                  <ExternalLink size={12} />
+                                </a>
+                              ) : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {renderPagination(contentPage, contentList.length, ITEMS_PER_PAGE_CONTENT, setContentPage)}
+                </>
               )}
             </div>
 
@@ -1295,36 +1345,39 @@ export default function ClientPortal({ showToast }) {
                   No active campaigns to analyze.
                 </div>
               ) : (
-                <div className="portal-table-container">
-                  <table className="portal-table">
-                    <thead>
-                      <tr>
-                        <th>Campaign Name</th>
-                        <th>Platform</th>
-                        <th>Total Spend</th>
-                        <th>Leads</th>
-                        <th>Clicks</th>
-                        <th>CPL</th>
-                        <th>ROAS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {adCampaigns.map((ad, idx) => (
-                        <tr key={idx}>
-                          <td style={{ fontWeight: '800', color: '#000000' }}>{ad.ad_campaign_name}</td>
-                          <td>
-                            <span className="portal-badge portal-badge-success">{ad.platform}</span>
-                          </td>
-                          <td>₹{ad.total_ad_spend_inr?.toLocaleString() || 0}</td>
-                          <td>{ad.leads}</td>
-                          <td>{ad.clicks}</td>
-                          <td>₹{ad.cpl_inr || 0}</td>
-                          <td>{ad.roas ? `${ad.roas}x` : 'Leads Focused'}</td>
+                <>
+                  <div className="portal-table-container">
+                    <table className="portal-table">
+                      <thead>
+                        <tr>
+                          <th>Campaign Name</th>
+                          <th>Platform</th>
+                          <th>Total Spend</th>
+                          <th>Leads</th>
+                          <th>Clicks</th>
+                          <th>CPL</th>
+                          <th>ROAS</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {adCampaigns.slice((adsPage - 1) * ITEMS_PER_PAGE_ADS, adsPage * ITEMS_PER_PAGE_ADS).map((ad, idx) => (
+                          <tr key={idx}>
+                            <td style={{ fontWeight: '800', color: '#000000' }}>{ad.ad_campaign_name}</td>
+                            <td>
+                              <span className="portal-badge portal-badge-success">{ad.platform}</span>
+                            </td>
+                            <td>₹{ad.total_ad_spend_inr?.toLocaleString() || 0}</td>
+                            <td>{ad.leads}</td>
+                            <td>{ad.clicks}</td>
+                            <td>₹{ad.cpl_inr || 0}</td>
+                            <td>{ad.roas ? `${ad.roas}x` : 'Leads Focused'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {renderPagination(adsPage, adCampaigns.length, ITEMS_PER_PAGE_ADS, setAdsPage)}
+                </>
               )}
             </div>
 
