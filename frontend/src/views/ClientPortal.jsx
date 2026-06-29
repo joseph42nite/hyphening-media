@@ -716,7 +716,7 @@ export default function ClientPortal({ showToast }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
           <h2 style={{ fontSize: '1.25rem' }}>Booked Artists & Performances</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            List of artists scheduled for your venues and their booking status.
+            List of artists scheduled for your venues and their payment status.
           </p>
 
           {bookings.length === 0 ? (
@@ -731,7 +731,7 @@ export default function ClientPortal({ showToast }) {
                     <th>Artist</th>
                     <th>Date</th>
                     <th>Company & Venue</th>
-                    <th>Booking Status</th>
+                    <th>Payment Status</th>
                   </tr>
                 </thead>
                 <tbody>
