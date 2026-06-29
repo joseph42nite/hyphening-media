@@ -1,10 +1,628 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
-  TrendingUp, BarChart2, MessageSquare, ThumbsUp, 
-  Check, X, Eye, FileText, Send, Lock
+  TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink
 } from 'lucide-react';
 import { API_BASE } from '../api.js';
+
+const PORTAL_STYLES = `
+/* Neo-Brutalist Bento Design System for Client Portal */
+.client-portal-wrapper {
+  --bg-primary: #f0f0f2;
+  --bg-card: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #18181b;
+  --text-muted: #52525b;
+  --border-color: #000000;
+  --border-width: 3px;
+  
+  --shadow-sm: 2px 2px 0px #000000;
+  --shadow-md: 5px 5px 0px #000000;
+  --shadow-lg: 8px 8px 0px #000000;
+  
+  --radius-md: 20px;
+  --radius-sm: 8px;
+  
+  --accent-purple: #a855f7;
+  --accent-cyan: #06b6d4;
+  --accent-rose: #f43f5e;
+  --accent-blue: #3b82f6;
+  
+  box-sizing: border-box;
+  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text-primary);
+  min-height: 100vh;
+  padding: 32px 16px;
+  background-color: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+body.portal-active {
+  background-color: #f0f0f2 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.portal-container {
+  width: 100%;
+  max-width: 850px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+/* Bento Card styling */
+.portal-bento-card {
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+  padding: 24px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+.portal-bento-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Header Banner */
+.portal-header-banner {
+  background: #ffffff;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 28px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.portal-header-tag {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #000000;
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.portal-header-title {
+  font-size: 2.2rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin: 0;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* Tabs segment - clean pill outline */
+.portal-tabs-container {
+  display: flex;
+  background: #ffffff;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 9999px;
+  padding: 6px;
+  margin-bottom: 28px;
+  width: 100%;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.portal-tabs-container::-webkit-scrollbar {
+  display: none;
+}
+
+.portal-tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: #000000;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.portal-tab-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.portal-tab-btn.active {
+  background: #000000;
+  color: #ffffff;
+}
+
+/* Metrics Bento Grid */
+.portal-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.portal-metric-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  background: #ffffff;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 20px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.portal-metric-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.portal-metric-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  margin: 8px 0 0 0;
+  line-height: 1;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.portal-metric-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Badges */
+.portal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  border: 2px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  letter-spacing: 0.03em;
+  box-shadow: var(--shadow-sm);
+}
+
+.portal-badge-success { background: #d1fae5; color: #065f46; }
+.portal-badge-warning { background: #fef3c7; color: #92400e; }
+.portal-badge-danger { background: #fee2e2; color: #991b1b; }
+.portal-badge-info { background: #dbeafe; color: #1e40af; }
+.portal-badge-muted { background: #f4f4f5; color: #52525b; }
+
+/* Form Controls & Buttons */
+.portal-control {
+  background: #ffffff;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  color: #000000;
+  font-family: inherit;
+  font-weight: 700;
+  transition: box-shadow 0.15s ease;
+  width: 100%;
+}
+
+.portal-control:focus {
+  outline: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.portal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  border-radius: 9999px;
+  border: var(--border-width) solid var(--border-color);
+  cursor: pointer;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+}
+
+.portal-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+
+.portal-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: none;
+}
+
+.portal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.portal-btn-primary {
+  background: #000000;
+  color: #ffffff;
+}
+
+.portal-btn-primary:hover {
+  background: #ffffff;
+  color: #000000;
+}
+
+.portal-btn-success { background: #ffffff; color: #000000; }
+.portal-btn-success:hover { background: #10b981; color: #ffffff; }
+
+.portal-btn-danger { background: #ffffff; color: #000000; }
+.portal-btn-danger:hover { background: #ef4444; color: #ffffff; }
+
+/* Grid Layouts */
+.portal-grid-half {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+/* Tables */
+.portal-table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-color);
+  background: #ffffff;
+  box-shadow: var(--shadow-md);
+  width: 100%;
+}
+
+.portal-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.portal-table th {
+  background: #f4f4f5;
+  padding: 16px 20px;
+  font-weight: 800;
+  color: #000000;
+  border-bottom: var(--border-width) solid var(--border-color);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.portal-table td {
+  padding: 16px 20px;
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.portal-table tr:last-child td {
+  border-bottom: none;
+}
+
+.portal-table tr:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Modal styling */
+.portal-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* Month selector pills */
+.portal-month-selector {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+  scrollbar-width: none;
+}
+
+.portal-month-selector::-webkit-scrollbar {
+  display: none;
+}
+
+.portal-month-tab {
+  padding: 10px 20px;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  background: #ffffff;
+  border: var(--border-width) solid var(--border-color);
+  color: #000000;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.portal-month-tab:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
+}
+
+.portal-month-tab.active {
+  background: #000000;
+  color: #ffffff;
+}
+
+/* Script Box */
+.portal-script-box {
+  background: #f4f4f5;
+  border: var(--border-width) solid var(--border-color);
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #000000;
+  white-space: pre-wrap;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.portal-form-group {
+  margin-bottom: 20px;
+}
+
+.portal-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #000000;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@media(max-width: 768px) {
+  .portal-grid-half {
+    grid-template-columns: 1fr;
+  }
+}
+`;
+
+function PerformanceTrendChart({ data }) {
+  const [metric, setMetric] = useState('views'); // 'views' or 'engagement'
+  
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px', textAlign: 'center', fontWeight: '700' }}>
+        No trend data available yet.
+      </div>
+    );
+  }
+
+  const width = 500;
+  const height = 220;
+  const paddingLeft = 55;
+  const paddingRight = 20;
+  const paddingTop = 20;
+  const paddingBottom = 40;
+  
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const isViews = metric === 'views';
+  
+  // Calculate max val
+  const maxVal = Math.max(...data.map(d => isViews ? (d.views || 0) : (d.engagement_rate_pct || 0)), 1);
+  const roundedMax = isViews ? Math.ceil(maxVal / 1000) * 1000 : Math.ceil(maxVal);
+
+  const points = data.map((d, index) => {
+    const x = paddingLeft + (data.length > 1 ? (index / (data.length - 1)) * chartWidth : chartWidth / 2);
+    const currVal = isViews ? (d.views || 0) : (d.engagement_rate_pct || 0);
+    const y = paddingTop + chartHeight - (currVal / roundedMax) * chartHeight;
+    return { x, y, val: currVal, date: d.date, title: d.title };
+  });
+
+  let pathD = '';
+  let areaD = '';
+  if (points.length > 0) {
+    pathD = `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+    areaD = `${pathD} L ${points[points.length - 1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`;
+  }
+
+  const gridTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  const formatNumberAbbr = (num) => {
+    if (num === null || num === undefined) return '0';
+    if (isViews) {
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(0) + 'K';
+      return num.toString();
+    } else {
+      return num.toFixed(1) + '%';
+    }
+  };
+
+  const shortDate = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [year, month, day] = parts;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${parseInt(day, 10)} ${months[parseInt(month, 10) - 1]}`;
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <h3 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'uppercase', fontWeight: 800 }}>Content Performance Trend</h3>
+        <div style={{ display: 'flex', border: '3px solid #000000', borderRadius: '9999px', overflow: 'hidden', boxShadow: '2px 2px 0px #000000' }}>
+          <button 
+            onClick={() => setMetric('views')}
+            style={{
+              padding: '6px 14px',
+              border: 'none',
+              fontWeight: '800',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              background: isViews ? '#000000' : '#ffffff',
+              color: isViews ? '#ffffff' : '#000000',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Video Views
+          </button>
+          <button 
+            onClick={() => setMetric('engagement')}
+            style={{
+              padding: '6px 14px',
+              border: 'none',
+              fontWeight: '800',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              background: !isViews ? '#000000' : '#ffffff',
+              color: !isViews ? '#ffffff' : '#000000',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Engagement %
+          </button>
+        </div>
+      </div>
+
+      <div style={{ width: '100%', background: '#ffffff', border: '3px solid #000000', borderRadius: '14px', padding: '16px', boxShadow: '4px 4px 0px #000000', boxSizing: 'border-box' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="auto" style={{ overflow: 'visible' }}>
+          {/* Grid lines */}
+          {gridTicks.map((tick, idx) => {
+            const y = paddingTop + chartHeight - tick * chartHeight;
+            const gridVal = isViews ? Math.round(tick * roundedMax) : (tick * roundedMax);
+            return (
+              <g key={idx}>
+                <line 
+                  x1={paddingLeft} 
+                  y1={y} 
+                  x2={width - paddingRight} 
+                  y2={y} 
+                  stroke="#e4e4e7" 
+                  strokeWidth="2"
+                  strokeDasharray={idx === 0 ? "0" : "4 4"}
+                />
+                <text 
+                  x={paddingLeft - 8} 
+                  y={y + 4} 
+                  textAnchor="end" 
+                  fill="#000000" 
+                  style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: '800' }}
+                >
+                  {formatNumberAbbr(gridVal)}
+                </text>
+              </g>
+            );
+          })}
+          
+          {/* Fill Area */}
+          {points.length > 0 && (
+            <path 
+              d={areaD} 
+              fill={isViews ? "rgba(168, 85, 247, 0.15)" : "rgba(6, 182, 212, 0.15)"}
+            />
+          )}
+          
+          {/* Stroke Line */}
+          {points.length > 0 && (
+            <path 
+              d={pathD} 
+              fill="none" 
+              stroke="#000000" 
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+          
+          {/* Points circles and native titles */}
+          {points.map((p, idx) => (
+            <g key={idx}>
+              <circle 
+                cx={p.x} 
+                cy={p.y} 
+                r="6" 
+                fill={isViews ? "#a855f7" : "#06b6d4"} 
+                stroke="#000000" 
+                strokeWidth="2.5"
+                style={{ cursor: 'pointer' }}
+              >
+                <title>{`${p.title}\n${isViews ? 'Views' : 'Engagement'}: ${isViews ? p.val.toLocaleString() : p.val.toFixed(2) + '%'}\nDate: ${p.date}`}</title>
+              </circle>
+              {/* Date labels */}
+              <text 
+                x={p.x} 
+                y={paddingTop + chartHeight + 18} 
+                textAnchor="middle" 
+                fill="#000000" 
+                style={{ fontSize: '9px', fontFamily: 'var(--font-sans)', fontWeight: '800' }}
+              >
+                {shortDate(p.date)}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
 
 export default function ClientPortal({ showToast }) {
   const { token } = useParams();
@@ -23,6 +641,8 @@ export default function ClientPortal({ showToast }) {
   const [adCampaigns, setAdCampaigns] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [scripts, setScripts] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState('');
   
   // Feedback form
   const [feedbackMsg, setFeedbackMsg] = useState('');
@@ -52,6 +672,24 @@ export default function ClientPortal({ showToast }) {
     return `${parseInt(day, 10)} ${monthName} ${year}`;
   };
 
+  const formatMonthName = (monthStr) => {
+    if (!monthStr) return '';
+    const [year, month] = monthStr.split('-');
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return `${monthNames[parseInt(month, 10) - 1]} ${year}`;
+  };
+
+  // Setup/Cleanup portal-active body class
+  useEffect(() => {
+    document.body.classList.add('portal-active');
+    return () => {
+      document.body.classList.remove('portal-active');
+    };
+  }, []);
+
   // Try fetching to see if authenticated/PIN required
   useEffect(() => {
     checkPortalAuth();
@@ -70,11 +708,13 @@ export default function ClientPortal({ showToast }) {
         setPinRequired(false);
         setClientName(data.client_name);
         setClientType(data.client_type || 'marketing');
+        
         if (data.client_type === 'artist_curation') {
           setActiveTab('bookings');
-        } else {
+        } else if (activeTab !== 'approval' && activeTab !== 'content' && activeTab !== 'bookings') {
           setActiveTab('overview');
         }
+        
         setOverview(data);
         fetchData(data.client_type || 'marketing');
       } else {
@@ -108,7 +748,7 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
-  const fetchData = async (type) => {
+  const fetchData = async (type = clientType) => {
     try {
       if (type === 'artist_curation' || type === 'both') {
         const resBookings = await fetch(`${API_BASE}/api/portal/${token}/bookings`, { credentials: 'include' });
@@ -130,6 +770,18 @@ export default function ClientPortal({ showToast }) {
         const resPlan = await fetch(`${API_BASE}/api/portal/${token}/content-plan`, { credentials: 'include' });
         const dataPlan = await resPlan.json();
         if (resPlan.ok) setPendingPlan(dataPlan.content_plan || []);
+
+        // Fetch monthly scripts (Content tab)
+        const resScripts = await fetch(`${API_BASE}/api/portal/${token}/scripts`, { credentials: 'include' });
+        const dataScripts = await resScripts.json();
+        if (resScripts.ok) {
+          const loadedScripts = dataScripts.scripts || [];
+          setScripts(loadedScripts);
+          if (loadedScripts.length > 0) {
+            const months = [...new Set(loadedScripts.map(s => s.month))].sort((a, b) => b.localeCompare(a));
+            setSelectedMonth(prev => prev || months[0] || '');
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching portal sub-data:', err);
@@ -147,7 +799,6 @@ export default function ClientPortal({ showToast }) {
       if (!response.ok) throw new Error(data.error || 'Failed to approve');
       
       showToast('Content approved successfully', 'success');
-      // Refresh
       fetchData();
       checkPortalAuth();
     } catch (err) {
@@ -215,20 +866,21 @@ export default function ClientPortal({ showToast }) {
 
   if (pinRequired) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', padding: '16px' }}>
-        <div className="glass-premium" style={{ width: '100%', maxWidth: '400px', padding: '32px', textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', padding: '12px', background: 'var(--accent-glow)', borderRadius: '50%', color: 'var(--accent)', marginBottom: '16px' }}>
+      <div className="client-portal-wrapper">
+        <style dangerouslySetInnerHTML={{ __html: PORTAL_STYLES }} />
+        <div className="portal-bento-card" style={{ width: '100%', maxWidth: '420px', padding: '32px', textAlign: 'center', marginTop: '10vh' }}>
+          <div style={{ display: 'inline-flex', padding: '12px', background: '#000000', color: '#ffffff', border: '3px solid #000000', borderRadius: '50%', marginBottom: '16px', boxShadow: '2px 2px 0px #000000' }}>
             <Lock size={32} />
           </div>
-          <h2 style={{ marginBottom: '8px' }}>Security Verification</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+          <h2 style={{ marginBottom: '8px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '-0.02em' }}>Security Verification</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px', fontWeight: 700 }}>
             Please enter your Client PIN to access the performance dashboard and approval portal.
           </p>
           <form onSubmit={verifyPin}>
-            <div className="form-group">
+            <div className="portal-form-group">
               <input
                 type="password"
-                className="form-control"
+                className="portal-control"
                 placeholder="Enter PIN"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
@@ -236,7 +888,7 @@ export default function ClientPortal({ showToast }) {
                 required
               />
             </div>
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px' }}>
+            <button type="submit" className="portal-btn portal-btn-primary" style={{ width: '100%', padding: '12px', marginTop: '16px' }}>
               Verify Access
             </button>
           </form>
@@ -247,555 +899,670 @@ export default function ClientPortal({ showToast }) {
 
   if (!isVerified || !overview) {
     return (
-      <div className="flex-center" style={{ minHeight: '80vh' }}>
+      <div className="client-portal-wrapper" style={{ justifyContent: 'center' }}>
+        <style dangerouslySetInnerHTML={{ __html: PORTAL_STYLES }} />
         <div style={{ textAlign: 'center' }}>
-          <div className="loader" style={{ border: '3px solid var(--border-color)', borderTop: '3px solid var(--accent)', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }}></div>
-          <p style={{ color: 'var(--text-secondary)' }}>Verifying secure token access...</p>
+          <div style={{ border: '3px solid #000000', borderTop: '3px solid #a855f7', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }}></div>
+          <p style={{ color: '#000000', fontWeight: '800', textTransform: 'uppercase', fontSize: '0.9rem' }}>Verifying secure token access...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container" style={{ padding: '16px 8px', maxWidth: '800px', animation: 'fadeIn 0.3s ease-out' }}>
+    <div className="client-portal-wrapper">
+      <style dangerouslySetInnerHTML={{ __html: PORTAL_STYLES }} />
       
-      {/* Portal Header */}
-      <header className="glass" style={{ padding: '20px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)', fontWeight: 600 }}>
-            Client Portal
-          </span>
-          {overview.pending_approvals > 0 && (
-            <span className="badge badge-warning" style={{ animation: 'pulseGlow 2s infinite' }}>
-              {overview.pending_approvals} approval pending
+      <div className="portal-container">
+        
+        {/* Portal Header */}
+        <header className="portal-header-banner">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="portal-header-tag">
+              Client Portal
             </span>
+            {overview.pending_approvals > 0 && (
+              <span className="portal-badge portal-badge-warning">
+                {overview.pending_approvals} Approval Pending
+              </span>
+            )}
+          </div>
+          <h1 className="portal-header-title">{clientName}</h1>
+          {overview.sister_companies && overview.sister_companies.length > 0 && (
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px', fontWeight: '800' }}>
+              Group Locations: <strong style={{ color: '#000000' }}>{clientName}</strong>, {overview.sister_companies.join(', ')}
+            </div>
+          )}
+        </header>
+
+        {/* Tabs Menu */}
+        <div className="portal-tabs-container">
+          {(clientType === 'marketing' || clientType === 'both') && (
+            <>
+              <button 
+                onClick={() => setActiveTab('overview')} 
+                className={`portal-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+              >
+                <BarChart2 size={16} /> Overview
+              </button>
+              <button 
+                onClick={() => setActiveTab('approval')} 
+                className={`portal-tab-btn ${activeTab === 'approval' ? 'active' : ''}`}
+                style={{ position: 'relative' }}
+              >
+                <FileText size={16} /> Approvals
+                {overview.pending_approvals > 0 && (
+                  <span style={{ position: 'absolute', top: '8px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />
+                )}
+              </button>
+              <button 
+                onClick={() => setActiveTab('content')} 
+                className={`portal-tab-btn ${activeTab === 'content' ? 'active' : ''}`}
+              >
+                <Calendar size={16} /> Content
+              </button>
+            </>
+          )}
+          {(clientType === 'artist_curation' || clientType === 'both') && (
+            <button 
+              onClick={() => setActiveTab('bookings')} 
+              className={`portal-tab-btn ${activeTab === 'bookings' ? 'active' : ''}`}
+            >
+              <TrendingUp size={16} /> Artist Bookings
+            </button>
           )}
         </div>
-        <h1 style={{ fontSize: '1.8rem', margin: '4px 0 0' }}>{clientName}</h1>
-        {overview.sister_companies && overview.sister_companies.length > 0 && (
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Group Locations: <strong style={{ color: 'var(--accent)' }}>{clientName}</strong>, {overview.sister_companies.join(', ')}
-          </div>
-        )}
-      </header>
 
-      {/* Tabs Menu */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '4px' }}>
-        {(clientType === 'marketing' || clientType === 'both') && (
-          <>
-            <button 
-              onClick={() => setActiveTab('overview')} 
-              className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flexGrow: 1 }}
-            >
-              <BarChart2 size={16} /> Overview
-            </button>
-            <button 
-              onClick={() => setActiveTab('content')} 
-              className={`btn ${activeTab === 'content' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flexGrow: 1 }}
-            >
-              <TrendingUp size={16} /> Content
-            </button>
-            <button 
-              onClick={() => setActiveTab('approval')} 
-              className={`btn ${activeTab === 'approval' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flexGrow: 1, position: 'relative' }}
-            >
-              <FileText size={16} /> Approvals
-              {overview.pending_approvals > 0 && (
-                <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--warning)' }} />
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (clientType === 'marketing' || clientType === 'both') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Performance Summary</h2>
+            
+            <div className="portal-metrics-grid">
+              {/* Content Stats */}
+              {overview.content && (
+                <>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Total Video Views</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--accent-purple)' }}>{overview.content.total_views?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Avg Engagement Rate</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--accent-cyan)' }}>{overview.content.avg_engagement_rate || 0}%</span>
+                  </div>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Content Quality Score</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--accent-rose)' }}>{overview.content.avg_content_score || 0}</span>
+                  </div>
+                </>
               )}
-            </button>
-          </>
-        )}
-        {(clientType === 'artist_curation' || clientType === 'both') && (
-          <button 
-            onClick={() => setActiveTab('bookings')} 
-            className={`btn ${activeTab === 'bookings' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flexGrow: 1 }}
-          >
-            <TrendingUp size={16} /> Artist Bookings
-          </button>
-        )}
-      </div>
 
-      {/* Overview Tab */}
-      {activeTab === 'overview' && (clientType === 'marketing' || clientType === 'both') && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <h2 style={{ fontSize: '1.25rem', textAlign: 'left' }}>Performance Summary</h2>
-          
-          <div className="grid-auto">
-            {/* Content Stats */}
-            {overview.content && (
-              <>
-                <div className="glass card-metric">
-                  <span className="metric-label">Total Video Views</span>
-                  <span className="metric-value">{overview.content.total_views?.toLocaleString() || 0}</span>
-                </div>
-                <div className="glass card-metric">
-                  <span className="metric-label">Avg Engagement Rate</span>
-                  <span className="metric-value">{overview.content.avg_engagement_rate || 0}%</span>
-                </div>
-                <div className="glass card-metric">
-                  <span className="metric-label">Content Quality Score</span>
-                  <span className="metric-value">{overview.content.avg_content_score || 0}</span>
-                </div>
-              </>
-            )}
+              {/* Ads Stats */}
+              {overview.ads && (
+                <>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Total Leads</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--accent-blue)' }}>{overview.ads.total_leads || 0}</span>
+                  </div>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Return on Ad Spend</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--accent-purple)' }}>{overview.ads.avg_roas ? `${overview.ads.avg_roas}x` : 'N/A'}</span>
+                  </div>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Total Spend</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--text-primary)' }}>₹{overview.ads.total_spend?.toLocaleString() || 0}</span>
+                  </div>
+                </>
+              )}
+            </div>
 
-            {/* Ads Stats */}
-            {overview.ads && (
-              <>
-                <div className="glass card-metric">
-                  <span className="metric-label">Total Leads</span>
-                  <span className="metric-value">{overview.ads.total_leads || 0}</span>
-                </div>
-                <div className="glass card-metric">
-                  <span className="metric-label">Return on Ad Spend (ROAS)</span>
-                  <span className="metric-value">{overview.ads.avg_roas ? `${overview.ads.avg_roas}x` : 'N/A'}</span>
-                </div>
-                <div className="glass card-metric">
-                  <span className="metric-label">Total Spend</span>
-                  <span className="metric-value">₹{overview.ads.total_spend?.toLocaleString() || 0}</span>
-                </div>
-              </>
-            )}
-          </div>
+            {/* Performance Trend Chart */}
+            <PerformanceTrendChart data={overview.views_trend} />
 
-          {/* SVG Performance Charts & Graphs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '12px' }}>
-            {/* Platform Distribution Donut Chart */}
-            <div className="glass" style={{ padding: '20px', textAlign: 'left' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Platform Distribution</h3>
-              {(!overview.platform_breakdown || overview.platform_breakdown.length === 0) ? (
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No distribution data available yet.</div>
-              ) : (() => {
-                const total = overview.platform_breakdown.reduce((sum, item) => sum + item.count, 0);
-                let accumulatedPercent = 0;
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    {total > 0 ? (
-                      <svg width="120" height="120" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)', borderRadius: '50%' }}>
-                        <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="4"></circle>
+            {/* SVG Performance Charts & Graphs */}
+            <div className="portal-grid-half">
+              {/* Platform Distribution Donut Chart */}
+              <div className="portal-bento-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800 }}>Platform Distribution</h3>
+                {(!overview.platform_breakdown || overview.platform_breakdown.length === 0) ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No distribution data available yet.</div>
+                ) : (() => {
+                  const total = overview.platform_breakdown.reduce((sum, item) => sum + item.count, 0);
+                  let accumulatedPercent = 0;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {total > 0 ? (
+                        <svg width="120" height="120" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)', borderRadius: '50%', border: '3px solid #000000', boxShadow: '2px 2px 0px #000000' }}>
+                          <circle cx="21" cy="21" r="15.91549430918954" fill="#ffffff"></circle>
+                          {overview.platform_breakdown.map((item, idx) => {
+                            const percent = (item.count / total) * 100;
+                            const strokeDashoffset = 100 - accumulatedPercent;
+                            accumulatedPercent += percent;
+                            const colors = ['#a855f7', '#06b6d4', '#f43f5e', '#3b82f6'];
+                            const color = colors[idx % colors.length];
+                            return (
+                              <circle
+                                key={item.platform}
+                                cx="21"
+                                cy="21"
+                                r="15.91549430918954"
+                                fill="transparent"
+                                stroke={color}
+                                strokeWidth="4.5"
+                                strokeDasharray={`${percent} ${100 - percent}`}
+                                strokeDashoffset={strokeDashoffset}
+                                style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                              />
+                            );
+                          })}
+                        </svg>
+                      ) : (
+                        <div style={{ width: '120px', height: '120px', borderRadius: '50%', border: '3px solid #000000' }} />
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flexGrow: 1 }}>
                         {overview.platform_breakdown.map((item, idx) => {
-                          const percent = (item.count / total) * 100;
-                          const strokeDashoffset = 100 - accumulatedPercent;
-                          accumulatedPercent += percent;
+                          const percent = total > 0 ? ((item.count / total) * 100).toFixed(0) : 0;
                           const colors = ['#a855f7', '#06b6d4', '#f43f5e', '#3b82f6'];
                           const color = colors[idx % colors.length];
                           return (
-                            <circle
-                              key={item.platform}
-                              cx="21"
-                              cy="21"
-                              r="15.91549430918954"
-                              fill="transparent"
-                              stroke={color}
-                              strokeWidth="4.5"
-                              strokeDasharray={`${percent} ${100 - percent}`}
-                              strokeDashoffset={strokeDashoffset}
-                              style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-                            />
-                          );
-                        })}
-                      </svg>
-                    ) : (
-                      <div style={{ width: '120px', height: '120px', borderRadius: '50%', border: '4px solid rgba(255,255,255,0.05)' }} />
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flexGrow: 1 }}>
-                      {overview.platform_breakdown.map((item, idx) => {
-                        const percent = total > 0 ? ((item.count / total) * 100).toFixed(0) : 0;
-                        const colors = ['#a855f7', '#06b6d4', '#f43f5e', '#3b82f6'];
-                        const color = colors[idx % colors.length];
-                        return (
-                          <div key={item.platform} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, display: 'inline-block' }} />
-                            <span style={{ textTransform: 'capitalize' }}>{item.platform}:</span>
-                            <span style={{ color: 'var(--text-secondary)' }}>{item.count} posts ({percent}%)</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Ad Campaign Performance Bar Charts */}
-            <div className="glass" style={{ padding: '20px', textAlign: 'left' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Ad Campaigns Performance</h3>
-              {(!overview.ads_breakdown || overview.ads_breakdown.length === 0) ? (
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No active campaigns to analyze.</div>
-              ) : (() => {
-                const maxSpend = Math.max(...overview.ads_breakdown.map(item => item.spend || 0), 1);
-                const maxLeads = Math.max(...overview.ads_breakdown.map(item => item.leads || 0), 1);
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div>
-                      <h4 style={{ fontSize: '0.8rem', marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ad Spend (₹)</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {overview.ads_breakdown.map((item, idx) => {
-                          const widthPct = ((item.spend || 0) / maxSpend) * 100;
-                          const colors = ['#3b82f6', '#10b981', '#f59e0b'];
-                          const color = colors[idx % colors.length];
-                          return (
-                            <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
-                                <span>₹{(item.spend || 0).toLocaleString()}</span>
-                              </div>
-                              <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '9999px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color }} />
-                              </div>
+                            <div key={item.platform} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: '800' }}>
+                              <span style={{ width: '10px', height: '10px', border: '1px solid #000000', borderRadius: '50%', background: color, display: 'inline-block' }} />
+                              <span style={{ textTransform: 'capitalize' }}>{item.platform}:</span>
+                              <span style={{ color: 'var(--text-muted)' }}>{item.count} ({percent}%)</span>
                             </div>
                           );
                         })}
                       </div>
                     </div>
+                  );
+                })()}
+              </div>
 
-                    <div>
-                      <h4 style={{ fontSize: '0.8rem', marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leads Generated</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {overview.ads_breakdown.map((item, idx) => {
-                          const widthPct = ((item.leads || 0) / maxLeads) * 100;
-                          const colors = ['#a855f7', '#06b6d4', '#f43f5e'];
-                          const color = colors[idx % colors.length];
-                          return (
-                            <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
-                                <span>{item.leads || 0} leads</span>
+              {/* Ad Campaign Performance Bar Charts */}
+              <div className="portal-bento-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800 }}>Ad Campaigns Performance</h3>
+                {(!overview.ads_breakdown || overview.ads_breakdown.length === 0) ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No active campaigns to analyze.</div>
+                ) : (() => {
+                  const maxSpend = Math.max(...overview.ads_breakdown.map(item => item.spend || 0), 1);
+                  const maxLeads = Math.max(...overview.ads_breakdown.map(item => item.leads || 0), 1);
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div>
+                        <h4 style={{ fontSize: '0.8rem', marginBottom: '6px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ad Spend (₹)</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {overview.ads_breakdown.map((item, idx) => {
+                            const widthPct = ((item.spend || 0) / maxSpend) * 100;
+                            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
+                            const color = colors[idx % colors.length];
+                            return (
+                              <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: '800' }}>
+                                  <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
+                                  <span>₹{(item.spend || 0).toLocaleString()}</span>
+                                </div>
+                                <div style={{ height: '10px', background: '#ffffff', border: '2px solid #000000', borderRadius: '9999px', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color, borderRight: widthPct < 100 ? '2px solid #000000' : 'none' }} />
+                                </div>
                               </div>
-                              <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '9999px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color }} />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 style={{ fontSize: '0.8rem', marginBottom: '6px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leads Generated</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {overview.ads_breakdown.map((item, idx) => {
+                            const widthPct = ((item.leads || 0) / maxLeads) * 100;
+                            const colors = ['#a855f7', '#06b6d4', '#f43f5e'];
+                            const color = colors[idx % colors.length];
+                            return (
+                              <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: '800' }}>
+                                  <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
+                                  <span>{item.leads || 0} leads</span>
+                                </div>
+                                <div style={{ height: '10px', background: '#ffffff', border: '2px solid #000000', borderRadius: '9999px', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color, borderRight: widthPct < 100 ? '2px solid #000000' : 'none' }} />
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
+              </div>
             </div>
-          </div>
 
-          {/* Quick feedback request */}
-          <div className="glass" style={{ padding: '20px', textAlign: 'left', marginTop: '12px' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '8px' }}>Need assistance or request changes?</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
-              Drop a note directly to our operations team. We will be notified instantly.
-            </p>
-            <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', gap: '12px' }}>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Ask a question or request an update..."
-                value={feedbackMsg}
-                onChange={(e) => setFeedbackMsg(e.target.value)}
-                style={{ flexGrow: 1 }}
-                required
-              />
-              <button type="submit" className="btn btn-primary" disabled={submittingFeedback}>
-                <Send size={16} />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Content Tab */}
-      {activeTab === 'content' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
-          <h2 style={{ fontSize: '1.25rem' }}>Tracked Performance</h2>
-          
-          {contentList.length === 0 ? (
-            <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              No tracked posts found yet.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {contentList.map(item => (
-                <div key={item.id} className="glass" style={{ padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div>
-                      <span className="badge badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
-                      <span className="badge badge-muted">{item.post_type}</span>
-                    </div>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>12 July 2026</span>
-                  </div>
-                  <h3 style={{ fontSize: '1rem', marginBottom: '8px' }}>{item.title}</h3>
-                  {item.caption && (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 8px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={item.caption}>
-                      {item.caption}
-                    </p>
-                  )}
-                  {item.link && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8rem', color: 'var(--accent)', textDecoration: 'underline' }}>
-                        View Post
-                      </a>
-                    </div>
-                  )}
-                  {item.platform === 'youtube' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', fontSize: '0.8rem', marginTop: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '4px' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Views</div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.youtube_views?.toLocaleString() || 0}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Watch Time</div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.youtube_watch_time || 0}h</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Duration</div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{item.youtube_avg_view_duration || 'N/A'}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>CTR</div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.youtube_ctr || 0}%</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '0.8rem', marginTop: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '4px' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Views</div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.views?.toLocaleString() || 0}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Engagement</div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Quality Score</div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.content_score || 0}</div>
-                      </div>
-                    </div>
-                  )}
+            {/* Detailed Performance List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+              <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Tracked Performance Detail</h2>
+              
+              {contentList.length === 0 ? (
+                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No tracked posts found yet.
                 </div>
-              ))}
-            </div>
-          )}
-
-          {adCampaigns.length > 0 && (
-            <>
-              <h2 style={{ fontSize: '1.25rem', marginTop: '20px' }}>Ad Campaigns</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {adCampaigns.map((ad, idx) => (
-                  <div key={idx} className="glass" style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span className="badge badge-success">{ad.platform}</span>
-                      <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{ad.roas ? `${ad.roas}x ROAS` : 'Leads focused'}</span>
-                    </div>
-                    <h3 style={{ fontSize: '0.95rem', marginBottom: '12px' }}>{ad.ad_campaign_name}</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', fontSize: '0.75rem' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Leads</div>
-                        <div style={{ fontWeight: 'bold' }}>{ad.leads}</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {contentList.map(item => (
+                    <div key={item.id} className="portal-bento-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div>
+                          <span className="portal-badge portal-badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
+                          <span className="portal-badge portal-badge-muted">{item.post_type}</span>
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>{formatDateStr(item.date)}</span>
                       </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Spend</div>
-                        <div style={{ fontWeight: 'bold' }}>₹{ad.total_ad_spend_inr}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>Clicks</div>
-                        <div style={{ fontWeight: 'bold' }}>{ad.clicks}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-muted)' }}>CPL</div>
-                        <div style={{ fontWeight: 'bold' }}>₹{ad.cpl_inr}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Approval Tab */}
-      {activeTab === 'approval' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
-          <h2 style={{ fontSize: '1.25rem' }}>Review Pending Content</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            Please review the scripts, concepts, or captions prepared by our managers. Click approve, or request revisions.
-          </p>
-
-          {pendingPlan.length === 0 ? (
-            <div className="glass" style={{ padding: '45px', textAlign: 'center', color: 'var(--success)' }}>
-              <div style={{ display: 'inline-flex', padding: '10px', background: 'var(--success-glow)', borderRadius: '50%', marginBottom: '12px' }}>
-                <Check size={28} />
-              </div>
-              <h4>All Content Approved!</h4>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                No pending content awaits your action. Good job!
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {pendingPlan.map(item => {
-                const isExpanded = expandedItems[item.id];
-                return (
-                  <div key={item.id} className="glass" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <div>
-                        <span className="badge badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
-                        <span className="badge badge-muted">{item.post_type}</span>
-                      </div>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Target: 12 July 2026</span>
-                    </div>
-
-                    <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>{item.title}</h3>
-
-                    {/* Script details */}
-                    <div style={{ 
-                      background: 'rgba(0, 0, 0, 0.2)', 
-                      padding: '12px 16px', 
-                      borderRadius: '6px', 
-                      fontFamily: 'var(--font-sans)', 
-                      fontSize: '0.9rem', 
-                      whiteSpace: 'pre-wrap',
-                      maxHeight: isExpanded ? 'none' : '80px',
-                      overflow: 'hidden',
-                      position: 'relative',
-                      borderLeft: '3px solid var(--accent)',
-                      marginBottom: '12px'
-                    }}>
-                      {item.script || 'No script text provided.'}
-                      {!isExpanded && item.script && item.script.length > 100 && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: '30px',
-                          background: 'linear-gradient(to top, rgba(10,11,16,0.9), transparent)'
-                        }} />
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase' }}>{item.title}</h3>
+                      {item.caption && (
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '4px 0 12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontWeight: '500' }} title={item.caption}>
+                          {item.caption}
+                        </p>
+                      )}
+                      {item.link && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ color: '#000000', textDecoration: 'none', fontWeight: 800 }}>
+                            <ExternalLink size={12} style={{ marginRight: '2px' }} /> View Live Post
+                          </a>
+                        </div>
+                      )}
+                      
+                      {item.platform === 'youtube' ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '0.8rem', marginTop: '12px', background: '#f4f4f5', border: '2px solid #000000', padding: '12px', borderRadius: '8px' }}>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Views</div>
+                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.youtube_views?.toLocaleString() || 0}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Watch Time</div>
+                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.youtube_watch_time || 0}h</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Duration</div>
+                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px', whiteSpace: 'nowrap' }}>{item.youtube_avg_view_duration || 'N/A'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>CTR</div>
+                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.youtube_ctr || 0}%</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '0.8rem', marginTop: '12px', background: '#f4f4f5', border: '2px solid #000000', padding: '12px', borderRadius: '8px' }}>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Views</div>
+                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.views?.toLocaleString() || 0}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Engagement</div>
+                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800 }}>Quality Score</div>
+                            <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{item.content_score || 0}</div>
+                          </div>
+                        </div>
                       )}
                     </div>
-
-                    {item.script && item.script.length > 100 && (
-                      <button 
-                        onClick={() => toggleExpand(item.id)}
-                        className="btn btn-secondary" 
-                        style={{ padding: '4px 8px', fontSize: '0.75rem', marginBottom: '16px' }}
-                      >
-                        {isExpanded ? 'Show Less' : 'Read Full Script'}
-                      </button>
-                    )}
-
-                    {/* Action buttons */}
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                      <button 
-                        onClick={() => handleApprove(item.id)}
-                        className="btn btn-success" 
-                        style={{ flexGrow: 1 }}
-                      >
-                        <Check size={16} /> Approve
-                      </button>
-                      <button 
-                        onClick={() => openRejectModal(item)}
-                        className="btn btn-danger" 
-                        style={{ flexGrow: 1 }}
-                      >
-                        <X size={16} /> Request Changes
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Bookings Tab */}
-      {activeTab === 'bookings' && (clientType === 'artist_curation' || clientType === 'both') && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
-          <h2 style={{ fontSize: '1.25rem' }}>Booked Artists & Performances</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            List of artists scheduled for your venues and their payment status.
-          </p>
-
-          {bookings.length === 0 ? (
-            <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              No bookings scheduled yet.
-            </div>
-          ) : (
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Artist</th>
-                    <th>Date</th>
-                    <th>Company & Venue</th>
-                    <th>Payment Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.map(b => (
-                    <tr key={b.id}>
-                      <td style={{ fontWeight: 'bold' }}>
-                        {b.artist_name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>({b.artist_code})</span>
-                      </td>
-                      <td>{formatDateStr(b.gig_date)}</td>
-                      <td>
-                        <div style={{ fontWeight: 'bold' }}>{b.client_name}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{b.venue_name || '-'}</div>
-                      </td>
-                      <td>
-                        <span className={`badge badge-${
-                          b.status === 'Paid' || b.status === 'Confirmed' ? 'success' :
-                          b.status === 'Pending' ? 'warning' :
-                          b.status === 'Cancelled' ? 'danger' : 'info'
-                        }`}>
-                          {b.status}
-                        </span>
-                      </td>
-                    </tr>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Ad Campaigns List */}
+            {adCampaigns.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h2 style={{ fontSize: '1.25rem', marginTop: '8px', textTransform: 'uppercase', fontWeight: 800 }}>Active Campaigns</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {adCampaigns.map((ad, idx) => (
+                    <div key={idx} className="portal-bento-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span className="portal-badge portal-badge-success">{ad.platform}</span>
+                        <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#000000' }}>{ad.roas ? `${ad.roas}x ROAS` : 'Leads Focused'}</span>
+                      </div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{ad.ad_campaign_name}</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', fontSize: '0.8rem', background: '#f4f4f5', border: '2px solid #000000', padding: '12px', borderRadius: '8px' }}>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>Leads</div>
+                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{ad.leads}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>Spend</div>
+                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>₹{ad.total_ad_spend_inr?.toLocaleString() || 0}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>Clicks</div>
+                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>{ad.clicks}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 800 }}>CPL</div>
+                          <div style={{ fontWeight: '900', color: '#000000', marginTop: '2px' }}>₹{ad.cpl_inr || 0}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assist Feedback form */}
+            <div className="portal-bento-card" style={{ padding: '24px', marginTop: '12px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase' }}>Need assistance or request changes?</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 600 }}>
+                Drop a note directly to our operations team. We will be notified instantly.
+              </p>
+              <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', gap: '12px' }}>
+                <input
+                  type="text"
+                  className="portal-control"
+                  placeholder="Ask a question or request an update..."
+                  value={feedbackMsg}
+                  onChange={(e) => setFeedbackMsg(e.target.value)}
+                  style={{ flexGrow: 1 }}
+                  required
+                />
+                <button type="submit" className="portal-btn portal-btn-primary" disabled={submittingFeedback} style={{ padding: '12px 20px' }}>
+                  <Send size={16} />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Approval Tab */}
+        {activeTab === 'approval' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Review Pending Content</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
+              Please review the scripts, concepts, or captions prepared by our managers. Click approve, or request revisions.
+            </p>
+
+            {pendingPlan.length === 0 ? (
+              <div className="portal-bento-card" style={{ padding: '50px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ display: 'inline-flex', padding: '14px', background: '#d1fae5', borderRadius: '50%', color: '#065f46', border: '3px solid #000000', marginBottom: '16px', boxShadow: '2px 2px 0px #000000' }}>
+                  <Check size={32} />
+                </div>
+                <h4 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#000000', textTransform: 'uppercase' }}>All Content Approved!</h4>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '6px', fontWeight: 600 }}>
+                  No pending content awaits your action. Good job!
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {pendingPlan.map(item => {
+                  const isExpanded = expandedItems[item.id];
+                  return (
+                    <div key={item.id} className="portal-bento-card" style={{ padding: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div>
+                          <span className="portal-badge portal-badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
+                          <span className="portal-badge portal-badge-muted">{item.post_type}</span>
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>Target: {formatDateStr(item.date)}</span>
+                      </div>
+
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '10px', textTransform: 'uppercase' }}>{item.title}</h3>
+
+                      {/* Script details */}
+                      <div className="portal-script-box" style={{ maxHeight: isExpanded ? 'none' : '100px' }}>
+                        {item.script || 'No script text provided.'}
+                        {!isExpanded && item.script && item.script.length > 120 && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: '40px',
+                            background: 'linear-gradient(to top, #f4f4f5 90%, transparent)'
+                          }} />
+                        )}
+                      </div>
+
+                      {item.script && item.script.length > 120 && (
+                        <button 
+                          onClick={() => toggleExpand(item.id)}
+                          className="portal-btn" 
+                          style={{ padding: '6px 12px', fontSize: '0.75rem', marginBottom: '16px' }}
+                        >
+                          {isExpanded ? 'Show Less' : 'Read Full Script'}
+                        </button>
+                      )}
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                        <button 
+                          onClick={() => handleApprove(item.id)}
+                          className="portal-btn portal-btn-success" 
+                          style={{ flexGrow: 1 }}
+                        >
+                          <Check size={16} /> Approve
+                        </button>
+                        <button 
+                          onClick={() => openRejectModal(item)}
+                          className="portal-btn portal-btn-danger" 
+                          style={{ flexGrow: 1 }}
+                        >
+                          <X size={16} /> Request Changes
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Content Tab (3rd Tab) */}
+        {activeTab === 'content' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Monthly Content Plans</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
+              Read the finalized scripts and concepts prepared for your brand this month.
+            </p>
+
+            {scripts.length === 0 ? (
+              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                No monthly scripts uploaded yet.
+              </div>
+            ) : (
+              <>
+                {/* Month selector */}
+                <div className="portal-month-selector">
+                  {uniqueMonths.map(m => (
+                    <button 
+                      key={m} 
+                      onClick={() => setSelectedMonth(m)}
+                      className={`portal-month-tab ${selectedMonth === m ? 'active' : ''}`}
+                    >
+                      {formatMonthName(m)}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filtered scripts list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {scripts.filter(s => s.month === selectedMonth).length === 0 ? (
+                    <div className="portal-bento-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                      No scripts found for this month.
+                    </div>
+                  ) : (
+                    scripts.filter(s => s.month === selectedMonth).map(s => {
+                      const isExpanded = expandedItems[s.id];
+                      return (
+                        <div key={s.id} className="portal-bento-card" style={{ padding: '24px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                            <div>
+                              <span className="portal-badge portal-badge-info" style={{ marginRight: '6px' }}>
+                                {s.format === 'long_format' ? 'Long Format' : 'Reel'}
+                              </span>
+                              <span className={`portal-badge ${
+                                s.status === 'Posted' ? 'portal-badge-success' :
+                                s.status === 'Edited' ? 'portal-badge-info' :
+                                s.status === 'Shot' ? 'portal-badge-warning' : 'portal-badge-muted'
+                              }`}>
+                                {s.status}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>
+                              Last updated: {formatDateStr(s.updated_at?.split('T')[0] || '')}
+                            </span>
+                          </div>
+
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{s.title}</h3>
+
+                          {/* Script Text Box */}
+                          <div className="portal-script-box" style={{ maxHeight: isExpanded ? 'none' : '150px' }}>
+                            {s.script_text}
+                            {!isExpanded && s.script_text && s.script_text.length > 200 && (
+                              <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: '40px',
+                                background: 'linear-gradient(to top, #f4f4f5 90%, transparent)'
+                              }} />
+                            )}
+                          </div>
+
+                          {s.script_text && s.script_text.length > 200 && (
+                            <button 
+                              onClick={() => toggleExpand(s.id)}
+                              className="portal-btn" 
+                              style={{ padding: '6px 12px', fontSize: '0.75rem', marginBottom: '16px' }}
+                            >
+                              {isExpanded ? 'Collapse Script' : 'Read Full Script'}
+                            </button>
+                          )}
+
+                          {/* Action Links */}
+                          {(s.reference_video_link || s.reaction_video_link) && (
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
+                              {s.reference_video_link && (
+                                <a 
+                                  href={s.reference_video_link} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="portal-btn" 
+                                  style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+                                >
+                                  <PlayCircle size={14} style={{ marginRight: '2px' }} /> Reference Video
+                                </a>
+                              )}
+                              {s.reaction_video_link && (
+                                <a 
+                                  href={s.reaction_video_link} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="portal-btn" 
+                                  style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+                                >
+                                  <PlayCircle size={14} style={{ marginRight: '2px' }} /> Reaction Video
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Bookings Tab */}
+        {activeTab === 'bookings' && (clientType === 'artist_curation' || clientType === 'both') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Booked Artists & Performances</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
+              List of artists scheduled for your venues and their payment status.
+            </p>
+
+            {bookings.length === 0 ? (
+              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                No bookings scheduled yet.
+              </div>
+            ) : (
+              <div className="portal-table-container">
+                <table className="portal-table">
+                  <thead>
+                    <tr>
+                      <th>Artist</th>
+                      <th>Date</th>
+                      <th>Company & Venue</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bookings.map(b => (
+                      <tr key={b.id}>
+                        <td style={{ fontWeight: 'bold', color: '#000000' }}>
+                          {b.artist_name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({b.artist_code})</span>
+                        </td>
+                        <td>{formatDateStr(b.gig_date)}</td>
+                        <td>
+                          <div style={{ fontWeight: 'bold', color: '#000000' }}>{b.client_name}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{b.venue_name || '-'}</div>
+                        </td>
+                        <td>
+                          <span className={`portal-badge ${
+                            b.status === 'Paid' || b.status === 'Confirmed' ? 'portal-badge-success' :
+                            b.status === 'Pending' ? 'portal-badge-warning' :
+                            b.status === 'Cancelled' ? 'portal-badge-danger' : 'portal-badge-info'
+                          }`}>
+                            {b.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
 
       {/* Change Request Modal */}
       {rejectingItem && (
-        <div className="modal-overlay" onClick={() => setRejectingItem(null)}>
-          <div className="modal-content glass-premium" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '600px' }}>
-            <h2 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>Request Changes</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
-              Detail the changes required for: <strong>{rejectingItem.title}</strong>. This content will be marked as rejected, and operations will address your feedback immediately.
+        <div className="portal-modal-overlay" onClick={() => setRejectingItem(null)}>
+          <div className="portal-bento-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '550px', border: '3px solid #000000' }}>
+            <h2 style={{ fontSize: '1.25rem', color: '#000000', marginBottom: '8px', textTransform: 'uppercase', fontWeight: 800 }}>Request Changes</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 600 }}>
+              Detail the changes required for: <strong>{rejectingItem.title}</strong>. This content will be sent back to our social media management team for instant revision.
             </p>
             
             <form onSubmit={handleReject}>
-              <div className="form-group">
-                <label className="form-label">Revision Instructions</label>
+              <div className="portal-form-group">
+                <label className="portal-label">Revision Instructions</label>
                 <textarea
-                  className="form-control"
+                  className="portal-control"
                   rows={4}
                   placeholder="Tell us what to change (e.g. edit the intro hook, change the call to action, adjust caption details)..."
                   value={rejectionComment}
                   onChange={(e) => setRejectionComment(e.target.value)}
+                  style={{ resize: 'vertical' }}
                   required
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
                 <button 
                   type="button" 
-                  className="btn btn-secondary" 
+                  className="portal-btn" 
                   onClick={() => setRejectingItem(null)}
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="btn btn-primary" 
+                  className="portal-btn portal-btn-danger" 
                   disabled={submittingDecision}
                 >
                   {submittingDecision ? 'Submitting...' : 'Submit Request'}
