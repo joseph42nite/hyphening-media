@@ -14,6 +14,7 @@ export default function ClientPortal({ showToast }) {
   const [pin, setPin] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [clientName, setClientName] = useState('');
+  const [clientType, setClientType] = useState('marketing');
   
   // Dashboard data state
   const [activeTab, setActiveTab] = useState('overview');
@@ -21,6 +22,7 @@ export default function ClientPortal({ showToast }) {
   const [contentList, setContentList] = useState([]);
   const [adCampaigns, setAdCampaigns] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
+  const [bookings, setBookings] = useState([]);
   
   // Feedback form
   const [feedbackMsg, setFeedbackMsg] = useState('');
@@ -36,6 +38,18 @@ export default function ClientPortal({ showToast }) {
 
   const toggleExpand = (id) => {
     setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const formatDateStr = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [year, month, day] = parts;
+    const monthName = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ][parseInt(month, 10) - 1];
+    return `${parseInt(day, 10)} ${monthName} ${year}`;
   };
 
   // Try fetching to see if authenticated/PIN required
@@ -55,8 +69,14 @@ export default function ClientPortal({ showToast }) {
         setIsVerified(true);
         setPinRequired(false);
         setClientName(data.client_name);
+        setClientType(data.client_type || 'marketing');
+        if (data.client_type === 'artist_curation') {
+          setActiveTab('bookings');
+        } else {
+          setActiveTab('overview');
+        }
         setOverview(data);
-        fetchData();
+        fetchData(data.client_type || 'marketing');
       } else {
         throw new Error(data.error || 'Unable to access portal');
       }
@@ -88,22 +108,29 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = async (type) => {
     try {
-      // Content list
-      const resContent = await fetch(`${API_BASE}/api/portal/${token}/content`, { credentials: 'include' });
-      const dataContent = await resContent.json();
-      if (resContent.ok) setContentList(dataContent.content || []);
+      if (type === 'artist_curation' || type === 'both') {
+        const resBookings = await fetch(`${API_BASE}/api/portal/${token}/bookings`, { credentials: 'include' });
+        const dataBookings = await resBookings.json();
+        if (resBookings.ok) setBookings(dataBookings.bookings || []);
+      }
+      if (type === 'marketing' || type === 'both') {
+        // Content list
+        const resContent = await fetch(`${API_BASE}/api/portal/${token}/content`, { credentials: 'include' });
+        const dataContent = await resContent.json();
+        if (resContent.ok) setContentList(dataContent.content || []);
 
-      // Ad campaigns
-      const resAds = await fetch(`${API_BASE}/api/portal/${token}/ads`, { credentials: 'include' });
-      const dataAds = await resAds.json();
-      if (resAds.ok) setAdCampaigns(dataAds.ads || []);
+        // Ad campaigns
+        const resAds = await fetch(`${API_BASE}/api/portal/${token}/ads`, { credentials: 'include' });
+        const dataAds = await resAds.json();
+        if (resAds.ok) setAdCampaigns(dataAds.ads || []);
 
-      // Content plan pending approval
-      const resPlan = await fetch(`${API_BASE}/api/portal/${token}/content-plan`, { credentials: 'include' });
-      const dataPlan = await resPlan.json();
-      if (resPlan.ok) setPendingPlan(dataPlan.content_plan || []);
+        // Content plan pending approval
+        const resPlan = await fetch(`${API_BASE}/api/portal/${token}/content-plan`, { credentials: 'include' });
+        const dataPlan = await resPlan.json();
+        if (resPlan.ok) setPendingPlan(dataPlan.content_plan || []);
+      }
     } catch (err) {
       console.error('Error fetching portal sub-data:', err);
     }
@@ -249,34 +276,47 @@ export default function ClientPortal({ showToast }) {
 
       {/* Tabs Menu */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '4px' }}>
-        <button 
-          onClick={() => setActiveTab('overview')} 
-          className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flexGrow: 1 }}
-        >
-          <BarChart2 size={16} /> Overview
-        </button>
-        <button 
-          onClick={() => setActiveTab('content')} 
-          className={`btn ${activeTab === 'content' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flexGrow: 1 }}
-        >
-          <TrendingUp size={16} /> Content
-        </button>
-        <button 
-          onClick={() => setActiveTab('approval')} 
-          className={`btn ${activeTab === 'approval' ? 'btn-primary' : 'btn-secondary'}`}
-          style={{ flexGrow: 1, position: 'relative' }}
-        >
-          <FileText size={16} /> Approvals
-          {overview.pending_approvals > 0 && (
-            <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--warning)' }} />
-          )}
-        </button>
+        {(clientType === 'marketing' || clientType === 'both') && (
+          <>
+            <button 
+              onClick={() => setActiveTab('overview')} 
+              className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flexGrow: 1 }}
+            >
+              <BarChart2 size={16} /> Overview
+            </button>
+            <button 
+              onClick={() => setActiveTab('content')} 
+              className={`btn ${activeTab === 'content' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flexGrow: 1 }}
+            >
+              <TrendingUp size={16} /> Content
+            </button>
+            <button 
+              onClick={() => setActiveTab('approval')} 
+              className={`btn ${activeTab === 'approval' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flexGrow: 1, position: 'relative' }}
+            >
+              <FileText size={16} /> Approvals
+              {overview.pending_approvals > 0 && (
+                <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--warning)' }} />
+              )}
+            </button>
+          </>
+        )}
+        {(clientType === 'artist_curation' || clientType === 'both') && (
+          <button 
+            onClick={() => setActiveTab('bookings')} 
+            className={`btn ${activeTab === 'bookings' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ flexGrow: 1 }}
+          >
+            <TrendingUp size={16} /> Artist Bookings
+          </button>
+        )}
       </div>
 
       {/* Overview Tab */}
-      {activeTab === 'overview' && (
+      {activeTab === 'overview' && (clientType === 'marketing' || clientType === 'both') && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <h2 style={{ fontSize: '1.25rem', textAlign: 'left' }}>Performance Summary</h2>
           
@@ -316,6 +356,124 @@ export default function ClientPortal({ showToast }) {
                 </div>
               </>
             )}
+          </div>
+
+          {/* SVG Performance Charts & Graphs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '12px' }}>
+            {/* Platform Distribution Donut Chart */}
+            <div className="glass" style={{ padding: '20px', textAlign: 'left' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Platform Distribution</h3>
+              {(!overview.platform_breakdown || overview.platform_breakdown.length === 0) ? (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No distribution data available yet.</div>
+              ) : (() => {
+                const total = overview.platform_breakdown.reduce((sum, item) => sum + item.count, 0);
+                let accumulatedPercent = 0;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {total > 0 ? (
+                      <svg width="120" height="120" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)', borderRadius: '50%' }}>
+                        <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="4"></circle>
+                        {overview.platform_breakdown.map((item, idx) => {
+                          const percent = (item.count / total) * 100;
+                          const strokeDashoffset = 100 - accumulatedPercent;
+                          accumulatedPercent += percent;
+                          const colors = ['#a855f7', '#06b6d4', '#f43f5e', '#3b82f6'];
+                          const color = colors[idx % colors.length];
+                          return (
+                            <circle
+                              key={item.platform}
+                              cx="21"
+                              cy="21"
+                              r="15.91549430918954"
+                              fill="transparent"
+                              stroke={color}
+                              strokeWidth="4.5"
+                              strokeDasharray={`${percent} ${100 - percent}`}
+                              strokeDashoffset={strokeDashoffset}
+                              style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                            />
+                          );
+                        })}
+                      </svg>
+                    ) : (
+                      <div style={{ width: '120px', height: '120px', borderRadius: '50%', border: '4px solid rgba(255,255,255,0.05)' }} />
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flexGrow: 1 }}>
+                      {overview.platform_breakdown.map((item, idx) => {
+                        const percent = total > 0 ? ((item.count / total) * 100).toFixed(0) : 0;
+                        const colors = ['#a855f7', '#06b6d4', '#f43f5e', '#3b82f6'];
+                        const color = colors[idx % colors.length];
+                        return (
+                          <div key={item.platform} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, display: 'inline-block' }} />
+                            <span style={{ textTransform: 'capitalize' }}>{item.platform}:</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{item.count} posts ({percent}%)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Ad Campaign Performance Bar Charts */}
+            <div className="glass" style={{ padding: '20px', textAlign: 'left' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Ad Campaigns Performance</h3>
+              {(!overview.ads_breakdown || overview.ads_breakdown.length === 0) ? (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No active campaigns to analyze.</div>
+              ) : (() => {
+                const maxSpend = Math.max(...overview.ads_breakdown.map(item => item.spend || 0), 1);
+                const maxLeads = Math.max(...overview.ads_breakdown.map(item => item.leads || 0), 1);
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.8rem', marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ad Spend (₹)</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {overview.ads_breakdown.map((item, idx) => {
+                          const widthPct = ((item.spend || 0) / maxSpend) * 100;
+                          const colors = ['#3b82f6', '#10b981', '#f59e0b'];
+                          const color = colors[idx % colors.length];
+                          return (
+                            <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
+                                <span>₹{(item.spend || 0).toLocaleString()}</span>
+                              </div>
+                              <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '9999px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 style={{ fontSize: '0.8rem', marginBottom: '6px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leads Generated</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {overview.ads_breakdown.map((item, idx) => {
+                          const widthPct = ((item.leads || 0) / maxLeads) * 100;
+                          const colors = ['#a855f7', '#06b6d4', '#f43f5e'];
+                          const color = colors[idx % colors.length];
+                          return (
+                            <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
+                                <span>{item.leads || 0} leads</span>
+                              </div>
+                              <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '9999px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
 
           {/* Quick feedback request */}
@@ -543,6 +701,55 @@ export default function ClientPortal({ showToast }) {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bookings Tab */}
+      {activeTab === 'bookings' && (clientType === 'artist_curation' || clientType === 'both') && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
+          <h2 style={{ fontSize: '1.25rem' }}>Booked Artists & Performances</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+            List of artists scheduled for your venues and their booking status.
+          </p>
+
+          {bookings.length === 0 ? (
+            <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No bookings scheduled yet.
+            </div>
+          ) : (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Artist</th>
+                    <th>Date</th>
+                    <th>Location</th>
+                    <th>Booking Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.map(b => (
+                    <tr key={b.id}>
+                      <td style={{ fontWeight: 'bold' }}>
+                        {b.artist_name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>({b.artist_code})</span>
+                      </td>
+                      <td>{formatDateStr(b.gig_date)}</td>
+                      <td>{b.venue_name || '-'}</td>
+                      <td>
+                        <span className={`badge badge-${
+                          b.status === 'Paid' || b.status === 'Confirmed' ? 'success' :
+                          b.status === 'Pending' ? 'warning' :
+                          b.status === 'Cancelled' ? 'danger' : 'info'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -4,6 +4,8 @@
  */
 
 import { Router } from 'express';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
@@ -321,6 +323,93 @@ router.post('/:id/chats', (req, res) => {
     res.status(201).json({ message: newMessage });
   } catch (err) {
     console.error('[CLIENTS] Send chat error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/clients/:id/portal
+ * Enable or disable portal access for a client.
+ */
+router.patch('/:id/portal', authorize('admin'), (req, res) => {
+  try {
+    const { portal_enabled } = req.body;
+    if (portal_enabled === undefined) {
+      return res.status(400).json({ error: 'portal_enabled is required' });
+    }
+
+    db.prepare('UPDATE crm_clients SET portal_enabled = ?, updated_at = ? WHERE id = ?')
+      .run(portal_enabled ? 1 : 0, new Date().toISOString(), req.params.id);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_portal_toggle',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff: { portal_enabled },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, portal_enabled: !!portal_enabled });
+  } catch (err) {
+    console.error('[CLIENTS] Toggle portal error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/portal/token
+ * Generate a fresh secure UUID token for the client portal.
+ */
+router.post('/:id/portal/token', authorize('admin'), (req, res) => {
+  try {
+    const token = crypto.randomUUID();
+    db.prepare('UPDATE crm_clients SET portal_token = ?, updated_at = ? WHERE id = ?')
+      .run(token, new Date().toISOString(), req.params.id);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_portal_token_generate',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff: { portal_token: token },
+      ip: req.ip,
+    });
+
+    res.json({ portal_token: token });
+  } catch (err) {
+    console.error('[CLIENTS] Generate portal token error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/portal/pin
+ * Secure client portal with a 4-digit PIN (or delete if null/empty).
+ */
+router.post('/:id/portal/pin', authorize('admin'), (req, res) => {
+  try {
+    const { pin } = req.body;
+    const hash = pin ? bcrypt.hashSync(String(pin), 10) : null;
+
+    db.prepare('UPDATE crm_clients SET portal_pin = ?, updated_at = ? WHERE id = ?')
+      .run(hash, new Date().toISOString(), req.params.id);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_portal_pin_update',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff: { has_pin: !!pin },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, has_pin: !!pin });
+  } catch (err) {
+    console.error('[CLIENTS] Update portal PIN error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

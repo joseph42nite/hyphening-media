@@ -129,14 +129,58 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       WHERE client_id = ? AND status = 'Pending Client Approval'
     `).get(clientId);
 
+    const platformBreakdown = db.prepare(`
+      SELECT platform, COUNT(*) as count, SUM(views) as views
+      FROM marketing_content_tracker
+      WHERE client_id = ? AND is_tracked = 1
+      GROUP BY platform
+    `).all(clientId);
+
+    const adsBreakdown = db.prepare(`
+      SELECT platform, SUM(total_ad_spend_inr) as spend, SUM(leads) as leads
+      FROM marketing_ad_campaigns
+      WHERE client_id = ?
+      GROUP BY platform
+    `).all(clientId);
+
     res.json({
       client_name: req.portalClient.name,
+      client_type: req.portalClient.client_type,
       content: contentStats,
       ads: adStats,
       pending_approvals: pendingApprovals.count,
+      platform_breakdown: platformBreakdown,
+      ads_breakdown: adsBreakdown
     });
   } catch (err) {
     console.error('[PORTAL] Overview error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/portal/:token/bookings
+ * Booked gigs for the client (with pricing hidden).
+ */
+router.get('/:token/bookings', portalAuth, (req, res) => {
+  try {
+    const clientId = req.portalClient.id;
+
+    // Retrieve gigs. Strictly omit fee_inr and advance_paid to secure pricing info.
+    const bookings = db.prepare(`
+      SELECT g.id, g.gig_date, g.status, 
+        a.name as artist_name, a.artist_id as artist_code,
+        v.name as venue_name
+      FROM gig_status g
+      LEFT JOIN artists a ON g.artist_id = a.id
+      LEFT JOIN venues v ON g.venue_id = v.id
+      WHERE g.client_id = ? OR v.client_id = ?
+      ORDER BY g.gig_date DESC
+    `).all(clientId, clientId);
+
+    res.json({ bookings });
+  } catch (err) {
+    console.error('[PORTAL] Bookings error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

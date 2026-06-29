@@ -2383,6 +2383,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                     <th>Type</th>
                     <th>Contact Info</th>
                     <th>API Integration</th>
+                    <th>Client Portal</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -2412,6 +2413,54 @@ export default function Dashboard({ auth, setAuth, showToast }) {
                           <span className={`badge ${client.youtube_channel_id ? 'badge-success' : 'badge-muted'}`}>
                             YouTube
                           </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className={`badge badge-${client.portal_enabled ? 'success' : 'muted'}`}>
+                              {client.portal_enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                            <button
+                              onClick={() => togglePortal(client, !client.portal_enabled)}
+                              className="btn btn-secondary"
+                              style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+                            >
+                              {client.portal_enabled ? 'Disable' : 'Enable'}
+                            </button>
+                          </div>
+                          {client.portal_enabled && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {client.portal_token ? (
+                                <button
+                                  onClick={() => {
+                                    const url = `${window.location.origin}/portal/${client.portal_token}`;
+                                    navigator.clipboard.writeText(url);
+                                    showToast('Portal link copied to clipboard!', 'success');
+                                  }}
+                                  className="btn btn-primary"
+                                  style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
+                                >
+                                  Copy Portal Link
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => generatePortalToken(client)}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
+                                >
+                                  Generate Token
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setPortalPin(client)}
+                                className="btn btn-secondary"
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
+                              >
+                                {client.has_portal_pin ? 'Change PIN' : 'Set PIN'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td>
