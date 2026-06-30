@@ -216,6 +216,12 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
     } = req.body;
 
     let finalTitle = title;
+    if (script_id) {
+      const scriptObj = db.prepare('SELECT title FROM marketing_scripts WHERE id = ?').get(script_id);
+      if (scriptObj && scriptObj.title) {
+        finalTitle = scriptObj.title;
+      }
+    }
     if (!finalTitle) {
       if (script) {
         finalTitle = script.slice(0, 30) + (script.length > 30 ? '...' : '');
@@ -417,6 +423,12 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       if (script_id && script_id !== null && script_id !== '') {
         db.prepare('INSERT INTO marketing_content_script_relation (content_id, script_id) VALUES (?, ?)')
           .run(req.params.contentId, script_id);
+        
+        const scriptObj = db.prepare('SELECT title FROM marketing_scripts WHERE id = ?').get(script_id);
+        if (scriptObj && scriptObj.title) {
+          db.prepare('UPDATE marketing_content_tracker SET title = ? WHERE id = ?')
+            .run(scriptObj.title, req.params.contentId);
+        }
       }
     }
 
