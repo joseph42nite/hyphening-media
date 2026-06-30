@@ -889,7 +889,7 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
-  const uniqueMonths = [...new Set(scripts.map(s => s.month))].sort((a, b) => b.localeCompare(a));
+  const uniqueMonths = [...new Set(contentList.map(item => item.date ? item.date.slice(0, 7) : '').filter(Boolean))].sort((a, b) => b.localeCompare(a));
 
   const renderPagination = (currentPage, totalItems, itemsPerPage, onPageChange) => {
     const totalPages = Math.max(Math.ceil(totalItems / itemsPerPage), 1);
@@ -1385,129 +1385,212 @@ export default function ClientPortal({ showToast }) {
         {/* Content Tab (3rd Tab) */}
         {activeTab === 'content' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Review Content Plan</h2>
+            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Monthly Content Plans</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
-              Read the scripts and concepts prepared for your review. Approve them or request changes with a comment.
+              Read the finalized scripts and concepts prepared for your brand. Approve items or request changes with a comment.
             </p>
 
-            {pendingPlan.length === 0 ? (
-              <div className="portal-bento-card" style={{ padding: '50px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ display: 'inline-flex', padding: '14px', background: '#d1fae5', borderRadius: '50%', color: '#065f46', border: '3px solid #000000', marginBottom: '16px', boxShadow: '2px 2px 0px #000000' }}>
-                  <Check size={32} />
-                </div>
-                <h4 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#000000', textTransform: 'uppercase' }}>All Content Approved!</h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '6px', fontWeight: 600 }}>
-                  No pending content awaits your action. You have approved all items!
-                </p>
+            {uniqueMonths.length === 0 ? (
+              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                No content plans uploaded yet.
               </div>
-            ) : (() => {
-              // Ensure index is within bounds
-              const index = currentContentIndex >= pendingPlan.length ? Math.max(0, pendingPlan.length - 1) : currentContentIndex;
-              const item = pendingPlan[index];
-              if (!item) return null;
-
-              return (
-                <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Pagination Controls */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000000', paddingBottom: '16px' }}>
+            ) : (
+              <>
+                {/* Month selector */}
+                <div className="portal-month-selector" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                  {uniqueMonths.map(m => (
                     <button 
-                      className="portal-btn"
-                      disabled={index === 0}
+                      key={m} 
                       onClick={() => {
-                        setCurrentContentIndex(index - 1);
+                        setSelectedMonth(m);
+                        setCurrentContentIndex(0);
                         setContentCommentText('');
                       }}
-                      style={{ padding: '8px 16px' }}
+                      className={`portal-month-tab ${selectedMonth === m ? 'active' : ''}`}
+                      style={{ padding: '8px 16px', borderRadius: '20px', border: '2px solid #000000', cursor: 'pointer', background: selectedMonth === m ? '#000000' : '#ffffff', color: selectedMonth === m ? '#ffffff' : '#000000', fontWeight: '800' }}
                     >
-                      &larr; Previous
+                      {formatMonthName(m)}
                     </button>
-                    <span style={{ fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase' }}>
-                      Content {index + 1} of {pendingPlan.length}
-                    </span>
-                    <button 
-                      className="portal-btn"
-                      disabled={index === pendingPlan.length - 1}
-                      onClick={() => {
-                        setCurrentContentIndex(index + 1);
-                        setContentCommentText('');
-                      }}
-                      style={{ padding: '8px 16px' }}
-                    >
-                      Next &rarr;
-                    </button>
-                  </div>
-
-                  {/* Content Item Details */}
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <div>
-                        <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>{item.platform}</span>
-                        <span className="portal-badge portal-badge-muted" style={{ textTransform: 'uppercase' }}>{item.post_type}</span>
-                      </div>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>Target: {formatDateStr(item.date)}</span>
-                    </div>
-
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{item.title || 'Untitled Post'}</h3>
-
-                    {/* Script details */}
-                    <div className="portal-script-box" style={{ maxHeight: 'none', background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', whiteSpace: 'pre-wrap' }}>
-                      {item.script || 'No script text provided.'}
-                    </div>
-
-                    {/* Links */}
-                    {item.link && (
-                      <div style={{ marginTop: '16px' }}>
-                        <a 
-                          href={item.link} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="portal-btn" 
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.8rem' }}
-                        >
-                          <PlayCircle size={14} /> View Reference Link
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Comment & Actions Form */}
-                  <div style={{ borderTop: '2px solid #000000', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div className="portal-form-group" style={{ margin: 0 }}>
-                      <label className="portal-label" style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', marginBottom: '6px', display: 'block' }}>
-                        Comments / Feedback for Revisions
-                      </label>
-                      <textarea
-                        className="portal-control"
-                        rows={3}
-                        placeholder="Type any comments or requested edits here. If you want changes, type them here and click 'Request Changes' below."
-                        value={contentCommentText}
-                        onChange={(e) => setContentCommentText(e.target.value)}
-                        style={{ resize: 'vertical', width: '100%', background: '#ffffff', border: '2px solid #000000', borderRadius: '6px', padding: '10px' }}
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
-                      <button 
-                        onClick={() => handleReject(item.id, contentCommentText)}
-                        className="portal-btn portal-btn-danger" 
-                        style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        disabled={submittingDecision}
-                      >
-                        <X size={16} /> Request Changes with Comment
-                      </button>
-                      <button 
-                        onClick={() => handleApprove(item.id)}
-                        className="portal-btn portal-btn-success" 
-                        style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        disabled={submittingDecision}
-                      >
-                        <Check size={16} /> Approve Content
-                      </button>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              );
-            })()}
+
+                {(() => {
+                  const filteredContent = contentList.filter(item => item.date && item.date.slice(0, 7) === selectedMonth);
+
+                  if (filteredContent.length === 0) {
+                    return (
+                      <div className="portal-bento-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                        No content plans found for this month.
+                      </div>
+                    );
+                  }
+
+                  const index = currentContentIndex >= filteredContent.length ? Math.max(0, filteredContent.length - 1) : currentContentIndex;
+                  const item = filteredContent[index];
+                  if (!item) return null;
+
+                  return (
+                    <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      {/* Pagination Controls */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000000', paddingBottom: '16px' }}>
+                        <button 
+                          className="portal-btn"
+                          disabled={index === 0}
+                          onClick={() => {
+                            setCurrentContentIndex(index - 1);
+                            setContentCommentText('');
+                          }}
+                          style={{ padding: '8px 16px' }}
+                        >
+                          &larr; Previous
+                        </button>
+                        <span style={{ fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase' }}>
+                          Content {index + 1} of {filteredContent.length}
+                        </span>
+                        <button 
+                          className="portal-btn"
+                          disabled={index === filteredContent.length - 1}
+                          onClick={() => {
+                            setCurrentContentIndex(index + 1);
+                            setContentCommentText('');
+                          }}
+                          style={{ padding: '8px 16px' }}
+                        >
+                          Next &rarr;
+                        </button>
+                      </div>
+
+                      {/* Content Item Details */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                          <div>
+                            <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>{item.platform}</span>
+                            <span className="portal-badge portal-badge-muted" style={{ marginRight: '6px', textTransform: 'uppercase' }}>{item.post_type}</span>
+                            <span className={`portal-badge ${
+                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? 'portal-badge-success' :
+                              item.status === 'Pending Client Approval' ? 'portal-badge-warning' :
+                              item.status === 'Client Rejected' ? 'portal-badge-danger' : 'portal-badge-muted'
+                            }`} style={{ textTransform: 'uppercase' }}>
+                              {item.status === 'Pending' ? 'Approved (Pending Posting)' : item.status}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>Target: {formatDateStr(item.date)}</span>
+                        </div>
+
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{item.title || 'Untitled Post'}</h3>
+
+                        {/* Script details */}
+                        <div className="portal-script-box" style={{ maxHeight: 'none', background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', whiteSpace: 'pre-wrap' }}>
+                          {item.script || 'No script/concept details provided.'}
+                        </div>
+
+                        {/* Caption details (if any) */}
+                        {item.caption && (
+                          <div style={{ marginTop: '16px' }}>
+                            <strong style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Caption</strong>
+                            <div style={{ background: 'var(--bg-input)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.9rem', marginTop: '4px', whiteSpace: 'pre-wrap' }}>
+                              {item.caption}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Links */}
+                        {item.link && (
+                          <div style={{ marginTop: '16px' }}>
+                            <a 
+                              href={item.link} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="portal-btn" 
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.8rem' }}
+                            >
+                              <PlayCircle size={14} /> View Reference Link
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Comment & Actions Form or Status Message */}
+                      <div style={{ borderTop: '2px solid #000000', paddingTop: '20px' }}>
+                        {item.status === 'Pending Client Approval' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className="portal-form-group" style={{ margin: 0 }}>
+                              <label className="portal-label" style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', marginBottom: '6px', display: 'block' }}>
+                                Comments / Feedback for Revisions
+                              </label>
+                              <textarea
+                                className="portal-control"
+                                rows={3}
+                                placeholder="Type any comments or requested edits here. If you want changes, type them here and click 'Request Changes' below."
+                                value={contentCommentText}
+                                onChange={(e) => setContentCommentText(e.target.value)}
+                                style={{ resize: 'vertical', width: '100%', background: '#ffffff', border: '2px solid #000000', borderRadius: '6px', padding: '10px' }}
+                              />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                              <button 
+                                onClick={() => handleReject(item.id, contentCommentText)}
+                                className="portal-btn portal-btn-danger" 
+                                style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                disabled={submittingDecision}
+                              >
+                                <X size={16} /> Request Changes with Comment
+                              </button>
+                              <button 
+                                onClick={() => handleApprove(item.id)}
+                                className="portal-btn portal-btn-success" 
+                                style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                disabled={submittingDecision}
+                              >
+                                <Check size={16} /> Approve Content
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{
+                            background:
+                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? '#d1fae5' :
+                              item.status === 'Client Rejected' ? '#fffbeb' : '#f4f4f5',
+                            border:
+                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? '2px solid #059669' :
+                              item.status === 'Client Rejected' ? '2px solid #fbbf24' : '2px solid #e4e4e7',
+                            borderRadius: '8px',
+                            padding: '16px',
+                            color:
+                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? '#065f46' :
+                              item.status === 'Client Rejected' ? '#92400e' : '#27272a',
+                            fontSize: '0.9rem',
+                            fontWeight: '600'
+                          }}>
+                            {item.status === 'Posted' && (
+                              <div>🎉 This post has been posted live!</div>
+                            )}
+                            {item.status === 'Client Approved' && (
+                              <div>✓ You have approved this content! It is queued for posting.</div>
+                            )}
+                            {item.status === 'Pending' && (
+                              <div>✓ Content approved. Pending posting.</div>
+                            )}
+                            {item.status === 'Client Rejected' && (
+                              <div>
+                                <strong>⚠️ Revisions Requested:</strong>
+                                <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#78350f' }}>
+                                  "{item.client_comments || 'No comment text'}"
+                                </p>
+                              </div>
+                            )}
+                            {item.status === 'Draft' && (
+                              <div>✍️ Internal Draft - preparing by managers. Not ready for review yet.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
           </div>
         )}
 
