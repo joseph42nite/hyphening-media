@@ -652,6 +652,10 @@ export default function ClientPortal({ showToast }) {
   const [seoPage, setSeoPage] = useState(1);
   const [adsPage, setAdsPage] = useState(1);
 
+  // Content pagination inside Content option
+  const [currentContentIndex, setCurrentContentIndex] = useState(0);
+  const [contentCommentText, setContentCommentText] = useState('');
+
   const ITEMS_PER_PAGE_CONTENT = 10;
   const ITEMS_PER_PAGE_SEO = 5;
   const ITEMS_PER_PAGE_ADS = 5;
@@ -659,6 +663,13 @@ export default function ClientPortal({ showToast }) {
   useEffect(() => { setContentPage(1); }, [contentList]);
   useEffect(() => { setSeoPage(1); }, [seoReports]);
   useEffect(() => { setAdsPage(1); }, [adCampaigns]);
+
+  // Adjust index when plan length changes
+  useEffect(() => {
+    if (pendingPlan && currentContentIndex >= pendingPlan.length) {
+      setCurrentContentIndex(Math.max(0, pendingPlan.length - 1));
+    }
+  }, [pendingPlan]);
   
   // Feedback form
   const [feedbackMsg, setFeedbackMsg] = useState('');
@@ -727,7 +738,7 @@ export default function ClientPortal({ showToast }) {
         
         if (data.client_type === 'artist_curation') {
           setActiveTab('bookings');
-        } else if (activeTab !== 'reports' && activeTab !== 'approval' && activeTab !== 'content' && activeTab !== 'bookings') {
+        } else if (activeTab !== 'reports' && activeTab !== 'content' && activeTab !== 'bookings') {
           setActiveTab('overview');
         }
         
@@ -827,31 +838,24 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
-  const openRejectModal = (item) => {
-    setRejectingItem(item);
-    setRejectionComment('');
-  };
-
-  const handleReject = async (e) => {
-    e.preventDefault();
-    if (!rejectionComment.trim()) {
-      showToast('Please provide a comment outlining the changes required', 'error');
+  const handleReject = async (id, comment) => {
+    if (!comment.trim()) {
+      showToast('Please enter your comments before submitting.', 'error');
       return;
     }
-    
     setSubmittingDecision(true);
     try {
-      const response = await fetch(`${API_BASE}/api/portal/${token}/content-plan/${rejectingItem.id}/reject`, {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/content-plan/${id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: rejectionComment }),
+        body: JSON.stringify({ comment }),
         credentials: 'include'
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to request changes');
 
-      showToast('Revisions submitted successfully', 'success');
-      setRejectingItem(null);
+      showToast('Comments and revisions submitted successfully', 'success');
+      setContentCommentText('');
       fetchData();
       checkPortalAuth();
     } catch (err) {
@@ -1006,20 +1010,14 @@ export default function ClientPortal({ showToast }) {
                 <TrendingUp size={16} /> Reports
               </button>
               <button 
-                onClick={() => setActiveTab('approval')} 
-                className={`portal-tab-btn ${activeTab === 'approval' ? 'active' : ''}`}
-                style={{ position: 'relative' }}
-              >
-                <FileText size={16} /> Approvals
-                {overview.pending_approvals > 0 && (
-                  <span style={{ position: 'absolute', top: '8px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />
-                )}
-              </button>
-              <button 
                 onClick={() => setActiveTab('content')} 
                 className={`portal-tab-btn ${activeTab === 'content' ? 'active' : ''}`}
+                style={{ position: 'relative' }}
               >
                 <Calendar size={16} /> Content
+                {overview?.pending_approvals > 0 && (
+                  <span style={{ position: 'absolute', top: '8px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />
+                )}
               </button>
             </>
           )}
@@ -1384,12 +1382,12 @@ export default function ClientPortal({ showToast }) {
           </div>
         )}
 
-        {/* Approval Tab */}
-        {activeTab === 'approval' && (
+        {/* Content Tab (3rd Tab) */}
+        {activeTab === 'content' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Review Pending Content</h2>
+            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Review Content Plan</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
-              Please review the scripts, concepts, or captions prepared by our managers. Click approve, or request revisions.
+              Read the scripts and concepts prepared for your review. Approve them or request changes with a comment.
             </p>
 
             {pendingPlan.length === 0 ? (
@@ -1399,193 +1397,117 @@ export default function ClientPortal({ showToast }) {
                 </div>
                 <h4 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#000000', textTransform: 'uppercase' }}>All Content Approved!</h4>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '6px', fontWeight: 600 }}>
-                  No pending content awaits your action. Good job!
+                  No pending content awaits your action. You have approved all items!
                 </p>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {pendingPlan.map(item => {
-                  const isExpanded = expandedItems[item.id];
-                  return (
-                    <div key={item.id} className="portal-bento-card" style={{ padding: '24px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                        <div>
-                          <span className="portal-badge portal-badge-info" style={{ marginRight: '6px' }}>{item.platform}</span>
-                          <span className="portal-badge portal-badge-muted">{item.post_type}</span>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>Target: {formatDateStr(item.date)}</span>
-                      </div>
+            ) : (() => {
+              // Ensure index is within bounds
+              const index = currentContentIndex >= pendingPlan.length ? Math.max(0, pendingPlan.length - 1) : currentContentIndex;
+              const item = pendingPlan[index];
+              if (!item) return null;
 
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '10px', textTransform: 'uppercase' }}>{item.title}</h3>
-
-                      {/* Script details */}
-                      <div className="portal-script-box" style={{ maxHeight: isExpanded ? 'none' : '100px' }}>
-                        {item.script || 'No script text provided.'}
-                        {!isExpanded && item.script && item.script.length > 120 && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: '40px',
-                            background: 'linear-gradient(to top, #f4f4f5 90%, transparent)'
-                          }} />
-                        )}
-                      </div>
-
-                      {item.script && item.script.length > 120 && (
-                        <button 
-                          onClick={() => toggleExpand(item.id)}
-                          className="portal-btn" 
-                          style={{ padding: '6px 12px', fontSize: '0.75rem', marginBottom: '16px' }}
-                        >
-                          {isExpanded ? 'Show Less' : 'Read Full Script'}
-                        </button>
-                      )}
-
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                        <button 
-                          onClick={() => handleApprove(item.id)}
-                          className="portal-btn portal-btn-success" 
-                          style={{ flexGrow: 1 }}
-                        >
-                          <Check size={16} /> Approve
-                        </button>
-                        <button 
-                          onClick={() => openRejectModal(item)}
-                          className="portal-btn portal-btn-danger" 
-                          style={{ flexGrow: 1 }}
-                        >
-                          <X size={16} /> Request Changes
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Content Tab (4th Tab) */}
-        {activeTab === 'content' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Monthly Content Plans</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
-              Read the finalized scripts and concepts prepared for your brand this month.
-            </p>
-
-            {scripts.length === 0 ? (
-              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
-                No monthly scripts uploaded yet.
-              </div>
-            ) : (
-              <>
-                {/* Month selector */}
-                <div className="portal-month-selector">
-                  {uniqueMonths.map(m => (
+              return (
+                <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Pagination Controls */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000000', paddingBottom: '16px' }}>
                     <button 
-                      key={m} 
-                      onClick={() => setSelectedMonth(m)}
-                      className={`portal-month-tab ${selectedMonth === m ? 'active' : ''}`}
+                      className="portal-btn"
+                      disabled={index === 0}
+                      onClick={() => {
+                        setCurrentContentIndex(index - 1);
+                        setContentCommentText('');
+                      }}
+                      style={{ padding: '8px 16px' }}
                     >
-                      {formatMonthName(m)}
+                      &larr; Previous
                     </button>
-                  ))}
-                </div>
+                    <span style={{ fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase' }}>
+                      Content {index + 1} of {pendingPlan.length}
+                    </span>
+                    <button 
+                      className="portal-btn"
+                      disabled={index === pendingPlan.length - 1}
+                      onClick={() => {
+                        setCurrentContentIndex(index + 1);
+                        setContentCommentText('');
+                      }}
+                      style={{ padding: '8px 16px' }}
+                    >
+                      Next &rarr;
+                    </button>
+                  </div>
 
-                {/* Filtered scripts list */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {scripts.filter(s => s.month === selectedMonth).length === 0 ? (
-                    <div className="portal-bento-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
-                      No scripts found for this month.
+                  {/* Content Item Details */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <div>
+                        <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>{item.platform}</span>
+                        <span className="portal-badge portal-badge-muted" style={{ textTransform: 'uppercase' }}>{item.post_type}</span>
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>Target: {formatDateStr(item.date)}</span>
                     </div>
-                  ) : (
-                    scripts.filter(s => s.month === selectedMonth).map(s => {
-                      const isExpanded = expandedItems[s.id];
-                      const scriptStatus = s.content_status || 'Script Made';
-                      return (
-                        <div key={s.id} className="portal-bento-card" style={{ padding: '24px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                            <div>
-                              <span className="portal-badge portal-badge-info" style={{ marginRight: '6px' }}>
-                                {s.format === 'long_format' ? 'Long Format' : 'Reel'}
-                              </span>
-                              <span className={`portal-badge ${
-                                scriptStatus === 'Posted' || scriptStatus === 'Client Approved' ? 'portal-badge-success' :
-                                scriptStatus === 'Pending Client Approval' ? 'portal-badge-warning' :
-                                scriptStatus === 'Client Rejected' ? 'portal-badge-danger' : 'portal-badge-muted'
-                              }`}>
-                                {scriptStatus}
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>
-                              Last updated: {formatDateStr(s.updated_at?.split('T')[0] || '')}
-                            </span>
-                          </div>
 
-                          <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{s.title}</h3>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{item.title || 'Untitled Post'}</h3>
 
-                          {/* Script Text Box */}
-                          <div className="portal-script-box" style={{ maxHeight: isExpanded ? 'none' : '150px' }}>
-                            {s.script_text}
-                            {!isExpanded && s.script_text && s.script_text.length > 200 && (
-                              <div style={{
-                                position: 'absolute',
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                height: '40px',
-                                background: 'linear-gradient(to top, #f4f4f5 90%, transparent)'
-                              }} />
-                            )}
-                          </div>
+                    {/* Script details */}
+                    <div className="portal-script-box" style={{ maxHeight: 'none', background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', whiteSpace: 'pre-wrap' }}>
+                      {item.script || 'No script text provided.'}
+                    </div>
 
-                          {s.script_text && s.script_text.length > 200 && (
-                            <button 
-                              onClick={() => toggleExpand(s.id)}
-                              className="portal-btn" 
-                              style={{ padding: '6px 12px', fontSize: '0.75rem', marginBottom: '16px' }}
-                            >
-                              {isExpanded ? 'Collapse Script' : 'Read Full Script'}
-                            </button>
-                          )}
+                    {/* Links */}
+                    {item.link && (
+                      <div style={{ marginTop: '16px' }}>
+                        <a 
+                          href={item.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="portal-btn" 
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.8rem' }}
+                        >
+                          <PlayCircle size={14} /> View Reference Link
+                        </a>
+                      </div>
+                    )}
+                  </div>
 
-                          {/* Action Links */}
-                          {(s.reference_video_link || s.reaction_video_link) && (
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
-                              {s.reference_video_link && (
-                                <a 
-                                  href={s.reference_video_link} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="portal-btn" 
-                                  style={{ padding: '8px 14px', fontSize: '0.8rem' }}
-                                >
-                                  <PlayCircle size={14} style={{ marginRight: '2px' }} /> Reference Video
-                                </a>
-                              )}
-                              {s.reaction_video_link && (
-                                <a 
-                                  href={s.reaction_video_link} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="portal-btn" 
-                                  style={{ padding: '8px 14px', fontSize: '0.8rem' }}
-                                >
-                                  <PlayCircle size={14} style={{ marginRight: '2px' }} /> Reaction Video
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
+                  {/* Comment & Actions Form */}
+                  <div style={{ borderTop: '2px solid #000000', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="portal-form-group" style={{ margin: 0 }}>
+                      <label className="portal-label" style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', marginBottom: '6px', display: 'block' }}>
+                        Comments / Feedback for Revisions
+                      </label>
+                      <textarea
+                        className="portal-control"
+                        rows={3}
+                        placeholder="Type any comments or requested edits here. If you want changes, type them here and click 'Request Changes' below."
+                        value={contentCommentText}
+                        onChange={(e) => setContentCommentText(e.target.value)}
+                        style={{ resize: 'vertical', width: '100%', background: '#ffffff', border: '2px solid #000000', borderRadius: '6px', padding: '10px' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                      <button 
+                        onClick={() => handleReject(item.id, contentCommentText)}
+                        className="portal-btn portal-btn-danger" 
+                        style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        disabled={submittingDecision}
+                      >
+                        <X size={16} /> Request Changes with Comment
+                      </button>
+                      <button 
+                        onClick={() => handleApprove(item.id)}
+                        className="portal-btn portal-btn-success" 
+                        style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        disabled={submittingDecision}
+                      >
+                        <Check size={16} /> Approve Content
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -1642,50 +1564,6 @@ export default function ClientPortal({ showToast }) {
         )}
 
       </div>
-
-      {/* Change Request Modal */}
-      {rejectingItem && (
-        <div className="portal-modal-overlay" onClick={() => setRejectingItem(null)}>
-          <div className="portal-bento-card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '550px', border: '3px solid #000000' }}>
-            <h2 style={{ fontSize: '1.25rem', color: '#000000', marginBottom: '8px', textTransform: 'uppercase', fontWeight: 800 }}>Request Changes</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 600 }}>
-              Detail the changes required for: <strong>{rejectingItem.title}</strong>. This content will be sent back to our social media management team for instant revision.
-            </p>
-            
-            <form onSubmit={handleReject}>
-              <div className="portal-form-group">
-                <label className="portal-label">Revision Instructions</label>
-                <textarea
-                  className="portal-control"
-                  rows={4}
-                  placeholder="Tell us what to change (e.g. edit the intro hook, change the call to action, adjust caption details)..."
-                  value={rejectionComment}
-                  onChange={(e) => setRejectionComment(e.target.value)}
-                  style={{ resize: 'vertical' }}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                <button 
-                  type="button" 
-                  className="portal-btn" 
-                  onClick={() => setRejectingItem(null)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="portal-btn portal-btn-danger" 
-                  disabled={submittingDecision}
-                >
-                  {submittingDecision ? 'Submitting...' : 'Submit Request'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
