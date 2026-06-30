@@ -2155,6 +2155,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             </form>
           </div>
         </div>
+      )}
       {showContentModal && (
         <ContentModal
           showContentModal={showContentModal}
