@@ -126,7 +126,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     const pendingApprovals = db.prepare(`
       SELECT COUNT(*) as count 
       FROM marketing_content_tracker 
-      WHERE client_id = ? AND status = 'Pending Client Approval'
+      WHERE client_id = ? AND status IN ('Pending Client Approval', 'Pending')
     `).get(clientId);
 
     const platformBreakdown = db.prepare(`
@@ -284,7 +284,7 @@ router.get('/:token/content-plan', portalAuth, (req, res) => {
     const plan = db.prepare(`
       SELECT id, date, platform, post_type, title, script, status, link, time, caption
       FROM marketing_content_tracker 
-      WHERE client_id = ? AND status = 'Pending Client Approval'
+      WHERE client_id = ? AND status IN ('Pending Client Approval', 'Pending')
       ORDER BY date ASC
     `).all(req.portalClient.id);
 
@@ -345,8 +345,8 @@ router.get('/:token/seo-reports', portalAuth, (req, res) => {
 router.post('/:token/content-plan/:contentId/approve', portalAuth, (req, res) => {
   try {
     const content = db.prepare(
-      'SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ? AND status = ?'
-    ).get(req.params.contentId, req.portalClient.id, 'Pending Client Approval');
+      "SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ? AND status IN ('Pending Client Approval', 'Pending')"
+    ).get(req.params.contentId, req.portalClient.id);
 
     if (!content) return res.status(404).json({ error: 'Content not found or not pending approval' });
 
@@ -382,8 +382,8 @@ router.post('/:token/content-plan/:contentId/reject', portalAuth, (req, res) => 
     if (!comment) return res.status(400).json({ error: 'A comment is required when requesting changes' });
 
     const content = db.prepare(
-      'SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ? AND status = ?'
-    ).get(req.params.contentId, req.portalClient.id, 'Pending Client Approval');
+      "SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ? AND status IN ('Pending Client Approval', 'Pending')"
+    ).get(req.params.contentId, req.portalClient.id);
 
     if (!content) return res.status(404).json({ error: 'Content not found or not pending approval' });
 
