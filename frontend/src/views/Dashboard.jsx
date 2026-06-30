@@ -670,7 +670,15 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         throw new Error(data.error);
       }
       showToast('Status updated successfully', 'success');
+
+      const task = tasks.find(t => t.id === taskId);
+      const clientId = task ? task.client_id : null;
+
       fetchTasks();
+      fetchCalendarMarketingContent();
+      if (clientId) {
+        fetchMarketingData(clientId);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1509,8 +1517,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       tasks.forEach(t => {
         if (t.due_date === dateStr) {
           if (!calendarClientFilter || t.client_id === parseInt(calendarClientFilter)) {
-            // Synced tasks are already represented by 'content' events, so we exclude 'social' tasks to prevent duplication
-            if (t.task_type !== 'social') {
+            // Synced tasks are already represented by 'content' events, so we exclude them to prevent duplication
+            if (!t.content_id) {
               dateEvents.push({
                 type: 'task',
                 title: t.title,
@@ -1585,8 +1593,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     tasks.forEach(t => {
       if (t.due_date === selectedDateStr) {
         if (!calendarClientFilter || t.client_id === parseInt(calendarClientFilter)) {
-          // Synced tasks are already represented by 'content' events, so we exclude 'social' tasks to prevent duplication
-          if (t.task_type !== 'social') {
+          // Synced tasks are already represented by 'content' events, so we exclude them to prevent duplication
+          if (!t.content_id) {
             selectedEvents.push({
               type: 'task',
               title: t.title,
