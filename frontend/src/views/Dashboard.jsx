@@ -16,6 +16,7 @@ import ScriptTrackerTab from '../components/dashboard/ScriptTrackerTab.jsx';
 import MarketingDataTab from '../components/dashboard/MarketingDataTab.jsx';
 import AuditLogsTab from '../components/dashboard/AuditLogsTab.jsx';
 import ChatTab from '../components/dashboard/ChatTab.jsx';
+import ContentModal from '../components/dashboard/ContentModal.jsx';
 
 let isRefreshing = false;
 let refreshPromise = null;
@@ -2154,8 +2155,19 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             </form>
           </div>
         </div>
+      {showContentModal && (
+        <ContentModal
+          showContentModal={showContentModal}
+          setShowContentModal={setShowContentModal}
+          editingContent={editingContent}
+          contentFormData={contentFormData}
+          setContentFormData={setContentFormData}
+          handleContentSubmit={handleContentSubmit}
+          clients={clients}
+          staffUsers={staffUsers}
+          marketingScripts={marketingScripts}
+        />
       )}
-
 
     </div>
   );
