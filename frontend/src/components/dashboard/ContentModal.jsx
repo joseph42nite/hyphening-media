@@ -17,6 +17,23 @@ export default function ContentModal({
     <div className="modal-overlay" onClick={() => setShowContentModal(false)}>
       <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
         <h2>{editingContent ? 'Edit Content Row' : 'Add Content Row'}</h2>
+        {editingContent?.client_comments && (
+          <div style={{
+            background: '#fee2e2',
+            border: '2px solid #ef4444',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            color: '#991b1b',
+            fontSize: '0.85rem',
+            fontWeight: '600',
+            marginBottom: '16px'
+          }}>
+            <strong>⚠️ CLIENT REVISION COMMENT:</strong>
+            <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#7f1d1d' }}>
+              "{editingContent.client_comments}"
+            </p>
+          </div>
+        )}
         <form onSubmit={handleContentSubmit} style={{ marginTop: '20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">

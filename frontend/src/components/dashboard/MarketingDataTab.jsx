@@ -354,7 +354,14 @@ export default function MarketingDataTab({
                     <tr key={item.id}>
                       <td>{item.date ? formatDateStr(item.date) : '-'}</td>
                       <td><span className="badge badge-info">{item.post_type}</span></td>
-                      <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script_title || item.script}>{item.script_title || item.script || '-'}</td>
+                      <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script_title || item.script}>
+                        {item.script_title || item.script || '-'}
+                        {item.client_comments && (
+                          <span style={{ color: 'var(--danger)', cursor: 'help', marginLeft: '4px', display: 'inline-block' }} title={`Client Feedback: ${item.client_comments}`}>
+                            💬
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <select
                           value={item.status === 'Pending Client Approval' || item.status === 'Client Approved' ? 'Pending' : (item.status === 'Client Rejected' ? 'Draft' : item.status)}
