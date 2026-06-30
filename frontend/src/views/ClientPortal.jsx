@@ -889,7 +889,7 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
-  const uniqueMonths = [...new Set(contentList.map(item => item.date ? item.date.slice(0, 7) : '').filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const uniqueMonths = [...new Set(scripts.map(s => s.month))].sort((a, b) => b.localeCompare(a));
 
   const renderPagination = (currentPage, totalItems, itemsPerPage, onPageChange) => {
     const totalPages = Math.max(Math.ceil(totalItems / itemsPerPage), 1);
@@ -1392,7 +1392,7 @@ export default function ClientPortal({ showToast }) {
 
             {uniqueMonths.length === 0 ? (
               <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
-                No content plans uploaded yet.
+                No scripts uploaded yet.
               </div>
             ) : (
               <>
@@ -1415,19 +1415,21 @@ export default function ClientPortal({ showToast }) {
                 </div>
 
                 {(() => {
-                  const filteredContent = contentList.filter(item => item.date && item.date.slice(0, 7) === selectedMonth);
+                  const filteredScripts = scripts.filter(s => s.month === selectedMonth);
 
-                  if (filteredContent.length === 0) {
+                  if (filteredScripts.length === 0) {
                     return (
                       <div className="portal-bento-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
-                        No content plans found for this month.
+                        No scripts found for this month.
                       </div>
                     );
                   }
 
-                  const index = currentContentIndex >= filteredContent.length ? Math.max(0, filteredContent.length - 1) : currentContentIndex;
-                  const item = filteredContent[index];
+                  const index = currentContentIndex >= filteredScripts.length ? Math.max(0, filteredScripts.length - 1) : currentContentIndex;
+                  const item = filteredScripts[index];
                   if (!item) return null;
+
+                  const isApproved = ['Client Approved', 'Pending', 'Posted'].includes(item.content_status);
 
                   return (
                     <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1445,11 +1447,11 @@ export default function ClientPortal({ showToast }) {
                           &larr; Previous
                         </button>
                         <span style={{ fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase' }}>
-                          Content {index + 1} of {filteredContent.length}
+                          Script {index + 1} of {filteredScripts.length}
                         </span>
                         <button 
                           className="portal-btn"
-                          disabled={index === filteredContent.length - 1}
+                          disabled={index === filteredScripts.length - 1}
                           onClick={() => {
                             setCurrentContentIndex(index + 1);
                             setContentCommentText('');
@@ -1464,56 +1466,73 @@ export default function ClientPortal({ showToast }) {
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                           <div>
-                            <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>{item.platform}</span>
-                            <span className="portal-badge portal-badge-muted" style={{ marginRight: '6px', textTransform: 'uppercase' }}>{item.post_type}</span>
-                            <span className={`portal-badge ${
-                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? 'portal-badge-success' :
-                              item.status === 'Pending Client Approval' ? 'portal-badge-warning' :
-                              item.status === 'Client Rejected' ? 'portal-badge-danger' : 'portal-badge-muted'
-                            }`} style={{ textTransform: 'uppercase' }}>
-                              {item.status === 'Pending' ? 'Approved (Pending Posting)' : item.status}
+                            <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>
+                              {item.format === 'long_format' ? 'Long Format' : 'Reel'}
                             </span>
+                            {item.content_status && (
+                              <span className={`portal-badge ${
+                                isApproved ? 'portal-badge-success' :
+                                item.content_status === 'Pending Client Approval' ? 'portal-badge-warning' :
+                                item.content_status === 'Client Rejected' ? 'portal-badge-danger' : 'portal-badge-muted'
+                              }`} style={{ textTransform: 'uppercase' }}>
+                                {item.content_status === 'Pending' ? 'Approved (Pending Posting)' : item.content_status}
+                              </span>
+                            )}
                           </div>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>Target: {formatDateStr(item.date)}</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>
+                            Last updated: {formatDateStr(item.updated_at?.split('T')[0] || '')}
+                          </span>
                         </div>
 
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{item.title || 'Untitled Post'}</h3>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{item.title}</h3>
 
                         {/* Script details */}
                         <div className="portal-script-box" style={{ maxHeight: 'none', background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', whiteSpace: 'pre-wrap' }}>
-                          {item.script || 'No script/concept details provided.'}
+                          {item.script_text || 'No script text provided.'}
                         </div>
 
-                        {/* Caption details (if any) */}
-                        {item.caption && (
-                          <div style={{ marginTop: '16px' }}>
-                            <strong style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Caption</strong>
-                            <div style={{ background: 'var(--bg-input)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '0.9rem', marginTop: '4px', whiteSpace: 'pre-wrap' }}>
-                              {item.caption}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Links */}
-                        {item.link && (
-                          <div style={{ marginTop: '16px' }}>
-                            <a 
-                              href={item.link} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="portal-btn" 
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.8rem' }}
-                            >
-                              <PlayCircle size={14} /> View Reference Link
-                            </a>
+                        {/* Reference video links */}
+                        {(item.reference_video_link || item.reaction_video_link) && (
+                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '16px' }}>
+                            {item.reference_video_link && (
+                              <a 
+                                href={item.reference_video_link} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="portal-btn" 
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.8rem' }}
+                              >
+                                <PlayCircle size={14} /> Reference Video
+                              </a>
+                            )}
+                            {item.reaction_video_link && (
+                              <a 
+                                href={item.reaction_video_link} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="portal-btn" 
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '0.8rem' }}
+                              >
+                                <PlayCircle size={14} /> Reaction Video
+                              </a>
+                            )}
                           </div>
                         )}
                       </div>
 
                       {/* Comment & Actions Form or Status Message */}
                       <div style={{ borderTop: '2px solid #000000', paddingTop: '20px' }}>
-                        {item.status === 'Pending Client Approval' ? (
+                        {!item.content_id ? (
+                          <div style={{ background: '#f4f4f5', border: '2px solid #e4e4e7', padding: '16px', borderRadius: '8px', color: '#71717a', fontSize: '0.9rem', fontWeight: '600' }}>
+                            ℹ️ This script has not been scheduled in the content tracker yet. Once linked by the manager, you will be able to comment and approve here.
+                          </div>
+                        ) : !isApproved ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {item.content_status === 'Client Rejected' && item.client_comments && (
+                              <div style={{ background: '#fffbeb', border: '2px solid #fbbf24', borderRadius: '6px', padding: '10px 14px', color: '#92400e', fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>
+                                <strong>Previous Revision Request:</strong> "{item.client_comments}"
+                              </div>
+                            )}
                             <div className="portal-form-group" style={{ margin: 0 }}>
                               <label className="portal-label" style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', marginBottom: '6px', display: 'block' }}>
                                 Comments / Feedback for Revisions
@@ -1530,7 +1549,7 @@ export default function ClientPortal({ showToast }) {
 
                             <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
                               <button 
-                                onClick={() => handleReject(item.id, contentCommentText)}
+                                onClick={() => handleReject(item.content_id, contentCommentText)}
                                 className="portal-btn portal-btn-danger" 
                                 style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
                                 disabled={submittingDecision}
@@ -1538,50 +1557,29 @@ export default function ClientPortal({ showToast }) {
                                 <X size={16} /> Request Changes with Comment
                               </button>
                               <button 
-                                onClick={() => handleApprove(item.id)}
+                                onClick={() => handleApprove(item.content_id)}
                                 className="portal-btn portal-btn-success" 
                                 style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
                                 disabled={submittingDecision}
                               >
-                                <Check size={16} /> Approve Content
+                                <Check size={16} /> Approve Script
                               </button>
                             </div>
                           </div>
                         ) : (
                           <div style={{
-                            background:
-                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? '#d1fae5' :
-                              item.status === 'Client Rejected' ? '#fffbeb' : '#f4f4f5',
-                            border:
-                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? '2px solid #059669' :
-                              item.status === 'Client Rejected' ? '2px solid #fbbf24' : '2px solid #e4e4e7',
+                            background: '#d1fae5',
+                            border: '2px solid #059669',
                             borderRadius: '8px',
                             padding: '16px',
-                            color:
-                              item.status === 'Posted' || item.status === 'Client Approved' || item.status === 'Pending' ? '#065f46' :
-                              item.status === 'Client Rejected' ? '#92400e' : '#27272a',
+                            color: '#065f46',
                             fontSize: '0.9rem',
                             fontWeight: '600'
                           }}>
-                            {item.status === 'Posted' && (
-                              <div>🎉 This post has been posted live!</div>
-                            )}
-                            {item.status === 'Client Approved' && (
-                              <div>✓ You have approved this content! It is queued for posting.</div>
-                            )}
-                            {item.status === 'Pending' && (
-                              <div>✓ Content approved. Pending posting.</div>
-                            )}
-                            {item.status === 'Client Rejected' && (
-                              <div>
-                                <strong>⚠️ Revisions Requested:</strong>
-                                <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#78350f' }}>
-                                  "{item.client_comments || 'No comment text'}"
-                                </p>
-                              </div>
-                            )}
-                            {item.status === 'Draft' && (
-                              <div>✍️ Internal Draft - preparing by managers. Not ready for review yet.</div>
+                            {item.content_status === 'Posted' ? (
+                              <div>🎉 Approved and posted live!</div>
+                            ) : (
+                              <div>✓ You have approved this script! Status: {item.content_status === 'Pending' ? 'Approved (Pending Posting)' : item.content_status}</div>
                             )}
                           </div>
                         )}

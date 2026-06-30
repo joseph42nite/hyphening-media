@@ -303,7 +303,7 @@ router.get('/:token/scripts', portalAuth, (req, res) => {
   try {
     const scripts = db.prepare(`
       SELECT s.id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.updated_at,
-             t.status AS content_status
+             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
       LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
