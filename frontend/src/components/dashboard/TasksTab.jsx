@@ -15,7 +15,8 @@ export default function TasksTab({
   gigs,
   calendarClientFilter,
   setCalendarClientFilter,
-  formatDateStr
+  formatDateStr,
+  fetchCalendarMarketingContent
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSMM = auth?.role === 'ops_social_media_manager';
@@ -37,7 +38,7 @@ export default function TasksTab({
     task_type: 'video', assigned_to: '', due_date: '', drive_link: ''
   });
 
-  const columns = ['todo', 'in_progress', 'review_pending', 'delivered'];
+  const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
 
   // Helper functions
   const isOverdue = (task) => {
@@ -67,8 +68,7 @@ export default function TasksTab({
   };
 
   const getTasksByStatus = (status) => {
-    return tasks.filter(t => {
-      if (t.status !== status) return false;
+    const filteredTasks = tasks.filter(t => {
       if (taskClientFilter && String(t.client_id) !== taskClientFilter) return false;
       if (taskSearch) {
         const matchTitle = t.title.toLowerCase().includes(taskSearch.toLowerCase());
@@ -78,6 +78,53 @@ export default function TasksTab({
       }
       return true;
     });
+
+    const localTodayStr = new Date().toLocaleDateString('en-CA');
+
+    if (status === 'todo') {
+      // TO - DO - TODAY: pending tasks due today or explicitly status 'todo' with no due date
+      return filteredTasks.filter(t => 
+        t.status !== 'delivered' && 
+        t.status !== 'in_progress' && 
+        (t.due_date === localTodayStr || (t.status === 'todo' && !t.due_date))
+      );
+    }
+    if (status === 'backlog') {
+      // BACKLOG: pending tasks that are not due today (overdue, future, or explicitly backlog)
+      const list = filteredTasks.filter(t => 
+        t.status !== 'delivered' && 
+        t.status !== 'in_progress' && 
+        t.due_date !== localTodayStr &&
+        !(t.status === 'todo' && !t.due_date)
+      );
+      return list.sort((a, b) => {
+        const isOverdueA = a.due_date && a.due_date < localTodayStr;
+        const isOverdueB = b.due_date && b.due_date < localTodayStr;
+        
+        if (isOverdueA && !isOverdueB) return -1;
+        if (!isOverdueA && isOverdueB) return 1;
+        
+        if (a.due_date && b.due_date) {
+          return a.due_date.localeCompare(b.due_date);
+        }
+        if (a.due_date) return -1;
+        if (b.due_date) return 1;
+        return 0;
+      });
+    }
+    if (status === 'in_progress') {
+      return filteredTasks.filter(t => t.status === 'in_progress');
+    }
+    if (status === 'delivered') {
+      const deliveredTasks = filteredTasks.filter(t => t.status === 'delivered');
+      // Sort: most recently completed/updated first, limit to 10
+      return deliveredTasks.sort((a, b) => {
+        const timeA = new Date(a.completed_at || a.updated_at || 0).getTime();
+        const timeB = new Date(b.completed_at || b.updated_at || 0).getTime();
+        return timeB - timeA;
+      }).slice(0, 10);
+    }
+    return [];
   };
 
   // Task CRUD handlers
@@ -122,6 +169,7 @@ export default function TasksTab({
       showToast(`Task ${editingTask ? 'updated' : 'created'} successfully`, 'success');
       setShowTaskModal(false);
       fetchTasks();
+      fetchCalendarMarketingContent?.();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -141,6 +189,7 @@ export default function TasksTab({
       }
       showToast('Status updated successfully', 'success');
       fetchTasks();
+      fetchCalendarMarketingContent?.();
     } catch (err) {
       showToast(err.message, 'error');
     }

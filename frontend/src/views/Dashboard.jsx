@@ -1786,6 +1786,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             calendarClientFilter={calendarClientFilter}
             setCalendarClientFilter={setCalendarClientFilter}
             formatDateStr={formatDateStr}
+            fetchCalendarMarketingContent={fetchCalendarMarketingContent}
           />
         )}
 
