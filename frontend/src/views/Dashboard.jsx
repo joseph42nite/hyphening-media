@@ -120,6 +120,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [selectedChatClient, setSelectedChatClient] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [newChatMessage, setNewChatMessage] = useState('');
+  const [headerAlert, setHeaderAlert] = useState(null);
 
   // SSE State
   const [sseConnected, setSseConnected] = useState(false);
@@ -320,6 +321,57 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   };
 
 
+  // Request Notification Permissions on load
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  // Helper to play synthesized notification chime
+  const playNotificationSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration) => {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.15, startTime + 0.02); // quick smooth fade-in
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration); // smooth decay
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      const now = audioCtx.currentTime;
+      // Soft, premium chime: G5 (783.99 Hz) then C6 (1046.50 Hz)
+      playTone(783.99, now, 0.35);
+      playTone(1046.50, now + 0.08, 0.45);
+    } catch (err) {
+      console.warn('AudioContext playback failed. Requires user interaction first.', err);
+    }
+  };
+
+  // Helper to trigger system Notification
+  const triggerSystemNotification = (title, body) => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body });
+      } catch (err) {
+        console.error('Failed to trigger system notification:', err);
+      }
+    }
+  };
+
   // 1. Initial Data Fetch Hook
   useEffect(() => {
     if (!auth) {
@@ -376,12 +428,38 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
     es.addEventListener('chat_message', (e) => {
       const data = JSON.parse(e.data);
+      
+      // Do not notify if the message is from ourselves
+      if (auth && data.message.sender_id === auth.id) {
+        if (selectedChatClientRef.current && selectedChatClientRef.current.id === data.client_id) {
+          setChatMessages(prev => [...prev, data.message]);
+        }
+        return;
+      }
+
+      // Play chime sound
+      playNotificationSound();
+
+      // Find client name
+      const client = (clientsRef.current || []).find(c => c.id === data.client_id);
+      const clientName = client ? client.name : 'Client';
+
+      // Send system browser notification
+      const notificationTitle = `New message in ${clientName} chat`;
+      const notificationBody = `${data.message.sender_name}: "${data.message.message}"`;
+      triggerSystemNotification(notificationTitle, notificationBody);
+
       if (selectedChatClientRef.current && selectedChatClientRef.current.id === data.client_id) {
         setChatMessages(prev => [...prev, data.message]);
+        showToast(`New message from ${data.message.sender_name} in active chat`, 'info');
       } else {
-        const client = (clientsRef.current || []).find(c => c.id === data.client_id);
-        const clientName = client ? client.name : 'Client';
         showToast(`New message in ${clientName} chat: "${data.message.message.substring(0, 30)}..."`, 'info');
+        setHeaderAlert({
+          client,
+          clientName,
+          message: data.message.message,
+          senderName: data.message.sender_name,
+        });
       }
     });
 
@@ -1675,6 +1753,67 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   return (
     <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
       
+      {headerAlert && (
+        <div style={{
+          background: '#fef3c7',
+          border: 'var(--border-width) solid var(--border-color)',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--shadow-sm)',
+          padding: '16px 24px',
+          marginBottom: '20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexGrow: 1 }}>
+            <span style={{ fontSize: '1.5rem' }}>💬</span>
+            <span style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+              <strong>New message in {headerAlert.clientName} chat:</strong> <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{headerAlert.senderName}</span>: "{headerAlert.message.length > 100 ? headerAlert.message.substring(0, 100) + '...' : headerAlert.message}"
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button
+              onClick={() => {
+                if (headerAlert.client) {
+                  setSelectedChatClient(headerAlert.client);
+                  setActiveTab('client-workspaces');
+                }
+                setHeaderAlert(null);
+              }}
+              className="btn btn-primary"
+              style={{
+                padding: '8px 16px',
+                fontSize: '0.85rem',
+                backgroundColor: 'var(--accent)',
+                color: 'var(--bg-card)',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              View Chat
+            </button>
+            <button
+              onClick={() => setHeaderAlert(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: 'var(--text-primary)',
+                padding: '4px',
+                lineHeight: 1
+              }}
+              aria-label="Dismiss alert"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="dashboard-header">
         <div className="dashboard-header-left">

@@ -993,6 +993,12 @@ function handleSendChatMessage(payload) {
     'INSERT INTO internal_chat_messages (client_id, sender_id, sender_name, message) VALUES (?, ?, ?, ?)'
   ).run(payload.client_id, 0, 'OpenClaw', payload.message);
 
+  const newMessage = db.prepare('SELECT * FROM internal_chat_messages WHERE id = ?').get(result.lastInsertRowid);
+
+  import('../../server.js').then(({ broadcastEvent }) => {
+    broadcastEvent('chat_message', { client_id: parseInt(payload.client_id), message: newMessage });
+  }).catch(err => console.error('[OPENCLAW] Broadcast chat message failed:', err));
+
   logAction({ action: 'create', entityType: 'chat_message', entityId: result.lastInsertRowid, diff: { client_id: payload.client_id, source: 'openclaw' } });
   return { success: true, summary: `Chat message sent for client ${payload.client_id}.` };
 }
