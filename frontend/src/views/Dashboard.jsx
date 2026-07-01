@@ -119,10 +119,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Chat state
   const [selectedChatClient, setSelectedChatClient] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
-  const [newChatMessage, setNewChatMessage] = useState('');
   const [headerAlert, setHeaderAlert] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [notificationPermission, setNotificationPermission] = useState(typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default');
+  const [unseenCounts, setUnseenCounts] = useState({});
+  const [clientRecencyOrder, setClientRecencyOrder] = useState([]);
 
   // SSE State
   const [sseConnected, setSseConnected] = useState(false);
@@ -260,6 +261,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const selectedChatClientRef = useRef(selectedChatClient);
   selectedChatClientRef.current = selectedChatClient;
 
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
   const clientsRef = useRef(clients);
   clientsRef.current = clients;
 
@@ -277,10 +281,16 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   }, [chatMessages, activeTab, selectedChatClient]);
 
-  // Reset job assignments page when selected client changes
+  // Reset job assignments page and clear unseen counts when active client or active tab changes
   useEffect(() => {
     setAssignmentsPage(1);
-  }, [selectedChatClient]);
+    if (selectedChatClient && activeTab === 'client-workspaces') {
+      setUnseenCounts(prev => ({
+        ...prev,
+        [selectedChatClient.id]: 0
+      }));
+    }
+  }, [selectedChatClient, activeTab]);
 
   // Auto-refresh fetch wrapper: handles expired JWT tokens transparently
   const authFetch = async (url, options = {}) => {
@@ -464,7 +474,29 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         if (selectedChatClientRef.current && selectedChatClientRef.current.id === data.client_id) {
           setChatMessages(prev => [...prev, data.message]);
         }
+        // Move to the top of recency list
+        setClientRecencyOrder(prev => {
+          const filtered = prev.filter(id => id !== data.client_id);
+          return [data.client_id, ...filtered];
+        });
         return;
+      }
+
+      // Move to the top of recency list
+      setClientRecencyOrder(prev => {
+        const filtered = prev.filter(id => id !== data.client_id);
+        return [data.client_id, ...filtered];
+      });
+
+      // Increment unseen count if chat is not active
+      const isChatActive = activeTabRef.current === 'client-workspaces' && 
+                           selectedChatClientRef.current && 
+                           selectedChatClientRef.current.id === data.client_id;
+      if (!isChatActive) {
+        setUnseenCounts(prev => ({
+          ...prev,
+          [data.client_id]: (prev[data.client_id] || 0) + 1
+        }));
       }
 
       // Play chime sound
@@ -551,28 +583,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       if (res.ok) setChatMessages(data.chats || []);
     } catch (err) {
       console.error('Error fetching chats:', err);
-    }
-  };
-
-  const sendChatMessage = async (e) => {
-    e.preventDefault();
-    if (!newChatMessage.trim() || !selectedChatClient) return;
-
-    try {
-      const res = await authFetch(`/api/clients/${selectedChatClient.id}/chats`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: newChatMessage })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setNewChatMessage('');
-        fetchChats(selectedChatClient.id);
-      } else {
-        showToast(data.error || 'Failed to send message', 'error');
-      }
-    } catch (err) {
-      showToast(err.message, 'error');
     }
   };
 
@@ -1544,6 +1554,26 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     window.open(`/api/clients/${selectedClientForReports.id}/export/${type}`, '_blank');
   };
 
+  // Sort clients by recency of chat messages, then alphabetically
+  const sortedClients = React.useMemo(() => {
+    const list = [...clients];
+    list.sort((a, b) => {
+      const idxA = clientRecencyOrder.indexOf(a.id);
+      const idxB = clientRecencyOrder.indexOf(b.id);
+      const hasA = idxA !== -1;
+      const hasB = idxB !== -1;
+      
+      if (hasA && hasB) return idxA - idxB;
+      if (hasA) return -1;
+      if (hasB) return 1;
+      
+      const nameA = (a.parent_name ? `${a.parent_name} - ${a.name}` : a.name).toLowerCase();
+      const nameB = (b.parent_name ? `${b.parent_name} - ${b.name}` : b.name).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+    return list;
+  }, [clients, clientRecencyOrder]);
+
   // Filtering lists
   const filteredClients = clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
   const filteredTasks = tasks.filter(t => {
@@ -1971,7 +2001,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {activeTab === 'client-workspaces' && (
           <ChatTab
             auth={auth}
-            clients={clients}
+            clients={sortedClients}
             selectedChatClient={selectedChatClient}
             setSelectedChatClient={setSelectedChatClient}
             chatMessages={chatMessages}
@@ -1982,6 +2012,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             showToast={showToast}
             formatDateStr={formatDateStr}
             staffUsers={staffUsers}
+            unseenCounts={unseenCounts}
           />
         )}
 

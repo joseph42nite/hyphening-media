@@ -13,7 +13,8 @@ export default function ChatTab({
   fetchTasks,
   showToast,
   formatDateStr,
-  staffUsers
+  staffUsers,
+  unseenCounts = {}
 }) {
   const isVideoEditor = auth?.role === 'ops_video_editor';
   const chatContainerRef = useRef(null);
@@ -123,10 +124,34 @@ export default function ChatTab({
                 background: selectedChatClient?.id === c.id ? '#000' : '#fff',
                 color: selectedChatClient?.id === c.id ? '#fff' : '#000',
                 fontWeight: 'bold',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
               }}
             >
-              {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
+              <span>{c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}</span>
+              {unseenCounts[c.id] > 0 && (
+                <span style={{
+                  background: 'var(--warning)',
+                  color: '#000',
+                  border: '2px solid #000',
+                  borderRadius: '50%',
+                  minWidth: '22px',
+                  height: '22px',
+                  padding: '2px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '1px 1px 0px #000'
+                }}>
+                  {unseenCounts[c.id]}
+                </span>
+              )}
             </div>
           ))}
         </div>
