@@ -6,7 +6,7 @@ import {
   Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
   Search, Share2, FileDown, Eye, HelpCircle, Check, X, ShieldAlert,
-  AlertTriangle, Play, MessageSquare, FileText
+  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff
 } from 'lucide-react';
 
 import TasksTab from '../components/dashboard/TasksTab.jsx';
@@ -121,6 +121,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [chatMessages, setChatMessages] = useState([]);
   const [newChatMessage, setNewChatMessage] = useState('');
   const [headerAlert, setHeaderAlert] = useState(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [notificationPermission, setNotificationPermission] = useState(typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default');
 
   // SSE State
   const [sseConnected, setSseConnected] = useState(false);
@@ -331,7 +333,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   }, []);
 
   // Helper to play synthesized notification chime
-  const playNotificationSound = () => {
+  const playNotificationSound = (force = false) => {
+    if (!soundEnabled && !force) return;
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const playTone = (freq, startTime, duration) => {
@@ -370,6 +373,33 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         console.error('Failed to trigger system notification:', err);
       }
     }
+  };
+
+  // Helper to handle manual notification permission request
+  const handleRequestPermission = () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      Notification.requestPermission().then(permission => {
+        setNotificationPermission(permission);
+        if (permission === 'granted') {
+          showToast('System notifications enabled!', 'success');
+          playNotificationSound(true);
+        } else if (permission === 'denied') {
+          showToast('System notifications blocked. Please enable them in browser settings.', 'warning');
+        }
+      });
+    }
+  };
+
+  // Helper to toggle sound chime mute/unmute
+  const toggleSound = () => {
+    setSoundEnabled(prev => {
+      const newVal = !prev;
+      showToast(newVal ? 'Chime sound enabled' : 'Chime sound muted', 'info');
+      if (newVal) {
+        playNotificationSound(true);
+      }
+      return newVal;
+    });
   };
 
   // 1. Initial Data Fetch Hook
@@ -1829,7 +1859,45 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </div>
         </div>
 
-        <div className="dashboard-header-right">
+        <div className="dashboard-header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Notification Alarm Status/Toggle Button */}
+          <button 
+            onClick={notificationPermission === 'default' ? handleRequestPermission : toggleSound}
+            className={`btn ${soundEnabled && notificationPermission === 'granted' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ 
+              padding: '8px 12px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              cursor: 'pointer',
+              border: 'var(--border-width) solid var(--border-color)',
+              boxShadow: 'var(--shadow-sm)',
+              fontSize: '0.85rem'
+            }}
+            title={
+              notificationPermission === 'default' 
+                ? 'Enable Browser Notifications' 
+                : (soundEnabled ? 'Mute Chat Sound' : 'Unmute Chat Sound')
+            }
+          >
+            {notificationPermission === 'default' ? (
+              <>
+                <Bell size={16} />
+                <span>Enable Alerts</span>
+              </>
+            ) : soundEnabled ? (
+              <>
+                <Bell size={16} style={{ color: 'var(--success)' }} />
+                <span>Alerts On</span>
+              </>
+            ) : (
+              <>
+                <BellOff size={16} style={{ color: 'var(--text-muted)' }} />
+                <span>Alerts Muted</span>
+              </>
+            )}
+          </button>
+
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{auth?.name}</div>
             <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 'bold' }}>
