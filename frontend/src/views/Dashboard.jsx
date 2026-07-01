@@ -17,6 +17,7 @@ import MarketingDataTab from '../components/dashboard/MarketingDataTab.jsx';
 import AuditLogsTab from '../components/dashboard/AuditLogsTab.jsx';
 import ChatTab from '../components/dashboard/ChatTab.jsx';
 import ContentModal from '../components/dashboard/ContentModal.jsx';
+import BlogTab from '../components/dashboard/BlogTab.jsx';
 
 let isRefreshing = false;
 let refreshPromise = null;
@@ -1750,6 +1751,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             <Shield size={16} /> Audit Logs
           </button>
         )}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('blog')} className={`btn ${activeTab === 'blog' ? 'btn-primary' : 'btn-secondary'}`}>
+            <FileText size={16} /> Blog
+          </button>
+        )}
       </div>
 
       {/* Main Workspace Container */}
@@ -1980,6 +1986,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             setAuditLimit={setAuditLimit}
             formatDateStr={formatDateStr}
           />
+        )}
+
+        {/* BLOG TAB */}
+        {activeTab === 'blog' && (
+          <BlogTab showToast={showToast} />
         )}
 
       </main>

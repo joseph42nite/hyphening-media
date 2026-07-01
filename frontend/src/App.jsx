@@ -8,6 +8,7 @@ import Toast from './components/Toast.jsx';
 
 // Lazy-load Landing page — never fetched on mobile (saves ~60KB + game canvas)
 const Landing = React.lazy(() => import('./views/Landing.jsx'));
+const Blog = React.lazy(() => import('./views/Blog.jsx'));
 
 // WebViews need HashRouter — no server-side routing fallback for client-side routes
 const Router = isNative ? HashRouter : BrowserRouter;
@@ -67,6 +68,16 @@ function App() {
           <Route 
             path="/portal/:token" 
             element={<ClientPortal showToast={showToast} />} 
+          />
+
+          {/* Public Blog */}
+          <Route 
+            path="/blog" 
+            element={<React.Suspense fallback={null}><Blog /></React.Suspense>}
+          />
+          <Route 
+            path="/blog/:slug" 
+            element={<React.Suspense fallback={null}><Blog /></React.Suspense>}
           />
 
           {/* Fallback routes */}

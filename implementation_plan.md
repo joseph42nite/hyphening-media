@@ -610,3 +610,174 @@ Production deployment, database backup schedules, and safe key rotation.
 - [ ] Staging pipeline builds successfully.
 - [ ] `rotate-encryption-key.js` runs staging database rotations with zero data loss.
 - [ ] Off-site daily backup is verified restorable.
+
+
+
+
+# Blog Section — OpenClaw Integrated, SEO-Optimized
+
+Add a full blog system to the Hyphening website, integrated into the **OpenClaw webhook system** so the AI agent can automatically create, update, and optimize blog posts. The public pages will be fully SEO-optimized with structured data, sitemap, internal linking, and meta tags.
+
+## Proposed Changes
+
+### Database — Blog Posts Table
+
+#### [NEW] [030_blog_posts.sql](file:///Users/jomygeorge/Desktop/hyphening/src/migrations/030_blog_posts.sql)
+- New `blog_posts` table:
+  - `id`, `title`, `slug` (unique, URL-friendly)
+  - `excerpt` — Short summary for cards and meta descriptions
+  - `content` — Full article body in Markdown
+  - `cover_image_url` — Hero image URL
+  - `author` — Author name
+  - `category` — e.g. "Social Media", "Branding", "Growth", "Tech"
+  - `tags` — Comma-separated tags for filtering
+  - `meta_title` — Custom SEO title (falls back to title)
+  - `meta_description` — Custom meta description (falls back to excerpt)
+  - `meta_keywords` — SEO keywords
+  - `internal_links` — JSON array of internal link slugs for cross-linking
+  - `status` — `draft` / `published`
+  - `published_at`, `created_at`, `updated_at`
+- Indexes on `slug`, `status`, `published_at`, and `category`.
+
+---
+
+### OpenClaw Integration — Blog Event Handlers
+
+#### [MODIFY] [openclaw.js](file:///Users/jomygeorge/Desktop/hyphening/src/routes/openclaw.js)
+
+Add two new event types to the OpenClaw webhook system:
+
+**`create_blog_post`** — OpenClaw sends a full blog post payload:
+```json
+{
+  "event_type": "create_blog_post",
+  "payload": {
+    "title": "10 Proven Instagram Reel Strategies for D2C Brands in 2026",
+    "excerpt": "Discover data-backed reel strategies...",
+    "content": "# Introduction\n\nInstagram Reels...(full markdown)...",
+    "cover_image_url": "https://images.unsplash.com/...",
+    "author": "Hyphening Media",
+    "category": "Social Media",
+    "tags": "instagram,reels,d2c,growth",
+    "meta_title": "10 Instagram Reel Strategies for D2C Brands | Hyphening Media",
+    "meta_description": "Learn 10 proven Instagram Reel strategies...",
+    "meta_keywords": "instagram reels, d2c brands, social media marketing",
+    "internal_links": ["social-media-marketing-guide", "content-strategy-101"],
+    "status": "published"
+  }
+}
+```
+- Auto-generates slug from title (e.g. `10-proven-instagram-reel-strategies-for-d2c-brands-in-2026`)
+- Sets `published_at` to current timestamp if status is `published`
+- Staged for Telegram confirmation like all other OpenClaw events
+
+**`update_blog_post`** — Update an existing post by `blog_id` or `slug`:
+```json
+{
+  "event_type": "update_blog_post",
+  "payload": {
+    "blog_id": 5,
+    "content": "...updated markdown...",
+    "internal_links": ["new-related-post-slug"],
+    "meta_title": "Updated SEO Title"
+  }
+}
+```
+
+Changes to [openclaw.js](file:///Users/jomygeorge/Desktop/hyphening/src/routes/openclaw.js):
+- Add `'create_blog_post'` and `'update_blog_post'` to the `knownEvents` array
+- Add `case 'create_blog_post': return handleCreateBlogPost(payload);` and `case 'update_blog_post': return handleUpdateBlogPost(payload);` to the `executeEvent` switch
+- Implement `handleCreateBlogPost()` and `handleUpdateBlogPost()` handler functions
+
+---
+
+### Backend — Public Blog API Routes
+
+#### [NEW] [blog.js](file:///Users/jomygeorge/Desktop/hyphening/src/routes/blog.js)
+- **`GET /api/blog`** — Public. Returns published posts (paginated). Supports `?category=`, `?tag=`, `?page=`, `?limit=` filters. Returns total count for pagination.
+- **`GET /api/blog/:slug`** — Public. Returns a single post by slug. Also returns related posts (same category, excluding current) for internal linking.
+- **`GET /api/blog/sitemap`** — Public. Returns all published post slugs + dates for XML sitemap generation.
+- **`GET /api/blog/admin/all`** — Auth-protected (admin/super_admin). Returns all posts including drafts.
+- **`POST /api/blog`** — Auth-protected. Create a blog post manually from dashboard.
+- **`PATCH /api/blog/:id`** — Auth-protected. Update a blog post.
+- **`DELETE /api/blog/:id`** — Auth-protected. Delete a blog post.
+
+#### [MODIFY] [server.js](file:///Users/jomygeorge/Desktop/hyphening/server.js)
+- Import and mount `blogRoutes` at `/api/blog`.
+
+---
+
+### Frontend — Public Blog Pages (SEO-Optimized)
+
+#### [NEW] [Blog.jsx](file:///Users/jomygeorge/Desktop/hyphening/frontend/src/views/Blog.jsx)
+
+**Blog Listing Page** (`/blog`):
+- Uses the same landing page navbar + footer for consistency
+- Category filter tabs at the top
+- Premium editorial magazine-style grid layout (3→2→1 columns responsive)
+- Each card: cover image, category badge, title, excerpt, read-time estimate, date
+- Pagination with page numbers
+- SEO: `<title>`, `<meta name="description">`, structured data (`Blog` schema)
+
+**Blog Article Page** (`/blog/:slug`):
+- Full-width cover image hero banner
+- Article metadata: author, date, read time, category badge
+- Markdown content rendered to HTML with proper heading hierarchy
+- **Internal linking**: Auto-renders related article cards at bottom
+- **In-content internal links**: All `internal_links` slugs are rendered as contextual links within the article
+- SEO per article:
+  - `<title>` = `meta_title` or `title`
+  - `<meta name="description">` = `meta_description` or `excerpt`
+  - `<meta name="keywords">` = `meta_keywords`
+  - Structured data: `Article` schema with author, datePublished, image
+  - Canonical URL: `https://hyphening.com/blog/{slug}`
+  - Open Graph tags for social sharing
+
+---
+
+### Frontend — Admin Blog Management (Dashboard Tab)
+
+#### [NEW] [BlogTab.jsx](file:///Users/jomygeorge/Desktop/hyphening/frontend/src/components/dashboard/BlogTab.jsx)
+- Table view of all posts (title, status badge, category, published date, actions)
+- Create/Edit modal with fields: title, excerpt, content (textarea), category dropdown, tags, cover image URL, meta_title, meta_description, meta_keywords, internal_links, status toggle (draft/published)
+- Live Markdown preview panel
+- Delete with confirmation
+
+#### [MODIFY] [Dashboard.jsx](file:///Users/jomygeorge/Desktop/hyphening/frontend/src/views/Dashboard.jsx)
+- Add "Blog" tab to the sidebar navigation (visible to admin/super_admin roles only)
+- Import and render `BlogTab` component
+
+---
+
+### Frontend — Navigation & Routing
+
+#### [MODIFY] [App.jsx](file:///Users/jomygeorge/Desktop/hyphening/frontend/src/App.jsx)
+- Add routes: `/blog` (listing) and `/blog/:slug` (article reader)
+- Lazy-load the Blog component
+
+#### [MODIFY] [Landing.jsx](file:///Users/jomygeorge/Desktop/hyphening/frontend/src/views/Landing.jsx)
+- Add "Blog" link to desktop navbar and mobile drawer menu
+
+---
+
+### Styling
+
+#### [MODIFY] [index.css](file:///Users/jomygeorge/Desktop/hyphening/frontend/src/index.css)
+- Blog-specific CSS: `.blog-grid`, `.blog-card`, `.blog-article`, `.blog-hero`, `.blog-content`, `.blog-sidebar`, `.blog-related`, `.blog-tag`
+- Follows existing neo-brutalist design (thick borders, bold uppercase headings, box shadows)
+- Responsive: 3 columns → 2 → 1
+- Article content typography: proper heading sizes, code blocks, blockquotes, lists
+
+## Verification Plan
+
+### Automated Tests
+- `curl` the public blog API endpoints
+- Test OpenClaw webhook with a `create_blog_post` payload (confirm Telegram message appears)
+
+### Manual Verification
+- Accept a blog post via Telegram → verify it appears on `/blog`
+- Verify article reader at `/blog/:slug` renders correctly with SEO tags
+- Create/edit a post from the admin dashboard
+- Test responsive layout on mobile
+- Deploy to production and verify live
+

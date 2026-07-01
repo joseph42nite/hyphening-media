@@ -902,6 +902,7 @@ function Landing() {
           <a href="#portfolio" onClick={(e) => { e.preventDefault(); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }}>Portfolio</a>
           <a href="#faq" onClick={(e) => { e.preventDefault(); document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }); }}>FAQ</a>
           <a href="#contact" onClick={(e) => { e.preventDefault(); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Contact</a>
+          <a href="/blog" onClick={(e) => { e.preventDefault(); navigate('/blog'); }}>Blog</a>
         </div>
 
         {/* Hamburger button on the right */}
@@ -940,6 +941,7 @@ function Landing() {
             <a href="#portfolio" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }}>Portfolio</a>
             <a href="#faq" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }); }}>FAQ</a>
             <a href="#contact" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Contact</a>
+            <a href="/blog" onClick={(e) => { e.preventDefault(); setMenuOpen(false); navigate('/blog'); }}>Blog</a>
             
             <div className="landing-drawer-divider" />
             
