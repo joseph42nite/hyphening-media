@@ -155,7 +155,7 @@ router.get('/sitemap', (req, res) => {
 router.get('/admin/all', requireAdmin, (req, res) => {
   try {
     const posts = db.prepare(
-      'SELECT id, title, slug, excerpt, cover_image_url, author, category, tags, meta_title, meta_description, meta_keywords, internal_links, status, published_at, created_at, updated_at FROM blog_posts ORDER BY created_at DESC'
+      'SELECT id, title, slug, excerpt, content, cover_image_url, author, category, tags, meta_title, meta_description, meta_keywords, internal_links, status, published_at, created_at, updated_at FROM blog_posts ORDER BY created_at DESC'
     ).all();
     res.json({ posts });
   } catch (err) {

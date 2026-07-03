@@ -13,6 +13,14 @@ export default function ContentModal({
 }) {
   if (!showContentModal) return null;
 
+  const [scriptFilterDate, setScriptFilterDate] = React.useState(contentFormData.date || '');
+
+  React.useEffect(() => {
+    if (contentFormData.date) {
+      setScriptFilterDate(contentFormData.date);
+    }
+  }, [contentFormData.date]);
+
   return (
     <div className="modal-overlay" onClick={() => setShowContentModal(false)}>
       <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -134,6 +142,15 @@ export default function ContentModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
+              <label className="form-label">Script/Blog Date (Filter)</label>
+              <input
+                type="date"
+                className="form-control"
+                value={scriptFilterDate}
+                onChange={e => setScriptFilterDate(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
               <label className="form-label">Linked Script</label>
               <select
                 className="form-control"
@@ -142,7 +159,7 @@ export default function ContentModal({
               >
                 <option value="">-- None --</option>
                 {(() => {
-                  const selectedMonth = contentFormData.date ? contentFormData.date.slice(0, 7) : '';
+                  const selectedMonth = scriptFilterDate ? scriptFilterDate.slice(0, 7) : '';
                   const filteredScripts = selectedMonth
                     ? marketingScripts.filter(s => s.month === selectedMonth)
                     : marketingScripts;
@@ -160,7 +177,7 @@ export default function ContentModal({
                 </span>
               ) : (
                 (() => {
-                  const selectedMonth = contentFormData.date ? contentFormData.date.slice(0, 7) : '';
+                  const selectedMonth = scriptFilterDate ? scriptFilterDate.slice(0, 7) : '';
                   const filtered = selectedMonth ? marketingScripts.filter(s => s.month === selectedMonth) : marketingScripts;
                   if (filtered.length === 0 && selectedMonth) {
                     return (
@@ -173,16 +190,18 @@ export default function ContentModal({
                 })()
               )}
             </div>
-            <div className="form-group">
-              <label className="form-label">Caption</label>
-              <textarea
-                className="form-control"
-                rows={2}
-                value={contentFormData.caption}
-                onChange={e => setContentFormData({ ...contentFormData, caption: e.target.value })}
-              />
-            </div>
           </div>
+
+          <div className="form-group">
+            <label className="form-label">Caption</label>
+            <textarea
+              className="form-control"
+              rows={2}
+              value={contentFormData.caption}
+              onChange={e => setContentFormData({ ...contentFormData, caption: e.target.value })}
+            />
+          </div>
+
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div className="form-group">

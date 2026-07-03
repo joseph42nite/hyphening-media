@@ -21,6 +21,29 @@ export default function ChatTab({
 
   // Local state for chat message input
   const [newChatMessage, setNewChatMessage] = useState('');
+  const inputRef = useRef(null);
+
+  // Mention system state
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStartIdx, setMentionStartIdx] = useState(0);
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
+
+  // Filter clients to only show parent/standalone companies in the sidebar
+  const chatClients = React.useMemo(() => {
+    return clients.filter(c => !c.parent_id);
+  }, [clients]);
+
+  // Aggregate tasks for the selected parent client and all of its children
+  const clientTasks = React.useMemo(() => {
+    if (!selectedChatClient) return [];
+    return tasks.filter(t => {
+      if (t.client_id === selectedChatClient.id) return true;
+      const taskClient = clients.find(c => c.id === t.client_id);
+      if (taskClient && taskClient.parent_id === selectedChatClient.id) return true;
+      return false;
+    });
+  }, [tasks, selectedChatClient, clients]);
 
   // Local pagination states for Job Assignments
   const [assignmentsPage, setAssignmentsPage] = useState(1);
@@ -34,6 +57,115 @@ export default function ChatTab({
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatMessages]);
+
+  // Click outside to close mention dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMentionDropdown && !event.target.closest('.mention-dropdown') && !event.target.closest('.chat-input-field')) {
+        setShowMentionDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMentionDropdown]);
+
+  // Mention Suggestions list
+  const mentionSuggestions = staffUsers.filter(u =>
+    u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+  );
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setNewChatMessage(val);
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIdx !== -1) {
+      const textAfterAt = textBeforeCursor.slice(lastAtIdx + 1);
+      // Only trigger if there are no spaces between '@' and current cursor position
+      if (!textAfterAt.includes(' ')) {
+        setMentionQuery(textAfterAt);
+        setMentionStartIdx(lastAtIdx);
+        setShowMentionDropdown(true);
+        setActiveMentionIndex(0);
+        return;
+      }
+    }
+    setShowMentionDropdown(false);
+  };
+
+  const handleInputKeyDown = (e) => {
+    if (showMentionDropdown && mentionSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveMentionIndex(prev => (prev + 1) % mentionSuggestions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveMentionIndex(prev => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        selectMentionUser(mentionSuggestions[activeMentionIndex]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentionDropdown(false);
+      }
+    }
+  };
+
+  const selectMentionUser = (user) => {
+    const textBeforeAt = newChatMessage.slice(0, mentionStartIdx);
+    const textAfterCursor = newChatMessage.slice(inputRef.current?.selectionStart || newChatMessage.length);
+    const newText = `${textBeforeAt}@${user.name} ${textAfterCursor}`;
+    setNewChatMessage(newText);
+    setShowMentionDropdown(false);
+
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        const newCursorPos = mentionStartIdx + user.name.length + 2; // +2 for @ and trailing space
+        inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  };
+
+  // Helper to parse message text and render highlighted mentions
+  const renderMessageContent = (text) => {
+    if (!text) return '';
+    const parts = text.split(/(\s+)/);
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const match = part.substring(1).match(/^([a-zA-Z0-9_]+)(.*)$/);
+        if (match) {
+          const candidateName = match[1];
+          const punctuation = match[2];
+          const matchedUser = staffUsers.find(u => u.name.toLowerCase() === candidateName.toLowerCase());
+          if (matchedUser) {
+            return (
+              <span key={index}>
+                <span
+                  style={{
+                    background: '#fef3c7',
+                    color: '#d97706',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    border: '1px solid #f59e0b',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  @{matchedUser.name}
+                </span>
+                {punctuation}
+              </span>
+            );
+          }
+        }
+      }
+      return part;
+    });
+  };
 
   const sendChatMessage = async (e) => {
     e.preventDefault();
@@ -49,6 +181,7 @@ export default function ChatTab({
       const data = await res.json();
       if (res.ok) {
         setNewChatMessage('');
+        setShowMentionDropdown(false);
         fetchChats(selectedChatClient.id);
       } else {
         showToast(data.error || 'Failed to send message', 'error');
@@ -109,7 +242,7 @@ export default function ChatTab({
       <div className="glass" style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: 'fit-content' }}>
         <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '8px' }}>Clients</h3>
         <div className="workspace-client-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {clients.map(c => (
+          {chatClients.map(c => (
             <div
               key={c.id}
               onClick={() => {
@@ -133,25 +266,40 @@ export default function ChatTab({
               }}
             >
               <span>{c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}</span>
-              {unseenCounts[c.id] > 0 && (
-                <span style={{
-                  background: 'var(--warning)',
-                  color: '#000',
-                  border: '2px solid #000',
-                  borderRadius: '50%',
-                  minWidth: '22px',
-                  height: '22px',
-                  padding: '2px',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '1px 1px 0px #000'
-                }}>
-                  {unseenCounts[c.id]}
-                </span>
-              )}
+              {(() => {
+                let totalUnseen = unseenCounts[c.id] || 0;
+                clients.forEach(child => {
+                  if (child.parent_id === c.id) {
+                    totalUnseen += unseenCounts[child.id] || 0;
+                  }
+                });
+                if (totalUnseen > 0) {
+                  return (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-10px',
+                      right: '-10px',
+                      background: 'var(--warning)',
+                      color: '#000',
+                      border: '2px solid #000',
+                      borderRadius: '50%',
+                      minWidth: '22px',
+                      height: '22px',
+                      padding: '2px',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '1px 1px 0px #000',
+                      zIndex: 10
+                    }}>
+                      {totalUnseen}
+                    </span>
+                  );
+                }
+                return null;
+              })()}
             </div>
           ))}
         </div>
@@ -175,6 +323,8 @@ export default function ChatTab({
               ) : (
                 chatMessages.map(msg => {
                   const isMe = msg.sender_id === auth?.id;
+                  const messageClient = clients.find(cl => cl.id === msg.client_id);
+                  const showBrandName = messageClient && messageClient.id !== selectedChatClient.id;
                   return (
                     <div
                       key={msg.id}
@@ -190,10 +340,10 @@ export default function ChatTab({
                       }}
                     >
                       <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: isMe ? '#a1a1aa' : 'var(--text-muted)', marginBottom: '2px' }}>
-                        {msg.sender_name} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {msg.sender_name} {showBrandName && `(${messageClient.name})`} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
-                      <div style={{ fontWeight: '500', fontSize: '0.9rem', wordBreak: 'break-word' }}>
-                        {msg.message}
+                      <div style={{ fontWeight: '500', fontSize: '0.9rem', wordBreak: 'break-word', lineHeight: '1.4' }}>
+                        {renderMessageContent(msg.message)}
                       </div>
                     </div>
                   );
@@ -202,21 +352,76 @@ export default function ChatTab({
             </div>
 
             {/* Message Input form */}
-            <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '12px' }}>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Type internal chat message..."
-                value={newChatMessage}
-                onChange={e => setNewChatMessage(e.target.value)}
-                style={{ flexGrow: 1 }}
-                required
-              />
-              <button type="submit" className="btn btn-primary">
-                Send
-              </button>
-            </form>
+            <div style={{ position: 'relative' }}>
+              {showMentionDropdown && mentionSuggestions.length > 0 && (
+                <div
+                  className="mention-dropdown"
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 8px)',
+                    left: '0',
+                    width: '280px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    background: '#fff',
+                    border: '2px solid #000',
+                    boxShadow: '3px 3px 0px #000',
+                    borderRadius: '4px',
+                    zIndex: 1000,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: '4px 0'
+                  }}
+                >
+                  <div style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)', marginBottom: '4px' }}>
+                    Mention Team Member
+                  </div>
+                  {mentionSuggestions.map((user, idx) => {
+                    const isActive = idx === activeMentionIndex;
+                    return (
+                      <div
+                        key={user.id}
+                        onClick={() => selectMentionUser(user)}
+                        onMouseEnter={() => setActiveMentionIndex(idx)}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          background: isActive ? '#000' : 'transparent',
+                          color: isActive ? '#fff' : '#000',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                          transition: 'background 0.1s ease, color 0.1s ease'
+                        }}
+                      >
+                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{user.name}</div>
+                        <div style={{ fontSize: '0.7rem', opacity: isActive ? 0.8 : 0.6 }}>
+                          {user.role.replace('ops_', '').replace('_', ' ')}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '12px' }}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  className="form-control chat-input-field"
+                  placeholder="Type internal chat message..."
+                  value={newChatMessage}
+                  onChange={handleInputChange}
+                  onKeyDown={handleInputKeyDown}
+                  style={{ flexGrow: 1 }}
+                  required
+                />
+                <button type="submit" className="btn btn-primary">
+                  Send
+                </button>
+              </form>
+            </div>
           </div>
+
 
           {/* Right Bottom Bento: Assignments */}
           <div className="glass">
@@ -238,7 +443,6 @@ export default function ChatTab({
                 </thead>
                 <tbody>
                   {(() => {
-                    const clientTasks = tasks.filter(t => t.client_id === selectedChatClient.id);
                     if (clientTasks.length === 0) {
                       return (
                         <tr>
@@ -253,7 +457,14 @@ export default function ChatTab({
 
                     return paginatedTasks.map(task => (
                       <tr key={task.id}>
-                        <td style={{ fontWeight: 'bold' }}>{task.title}</td>
+                        <td style={{ fontWeight: 'bold' }}>
+                          {task.title}
+                          {task.client_id !== selectedChatClient.id && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 'normal', marginTop: '2px' }}>
+                              Brand: <span style={{ fontWeight: 'bold' }}>{task.client_name}</span>
+                            </div>
+                          )}
+                        </td>
                         <td>
                           <span className="badge badge-muted" style={{ fontSize: '0.7rem' }}>{task.task_type}</span>
                         </td>
@@ -320,7 +531,6 @@ export default function ChatTab({
 
             {/* Pagination Controls */}
             {(() => {
-              const clientTasks = tasks.filter(t => t.client_id === selectedChatClient.id);
               if (clientTasks.length === 0) return null;
               return (
                 <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderTop: '2px solid #000', paddingTop: '16px' }}>

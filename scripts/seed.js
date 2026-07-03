@@ -8,8 +8,8 @@ import bcrypt from 'bcryptjs';
 const users = [
   { email: 'joseph@hyphening.com', password: process.env.SEED_JOSEPH_PASSWORD || 'SetupTemporaryPassword123!', name: 'Joseph', role: 'admin' },
   { email: 'deepanjan@hyphening.com', password: process.env.SEED_DEEPANJAN_PASSWORD || 'SetupTemporaryPassword123!', name: 'Deepanjan', role: 'admin' },
-  { email: 'editor@hyphening.com', password: process.env.SEED_EDITOR_PASSWORD || 'SetupTemporaryPassword123!', name: 'Video Editor', role: 'ops_video_editor' },
-  { email: 'social@hyphening.com', password: process.env.SEED_SMM_PASSWORD || 'SetupTemporaryPassword123!', name: 'Social Media Manager', role: 'ops_social_media_manager' },
+  { email: 'editor@hyphening.com', password: process.env.SEED_EDITOR_PASSWORD || 'SetupTemporaryPassword123!', name: 'Ashu', role: 'ops_video_editor' },
+  { email: 'social@hyphening.com', password: process.env.SEED_SMM_PASSWORD || 'SetupTemporaryPassword123!', name: 'Omkar', role: 'ops_social_media_manager' },
 ];
 
 async function generateHashes() {

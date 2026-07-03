@@ -270,20 +270,31 @@ router.patch('/:id', authorize('admin'), (req, res) => {
 
 /**
  * GET /api/clients/:id/chats
- * Retrieve chat messages for a specific client.
+ * Retrieve chat messages for a specific client (including parent/child family).
  */
 router.get('/:id/chats', (req, res) => {
   try {
+    const client = db.prepare('SELECT id, parent_id FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    // Identify parent and child family client IDs
+    const parentId = client.parent_id || client.id;
+    const allFamily = db.prepare('SELECT id FROM crm_clients WHERE id = ? OR parent_id = ?').all(parentId, parentId);
+    const clientIds = allFamily.map(c => c.id);
+
     if (req.user.role === 'ops_video_editor') {
-      const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+      // Check if video editor is assigned to any task of the client family
+      const placeholders = clientIds.map(() => '?').join(', ');
+      const hasTask = db.prepare(`SELECT 1 FROM kanban_tasks WHERE client_id IN (${placeholders}) AND assigned_to = ? AND task_type = 'video' LIMIT 1`).get(...clientIds, req.user.id);
       if (!hasTask) {
         return res.status(403).json({ error: 'Access denied: you have no video assignments for this client' });
       }
     }
 
+    const placeholders = clientIds.map(() => '?').join(', ');
     const chats = db.prepare(
-      'SELECT * FROM internal_chat_messages WHERE client_id = ? ORDER BY created_at ASC'
-    ).all(req.params.id);
+      `SELECT * FROM internal_chat_messages WHERE client_id IN (${placeholders}) ORDER BY created_at ASC`
+    ).all(...clientIds);
     res.json({ chats });
   } catch (err) {
     console.error('[CLIENTS] Get chats error:', err);

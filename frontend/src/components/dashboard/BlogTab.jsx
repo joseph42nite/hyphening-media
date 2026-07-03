@@ -312,14 +312,15 @@ export default function BlogTab({ showToast }) {
 function simpleMarkdown(md) {
   if (!md) return '<p style="color:#999">Nothing to preview yet.</p>';
   return md
+    .replace(/\r/g, '')
     .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;border-radius:8px" />')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-    .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^#### (.+)$/gm, '<h4><strong>$1</strong></h4>')
+    .replace(/^### (.+)$/gm, '<h3><strong>$1</strong></h3>')
+    .replace(/^## (.+)$/gm, '<h2><strong>$1</strong></h2>')
+    .replace(/^# (.+)$/gm, '<h1><strong>$1</strong></h1>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')

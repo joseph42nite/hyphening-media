@@ -12,6 +12,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 function renderMarkdown(md) {
   if (!md) return '';
   let html = md
+    .replace(/\r/g, '')
     // Code blocks (fenced)
     .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="blog-code">$2</code></pre>')
     // Inline code
@@ -21,10 +22,10 @@ function renderMarkdown(md) {
     // Links
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="blog-link" target="_blank" rel="noopener noreferrer">$1</a>')
     // Headings
-    .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^#### (.+)$/gm, '<h4><strong>$1</strong></h4>')
+    .replace(/^### (.+)$/gm, '<h3><strong>$1</strong></h3>')
+    .replace(/^## (.+)$/gm, '<h2><strong>$1</strong></h2>')
+    .replace(/^# (.+)$/gm, '<h1><strong>$1</strong></h1>')
     // Bold & Italic
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')

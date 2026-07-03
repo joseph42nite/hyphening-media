@@ -235,6 +235,24 @@ export default function ArtistCurationTab({
     }
   };
 
+  const handleGigDelete = async (gigId) => {
+    if (!window.confirm('Are you sure you want to delete this event?')) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/artists/gigs/${gigId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete event');
+
+      showToast('Event deleted successfully', 'success');
+      fetchCurationData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   if (!isAdmin) return null;
 
   return (
@@ -285,9 +303,14 @@ export default function ArtistCurationTab({
                   </td>
                   <td>₹{g.advance_paid !== null ? g.advance_paid.toLocaleString('en-IN') : '0'}</td>
                   <td>
-                    <button onClick={() => openGigModal(g)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                      Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => openGigModal(g)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                        Edit
+                      </button>
+                      <button onClick={() => handleGigDelete(g.id)} className="btn btn-danger" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

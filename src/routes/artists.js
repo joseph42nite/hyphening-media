@@ -447,6 +447,36 @@ router.patch('/gigs/:id', authorize('admin'), (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/artists/gigs/:id — delete a gig and recalculate rollups
+ */
+router.delete('/gigs/:id', authorize('admin'), (req, res) => {
+  try {
+    const gig = db.prepare('SELECT * FROM gig_status WHERE id = ?').get(req.params.id);
+    if (!gig) return res.status(404).json({ error: 'Gig not found' });
+
+    db.prepare('DELETE FROM gig_status WHERE id = ?').run(req.params.id);
+
+    // Recalculate artist rollups for the artist
+    recalculateRollups(gig.artist_id);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'delete',
+      entityType: 'gig',
+      entityId: parseInt(req.params.id),
+      diff: gig,
+      ip: req.ip,
+    });
+
+    res.json({ success: true, message: 'Event/Gig deleted successfully.' });
+  } catch (err) {
+    console.error('[GIGS] Delete error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // =========================================
 // PLANNING CYCLES
 // =========================================
