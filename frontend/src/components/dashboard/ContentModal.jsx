@@ -13,11 +13,11 @@ export default function ContentModal({
 }) {
   if (!showContentModal) return null;
 
-  const [scriptFilterDate, setScriptFilterDate] = React.useState(contentFormData.date || '');
+  const [scriptFilterDate, setScriptFilterDate] = React.useState((contentFormData.date || '').slice(0, 7));
 
   React.useEffect(() => {
     if (contentFormData.date) {
-      setScriptFilterDate(contentFormData.date);
+      setScriptFilterDate(contentFormData.date.slice(0, 7));
     }
   }, [contentFormData.date]);
 
@@ -142,9 +142,9 @@ export default function ContentModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
-              <label className="form-label">Script/Blog Date (Filter)</label>
+              <label className="form-label">Script/Blog Month (Filter)</label>
               <input
-                type="date"
+                type="month"
                 className="form-control"
                 value={scriptFilterDate}
                 onChange={e => setScriptFilterDate(e.target.value)}
