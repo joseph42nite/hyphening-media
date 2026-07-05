@@ -39,6 +39,7 @@ import portalRoutes from './src/routes/portal.js';
 import artistRoutes from './src/routes/artists.js';
 import openclawRoutes from './src/routes/openclaw.js';
 import blogRoutes from './src/routes/blog.js';
+import integrationsRoutes from './src/routes/integrations.js';
 import { publicGigConfirmRoute } from './src/routes/artists.js';
 
 // Import services
@@ -181,6 +182,9 @@ app.use('/api/openclaw', openclawRoutes);
 
 // Blog (public + admin)
 app.use('/api/blog', blogRoutes);
+
+// Composio Social Integrations
+app.use('/api', integrationsRoutes);
 
 // Audit logs (admin only)
 app.get('/api/audit-logs', (req, res) => {

@@ -1055,3 +1055,31 @@ Reserved for task queue reordering.
 | `telegram_message_id` | TEXT | Telegram message ID for editing |
 | `created_at` | TEXT | ISO timestamp |
 | `resolved_at` | TEXT | ISO timestamp |
+
+---
+
+## 14. Composio Social Integrations Endpoints
+
+### Connect Social Channel
+* `POST /api/clients/:id/integrations/connect`
+* Body: `{ "appName": "instagram" | "youtube" | "linkedin" | "facebook" | "x", "redirectUrl": "..." }`
+* Response: `{ "success": true, "connectUrl": "https://..." }`
+
+### Integration Statuses
+* `GET /api/clients/:id/integrations/status`
+* Response: `{ "success": true, "clientId": 1, "integrations": { "instagram": { "connected": true, "status": "Connected" } } }`
+
+### On-Demand Metric Refresh
+* `POST /api/marketing/content/:id/refresh-metrics`
+* Response: `{ "success": true, "metrics": { "views": 1200, "likes": 150, "comments": 25 } }`
+
+### Quota Log Schema (`sys_composio_quota_logs`)
+| Column | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | INTEGER PK | Auto-increment |
+| `action_name` | TEXT | e.g. `INSTAGRAM_CREATE_USER_REEL_MEDIA` |
+| `client_id` | INTEGER | Client ID reference |
+| `called_at` | DATETIME | Timestamp |
+| `remaining_quota` | INTEGER | Remaining monthly free calls |
+
+---

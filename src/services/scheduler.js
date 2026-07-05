@@ -6,12 +6,32 @@
 import cron from 'node-cron';
 import db from '../../database.js';
 import { notifyAdmin, notifySMM, notifyVideographer } from './telegram.js';
+import { runAutoPublisher } from './autoPublisher.js';
+import { runMetricSyncWorker } from './metricSyncWorker.js';
+import { runDailyCommentSync } from './dailyCommentSync.js';
 
 /**
  * Initialize all scheduled jobs.
  */
 export function initScheduler() {
   console.log('[SCHEDULER] Initializing cron jobs...');
+
+  // Auto-Publisher worker — runs every minute
+  cron.schedule('* * * * *', () => {
+    runAutoPublisher();
+  });
+
+  // Daily comment ingestion cron — 2 AM daily
+  cron.schedule('0 2 * * *', () => {
+    console.log('[SCHEDULER] Running daily comment sync...');
+    runDailyCommentSync();
+  });
+
+  // 2-Stage metric refresh worker — 6 AM & 6 PM daily
+  cron.schedule('0 */12 * * *', () => {
+    console.log('[SCHEDULER] Running 2-Stage metric refresh worker...');
+    runMetricSyncWorker();
+  });
 
   // Daily calendar sync — midnight
   cron.schedule('0 0 * * *', () => {

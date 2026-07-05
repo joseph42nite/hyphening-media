@@ -536,3 +536,22 @@ If the webhook returns an error, OpenClaw should:
 3. **ALWAYS** include a unique nonce and current timestamp
 4. **NEVER** expose database IDs in Telegram messages to non-admin users
 5. **ALWAYS** get Telegram confirmation before executing write operations
+
+---
+
+## 10. Composio & Google Drive Video Ingestion Protocols
+
+### A. Google Drive URL Parsing & Scheduling
+When a Telegram user sends a Google Drive URL (`https://drive.google.com/file/d/...`), OpenClaw must parse the link, extract the target client name or prompt for client selection, and set up high-quality video auto-publishing.
+
+### B. 2-Step Zero-Hallucination Script Selector Protocol
+1. **Month-Filtered Script Query**:
+   * Run SQL: `GET /api/clients/:id/marketing/scripts?month=YYYY-MM`.
+2. **Deterministic Telegram Buttons**:
+   * Render clickable Telegram keyboard with exact script titles:
+     * `[ 🔘 Script #14: "5 Myths About Teeth Whitening" ]`
+     * `[ ⏩ Skip Script Link ]`
+3. **Strict Binding**:
+   * Tapping a script button posts payload `{ content_id: X, script_id: Y }`, creating the relationship in `marketing_content_script_relation` with zero hallucination.
+
+---

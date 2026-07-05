@@ -85,9 +85,14 @@ function buildConfirmationMessage(eventType, payload) {
     }
   }
 
+  const isReel = (eventType.includes('content') || payload.post_type) && 
+    (String(payload.post_type || '').toLowerCase().includes('reel') || String(payload.post_type || '').toLowerCase().includes('video') || String(payload.link || '').includes('drive.google.com'));
+
+  const trialNote = isReel ? `\n🧪 *Trial Posting Question:* Do you want to post this Reel as a Trial / Test Post first?\n` : '';
+
   return `🤖 *OpenClaw — Confirmation Required*\n\n` +
     `*Action:* ${actionVerb} ${entityName}\n\n` +
-    `📋 *Proposed Changes:*\n${details}\n` +
+    `📋 *Proposed Changes:*\n${details}${trialNote}` +
     `---\nTap a button below to proceed:`;
 }
 
@@ -98,6 +103,28 @@ async function stageAction(eventType, payload) {
   const actionId = generateActionId();
   const message = buildConfirmationMessage(eventType, payload);
 
+  // Check if item is Reel/Video content
+  const isReel = (eventType.includes('content') || payload.post_type) && 
+    (String(payload.post_type || '').toLowerCase().includes('reel') || String(payload.post_type || '').toLowerCase().includes('video') || String(payload.link || '').includes('drive.google.com'));
+
+  // Build inline keyboard with optional Trial button
+  const inlineButtons = [
+    [
+      { text: '✅ Accept & Schedule', callback_data: `openclaw_accept:${actionId}` },
+      { text: '❌ Reject', callback_data: `openclaw_reject:${actionId}` }
+    ]
+  ];
+
+  if (isReel) {
+    inlineButtons.unshift([
+      { text: '🧪 Post as Trial', callback_data: `openclaw_trial:${actionId}` }
+    ]);
+  } else {
+    inlineButtons.push([
+      { text: '✏️ Update', callback_data: `openclaw_update:${actionId}` }
+    ]);
+  }
+
   // Store pending action in DB
   db.prepare(`
     INSERT INTO openclaw_pending_actions (action_id, event_type, payload, status, telegram_chat_id)
@@ -105,17 +132,7 @@ async function stageAction(eventType, payload) {
   `).run(actionId, eventType, JSON.stringify(payload), ADMIN_CHAT_ID || '');
 
   // Send Telegram message with inline keyboard
-  const replyMarkup = {
-    inline_keyboard: [
-      [
-        { text: '✅ Accept', callback_data: `openclaw_accept:${actionId}` },
-        { text: '❌ Reject', callback_data: `openclaw_reject:${actionId}` }
-      ],
-      [
-        { text: '✏️ Update', callback_data: `openclaw_update:${actionId}` }
-      ]
-    ]
-  };
+  const replyMarkup = { inline_keyboard: inlineButtons };
 
   const result = await notifyAdmin(message, replyMarkup);
 
@@ -280,7 +297,12 @@ router.post('/telegram-callback', async (req, res) => {
       }
     }
 
-    if (action === 'openclaw_accept') {
+    if (action === 'openclaw_accept' || action === 'openclaw_trial') {
+      const isTrial = action === 'openclaw_trial';
+      if (isTrial) {
+        payload.is_trial = 1;
+      }
+
       // Execute the action
       const result = executeEvent(eventType, payload);
 
@@ -290,7 +312,8 @@ router.post('/telegram-callback', async (req, res) => {
 
       // Edit the Telegram message to show it was accepted in all admin chats
       const entityName = eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      const updatedText = `✅ *Done!* ${entityName} has been executed.\n\n${result.summary || ''}`;
+      const statusBadge = isTrial ? '🧪 *Executed as Trial Reel!*' : '✅ *Done!*';
+      const updatedText = `${statusBadge} ${entityName} has been scheduled/posted.\n\n${result.summary || ''}`;
       
       for (const msg of sentMessages) {
         if (msg && msg.chat_id && msg.message_id) {
@@ -298,12 +321,12 @@ router.post('/telegram-callback', async (req, res) => {
         }
       }
 
-      await answerCallbackQuery(callback_query.id, '✅ Action executed!');
+      await answerCallbackQuery(callback_query.id, isTrial ? '🧪 Trial Reel scheduled!' : '✅ Action executed!');
 
       logAction({
-        action: 'openclaw_confirmed',
+        action: isTrial ? 'openclaw_trial_scheduled' : 'openclaw_confirmed',
         entityType: 'openclaw',
-        diff: { event_type: eventType, action_id: actionId },
+        diff: { event_type: eventType, action_id: actionId, is_trial: isTrial ? 1 : 0 },
       });
 
     } else if (action === 'openclaw_reject') {
