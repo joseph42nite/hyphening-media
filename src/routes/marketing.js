@@ -7,57 +7,12 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
+import { syncContentToKanbanTask, formatDateStr } from '../services/kanbanSync.js';
+import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 
 const router = Router();
 
 router.use(authenticate);
-
-/**
- * Compute derived metrics for a content row.
- */
-function computeContentMetrics(row) {
-  const { views, likes, comments, shares, saves, avg_watch_time_pct } = row;
-
-  let engagement_rate_pct = null;
-  let save_rate_pct = null;
-  let skip_rate_pct = null;
-  let content_score = null;
-
-  if (views && views > 0) {
-    engagement_rate_pct = ((likes + comments + shares + saves) / views) * 100;
-    save_rate_pct = (saves / views) * 100;
-  }
-
-  if (avg_watch_time_pct !== null && avg_watch_time_pct !== undefined) {
-    skip_rate_pct = 100 - avg_watch_time_pct;
-  }
-
-  if (engagement_rate_pct !== null && save_rate_pct !== null && avg_watch_time_pct !== null) {
-    const rawScore = (engagement_rate_pct * 0.3) + (save_rate_pct * 2.5) + (avg_watch_time_pct * 0.45);
-    content_score = Math.round(rawScore * 10) / 10;
-  }
-
-  return {
-    engagement_rate_pct: engagement_rate_pct !== null ? Math.round(engagement_rate_pct * 100) / 100 : null,
-    save_rate_pct: save_rate_pct !== null ? Math.round(save_rate_pct * 100) / 100 : null,
-    skip_rate_pct: skip_rate_pct !== null ? Math.round(skip_rate_pct * 100) / 100 : null,
-    content_score,
-  };
-}
-
-/**
- * Compute derived metrics for an ad campaign row.
- */
-function computeAdMetrics(row) {
-  const { impressions, clicks, total_ad_spend_inr, leads, revenue_generated } = row;
-
-  return {
-    ctr_pct: impressions > 0 ? Math.round((clicks / impressions) * 100 * 100) / 100 : null,
-    cpc_inr: clicks > 0 ? Math.round(total_ad_spend_inr / clicks) : null,
-    cpl_inr: leads > 0 ? Math.round(total_ad_spend_inr / leads) : null,
-    roas: total_ad_spend_inr > 0 ? Math.round((revenue_generated / total_ad_spend_inr) * 100) / 100 : null,
-  };
-}
 
 // =========================================
 // CONTENT TRACKER
@@ -113,95 +68,7 @@ router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manage
  * POST /api/clients/:id/marketing/content
  * Create draft content plan.
  */
-/**
- * Automatically creates, updates, or transitions a Kanban task linked to a content row.
- */
-function formatDateStr(dateStr) {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  const [year, month, day] = parts;
-  const monthName = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ][parseInt(month, 10) - 1];
-  return `${parseInt(day, 10)} ${monthName} ${year}`;
-}
 
-function syncContentToKanbanTask(contentId, db) {
-  try {
-    const content = db.prepare(`
-      SELECT t.*, r.script_id, s.title AS script_title
-      FROM marketing_content_tracker t
-      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
-      LEFT JOIN marketing_scripts s ON r.script_id = s.id
-      WHERE t.id = ?
-    `).get(contentId);
-
-    if (!content) return;
-
-    const pendingStatuses = ['Draft', 'Pending Client Approval', 'Client Approved', 'Pending'];
-    const isPending = pendingStatuses.includes(content.status);
-    const isPosted = content.status === 'Posted';
-
-    if (isPending) {
-      const taskTitle = `Post: ${content.title || ('Content Plan - ' + formatDateStr(content.date))} (${content.platform || 'social'})`;
-      const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
-      const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
-      
-      const isVideo = ['reel', 'youtube', 'short'].includes((content.post_type || '').toLowerCase());
-      const taskType = isVideo ? 'video' : 'social';
-      
-      let assignedTo = content.assigned_to || null;
-      if (!assignedTo && isVideo) {
-        const videoEditor = db.prepare("SELECT id FROM users WHERE role = 'ops_video_editor' AND is_active = 1 LIMIT 1").get();
-        if (videoEditor) {
-          assignedTo = videoEditor.id;
-        }
-      }
-
-      if (content.kanban_task_id) {
-        const taskExists = db.prepare('SELECT id FROM kanban_tasks WHERE id = ?').get(content.kanban_task_id);
-        if (taskExists) {
-          db.prepare(`
-            UPDATE kanban_tasks 
-            SET title = ?, description = ?, client_id = ?, due_date = ?, task_type = ?, assigned_to = ?, updated_at = datetime('now')
-            WHERE id = ?
-          `).run(taskTitle, taskDesc, content.client_id, content.date || null, taskType, assignedTo, content.kanban_task_id);
-          return;
-        }
-      }
-
-      // Create task (default priority 'medium', status 'todo')
-      const result = db.prepare(`
-        INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, assigned_to, status, due_date)
-        VALUES (?, ?, ?, 'medium', ?, ?, 'todo', ?)
-      `).run(content.client_id, taskTitle, taskDesc, taskType, assignedTo, content.date || null);
-
-      db.prepare(`
-        UPDATE marketing_content_tracker 
-        SET kanban_task_id = ? 
-        WHERE id = ?
-      `).run(result.lastInsertRowid, contentId);
-
-    } else if (isPosted) {
-      if (content.kanban_task_id) {
-        db.prepare(`
-          UPDATE kanban_tasks 
-          SET status = 'delivered', completed_at = datetime('now'), updated_at = datetime('now')
-          WHERE id = ? AND status != 'delivered'
-        `).run(content.kanban_task_id);
-      }
-    } else if (content.status === 'Client Rejected') {
-      if (content.kanban_task_id) {
-        db.prepare('DELETE FROM kanban_tasks WHERE id = ?').run(content.kanban_task_id);
-        db.prepare('UPDATE marketing_content_tracker SET kanban_task_id = NULL WHERE id = ?').run(contentId);
-      }
-    }
-  } catch (err) {
-    console.error('[MARKETING-SYNC] Error syncing content to task:', err);
-  }
-}
 
 router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
@@ -476,6 +343,8 @@ router.post('/:id/marketing/content/:contentId/submit-approval', authorize('admi
 
     db.prepare('UPDATE marketing_content_tracker SET status = ?, updated_at = ? WHERE id = ?')
       .run('Pending Client Approval', new Date().toISOString(), req.params.contentId);
+
+    syncContentToKanbanTask(req.params.contentId, db);
 
     logAction({
       actorId: req.user.id,

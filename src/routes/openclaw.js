@@ -10,6 +10,8 @@ import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
 import { notifyAdmin, sendMessage } from '../services/telegram.js';
+import { syncContentToKanbanTask } from '../services/kanbanSync.js';
+import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 
 const router = Router();
 
@@ -500,14 +502,9 @@ function handleCreateContent(payload) {
   const shares = payload.shares || 0, saves = payload.saves || 0;
   const awt = payload.avg_watch_time_pct !== undefined ? payload.avg_watch_time_pct : null;
 
-  let engagement_rate_pct = null, save_rate_pct = null, content_score = null;
-  if (views > 0) {
-    engagement_rate_pct = Math.round(((likes + comments + shares + saves) / views) * 100 * 100) / 100;
-    save_rate_pct = Math.round((saves / views) * 100 * 100) / 100;
-  }
-  if (engagement_rate_pct !== null && save_rate_pct !== null && awt !== null) {
-    content_score = Math.round(((engagement_rate_pct * 0.3) + (save_rate_pct * 2.5) + (awt * 0.45)) * 10) / 10;
-  }
+  const { engagement_rate_pct, save_rate_pct, content_score } = computeContentMetrics({
+    views, likes, comments, shares, saves, avg_watch_time_pct: awt
+  });
 
   const result = db.prepare(`
     INSERT INTO marketing_content_tracker (
@@ -547,6 +544,8 @@ function handleCreateContent(payload) {
     db.prepare('INSERT INTO marketing_content_script_relation (content_id, script_id) VALUES (?, ?)')
       .run(result.lastInsertRowid, payload.script_id);
   }
+
+  syncContentToKanbanTask(result.lastInsertRowid, db);
 
   logAction({ action: 'create', entityType: 'content', entityId: result.lastInsertRowid, diff: { title: finalTitle, source: 'openclaw' } });
   return { success: true, summary: `Content #${result.lastInsertRowid} "${finalTitle}" created for client ${payload.client_id}.` };
@@ -605,17 +604,8 @@ function handleUpdateContent(payload) {
   if (Object.keys(updates).length > 0) {
     // Recompute metrics
     const merged = { ...content, ...updates };
-    const v = merged.views || 0, l = merged.likes || 0, c = merged.comments || 0;
-    const sh = merged.shares || 0, sa = merged.saves || 0;
-    const awt = merged.avg_watch_time_pct;
-
-    if (v > 0) {
-      updates.engagement_rate_pct = Math.round(((l + c + sh + sa) / v) * 100 * 100) / 100;
-      updates.save_rate_pct = Math.round((sa / v) * 100 * 100) / 100;
-    }
-    if (updates.engagement_rate_pct !== undefined && updates.save_rate_pct !== undefined && awt !== null && awt !== undefined) {
-      updates.content_score = Math.round(((updates.engagement_rate_pct * 0.3) + (updates.save_rate_pct * 2.5) + (awt * 0.45)) * 10) / 10;
-    }
+    const computed = computeContentMetrics(merged);
+    Object.assign(updates, computed);
 
     updates.updated_at = new Date().toISOString();
     const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
@@ -632,6 +622,8 @@ function handleUpdateContent(payload) {
     }
   }
 
+  syncContentToKanbanTask(targetContentId, db);
+
   logAction({ action: 'update', entityType: 'content', entityId: targetContentId, diff: { ...updates, source: 'openclaw' } });
   return { success: true, summary: `Content #${targetContentId} (found via ${identifierUsed}) updated.` };
 }
@@ -639,14 +631,13 @@ function handleUpdateContent(payload) {
 function handleCreateAdCampaign(payload) {
   if (!payload?.client_id) return { success: false, summary: 'client_id is required' };
 
-  const imp = payload.impressions || 0, clk = payload.clicks || 0;
-  const spend = payload.total_ad_spend_inr || 0, leads = payload.leads || 0;
-  const rev = payload.revenue_generated || 0;
-
-  const ctr_pct = imp > 0 ? Math.round((clk / imp) * 100 * 100) / 100 : null;
-  const cpc_inr = clk > 0 ? Math.round(spend / clk) : null;
-  const cpl_inr = leads > 0 ? Math.round(spend / leads) : null;
-  const roas = spend > 0 ? Math.round((rev / spend) * 100) / 100 : null;
+  const computed = computeAdMetrics({
+    impressions: payload.impressions || 0,
+    clicks: payload.clicks || 0,
+    total_ad_spend_inr: payload.total_ad_spend_inr || 0,
+    leads: payload.leads || 0,
+    revenue_generated: payload.revenue_generated || 0,
+  });
 
   const result = db.prepare(`
     INSERT INTO marketing_ad_campaigns (client_id, platform, ad_campaign_name, leads, total_ad_spend_inr,
@@ -654,7 +645,8 @@ function handleCreateAdCampaign(payload) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payload.client_id, payload.platform || null, payload.ad_campaign_name || null,
-    leads, spend, imp, clk, ctr_pct, cpc_inr, cpl_inr, rev, roas
+    payload.leads || 0, payload.total_ad_spend_inr || 0, payload.impressions || 0, payload.clicks || 0,
+    computed.ctr_pct, computed.cpc_inr, computed.cpl_inr, payload.revenue_generated || 0, computed.roas
   );
 
   logAction({ action: 'create', entityType: 'ad_campaign', entityId: result.lastInsertRowid, diff: { ad_campaign_name: payload.ad_campaign_name, source: 'openclaw' } });

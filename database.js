@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { syncContentToKanbanTask, formatDateStr } from './src/services/kanbanSync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,50 +112,9 @@ function syncExistingContentTracker(dbInstance) {
 
     if (unsynced.length === 0) return;
 
-    console.log(`[DB] Found ${unsynced.length} unsynced content tracker entries. Syncing to Kanban board...`);
-
-    const insertTask = dbInstance.prepare(`
-      INSERT INTO kanban_tasks (client_id, title, description, priority, task_type, status, due_date, completed_at)
-      VALUES (?, ?, ?, 'medium', 'social', ?, ?, ?)
-    `);
-
-    const updateContent = dbInstance.prepare(`
-      UPDATE marketing_content_tracker 
-      SET kanban_task_id = ? 
-      WHERE id = ?
-    `);
-
     const runSync = dbInstance.transaction(() => {
       for (const content of unsynced) {
-        // If content is Client Rejected, it shouldn't show on board, keep kanban_task_id null
-        if (content.status === 'Client Rejected') continue;
-
-        const pendingStatuses = ['Draft', 'Pending Client Approval', 'Client Approved', 'Pending'];
-        const isPending = pendingStatuses.includes(content.status);
-        const isPosted = content.status === 'Posted';
-
-        const taskTitle = `Post: ${content.title || ('Content Plan - ' + formatDateStr(content.date))} (${content.platform || 'social'})`;
-        const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
-        const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
-
-        let status = 'todo'; // Pending content maps to todo
-        let completedAt = null;
-
-        if (isPosted) {
-          status = 'delivered';
-          completedAt = content.date ? content.date + 'T12:00:00.000Z' : new Date().toISOString();
-        }
-
-        const result = insertTask.run(
-          content.client_id,
-          taskTitle,
-          taskDesc,
-          status,
-          content.date || null,
-          completedAt
-        );
-
-        updateContent.run(result.lastInsertRowid, content.id);
+        syncContentToKanbanTask(content.id, dbInstance);
       }
     });
 
@@ -163,18 +123,6 @@ function syncExistingContentTracker(dbInstance) {
   } catch (err) {
     console.error('[DB] Error syncing existing content tracker entries:', err);
   }
-}
-
-function formatDateStr(dateStr) {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  const [year, month, day] = parts;
-  const monthName = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ][parseInt(month, 10) - 1];
-  return `${parseInt(day, 10)} ${monthName} ${year}`;
 }
 
 /**

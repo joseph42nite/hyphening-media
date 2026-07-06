@@ -9,6 +9,7 @@ import db from '../../database.js';
 import { portalLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
 import { notifyAdmin } from '../services/telegram.js';
+import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 
 const router = Router();
 
@@ -356,6 +357,8 @@ router.post('/:token/content-plan/:contentId/approve', portalAuth, (req, res) =>
       WHERE id = ?
     `).run(new Date().toISOString(), req.params.contentId);
 
+    syncContentToKanbanTask(req.params.contentId, db);
+
     logAction({
       actorId: null,
       actorEmail: req.portalClient.contact_email,
@@ -392,6 +395,8 @@ router.post('/:token/content-plan/:contentId/reject', portalAuth, (req, res) => 
       SET client_approved = 0, status = 'Client Rejected', client_comments = ?, updated_at = ?
       WHERE id = ?
     `).run(comment, new Date().toISOString(), req.params.contentId);
+
+    syncContentToKanbanTask(req.params.contentId, db);
 
     logAction({
       actorId: null,
