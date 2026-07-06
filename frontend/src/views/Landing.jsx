@@ -1180,18 +1180,8 @@ function Landing() {
       </section>
 
       {/* ===== Sakura Lady Image ===== */}
-      <div 
-        className="sakura-image-wrapper" 
-        style={{ 
-          width: '100%', 
-          maxWidth: '1200px', 
-          margin: '60px auto', 
-          padding: '0 20px', 
-          display: 'flex', 
-          justifyContent: 'center'
-        }}
-      >
-        <img src={sakuraLadyImg} alt="Sakura Lady" style={{ maxWidth: '100%', height: 'auto', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+      <div className="sakura-image-wrapper">
+        <img src={sakuraLadyImg} alt="Sakura Lady" />
       </div>
 
       {/* ===== Client Ticker ===== */}
