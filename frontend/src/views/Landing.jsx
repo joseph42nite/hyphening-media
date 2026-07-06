@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Zap, Film, BarChart3, PenTool, Globe, Users, Play, Sparkles, TrendingUp, Menu, X, Code, Smartphone, Megaphone, Mouse, Sword, Bomb } from 'lucide-react';
 import { EncryptedText } from "@/components/ui/encrypted-text";
+import japaneseImg from '../assets/japenese-image.webp';
 import sakuraLadyImg from '../assets/sakura-lady.webp';
 import logoImg from '../assets/logo.png';
 
@@ -1139,6 +1140,23 @@ function Landing() {
         ))}
       </div>
 
+      {/* ===== Japanese Image (Our Story) ===== */}
+      <div 
+        id="our-story" 
+        className="japanese-image-wrapper" 
+        style={{ 
+          width: '100%', 
+          maxWidth: '1200px', 
+          margin: '60px auto', 
+          padding: '0 20px', 
+          display: 'flex', 
+          justifyContent: 'center',
+          scrollMarginTop: '120px'
+        }}
+      >
+        <img src={japaneseImg} alt="Japanese Art" style={{ maxWidth: '100%', height: 'auto', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+      </div>
+
       {/* ===== Capabilities ===== */}
       <section className="landing-section" id="capabilities">
         <div className="section-label"><Zap size={12} /> What We Do</div>
@@ -1161,18 +1179,16 @@ function Landing() {
         </div>
       </section>
 
-      {/* ===== Japanese Art / Our Story Image ===== */}
+      {/* ===== Sakura Lady Image ===== */}
       <div 
-        id="our-story" 
-        className="japanese-image-wrapper" 
+        className="sakura-image-wrapper" 
         style={{ 
           width: '100%', 
           maxWidth: '1200px', 
           margin: '60px auto', 
           padding: '0 20px', 
           display: 'flex', 
-          justifyContent: 'center',
-          scrollMarginTop: '120px'
+          justifyContent: 'center'
         }}
       >
         <img src={sakuraLadyImg} alt="Sakura Lady" style={{ maxWidth: '100%', height: 'auto', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
