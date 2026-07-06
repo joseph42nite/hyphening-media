@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, ChevronRight, Menu, X } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import logoImg from '../assets/logo.png';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -213,14 +214,7 @@ function BlogListing() {
       </section>
 
       {/* Footer */}
-      <footer className="blog-footer">
-        <div className="blog-footer-inner">
-          <Link to="/" style={{ display: 'flex', alignItems: 'center' }}>
-            <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto', filter: 'invert(1)' }} />
-          </Link>
-          <p>© {new Date().getFullYear()} HYPHENING MEDIA. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
@@ -401,14 +395,7 @@ function BlogArticle() {
       </article>
 
       {/* Footer */}
-      <footer className="blog-footer">
-        <div className="blog-footer-inner">
-          <Link to="/" style={{ display: 'flex', alignItems: 'center' }}>
-            <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto', filter: 'invert(1)' }} />
-          </Link>
-          <p>© {new Date().getFullYear()} HYPHENING MEDIA. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

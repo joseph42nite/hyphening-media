@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import { ArrowRight, Zap, Film, BarChart3, PenTool, Globe, Users, Play, Sparkles, TrendingUp, Menu, X, Code, Smartphone, Megaphone, Mouse, Sword, Bomb } from 'lucide-react';
 import { EncryptedText } from "@/components/ui/encrypted-text";
 import japaneseImg from '../assets/japenese-image.webp';
@@ -1388,43 +1389,7 @@ function Landing() {
         )}
       </div>
 
-      <footer className="landing-footer-detailed">
-        <div className="footer-grid">
-          <div className="footer-col brand-col">
-            <span className="footer-logo">
-              <img src={logoImg} alt="Hyphening Media" style={{ height: '120px', width: 'auto', marginTop: '-15px', marginBottom: '-15px', filter: 'invert(1)' }} />
-            </span>
-            <p className="footer-desc">
-              We design and scale creative operations for forward-thinking brands. 
-              From content strategy to high-performance web development.
-            </p>
-          </div>
-          
-          <div className="footer-col links-col">
-            <h4>Services</h4>
-            <a href="#capabilities" onClick={(e) => { e.preventDefault(); document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' }); }}>What We Do</a>
-            <a href="#portfolio" onClick={(e) => { e.preventDefault(); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }}>Portfolio</a>
-            <a href="mailto:hello@hyphening.com">Contact Us</a>
-          </div>
-          
-          <div className="footer-col social-col">
-            <h4>Follow Us</h4>
-            <div className="social-links">
-              <a href="https://instagram.com/hyphening" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                <InstagramIcon size={18} /> Instagram
-              </a>
-              <a href="https://linkedin.com/company/hyphening" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
-                <LinkedinIcon size={18} /> LinkedIn
-              </a>
-            </div>
-          </div>
-        </div>
-        
-        <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} HYPHENING MEDIA. All rights reserved.</span>
-          <span>Creative Operations Agency</span>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
