@@ -1234,7 +1234,7 @@ function Landing() {
   </div>
 
       {/* ===== FAQ Section (SEO & AEO Optimized) ===== */}
-      <section className="landing-section" id="faq" style={{ background: '#ffffff', borderTop: '3px solid #000000', borderBottom: '3px solid #000000', padding: '80px 24px', scrollMarginTop: '120px' }}>
+      <section className="landing-section" id="faq" style={{ scrollMarginTop: '120px' }}>
         <div className="section-label"><Users size={12} style={{ marginRight: '6px' }} /> FAQ</div>
         <h2 className="section-heading">Frequently Asked Questions</h2>
         
