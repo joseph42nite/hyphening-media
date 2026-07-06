@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, ChevronRight, Menu, X } from 'lucide-react';
+import Navbar from '../components/Navbar';
 import logoImg from '../assets/logo.png';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -119,38 +120,7 @@ function BlogListing() {
   return (
     <div className="landing-root">
       {/* Navigation */}
-      <nav className="landing-nav">
-        <Link to="/" className="landing-nav-logo" style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
-          <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
-        </Link>
-        <div className="landing-nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/blog" style={{ color: '#000', borderBottom: '2px solid #000' }}>Blog</Link>
-          <a href="/#contact" onClick={(e) => { e.preventDefault(); navigate('/'); setTimeout(() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }), 100); }}>Contact</a>
-        </div>
-        <button className="landing-nav-hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
-          <Menu size={20} strokeWidth={3} />
-        </button>
-      </nav>
-
-      {/* Mobile drawer */}
-      <div className={`landing-drawer ${menuOpen ? 'open' : ''}`}>
-        <div className="landing-drawer-overlay" onClick={() => setMenuOpen(false)} />
-        <div className="landing-drawer-content">
-          <div className="landing-drawer-header">
-            <Link to="/" className="landing-nav-logo" style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
-              <img src={logoImg} alt="Hyphening Media" style={{ height: '70px', width: 'auto' }} />
-            </Link>
-            <button className="landing-nav-hamburger close-btn" onClick={() => setMenuOpen(false)}>
-              <X size={20} strokeWidth={3} />
-            </button>
-          </div>
-          <div className="landing-drawer-links">
-            <Link to="/" onClick={() => setMenuOpen(false)}>Home</Link>
-            <Link to="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
-          </div>
-        </div>
-      </div>
+      <Navbar />
 
       {/* SEO Meta */}
       <title>Blog — Hyphening Media | Social Media Marketing Insights</title>
@@ -350,38 +320,7 @@ function BlogArticle() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
 
       {/* Navigation */}
-      <nav className="landing-nav">
-        <Link to="/" className="landing-nav-logo" style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
-          <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
-        </Link>
-        <div className="landing-nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/blog">Blog</Link>
-          <a href="/#contact" onClick={(e) => { e.preventDefault(); navigate('/'); setTimeout(() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }), 100); }}>Contact</a>
-        </div>
-        <button className="landing-nav-hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
-          <Menu size={20} strokeWidth={3} />
-        </button>
-      </nav>
-
-      {/* Mobile drawer */}
-      <div className={`landing-drawer ${menuOpen ? 'open' : ''}`}>
-        <div className="landing-drawer-overlay" onClick={() => setMenuOpen(false)} />
-        <div className="landing-drawer-content">
-          <div className="landing-drawer-header">
-            <Link to="/" className="landing-nav-logo" style={{ display: 'flex', alignItems: 'center', height: '40px' }}>
-              <img src={logoImg} alt="Hyphening Media" style={{ height: '70px', width: 'auto' }} />
-            </Link>
-            <button className="landing-nav-hamburger close-btn" onClick={() => setMenuOpen(false)}>
-              <X size={20} strokeWidth={3} />
-            </button>
-          </div>
-          <div className="landing-drawer-links">
-            <Link to="/" onClick={() => setMenuOpen(false)}>Home</Link>
-            <Link to="/blog" onClick={() => setMenuOpen(false)}>Blog</Link>
-          </div>
-        </div>
-      </div>
+      <Navbar />
 
       {/* Article Hero */}
       {post.cover_image_url && (

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 import { ArrowRight, Zap, Film, BarChart3, PenTool, Globe, Users, Play, Sparkles, TrendingUp, Menu, X, Code, Smartphone, Megaphone, Mouse, Sword, Bomb } from 'lucide-react';
 import { EncryptedText } from "@/components/ui/encrypted-text";
 import japaneseImg from '../assets/japenese-image.webp';
@@ -867,6 +868,8 @@ function Landing() {
     setSubmitted(true);
   };
 
+  const location = useLocation();
+
   // Remove body padding and #root constraints on mount
   useEffect(() => {
     const body = document.body;
@@ -881,77 +884,20 @@ function Landing() {
     };
   }, []);
 
+  // Handle hash scrolling on mount/location change
+  useEffect(() => {
+    if (location.hash) {
+      const targetId = location.hash.substring(1);
+      setTimeout(() => {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    }
+  }, [location]);
+
   return (
     <div className="landing-root">
       {/* ===== Fixed Navigation ===== */}
-      <nav className="landing-nav">
-        <span
-          className="landing-nav-logo"
-          onClick={(e) => {
-            e.preventDefault();
-            heroRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }}
-          style={{ display: 'flex', alignItems: 'center', height: '40px', cursor: 'pointer' }}
-        >
-          <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
-        </span>
-        
-        {/* Middle Links (Visible on desktop) */}
-        <div className="landing-nav-links">
-          <a href="#our-story" onClick={(e) => { e.preventDefault(); document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' }); }}>Our story</a>
-          <a href="#capabilities" onClick={(e) => { e.preventDefault(); document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' }); }}>Services</a>
-          <a href="#portfolio" onClick={(e) => { e.preventDefault(); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }}>Portfolio</a>
-          <a href="#faq" onClick={(e) => { e.preventDefault(); document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }); }}>FAQ</a>
-          <a href="#contact" onClick={(e) => { e.preventDefault(); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Contact</a>
-          <a href="/blog" onClick={(e) => { e.preventDefault(); navigate('/blog'); }}>Blog</a>
-        </div>
-
-        {/* Hamburger button on the right */}
-        <button 
-          className="landing-nav-hamburger" 
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle menu"
-        >
-          <Menu size={20} strokeWidth={3} />
-        </button>
-      </nav>
-
-      {/* ===== Mobile/Drawer Dropdown Menu ===== */}
-      <div className={`landing-drawer ${menuOpen ? 'open' : ''}`}>
-        <div className="landing-drawer-overlay" onClick={() => setMenuOpen(false)} />
-        <div className="landing-drawer-content">
-          <div className="landing-drawer-header">
-            <span
-              className="landing-nav-logo"
-              onClick={(e) => {
-                e.preventDefault();
-                setMenuOpen(false);
-                heroRef.current?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              style={{ display: 'flex', alignItems: 'center', height: '40px', cursor: 'pointer' }}
-            >
-              <img src={logoImg} alt="Hyphening Media" style={{ height: '70px', width: 'auto' }} />
-            </span>
-            <button className="landing-nav-hamburger close-btn" onClick={() => setMenuOpen(false)}>
-              <X size={20} strokeWidth={3} />
-            </button>
-          </div>
-          <div className="landing-drawer-links">
-            <a href="#our-story" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('our-story')?.scrollIntoView({ behavior: 'smooth' }); }}>Our story</a>
-            <a href="#capabilities" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' }); }}>Services</a>
-            <a href="#portfolio" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }}>Portfolio</a>
-            <a href="#faq" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }); }}>FAQ</a>
-            <a href="#contact" onClick={(e) => { e.preventDefault(); setMenuOpen(false); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Contact</a>
-            <a href="/blog" onClick={(e) => { e.preventDefault(); setMenuOpen(false); navigate('/blog'); }}>Blog</a>
-            
-            <div className="landing-drawer-divider" />
-            
-            <button className="btn btn-primary" onClick={() => { setMenuOpen(false); navigate('/login'); }} style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
-              Sign In <ArrowRight size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
+      <Navbar />
 
       {/* ===== Hero Section ===== */}
       <section className={`landing-hero ${gameMode ? "game-active" : ""}`} ref={heroRef}>
