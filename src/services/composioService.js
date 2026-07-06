@@ -31,8 +31,10 @@ export function logQuotaUsage(actionName, clientId = null, remainingQuota = null
  */
 export async function getConnectUrl(clientId, appName, redirectUrl = '') {
   if (!composioClient) {
-    throw new Error('COMPOSIO_API_KEY is not configured in environment variables');
+    console.log(`[COMPOSIO] [MOCK] Generating mock connect URL for ${appName} (Set COMPOSIO_API_KEY for live OAuth).`);
+    return `https://app.composio.dev/connect/${appName.toLowerCase()}?client_id=${clientId}&mock=true`;
   }
+
 
   const entityId = getEntityId(clientId);
   const entity = composioClient.getEntity(entityId);

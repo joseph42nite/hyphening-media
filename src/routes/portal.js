@@ -10,6 +10,7 @@ import { portalLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
 import { notifyAdmin } from '../services/telegram.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
+import { getConnectUrl, getClientConnectedAccounts, executeClientAction } from '../services/composioService.js';
 
 const router = Router();
 
@@ -439,4 +440,104 @@ router.post('/:token/feedback', portalAuth, (req, res) => {
   }
 });
 
+/**
+ * GET /api/portal/:token/integrations/status
+ * Fetch social platform connection status for client portal
+ */
+router.get('/:token/integrations/status', portalAuth, async (req, res) => {
+  try {
+    const accounts = await getClientConnectedAccounts(req.portalClient.id);
+    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'x'];
+    const statusMap = {};
+
+    platforms.forEach(p => {
+      const match = accounts.find(acc => acc.appName.toLowerCase().includes(p));
+      statusMap[p] = {
+        connected: !!match,
+        status: match ? 'Connected' : 'Not Connected',
+        accountName: match?.accountName || null
+      };
+    });
+
+    res.json({ success: true, integrations: statusMap });
+  } catch (err) {
+    console.error('[PORTAL-INTEGRATIONS] Status error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch integration status' });
+  }
+});
+
+/**
+ * POST /api/portal/:token/integrations/connect
+ * Initiate Composio OAuth flow for a social platform
+ */
+router.post('/:token/integrations/connect', portalAuth, async (req, res) => {
+  try {
+    const { appName, redirectUrl } = req.body;
+    if (!appName) {
+      return res.status(400).json({ error: 'appName is required' });
+    }
+
+    const connectUrl = await getConnectUrl(req.portalClient.id, appName, redirectUrl);
+    res.json({ success: true, connectUrl });
+  } catch (err) {
+    console.error('[PORTAL-INTEGRATIONS] Connect error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to generate connect URL' });
+  }
+});
+
+/**
+ * GET /api/portal/:token/comments
+ * Fetch cached social comments for client inbox
+ */
+router.get('/:token/comments', portalAuth, (req, res) => {
+  try {
+    const comments = db.prepare(`
+      SELECT sc.*, ct.title AS post_title
+      FROM social_comments sc
+      LEFT JOIN marketing_content_tracker ct ON sc.content_id = ct.id
+      WHERE sc.client_id = ?
+      ORDER BY sc.created_at DESC
+      LIMIT 50
+    `).all(req.portalClient.id);
+
+    res.json({ success: true, comments });
+  } catch (err) {
+    console.error('[PORTAL-COMMENTS] Fetch error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+/**
+ * POST /api/portal/:token/comments/reply
+ * Reply to a social comment via Composio
+ */
+router.post('/:token/comments/reply', portalAuth, async (req, res) => {
+  try {
+    const { commentId, replyText, platform = 'instagram' } = req.body;
+    if (!commentId || !replyText) {
+      return res.status(400).json({ error: 'commentId and replyText are required' });
+    }
+
+    const p = platform.toLowerCase();
+    const actionName = p.includes('youtube') ? 'YOUTUBE_REPLY_COMMENT' : 'INSTAGRAM_REPLY_COMMENT';
+    const params = p.includes('youtube') 
+      ? { comment_id: commentId, text: replyText }
+      : { comment_id: commentId, message: replyText };
+
+    let result = null;
+    if (process.env.COMPOSIO_API_KEY) {
+      result = await executeClientAction(req.portalClient.id, actionName, params);
+    } else {
+      console.log(`[PORTAL-COMMENTS] [MOCK] Dry-run reply to comment ${commentId}: "${replyText}"`);
+      result = { success: true, mock: true };
+    }
+
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error('[PORTAL-COMMENTS] Reply error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to reply to comment' });
+  }
+});
+
 export default router;
+

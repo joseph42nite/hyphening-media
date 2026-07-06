@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
-  TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink
+  TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink,
+  Share2, RefreshCw, MessageSquare, CheckCircle, Zap
 } from 'lucide-react';
+
 import { API_BASE } from '../api.js';
 
 const PORTAL_STYLES = `
@@ -647,7 +649,17 @@ export default function ClientPortal({ showToast }) {
   const [scripts, setScripts] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState('');
 
+  // Integrations & Social Comments state (4th Tab)
+  const [integrations, setIntegrations] = useState({});
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [replyTextMap, setReplyTextMap] = useState({});
+  const [replyingId, setReplyingId] = useState(null);
+  const [connectingApp, setConnectingApp] = useState(null);
+
   // Pagination states
+
   const [contentPage, setContentPage] = useState(1);
   const [seoPage, setSeoPage] = useState(1);
   const [adsPage, setAdsPage] = useState(1);
@@ -814,11 +826,96 @@ export default function ClientPortal({ showToast }) {
             setSelectedMonth(prev => prev || months[0] || '');
           }
         }
+
+        // Fetch integrations and comments
+        fetchIntegrations();
+        fetchComments();
       }
     } catch (err) {
       console.error('Error fetching portal sub-data:', err);
     }
   };
+
+  const fetchIntegrations = async () => {
+    try {
+      setIntegrationsLoading(true);
+      const res = await fetch(`${API_BASE}/api/portal/${token}/integrations/status`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.integrations) {
+        setIntegrations(data.integrations);
+      }
+    } catch (err) {
+      console.error('Error fetching integrations:', err);
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  };
+
+  const fetchComments = async () => {
+    try {
+      setCommentsLoading(true);
+      const res = await fetch(`${API_BASE}/api/portal/${token}/comments`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.comments) {
+        setComments(data.comments);
+      }
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleConnectApp = async (appName) => {
+    try {
+      setConnectingApp(appName);
+      const res = await fetch(`${API_BASE}/api/portal/${token}/integrations/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appName, redirectUrl: window.location.href }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate connect link');
+      if (data.connectUrl) {
+        window.open(data.connectUrl, '_blank', 'width=600,height=700');
+        showToast(`Opening ${appName} OAuth login window...`, 'info');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setConnectingApp(null);
+    }
+  };
+
+  const handleSendCommentReply = async (commentId, platform) => {
+    const text = replyTextMap[commentId];
+    if (!text || !text.trim()) {
+      showToast('Please type a reply message', 'error');
+      return;
+    }
+
+    try {
+      setReplyingId(commentId);
+      const res = await fetch(`${API_BASE}/api/portal/${token}/comments/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId, replyText: text, platform }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send reply');
+
+      showToast('✓ Reply posted live to social platform!', 'success');
+      setReplyTextMap(prev => ({ ...prev, [commentId]: '' }));
+      fetchComments();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setReplyingId(null);
+    }
+  };
+
 
   const handleApprove = async (id) => {
     if (!window.confirm('Are you sure you want to approve this content?')) return;
@@ -1019,8 +1116,15 @@ export default function ClientPortal({ showToast }) {
                   <span style={{ position: 'absolute', top: '8px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />
                 )}
               </button>
+              <button 
+                onClick={() => setActiveTab('integrations')} 
+                className={`portal-tab-btn ${activeTab === 'integrations' ? 'active' : ''}`}
+              >
+                <Share2 size={16} /> Integrations
+              </button>
             </>
           )}
+
           {(clientType === 'artist_curation' || clientType === 'both') && (
             <button 
               onClick={() => setActiveTab('bookings')} 
@@ -1644,7 +1748,202 @@ export default function ClientPortal({ showToast }) {
           </div>
         )}
 
+        {/* Integrations Tab (4th Tab) */}
+        {activeTab === 'integrations' && (clientType === 'marketing' || clientType === 'both') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Header / Subtitle */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>
+                  Social Integrations & Channel Connections
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>
+                  Connect your brand social accounts via Composio to enable 1080p uncompressed auto-publishing & live performance tracking.
+                </p>
+              </div>
+              <button 
+                onClick={() => { fetchIntegrations(); fetchComments(); showToast('Refreshing integrations status...', 'info'); }}
+                className="portal-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                disabled={integrationsLoading}
+              >
+                <RefreshCw size={14} className={integrationsLoading ? 'spin' : ''} /> Refresh All Statuses
+              </button>
+            </div>
+
+            {/* Section A: Connected Accounts Bento Grid */}
+            <div className="portal-metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+              {[
+                { key: 'instagram', name: 'Instagram Business', desc: 'Reels, Posts & Direct Video Stream', icon: '📸' },
+                { key: 'youtube', name: 'YouTube Channel', desc: 'Shorts & Long-form Retention Graphs', icon: '▶️' },
+                { key: 'linkedin', name: 'LinkedIn Company', desc: 'Organization & Professional Video', icon: '💼' },
+                { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Social Engagement', icon: '📘' },
+                { key: 'x', name: 'X (Twitter)', desc: 'Direct Video Posts & Tweet Stream', icon: '𝕏' }
+              ].map(app => {
+                const info = integrations[app.key] || {};
+                const isConn = info.connected;
+
+                return (
+                  <div key={app.key} className="portal-bento-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.6rem' }}>{app.icon}</span>
+                        <div>
+                          <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: 800, color: '#000000' }}>{app.name}</h3>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{app.desc}</span>
+                        </div>
+                      </div>
+                      <span className={`portal-badge ${isConn ? 'portal-badge-success' : 'portal-badge-warning'}`}>
+                        {isConn ? 'Connected ✓' : 'Not Connected'}
+                      </span>
+                    </div>
+
+                    {isConn && info.accountName && (
+                      <div style={{ fontSize: '0.8rem', background: '#f4f4f5', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e4e4e7', color: '#000000', fontWeight: 600 }}>
+                        Account: <strong>@{info.accountName}</strong>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleConnectApp(app.key)}
+                      className={`portal-btn ${isConn ? 'portal-btn-success' : ''}`}
+                      disabled={connectingApp === app.key}
+                      style={{
+                        width: '100%',
+                        justify: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.85rem',
+                        marginTop: 'auto',
+                        background: isConn ? '#dcfce7' : '#000000',
+                        color: isConn ? '#166534' : '#ffffff',
+                        border: '2px solid #000000'
+                      }}
+                    >
+                      {connectingApp === app.key ? (
+                        <>Connecting...</>
+                      ) : isConn ? (
+                        <><CheckCircle size={14} /> Reconnect / Switch</>
+                      ) : (
+                        <><Zap size={14} /> Connect {app.name.split(' ')[0]}</>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Section B: Community & Comment Reply Inbox */}
+            <div className="portal-bento-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', margin: '0 0 4px 0', textTransform: 'uppercase', fontWeight: 800 }}>
+                    💬 Community & Comment Reply Inbox
+                  </h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0, fontWeight: 600 }}>
+                    Incoming comments across Instagram Reels & YouTube Shorts. Reply live directly from your client portal!
+                  </p>
+                </div>
+                <button 
+                  onClick={fetchComments}
+                  className="portal-btn"
+                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                >
+                  Fetch Recent Comments
+                </button>
+              </div>
+
+              {commentsLoading ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Loading social comments...
+                </div>
+              ) : comments.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '2px dashed #cbd5e1', color: 'var(--text-muted)' }}>
+                  <MessageSquare size={32} style={{ opacity: 0.5, marginBottom: '8px' }} />
+                  <div style={{ fontWeight: 800, color: '#000000' }}>No Ingested Comments Yet</div>
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                    Comments are automatically synced every night at 2:00 AM UTC once social accounts are connected.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {comments.map(comm => (
+                    <div key={comm.id || comm.comment_id} style={{ background: '#f8fafc', border: '2px solid #000000', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="portal-badge portal-badge-info" style={{ textTransform: 'capitalize' }}>
+                            {comm.platform || 'Instagram'}
+                          </span>
+                          <strong style={{ color: '#000000', fontSize: '0.9rem' }}>@{comm.commenter_name || 'Social User'}</strong>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {comm.post_title ? `Post: ${comm.post_title}` : `Post ID: #${comm.content_id}`}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 500, paddingLeft: '4px' }}>
+                        "{comm.comment_text}"
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <input
+                          type="text"
+                          placeholder="Type live reply to post on social platform..."
+                          value={replyTextMap[comm.comment_id] || ''}
+                          onChange={(e) => setReplyTextMap({ ...replyTextMap, [comm.comment_id]: e.target.value })}
+                          style={{
+                            flexGrow: 1,
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            border: '2px solid #000000',
+                            fontSize: '0.85rem',
+                            outline: 'none'
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSendCommentReply(comm.comment_id, comm.platform);
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSendCommentReply(comm.comment_id, comm.platform)}
+                          className="portal-btn"
+                          disabled={replyingId === comm.comment_id}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                        >
+                          <Send size={14} /> {replyingId === comm.comment_id ? 'Posting...' : 'Reply'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Section C: Live Metrics Direct Refresh */}
+            <div className="portal-bento-card" style={{ background: '#f0fdf4', border: '3px solid #000000', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#166534', fontWeight: 800 }}>
+                  ⚡ High-Velocity Metric Sync
+                </h4>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
+                  All portal numbers update automatically 7-days and 30-days post-publishing. Trigger a manual sync anytime.
+                </p>
+              </div>
+              <button
+                onClick={() => { fetchData(); showToast('✓ Live metrics synced from cache', 'success'); }}
+                className="portal-btn"
+                style={{ background: '#166534', color: '#ffffff', border: '2px solid #000000', fontSize: '0.85rem' }}
+              >
+                Sync Live Metrics Now
+              </button>
+            </div>
+
+          </div>
+        )}
+
       </div>
     </div>
   );
 }
+

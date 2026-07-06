@@ -1083,3 +1083,26 @@ Reserved for task queue reordering.
 | `remaining_quota` | INTEGER | Remaining monthly free calls |
 
 ---
+
+## 15. Client Portal Composio & Social Comment Endpoints
+
+### Portal Integration Status
+* `GET /api/portal/:token/integrations/status`
+* Response: `{ "success": true, "integrations": { "instagram": { "connected": true, "accountName": "dentalchemy" } } }`
+
+### Portal Initiate Social OAuth
+* `POST /api/portal/:token/integrations/connect`
+* Body: `{ "appName": "instagram", "redirectUrl": "https://..." }`
+* Response: `{ "success": true, "connectUrl": "https://..." }`
+
+### Portal Social Comments Inbox
+* `GET /api/portal/:token/comments`
+* Response: `{ "success": true, "comments": [ { "id": 1, "comment_id": "c123", "commenter_name": "john_doe", "comment_text": "Awesome reel!", "platform": "instagram", "post_title": "Flossing Myths" } ] }`
+
+### Portal Reply to Comment
+* `POST /api/portal/:token/comments/reply`
+* Body: `{ "commentId": "c123", "replyText": "Thank you!", "platform": "instagram" }`
+* Response: `{ "success": true, "result": { ... } }`
+
+---
+
