@@ -52,7 +52,7 @@ export function syncContentToKanbanTask(contentId, database = db) {
         if (taskExists) {
           database.prepare(`
             UPDATE kanban_tasks 
-            SET title = ?, description = ?, client_id = ?, due_date = ?, task_type = ?, assigned_to = ?, updated_at = datetime('now')
+            SET title = ?, description = ?, client_id = ?, due_date = ?, task_type = ?, assigned_to = ?, status = 'todo', completed_at = NULL, updated_at = datetime('now')
             WHERE id = ?
           `).run(taskTitle, taskDesc, content.client_id, content.date || null, taskType, assignedTo, content.kanban_task_id);
           return;

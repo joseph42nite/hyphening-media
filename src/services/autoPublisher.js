@@ -17,7 +17,7 @@ export async function runAutoPublisher() {
       SELECT t.*, c.name AS client_name, c.composio_entity_id
       FROM marketing_content_tracker t
       JOIN crm_clients c ON t.client_id = c.id
-      WHERE t.status IN ('Client Approved', 'Pending', 'Scheduled')
+      WHERE t.status = 'Scheduled'
         AND (
           (t.date IS NOT NULL AND (t.date < ? OR (t.date = ? AND (t.time IS NULL OR t.time <= ?))))
           OR (t.scheduled_at IS NOT NULL AND t.scheduled_at <= datetime('now'))
