@@ -1734,16 +1734,57 @@ tr:hover td {
   100% { transform: translateX(-50%); }
 }
 
-/* --- Sakura Lady Full-Bleed Edge-to-Edge Image with Japanese Quote --- */
+/* --- Sakura Lady Quote Section & Full-Bleed Edge-to-Edge Image --- */
+.sakura-quote-container {
+  text-align: center;
+  max-width: 900px;
+  margin: 60px auto 28px auto;
+  padding: 0 24px;
+}
+
+.sakura-kanji {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: #000000;
+  margin-bottom: 12px;
+}
+
+.sakura-quote-title {
+  font-family: var(--font-heading);
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  color: #18181b;
+  margin: 0 0 14px 0;
+  line-height: 1.35;
+}
+
+.sakura-quote-sub {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #52525b;
+  padding: 6px 14px;
+  border: 1.5px solid #18181b;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
 .sakura-image-wrapper {
-  position: relative;
   width: 100%;
   max-width: 100%;
-  margin: 60px 0;
+  margin: 0 0 60px 0;
   padding: 0;
   display: flex;
   justify-content: center;
-  align-items: center;
   overflow: hidden;
 }
 
@@ -1755,75 +1796,18 @@ tr:hover td {
   object-fit: cover;
 }
 
-.sakura-quote-overlay {
-  position: absolute;
-  top: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  text-align: center;
-  padding: 24px 36px;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  max-width: 90%;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-}
-
-.sakura-kanji {
-  display: block;
-  font-size: 2.8rem;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  color: #ffffff;
-  text-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
-  margin-bottom: 8px;
-}
-
-.sakura-quote-en {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #f3e8ff;
-  margin: 0 0 6px 0;
-  letter-spacing: 0.03em;
-}
-
-.sakura-quote-sub {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: #ec4899;
-}
-
 @media (max-width: 768px) {
+  .sakura-quote-container {
+    margin: 40px auto 20px auto;
+    padding: 0 16px;
+  }
   .sakura-image-wrapper {
-    margin: 32px 0;
+    margin: 0 0 40px 0;
   }
   .sakura-image-wrapper img {
     border-radius: 0;
     max-height: 75vh;
     object-fit: cover;
-  }
-  .sakura-quote-overlay {
-    top: 20px;
-    padding: 16px 20px;
-    border-radius: 14px;
-    max-width: 92%;
-  }
-  .sakura-kanji {
-    font-size: 1.8rem;
-    letter-spacing: 0.15em;
-  }
-  .sakura-quote-en {
-    font-size: 0.85rem;
-  }
-  .sakura-quote-sub {
-    font-size: 0.65rem;
   }
 }
 
