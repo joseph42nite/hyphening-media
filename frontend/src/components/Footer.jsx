@@ -223,14 +223,14 @@ export default function Footer({ showCta = true }) {
           <div className="footer-col social-col">
             <h4>Connect</h4>
             <div className="social-links">
-              <a href="https://instagram.com/hyphening" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+              <a href="https://www.instagram.com/hypheningmedia/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
                 <InstagramIcon size={18} /> Instagram
               </a>
-              <a href="https://linkedin.com/company/hyphening" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+              <a href="https://www.linkedin.com/company/104980691/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
                 <LinkedinIcon size={18} /> LinkedIn
               </a>
-              <a href="mailto:hello@hyphening.com">
-                <MailIcon size={18} /> hello@hyphening.com
+              <a href="mailto:deepanjan@hypheningmedia.com">
+                <MailIcon size={18} /> deepanjan@hypheningmedia.com
               </a>
             </div>
           </div>

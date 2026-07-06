@@ -1287,8 +1287,8 @@ function Landing() {
                   "addressCountry": "IN"
                 },
                 "sameAs": [
-                  "https://instagram.com/hyphening",
-                  "https://linkedin.com/company/hyphening"
+                  "https://www.instagram.com/hypheningmedia/",
+                  "https://www.linkedin.com/company/104980691/"
                 ]
               }
             ]
