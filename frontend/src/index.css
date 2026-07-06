@@ -1734,14 +1734,16 @@ tr:hover td {
   100% { transform: translateX(-50%); }
 }
 
-/* --- Sakura Lady Full-Bleed Edge-to-Edge Image --- */
+/* --- Sakura Lady Full-Bleed Edge-to-Edge Image with Japanese Quote --- */
 .sakura-image-wrapper {
+  position: relative;
   width: 100%;
   max-width: 100%;
   margin: 60px 0;
   padding: 0;
   display: flex;
   justify-content: center;
+  align-items: center;
   overflow: hidden;
 }
 
@@ -1753,6 +1755,51 @@ tr:hover td {
   object-fit: cover;
 }
 
+.sakura-quote-overlay {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  text-align: center;
+  padding: 24px 36px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  max-width: 90%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.sakura-kanji {
+  display: block;
+  font-size: 2.8rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #ffffff;
+  text-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
+  margin-bottom: 8px;
+}
+
+.sakura-quote-en {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f3e8ff;
+  margin: 0 0 6px 0;
+  letter-spacing: 0.03em;
+}
+
+.sakura-quote-sub {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #ec4899;
+}
+
 @media (max-width: 768px) {
   .sakura-image-wrapper {
     margin: 32px 0;
@@ -1761,6 +1808,22 @@ tr:hover td {
     border-radius: 0;
     max-height: 75vh;
     object-fit: cover;
+  }
+  .sakura-quote-overlay {
+    top: 20px;
+    padding: 16px 20px;
+    border-radius: 14px;
+    max-width: 92%;
+  }
+  .sakura-kanji {
+    font-size: 1.8rem;
+    letter-spacing: 0.15em;
+  }
+  .sakura-quote-en {
+    font-size: 0.85rem;
+  }
+  .sakura-quote-sub {
+    font-size: 0.65rem;
   }
 }
 

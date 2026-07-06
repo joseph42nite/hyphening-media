@@ -1125,8 +1125,13 @@ function Landing() {
         </div>
       </section>
 
-      {/* ===== Sakura Lady Image ===== */}
+      {/* ===== Sakura Lady Image with Japanese Quote ===== */}
       <div className="sakura-image-wrapper">
+        <div className="sakura-quote-overlay">
+          <span className="sakura-kanji">一期一会</span>
+          <p className="sakura-quote-en">"Treasure every moment — turning momentary inspiration into timeless craft."</p>
+          <span className="sakura-quote-sub">いちごいちえ — ICHIGO ICHIE</span>
+        </div>
         <img src={sakuraLadyImg} alt="Sakura Lady" />
       </div>
 
