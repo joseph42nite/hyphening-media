@@ -935,12 +935,11 @@ function handleCreateGig(payload) {
   if (!payload?.artist_id || !payload?.gig_date) return { success: false, summary: 'artist_id and gig_date are required' };
 
   const result = db.prepare(`
-    INSERT INTO gig_status (artist_id, venue_id, planning_cycle_id, gig_date, fee_inr, advance_paid, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO gig_status (artist_id, venue_id, gig_date, fee_inr, advance_paid, status)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
     payload.artist_id,
     payload.venue_id || null,
-    payload.planning_cycle_id || null,
     payload.gig_date,
     payload.fee_inr || 0,
     payload.advance_paid || 0,

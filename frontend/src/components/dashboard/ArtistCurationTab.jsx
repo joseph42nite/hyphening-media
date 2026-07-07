@@ -7,7 +7,6 @@ export default function ArtistCurationTab({
   gigs,
   artists,
   venues,
-  planningCycles,
   fetchCurationData,
   showToast,
   formatDateStr,
@@ -42,7 +41,7 @@ export default function ArtistCurationTab({
   const [showGigModal, setShowGigModal] = useState(false);
   const [editingGig, setEditingGig] = useState(null);
   const [gigFormData, setGigFormData] = useState({
-    artist_id: '', venue_id: '', planning_cycle_id: '', gig_date: '', fee_inr: '0', advance_paid: '0', status: 'Pending', swiggy_link: '', zomato_link: ''
+    artist_id: '', venue_id: '', gig_date: '', fee_inr: '0', advance_paid: '0', status: 'Pending', swiggy_link: '', zomato_link: ''
   });
 
   // Autocomplete search states inside modals
@@ -175,7 +174,6 @@ export default function ArtistCurationTab({
       setGigFormData({
         artist_id: gig.artist_id || '',
         venue_id: gig.venue_id || '',
-        planning_cycle_id: gig.planning_cycle_id || '',
         gig_date: gig.gig_date || '',
         fee_inr: gig.fee_inr !== null && gig.fee_inr !== undefined ? String(gig.fee_inr) : '0',
         advance_paid: gig.advance_paid !== null && gig.advance_paid !== undefined ? String(gig.advance_paid) : '0',
@@ -194,7 +192,6 @@ export default function ArtistCurationTab({
       setGigFormData({
         artist_id: defaultArtist ? String(defaultArtist.id) : '',
         venue_id: defaultVenue ? String(defaultVenue.id) : '',
-        planning_cycle_id: planningCycles.length > 0 ? String(planningCycles[0].id) : '',
         gig_date: new Date().toISOString().split('T')[0],
         fee_inr: '0',
         advance_paid: '0',
@@ -220,7 +217,6 @@ export default function ArtistCurationTab({
         body: JSON.stringify({
           artist_id: parseInt(gigFormData.artist_id),
           venue_id: gigFormData.venue_id ? parseInt(gigFormData.venue_id) : null,
-          planning_cycle_id: gigFormData.planning_cycle_id ? parseInt(gigFormData.planning_cycle_id) : null,
           gig_date: gigFormData.gig_date,
           fee_inr: gigFormData.fee_inr ? parseFloat(gigFormData.fee_inr) : 0,
           advance_paid: gigFormData.advance_paid ? parseFloat(gigFormData.advance_paid) : 0,
@@ -1034,30 +1030,15 @@ export default function ArtistCurationTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Gig Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={gigFormData.gig_date}
-                    onChange={e => setGigFormData({ ...gigFormData, gig_date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Planning Cycle</label>
-                  <select
-                    className="form-control"
-                    value={gigFormData.planning_cycle_id}
-                    onChange={e => setGigFormData({ ...gigFormData, planning_cycle_id: e.target.value })}
-                  >
-                    <option value="">Select Cycle (None)</option>
-                    {planningCycles.map(c => (
-                      <option key={c.id} value={c.id}>{c.cycle_label}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Gig Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={gigFormData.gig_date}
+                  onChange={e => setGigFormData({ ...gigFormData, gig_date: e.target.value })}
+                  required
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>

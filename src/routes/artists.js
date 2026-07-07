@@ -351,16 +351,15 @@ router.get('/gigs', authorize('admin'), (req, res) => {
  */
 router.post('/gigs', authorize('admin'), (req, res) => {
   try {
-    const { artist_id, venue_id, planning_cycle_id, gig_date, fee_inr, advance_paid, status, swiggy_link, zomato_link } = req.body;
+    const { artist_id, venue_id, gig_date, fee_inr, advance_paid, status, swiggy_link, zomato_link } = req.body;
     if (!artist_id || !gig_date) return res.status(400).json({ error: 'artist_id and gig_date are required' });
 
     const result = db.prepare(`
-      INSERT INTO gig_status (artist_id, venue_id, planning_cycle_id, gig_date, fee_inr, advance_paid, status, swiggy_link, zomato_link)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO gig_status (artist_id, venue_id, gig_date, fee_inr, advance_paid, status, swiggy_link, zomato_link)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       artist_id,
       venue_id || null,
-      planning_cycle_id || null,
       gig_date,
       fee_inr || 0,
       advance_paid || 0,
@@ -479,68 +478,7 @@ router.delete('/gigs/:id', authorize('admin'), (req, res) => {
   }
 });
 
-// =========================================
-// PLANNING CYCLES
-// =========================================
 
-router.get('/planning-cycles', authorize('admin'), (req, res) => {
-  try {
-    res.json({
-      cycles: db.prepare('SELECT * FROM artist_planning_cycles ORDER BY start_date DESC').all(),
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.post('/planning-cycles', authorize('admin'), (req, res) => {
-  try {
-    const { cycle_label, start_date, end_date } = req.body;
-    if (!cycle_label || !start_date || !end_date) {
-      return res.status(400).json({ error: 'cycle_label, start_date, and end_date are required' });
-    }
-
-    const result = db.prepare(`
-      INSERT INTO artist_planning_cycles (cycle_label, start_date, end_date)
-      VALUES (?, ?, ?)
-    `).run(cycle_label, start_date, end_date);
-
-    res.status(201).json(db.prepare('SELECT * FROM artist_planning_cycles WHERE id = ?').get(result.lastInsertRowid));
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * POST /api/planning-cycles/:id/submit-approval
- * Submit cycle for admin approval via Telegram.
- */
-router.post('/planning-cycles/:id/submit-approval', authorize('admin'), (req, res) => {
-  try {
-    const cycle = db.prepare('SELECT * FROM artist_planning_cycles WHERE id = ?').get(req.params.id);
-    if (!cycle) return res.status(404).json({ error: 'Planning cycle not found' });
-
-    if (cycle.status !== 'open') {
-      return res.status(400).json({ error: 'Only open cycles can be submitted for approval' });
-    }
-
-    db.prepare('UPDATE artist_planning_cycles SET status = ?, updated_at = ? WHERE id = ?')
-      .run('finalised', new Date().toISOString(), req.params.id);
-
-    logAction({
-      actorId: req.user.id,
-      actorEmail: req.user.email,
-      action: 'submit_approval',
-      entityType: 'planning_cycle',
-      entityId: parseInt(req.params.id),
-      ip: req.ip,
-    });
-
-    res.json({ message: 'Planning cycle submitted for approval' });
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 /**
  * GET /api/public/gigs/confirm/:token

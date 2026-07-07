@@ -95,7 +95,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [totalAuditLogs, setTotalAuditLogs] = useState(0);
   const [assignmentsPage, setAssignmentsPage] = useState(1);
   const [assignmentsLimit, setAssignmentsLimit] = useState(5);
-  const [planningCycles, setPlanningCycles] = useState([]);
   const [artists, setArtists] = useState([]);
   const [venues, setVenues] = useState([]);
   const [gigs, setGigs] = useState([]);
@@ -577,11 +576,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchCurationData = async () => {
     try {
-      const cycleRes = await authFetch('/api/artists/planning-cycles');
-      if (cycleRes.ok) {
-        const cycleData = await cycleRes.json();
-        setPlanningCycles(cycleData.planning_cycles || []);
-      }
       
       const artistRes = await authFetch('/api/artists');
       if (artistRes.ok) {
@@ -1266,7 +1260,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             gigs={gigs}
             artists={artists}
             venues={venues}
-            planningCycles={planningCycles}
             fetchCurationData={fetchCurationData}
             showToast={showToast}
             formatDateStr={formatDateStr}
