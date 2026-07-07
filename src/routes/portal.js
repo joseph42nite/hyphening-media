@@ -214,7 +214,7 @@ router.get('/:token/bookings', portalAuth, (req, res) => {
 
     // Retrieve gigs for all family clients. Strictly omit fee_inr and advance_paid.
     const bookings = db.prepare(`
-      SELECT g.id, g.gig_date, g.status, 
+      SELECT g.id, g.gig_date, g.status, g.swiggy_link, g.zomato_link,
         a.name as artist_name, a.artist_id as artist_code,
         v.name as venue_name,
         COALESCE(c.name, vc.name) as client_name
@@ -227,7 +227,18 @@ router.get('/:token/bookings', portalAuth, (req, res) => {
       ORDER BY g.gig_date DESC
     `).all(...clientIds, ...clientIds);
 
-    res.json({ bookings });
+    // Dynamic date-based link expiration
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    const bookingsWithExpiredLinks = bookings.map(b => {
+      const isPast = b.gig_date < today;
+      return {
+        ...b,
+        swiggy_link: isPast ? null : b.swiggy_link,
+        zomato_link: isPast ? null : b.zomato_link
+      };
+    });
+
+    res.json({ bookings: bookingsWithExpiredLinks });
   } catch (err) {
     console.error('[PORTAL] Bookings error:', err);
     res.status(500).json({ error: 'Internal server error' });

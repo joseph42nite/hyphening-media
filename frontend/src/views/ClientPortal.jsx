@@ -1717,6 +1717,7 @@ export default function ClientPortal({ showToast }) {
                       <th>Date</th>
                       <th>Company & Venue</th>
                       <th>Status</th>
+                      <th>Links</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1738,6 +1739,55 @@ export default function ClientPortal({ showToast }) {
                           }`}>
                             {b.status}
                           </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {b.swiggy_link && (
+                              <a 
+                                href={b.swiggy_link} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="portal-badge"
+                                style={{ 
+                                  background: '#fc8019', 
+                                  color: '#ffffff', 
+                                  border: '2px solid #000000', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px', 
+                                  textDecoration: 'none',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  boxShadow: '1px 1px 0px #000000'
+                                }}
+                              >
+                                Swiggy <ExternalLink size={10} />
+                              </a>
+                            )}
+                            {b.zomato_link && (
+                              <a 
+                                href={b.zomato_link} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="portal-badge"
+                                style={{ 
+                                  background: '#cb202d', 
+                                  color: '#ffffff', 
+                                  border: '2px solid #000000', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px', 
+                                  textDecoration: 'none',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  boxShadow: '1px 1px 0px #000000'
+                                }}
+                              >
+                                Zomato <ExternalLink size={10} />
+                              </a>
+                            )}
+                            {!b.swiggy_link && !b.zomato_link && <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                          </div>
                         </td>
                       </tr>
                     ))}

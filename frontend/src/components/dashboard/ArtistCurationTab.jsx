@@ -42,7 +42,7 @@ export default function ArtistCurationTab({
   const [showGigModal, setShowGigModal] = useState(false);
   const [editingGig, setEditingGig] = useState(null);
   const [gigFormData, setGigFormData] = useState({
-    artist_id: '', venue_id: '', planning_cycle_id: '', gig_date: '', fee_inr: '0', advance_paid: '0', status: 'Pending'
+    artist_id: '', venue_id: '', planning_cycle_id: '', gig_date: '', fee_inr: '0', advance_paid: '0', status: 'Pending', swiggy_link: '', zomato_link: ''
   });
 
   // Autocomplete search states inside modals
@@ -179,7 +179,9 @@ export default function ArtistCurationTab({
         gig_date: gig.gig_date || '',
         fee_inr: gig.fee_inr !== null && gig.fee_inr !== undefined ? String(gig.fee_inr) : '0',
         advance_paid: gig.advance_paid !== null && gig.advance_paid !== undefined ? String(gig.advance_paid) : '0',
-        status: gig.status || 'Pending'
+        status: gig.status || 'Pending',
+        swiggy_link: gig.swiggy_link || '',
+        zomato_link: gig.zomato_link || ''
       });
       const artist = artists.find(a => a.id === gig.artist_id);
       setArtistSearch(artist ? `${artist.name} (${artist.category || 'No Category'})` : '');
@@ -196,7 +198,9 @@ export default function ArtistCurationTab({
         gig_date: new Date().toISOString().split('T')[0],
         fee_inr: '0',
         advance_paid: '0',
-        status: 'Pending'
+        status: 'Pending',
+        swiggy_link: '',
+        zomato_link: ''
       });
       setArtistSearch(defaultArtist ? `${defaultArtist.name} (${defaultArtist.category || 'No Category'})` : '');
       setVenueSearch(defaultVenue ? defaultVenue.name : '');
@@ -220,7 +224,9 @@ export default function ArtistCurationTab({
           gig_date: gigFormData.gig_date,
           fee_inr: gigFormData.fee_inr ? parseFloat(gigFormData.fee_inr) : 0,
           advance_paid: gigFormData.advance_paid ? parseFloat(gigFormData.advance_paid) : 0,
-          status: gigFormData.status
+          status: gigFormData.status,
+          swiggy_link: gigFormData.swiggy_link || null,
+          zomato_link: gigFormData.zomato_link || null
         }),
         credentials: 'include'
       });
@@ -276,13 +282,14 @@ export default function ArtistCurationTab({
               <th>Payment (₹)</th>
               <th>Status</th>
               <th>Advance Paid</th>
+              <th>Links</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {gigs.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No gigs found</td>
+                <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No gigs found</td>
               </tr>
             ) : (
               gigs.slice((gigsPage - 1) * gigsLimit, gigsPage * gigsLimit).map(g => (
@@ -302,6 +309,21 @@ export default function ArtistCurationTab({
                     </span>
                   </td>
                   <td>₹{g.advance_paid !== null ? g.advance_paid.toLocaleString('en-IN') : '0'}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {g.swiggy_link ? (
+                        <a href={g.swiggy_link} target="_blank" rel="noopener noreferrer" className="badge" style={{ background: '#fc8019', color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          Swiggy
+                        </a>
+                      ) : null}
+                      {g.zomato_link ? (
+                        <a href={g.zomato_link} target="_blank" rel="noopener noreferrer" className="badge" style={{ background: '#cb202d', color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          Zomato
+                        </a>
+                      ) : null}
+                      {!g.swiggy_link && !g.zomato_link && '-'}
+                    </div>
+                  </td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => openGigModal(g)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
@@ -1057,6 +1079,29 @@ export default function ArtistCurationTab({
                     placeholder="e.g. 5000"
                     value={gigFormData.advance_paid}
                     onChange={e => setGigFormData({ ...gigFormData, advance_paid: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Swiggy Link</label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    placeholder="https://swiggy.com/..."
+                    value={gigFormData.swiggy_link || ''}
+                    onChange={e => setGigFormData({ ...gigFormData, swiggy_link: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Zomato Link</label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    placeholder="https://zomato.com/..."
+                    value={gigFormData.zomato_link || ''}
+                    onChange={e => setGigFormData({ ...gigFormData, zomato_link: e.target.value })}
                   />
                 </div>
               </div>

@@ -351,12 +351,12 @@ router.get('/gigs', authorize('admin'), (req, res) => {
  */
 router.post('/gigs', authorize('admin'), (req, res) => {
   try {
-    const { artist_id, venue_id, planning_cycle_id, gig_date, fee_inr, advance_paid, status } = req.body;
+    const { artist_id, venue_id, planning_cycle_id, gig_date, fee_inr, advance_paid, status, swiggy_link, zomato_link } = req.body;
     if (!artist_id || !gig_date) return res.status(400).json({ error: 'artist_id and gig_date are required' });
 
     const result = db.prepare(`
-      INSERT INTO gig_status (artist_id, venue_id, planning_cycle_id, gig_date, fee_inr, advance_paid, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO gig_status (artist_id, venue_id, planning_cycle_id, gig_date, fee_inr, advance_paid, status, swiggy_link, zomato_link)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       artist_id,
       venue_id || null,
@@ -364,7 +364,9 @@ router.post('/gigs', authorize('admin'), (req, res) => {
       gig_date,
       fee_inr || 0,
       advance_paid || 0,
-      status || 'Pending'
+      status || 'Pending',
+      swiggy_link || null,
+      zomato_link || null
     );
 
     // Recalculate artist rollups
@@ -401,7 +403,7 @@ router.patch('/gigs/:id', authorize('admin'), (req, res) => {
     const gig = db.prepare('SELECT * FROM gig_status WHERE id = ?').get(req.params.id);
     if (!gig) return res.status(404).json({ error: 'Gig not found' });
 
-    const allowedFields = ['status', 'fee_inr', 'advance_paid', 'gig_date', 'venue_id', 'artist_id'];
+    const allowedFields = ['status', 'fee_inr', 'advance_paid', 'gig_date', 'venue_id', 'artist_id', 'swiggy_link', 'zomato_link'];
     const updates = {};
 
     for (const field of allowedFields) {
