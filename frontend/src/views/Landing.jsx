@@ -835,10 +835,6 @@ function Landing() {
   const [gameMode, setGameMode] = useState(false);
   const [lastSecret, setLastSecret] = useState("");
 
-  const handlePointerDown = () => {
-    setGameMode(true);
-  };
-
   const exitGame = (e) => {
     e.stopPropagation();
     setGameMode(false);
@@ -904,7 +900,7 @@ function Landing() {
       <section className={`landing-hero ${gameMode ? "game-active" : ""}`} ref={heroRef}>
         <div className="hero-bento">
           {/* Main Game Area */}
-          <div className="hero-main" onPointerDown={handlePointerDown}>
+          <div className="hero-main">
             <SlashCanvas
               score={score}
               onScore={(val) => {
