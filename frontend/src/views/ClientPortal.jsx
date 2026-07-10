@@ -663,6 +663,7 @@ export default function ClientPortal({ showToast }) {
   const [contentPage, setContentPage] = useState(1);
   const [seoPage, setSeoPage] = useState(1);
   const [adsPage, setAdsPage] = useState(1);
+  const [bookingsPage, setBookingsPage] = useState(1);
 
   // Content pagination inside Content option
   const [currentContentIndex, setCurrentContentIndex] = useState(0);
@@ -671,10 +672,12 @@ export default function ClientPortal({ showToast }) {
   const ITEMS_PER_PAGE_CONTENT = 10;
   const ITEMS_PER_PAGE_SEO = 5;
   const ITEMS_PER_PAGE_ADS = 5;
+  const ITEMS_PER_PAGE_BOOKINGS = 10;
 
   useEffect(() => { setContentPage(1); }, [contentList]);
   useEffect(() => { setSeoPage(1); }, [seoReports]);
   useEffect(() => { setAdsPage(1); }, [adCampaigns]);
+  useEffect(() => { setBookingsPage(1); }, [bookings]);
 
   // Adjust index when plan length changes
   useEffect(() => {
@@ -1709,91 +1712,94 @@ export default function ClientPortal({ showToast }) {
                 No bookings scheduled yet.
               </div>
             ) : (
-              <div className="portal-table-container">
-                <table className="portal-table">
-                  <thead>
-                    <tr>
-                      <th>Artist</th>
-                      <th>Date</th>
-                      <th>Company & Venue</th>
-                      <th>Status</th>
-                      <th>Links</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bookings.map(b => (
-                      <tr key={b.id}>
-                        <td style={{ fontWeight: 'bold', color: '#000000' }}>
-                          {b.artist_name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({b.artist_code})</span>
-                        </td>
-                        <td>{formatDateStr(b.gig_date)}</td>
-                        <td>
-                          <div style={{ fontWeight: 'bold', color: '#000000' }}>{b.client_name}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{b.venue_name || '-'}</div>
-                        </td>
-                        <td>
-                          <span className={`portal-badge ${
-                            b.status === 'Paid' || b.status === 'Confirmed' ? 'portal-badge-success' :
-                            b.status === 'Pending' ? 'portal-badge-warning' :
-                            b.status === 'Cancelled' ? 'portal-badge-danger' : 'portal-badge-info'
-                          }`}>
-                            {b.status}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            {b.swiggy_link && (
-                              <a 
-                                href={b.swiggy_link} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="portal-badge"
-                                style={{ 
-                                  background: '#fc8019', 
-                                  color: '#ffffff', 
-                                  border: '2px solid #000000', 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '4px', 
-                                  textDecoration: 'none',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 800,
-                                  boxShadow: '1px 1px 0px #000000'
-                                }}
-                              >
-                                Swiggy <ExternalLink size={10} />
-                              </a>
-                            )}
-                            {b.zomato_link && (
-                              <a 
-                                href={b.zomato_link} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="portal-badge"
-                                style={{ 
-                                  background: '#cb202d', 
-                                  color: '#ffffff', 
-                                  border: '2px solid #000000', 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '4px', 
-                                  textDecoration: 'none',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 800,
-                                  boxShadow: '1px 1px 0px #000000'
-                                }}
-                              >
-                                Zomato <ExternalLink size={10} />
-                              </a>
-                            )}
-                            {!b.swiggy_link && !b.zomato_link && <span style={{ color: 'var(--text-muted)' }}>-</span>}
-                          </div>
-                        </td>
+              <>
+                <div className="portal-table-container">
+                  <table className="portal-table">
+                    <thead>
+                      <tr>
+                        <th>Artist</th>
+                        <th>Date</th>
+                        <th>Company & Venue</th>
+                        <th>Status</th>
+                        <th>Links</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {bookings.slice((bookingsPage - 1) * ITEMS_PER_PAGE_BOOKINGS, bookingsPage * ITEMS_PER_PAGE_BOOKINGS).map(b => (
+                        <tr key={b.id}>
+                          <td style={{ fontWeight: 'bold', color: '#000000' }}>
+                            {b.artist_name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({b.artist_code})</span>
+                          </td>
+                          <td>{formatDateStr(b.gig_date)}</td>
+                          <td>
+                            <div style={{ fontWeight: 'bold', color: '#000000' }}>{b.client_name}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{b.venue_name || '-'}</div>
+                          </td>
+                          <td>
+                            <span className={`portal-badge ${
+                              b.status === 'Paid' || b.status === 'Confirmed' ? 'portal-badge-success' :
+                              b.status === 'Pending' ? 'portal-badge-warning' :
+                              b.status === 'Cancelled' ? 'portal-badge-danger' : 'portal-badge-info'
+                            }`}>
+                              {b.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {b.swiggy_link && (
+                                <a 
+                                  href={b.swiggy_link} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="portal-badge"
+                                  style={{ 
+                                    background: '#fc8019', 
+                                    color: '#ffffff', 
+                                    border: '2px solid #000000', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    gap: '4px', 
+                                    textDecoration: 'none',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    boxShadow: '1px 1px 0px #000000'
+                                  }}
+                                >
+                                  Swiggy <ExternalLink size={10} />
+                                </a>
+                              )}
+                              {b.zomato_link && (
+                                <a 
+                                  href={b.zomato_link} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="portal-badge"
+                                  style={{ 
+                                    background: '#cb202d', 
+                                    color: '#ffffff', 
+                                    border: '2px solid #000000', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    gap: '4px', 
+                                    textDecoration: 'none',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    boxShadow: '1px 1px 0px #000000'
+                                  }}
+                                >
+                                  Zomato <ExternalLink size={10} />
+                                </a>
+                              )}
+                              {!b.swiggy_link && !b.zomato_link && <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {renderPagination(bookingsPage, bookings.length, ITEMS_PER_PAGE_BOOKINGS, setBookingsPage)}
+              </>
             )}
           </div>
         )}
