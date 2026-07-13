@@ -20,7 +20,7 @@ export default function ScriptTrackerTab({
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [editingScript, setEditingScript] = useState(null);
   const [scriptFormData, setScriptFormData] = useState({
-    title: '', script_text: '', month: new Date().toISOString().substring(0, 7), reference_video_link: '', reaction_video_link: '', format: 'reel'
+    title: '', script_text: '', month: new Date().toISOString().substring(0, 7), reference_video_link: '', reaction_video_link: '', format: 'reel', status: 'Pending Client Approval', client_comments: ''
   });
 
   const handleSaveScript = async (e) => {
@@ -45,7 +45,16 @@ export default function ScriptTrackerTab({
       showToast(editingScript ? 'Script updated successfully' : 'Script created successfully', 'success');
       setShowScriptModal(false);
       setEditingScript(null);
-      setScriptFormData({ title: '', script_text: '', month: scriptMonth, reference_video_link: '', reaction_video_link: '', format: 'reel' });
+      setScriptFormData({ 
+        title: '', 
+        script_text: '', 
+        month: scriptMonth, 
+        reference_video_link: '', 
+        reaction_video_link: '', 
+        format: 'reel',
+        status: 'Pending Client Approval',
+        client_comments: ''
+      });
       fetchMarketingData(selectedScriptClient.id);
     } catch (err) {
       showToast(err.message, 'error');
@@ -108,7 +117,9 @@ export default function ScriptTrackerTab({
               month: scriptMonth,
               reference_video_link: '',
               reaction_video_link: '',
-              format: 'reel'
+              format: 'reel',
+              status: 'Pending Client Approval',
+              client_comments: ''
             });
             setShowScriptModal(true);
           }}
@@ -198,7 +209,9 @@ export default function ScriptTrackerTab({
                         month: item.month,
                         reference_video_link: item.reference_video_link || '',
                         reaction_video_link: item.reaction_video_link || '',
-                        format: item.format || 'reel'
+                        format: item.format || 'reel',
+                        status: item.content_status || 'Pending Client Approval',
+                        client_comments: item.client_comments || ''
                       });
                       setShowScriptModal(true);
                     }}
@@ -245,7 +258,7 @@ export default function ScriptTrackerTab({
                 </div>
               )}
 
-              {/* Script Status and Dropdown Selection */}
+              {/* Script Status */}
               <div style={{ 
                 display: 'flex', 
                 justifyContent: 'space-between', 
@@ -267,20 +280,6 @@ export default function ScriptTrackerTab({
                   >
                     {item.content_status || 'Pending Client Approval'}
                   </span>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <select
-                    className="form-control"
-                    value={item.content_status || 'Pending Client Approval'}
-                    onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                    style={{ fontSize: '0.8rem', padding: '4px 8px', width: 'auto', display: 'inline-block', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
-                  >
-                    <option value="Pending Client Approval">Pending Client Approval</option>
-                    <option value="Client Approved">Client Approved</option>
-                    <option value="Client Rejected">Client Rejected</option>
-                    <option value="Posted">Posted</option>
-                  </select>
                 </div>
               </div>
 
@@ -347,6 +346,38 @@ export default function ScriptTrackerTab({
                     <option value="reel">Reel Format</option>
                     <option value="long_format">Long Format</option>
                   </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Approval Status</label>
+                  <select
+                    className="form-control"
+                    value={scriptFormData.status || 'Pending Client Approval'}
+                    onChange={e => setScriptFormData({ ...scriptFormData, status: e.target.value })}
+                    required
+                  >
+                    <option value="Pending Client Approval">Pending Client Approval</option>
+                    <option value="Client Approved">Client Approved</option>
+                    <option value="Client Rejected">Client Rejected</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  {scriptFormData.status === 'Client Rejected' ? (
+                    <>
+                      <label className="form-label">Client Revision Comments</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={scriptFormData.client_comments || ''}
+                        onChange={e => setScriptFormData({ ...scriptFormData, client_comments: e.target.value })}
+                        placeholder="e.g. Please make the intro hook punchier"
+                      />
+                    </>
+                  ) : (
+                    <div style={{ minHeight: '1px' }}></div>
+                  )}
                 </div>
               </div>
 

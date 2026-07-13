@@ -634,6 +634,61 @@ router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manag
 // SCRIPTS
 // =========================================
 
+// Helper to sync status & client comments to content tracker for scripts
+const setScriptStatusAndComments = (db, clientId, scriptId, status, clientComments) => {
+  const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?').get(scriptId, clientId);
+  if (!script) return;
+
+  let relation = db.prepare(`
+    SELECT t.* FROM marketing_content_tracker t
+    JOIN marketing_content_script_relation r ON t.id = r.content_id
+    WHERE r.script_id = ? AND t.client_id = ?
+  `).get(scriptId, clientId);
+
+  const now = new Date().toISOString();
+
+  if (!relation) {
+    const scheduledDate = script.month ? `${script.month}-01` : null;
+    const platform = script.format === 'long_format' ? 'youtube' : 'instagram';
+    const postType = script.format === 'long_format' ? 'Youtube' : 'Reel';
+
+    const insertResult = db.prepare(`
+      INSERT INTO marketing_content_tracker (
+        client_id, platform, date, post_type, title, script, status, client_approved, source, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, ?)
+    `).run(
+      clientId,
+      platform,
+      scheduledDate,
+      postType,
+      script.title,
+      script.script_text,
+      status,
+      now,
+      now
+    );
+
+    const contentId = insertResult.lastInsertRowid;
+
+    db.prepare(`
+      INSERT INTO marketing_content_script_relation (content_id, script_id)
+      VALUES (?, ?)
+    `).run(contentId, scriptId);
+
+    relation = { id: contentId };
+  }
+
+  const clientApproved = ['Client Approved', 'Posted'].includes(status) ? 1 : 0;
+
+  db.prepare(`
+    UPDATE marketing_content_tracker
+    SET status = ?, client_approved = ?, client_comments = ?, updated_at = ?
+    WHERE id = ?
+  `).run(status, clientApproved, clientComments || null, now, relation.id);
+
+  syncContentToKanbanTask(relation.id, db);
+};
+
 /**
  * GET /api/clients/:id/marketing/scripts
  * List scripts for a client, optionally filtered by month.
@@ -671,7 +726,7 @@ router.get('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manage
  */
 router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
-    const { title, script_text, month, reference_video_link, reaction_video_link, format } = req.body;
+    const { title, script_text, month, reference_video_link, reaction_video_link, format, status, client_comments } = req.body;
     if (!title || !script_text || !month) {
       return res.status(400).json({ error: 'Title, script_text, and month are required' });
     }
@@ -681,17 +736,31 @@ router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manag
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(req.params.id, month, title, script_text, reference_video_link || null, reaction_video_link || null, format || 'reel');
 
+    const newScriptId = result.lastInsertRowid;
+
+    if (status) {
+      setScriptStatusAndComments(db, req.params.id, newScriptId, status, client_comments);
+    }
+
     logAction({
       actorId: req.user.id,
       actorEmail: req.user.email,
       action: 'create',
       entityType: 'script',
-      entityId: result.lastInsertRowid,
-      diff: { title, month },
+      entityId: newScriptId,
+      diff: { title, month, status },
       ip: req.ip,
     });
 
-    const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ?').get(result.lastInsertRowid);
+    const script = db.prepare(`
+      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
+             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
+      FROM marketing_scripts s
+      LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
+      LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
+      WHERE s.id = ?
+    `).get(newScriptId);
+
     res.status(201).json(script);
   } catch (err) {
     console.error('[MARKETING] Script create error:', err);
@@ -717,15 +786,17 @@ router.patch('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_
       }
     }
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date().toISOString();
+      const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+      db.prepare(`UPDATE marketing_scripts SET ${setClauses} WHERE id = ?`)
+        .run(...Object.values(updates), req.params.scriptId);
     }
 
-    updates.updated_at = new Date().toISOString();
-
-    const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-    db.prepare(`UPDATE marketing_scripts SET ${setClauses} WHERE id = ?`)
-      .run(...Object.values(updates), req.params.scriptId);
+    const { status, client_comments } = req.body;
+    if (status !== undefined) {
+      setScriptStatusAndComments(db, req.params.id, req.params.scriptId, status, client_comments);
+    }
 
     logAction({
       actorId: req.user.id,
@@ -733,11 +804,19 @@ router.patch('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_
       action: 'update',
       entityType: 'script',
       entityId: parseInt(req.params.scriptId),
-      diff: updates,
+      diff: { ...updates, status, client_comments },
       ip: req.ip,
     });
 
-    const updatedScript = db.prepare('SELECT * FROM marketing_scripts WHERE id = ?').get(req.params.scriptId);
+    const updatedScript = db.prepare(`
+      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
+             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
+      FROM marketing_scripts s
+      LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
+      LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
+      WHERE s.id = ?
+    `).get(req.params.scriptId);
+
     res.json(updatedScript);
   } catch (err) {
     console.error('[MARKETING] Script update error:', err);
