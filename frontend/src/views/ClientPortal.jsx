@@ -1338,19 +1338,14 @@ export default function ClientPortal({ showToast }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <button 
                   onClick={notificationPermission === 'default' ? handleRequestPermission : toggleLeadAlerts}
-                  className={`portal-btn`}
+                  className={`portal-btn ${leadAlertsEnabled && notificationPermission === 'granted' ? 'portal-btn-primary' : ''}`}
                   style={{ 
                     padding: '10px 18px', 
                     fontSize: '0.85rem',
-                    borderRadius: 'var(--radius-sm)',
-                    boxShadow: leadAlertsEnabled && notificationPermission === 'granted' ? 'none' : 'var(--shadow-sm)',
-                    transform: leadAlertsEnabled && notificationPermission === 'granted' ? 'translate(1px, 1px)' : 'none',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
-                    background: leadAlertsEnabled && notificationPermission === 'granted' ? '#000000' : '#ffffff',
-                    color: leadAlertsEnabled && notificationPermission === 'granted' ? '#ffffff' : '#000000',
-                    border: '3px solid #000000'
+                    width: 'auto'
                   }}
                   title={
                     notificationPermission === 'default' 
