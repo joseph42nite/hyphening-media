@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink,
-  Share2, RefreshCw, MessageSquare, CheckCircle, Zap
+  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff
 } from 'lucide-react';
 
 import { API_BASE } from '../api.js';
@@ -49,7 +49,7 @@ body.portal-active {
 
 .portal-container {
   width: 100%;
-  max-width: 850px;
+  max-width: 1200px;
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -436,9 +436,84 @@ body.portal-active {
   letter-spacing: 0.05em;
 }
 
+/* Select Dropdown & Input Reason */
+.portal-select {
+  background: #ffffff;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  color: #000000;
+  font-family: inherit;
+  font-weight: 700;
+  transition: box-shadow 0.15s ease;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+.portal-select:focus {
+  outline: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.portal-code-block {
+  background: #1e1e24;
+  color: #a9b1d6;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  box-shadow: var(--shadow-sm);
+  margin-top: 12px;
+}
+
 @media(max-width: 768px) {
   .portal-grid-half {
     grid-template-columns: 1fr;
+  }
+  .portal-tabs-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+  .portal-tab-btn {
+    border: var(--border-width) solid var(--border-color) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 10px 12px !important;
+    font-size: 0.8rem !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: var(--shadow-sm) !important;
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .portal-tab-btn.active {
+    background: #000000 !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    transform: translate(1px, 1px) !important;
+  }
+  .portal-tabs-container button:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
+  }
+  .portal-header-banner {
+    padding: 16px;
+  }
+  .portal-header-title {
+    font-size: 1.5rem;
+  }
+  .portal-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .portal-table th, .portal-table td {
+    padding: 10px 12px;
+    font-size: 0.75rem;
+  }
+  .portal-code-block {
+    font-size: 0.75rem;
+    padding: 12px;
   }
 }
 `;
@@ -642,7 +717,7 @@ export default function ClientPortal({ showToast }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [overview, setOverview] = useState(null);
   const [contentList, setContentList] = useState([]);
-  const [adCampaigns, setAdCampaigns] = useState([]);
+  const [leads, setLeads] = useState([]);
   const [seoReports, setSeoReports] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -658,11 +733,18 @@ export default function ClientPortal({ showToast }) {
   const [replyingId, setReplyingId] = useState(null);
   const [connectingApp, setConnectingApp] = useState(null);
 
-  // Pagination states
+  // Leads & Alerts settings
+  const [leadAlertsEnabled, setLeadAlertsEnabled] = useState(true);
+  const [notificationPermission, setNotificationPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
+  const [rejectionReasons, setRejectionReasons] = useState({});
+  const [leadsLoading, setLeadsLoading] = useState(false);
 
+  // Pagination states
   const [contentPage, setContentPage] = useState(1);
   const [seoPage, setSeoPage] = useState(1);
-  const [adsPage, setAdsPage] = useState(1);
+  const [leadsPage, setLeadsPage] = useState(1);
   const [bookingsPage, setBookingsPage] = useState(1);
 
   // Content pagination inside Content option
@@ -671,12 +753,12 @@ export default function ClientPortal({ showToast }) {
 
   const ITEMS_PER_PAGE_CONTENT = 10;
   const ITEMS_PER_PAGE_SEO = 5;
-  const ITEMS_PER_PAGE_ADS = 5;
+  const ITEMS_PER_PAGE_LEADS = 10;
   const ITEMS_PER_PAGE_BOOKINGS = 10;
 
   useEffect(() => { setContentPage(1); }, [contentList]);
   useEffect(() => { setSeoPage(1); }, [seoReports]);
-  useEffect(() => { setAdsPage(1); }, [adCampaigns]);
+  useEffect(() => { setLeadsPage(1); }, [leads]);
   useEffect(() => { setBookingsPage(1); }, [bookings]);
 
   // Adjust index when plan length changes
@@ -737,6 +819,43 @@ export default function ClientPortal({ showToast }) {
     checkPortalAuth();
   }, [token]);
 
+  // Leads Polling Side Effect (every 30 seconds, runs when verified)
+  useEffect(() => {
+    if (!isVerified || (clientType !== 'marketing' && clientType !== 'both')) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.leads) {
+          // Compare lists to identify new leads
+          const existingIds = new Set(leads.map(l => l.id));
+          const newLeads = data.leads.filter(l => !existingIds.has(l.id));
+          
+          if (newLeads.length > 0) {
+            // New leads detected!
+            setLeads(data.leads);
+            
+            // Play notification chime and browser alert if notifications are enabled
+            if (leadAlertsEnabled) {
+              playNotificationSound();
+              const latestLead = newLeads[0];
+              triggerSystemNotification(
+                `🔔 New Lead Captured!`,
+                `${latestLead.name} (${latestLead.platform || 'Ads'})`
+              );
+              showToast(`New Lead captured: ${latestLead.name}!`, 'success');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[POLLING] Error checking for new leads:', err);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [isVerified, leads, leadAlertsEnabled, token, clientType]);
+
   const checkPortalAuth = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/portal/${token}/overview`, { credentials: 'include' });
@@ -753,11 +872,14 @@ export default function ClientPortal({ showToast }) {
         
         if (data.client_type === 'artist_curation') {
           setActiveTab('bookings');
-        } else if (activeTab !== 'reports' && activeTab !== 'content' && activeTab !== 'bookings') {
+        } else if (activeTab !== 'reports' && activeTab !== 'content' && activeTab !== 'bookings' && activeTab !== 'leads') {
           setActiveTab('overview');
         }
         
         setOverview(data);
+        if (data.lead_alerts_enabled !== undefined) {
+          setLeadAlertsEnabled(!!data.lead_alerts_enabled);
+        }
         fetchData(data.client_type || 'marketing');
       } else {
         throw new Error(data.error || 'Unable to access portal');
@@ -803,10 +925,17 @@ export default function ClientPortal({ showToast }) {
         const dataContent = await resContent.json();
         if (resContent.ok) setContentList(dataContent.content || []);
 
-        // Ad campaigns
-        const resAds = await fetch(`${API_BASE}/api/portal/${token}/ads`, { credentials: 'include' });
-        const dataAds = await resAds.json();
-        if (resAds.ok) setAdCampaigns(dataAds.ads || []);
+        // Leads list
+        setLeadsLoading(true);
+        try {
+          const resLeads = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
+          const dataLeads = await resLeads.json();
+          if (resLeads.ok) setLeads(dataLeads.leads || []);
+        } catch (e) {
+          console.error('Error fetching leads:', e);
+        } finally {
+          setLeadsLoading(false);
+        }
 
         // SEO monthly reports
         const resSEO = await fetch(`${API_BASE}/api/portal/${token}/seo-reports`, { credentials: 'include' });
@@ -836,6 +965,106 @@ export default function ClientPortal({ showToast }) {
       }
     } catch (err) {
       console.error('Error fetching portal sub-data:', err);
+    }
+  };
+
+  // Notification Chime Sound Synthesizer
+  const playNotificationSound = (force = false) => {
+    if (!leadAlertsEnabled && !force) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      
+      const playTone = (frequency, startTime, duration, type = 'sine', volume = 0.3) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(frequency, startTime);
+        gainNode.gain.setValueAtTime(volume, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      
+      const now = ctx.currentTime;
+      // Play a beautiful, clear arpeggiated C-Major chime (C5 -> E5 -> G5 -> C6)
+      playTone(523.25, now, 0.25, 'sine', 0.25);        // C5
+      playTone(659.25, now + 0.12, 0.25, 'sine', 0.25); // E5
+      playTone(783.99, now + 0.24, 0.25, 'sine', 0.25); // G5
+      playTone(1046.50, now + 0.36, 0.5, 'sine', 0.35);  // C6
+    } catch (e) {
+      console.warn('AudioContext sound blocked or unsupported:', e);
+    }
+  };
+
+  // Trigger system notification
+  const triggerSystemNotification = (title, body) => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body });
+      } catch (err) {
+        console.error('Failed to trigger system notification:', err);
+      }
+    }
+  };
+
+  // Handle request permission
+  const handleRequestPermission = () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      Notification.requestPermission().then(permission => {
+        setNotificationPermission(permission);
+        if (permission === 'granted') {
+          showToast('System notifications enabled!', 'success');
+          playNotificationSound(true);
+        } else {
+          showToast('System notifications blocked. Please enable them in browser settings.', 'warning');
+        }
+      });
+    }
+  };
+
+  // Toggle client leads alerts
+  const toggleLeadAlerts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/lead-alerts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !leadAlertsEnabled }),
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setLeadAlertsEnabled(data.lead_alerts_enabled);
+        showToast(data.lead_alerts_enabled ? 'Lead alerts enabled' : 'Lead alerts muted', 'success');
+      } else {
+        throw new Error(data.error || 'Failed to toggle lead alerts');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  // Update lead status and rejection reason
+  const handleUpdateLeadStatus = async (leadId, status, rejection_reason = '') => {
+    try {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/leads/${leadId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, rejection_reason }),
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setLeads(prev => prev.map(l => l.id === leadId ? { ...l, lead_status: status, rejection_reason } : l));
+        showToast(`Lead status updated to ${status}`, 'success');
+      } else {
+        throw new Error(data.error || 'Failed to update lead status');
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
     }
   };
 
@@ -1075,22 +1304,71 @@ export default function ClientPortal({ showToast }) {
         
         {/* Portal Header */}
         <header className="portal-header-banner">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="portal-header-tag">
-              Client Portal
-            </span>
-            {overview.pending_approvals > 0 && (
-              <span className="portal-badge portal-badge-warning">
-                {overview.pending_approvals} Approval Pending
-              </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            {/* Left side text block */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 300px' }}>
+              <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span className="portal-header-tag" style={{ margin: 0 }}>
+                  Client Portal
+                </span>
+                {overview.pending_approvals > 0 && (
+                  <span className="portal-badge portal-badge-warning" style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px', margin: 0 }}>
+                    {overview.pending_approvals} Approval Pending
+                  </span>
+                )}
+              </div>
+              <h1 className="portal-header-title">{clientName}</h1>
+              {overview.sister_companies && overview.sister_companies.length > 0 && (
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: '800' }}>
+                  Group Locations: <strong style={{ color: '#000000' }}>{clientName}</strong>, {overview.sister_companies.join(', ')}
+                </div>
+              )}
+            </div>
+
+            {/* Right side actions block */}
+            {(clientType === 'marketing' || clientType === 'both') && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button 
+                  onClick={notificationPermission === 'default' ? handleRequestPermission : toggleLeadAlerts}
+                  className={`portal-btn ${leadAlertsEnabled && notificationPermission === 'granted' ? 'portal-btn-primary' : ''}`}
+                  style={{ 
+                    padding: '10px 18px', 
+                    fontSize: '0.85rem',
+                    borderRadius: 'var(--radius-sm)',
+                    boxShadow: 'var(--shadow-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: leadAlertsEnabled && notificationPermission === 'granted' ? 'var(--accent-cyan)' : '#ffffff',
+                    color: leadAlertsEnabled && notificationPermission === 'granted' ? '#ffffff' : '#000000',
+                    border: '3px solid #000000'
+                  }}
+                  title={
+                    notificationPermission === 'default' 
+                      ? 'Enable Browser Notifications' 
+                      : (leadAlertsEnabled ? 'Mute Lead Alerts' : 'Unmute Lead Alerts')
+                  }
+                >
+                  {notificationPermission === 'default' ? (
+                    <>
+                      <Bell size={16} />
+                      <span>Alert ON</span>
+                    </>
+                  ) : leadAlertsEnabled ? (
+                    <>
+                      <Bell size={16} style={{ color: '#ffffff' }} />
+                      <span>Alert ON</span>
+                    </>
+                  ) : (
+                    <>
+                      <BellOff size={16} style={{ color: 'var(--text-muted)' }} />
+                      <span>Alerts Muted</span>
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
-          <h1 className="portal-header-title">{clientName}</h1>
-          {overview.sister_companies && overview.sister_companies.length > 0 && (
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px', fontWeight: '800' }}>
-              Group Locations: <strong style={{ color: '#000000' }}>{clientName}</strong>, {overview.sister_companies.join(', ')}
-            </div>
-          )}
         </header>
 
         {/* Tabs Menu */}
@@ -1118,6 +1396,12 @@ export default function ClientPortal({ showToast }) {
                 {overview?.pending_approvals > 0 && (
                   <span style={{ position: 'absolute', top: '8px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />
                 )}
+              </button>
+              <button 
+                onClick={() => setActiveTab('leads')} 
+                className={`portal-tab-btn ${activeTab === 'leads' ? 'active' : ''}`}
+              >
+                <Users size={16} /> Leads
               </button>
               <button 
                 onClick={() => setActiveTab('integrations')} 
@@ -1166,16 +1450,16 @@ export default function ClientPortal({ showToast }) {
               {overview.ads && (
                 <>
                   <div className="portal-metric-card">
-                    <span className="portal-metric-label">Total Leads</span>
+                    <span className="portal-metric-label">Total Leads Captured</span>
                     <span className="portal-metric-value" style={{ color: 'var(--accent-blue)' }}>{overview.ads.total_leads || 0}</span>
                   </div>
                   <div className="portal-metric-card">
-                    <span className="portal-metric-label">Return on Ad Spend</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--accent-purple)' }}>{overview.ads.avg_roas ? `${overview.ads.avg_roas}x` : 'N/A'}</span>
+                    <span className="portal-metric-label">Qualified Leads</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--accent-cyan)' }}>{overview.ads.qualified_leads || 0}</span>
                   </div>
                   <div className="portal-metric-card">
-                    <span className="portal-metric-label">Total Spend</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--text-primary)' }}>₹{overview.ads.total_spend?.toLocaleString() || 0}</span>
+                    <span className="portal-metric-label">Appointments Booked</span>
+                    <span className="portal-metric-value" style={{ color: 'var(--accent-purple)' }}>{overview.ads.appointments_booked || 0}</span>
                   </div>
                 </>
               )}
@@ -1438,50 +1722,6 @@ export default function ClientPortal({ showToast }) {
                     </table>
                   </div>
                   {renderPagination(contentPage, contentList.length, ITEMS_PER_PAGE_CONTENT, setContentPage)}
-                </>
-              )}
-            </div>
-
-            {/* Ads Campaigns Table */}
-            <div>
-              <h2 style={{ fontSize: '1.25rem', margin: '4px 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>Ads Campaigns</h2>
-              {adCampaigns.length === 0 ? (
-                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
-                  No active campaigns to analyze.
-                </div>
-              ) : (
-                <>
-                  <div className="portal-table-container">
-                    <table className="portal-table">
-                      <thead>
-                        <tr>
-                          <th>Campaign Name</th>
-                          <th>Platform</th>
-                          <th>Total Spend</th>
-                          <th>Leads</th>
-                          <th>Clicks</th>
-                          <th>CPL</th>
-                          <th>ROAS</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {adCampaigns.slice((adsPage - 1) * ITEMS_PER_PAGE_ADS, adsPage * ITEMS_PER_PAGE_ADS).map((ad, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: '800', color: '#000000' }}>{ad.ad_campaign_name}</td>
-                            <td>
-                              <span className="portal-badge portal-badge-success">{ad.platform}</span>
-                            </td>
-                            <td>₹{ad.total_ad_spend_inr?.toLocaleString() || 0}</td>
-                            <td>{ad.leads}</td>
-                            <td>{ad.clicks}</td>
-                            <td>₹{ad.cpl_inr || 0}</td>
-                            <td>{ad.roas ? `${ad.roas}x` : 'Leads Focused'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {renderPagination(adsPage, adCampaigns.length, ITEMS_PER_PAGE_ADS, setAdsPage)}
                 </>
               )}
             </div>
@@ -1993,6 +2233,153 @@ export default function ClientPortal({ showToast }) {
               >
                 Sync Live Metrics Now
               </button>
+            </div>
+
+          </div>
+        )}
+
+        {/* Leads Tab */}
+        {activeTab === 'leads' && (clientType === 'marketing' || clientType === 'both') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Header / Subtitle */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>
+                  Campaign Leads & Conversions
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>
+                  Review leads captured from forms and calls. Confirm booking appointments or record rejection details.
+                </p>
+              </div>
+              <button 
+                onClick={() => { fetchData(); showToast('Refreshing leads list...', 'info'); }}
+                className="portal-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                disabled={leadsLoading}
+              >
+                <RefreshCw size={14} className={leadsLoading ? 'spin' : ''} /> Refresh Leads
+              </button>
+            </div>
+
+            {/* Leads Table Container */}
+            <div>
+              <h3 style={{ fontSize: '1.1rem', margin: '0 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>Captured Leads Log</h3>
+              
+              {leads.length === 0 ? (
+                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                  No leads captured yet.
+                </div>
+              ) : (
+                <>
+                  <div className="portal-table-container">
+                    <table className="portal-table">
+                      <thead>
+                        <tr>
+                          <th>Lead Info</th>
+                          <th>Source / Platform</th>
+                          <th>Ad Campaign</th>
+                          <th>Captured Date</th>
+                          <th>Status</th>
+                          <th>Rejection Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leads.slice((leadsPage - 1) * ITEMS_PER_PAGE_LEADS, leadsPage * ITEMS_PER_PAGE_LEADS).map(lead => {
+                          const statusBorderColor = 
+                            lead.lead_status === 'Qualified' ? '#10b981' :
+                            lead.lead_status === 'Appointment Booked' ? '#3b82f6' :
+                            lead.lead_status === 'Rejected' ? '#ef4444' : '#6b7280';
+                            
+                          const platformBadge = 
+                            lead.platform === 'Meta' ? 'portal-badge-info' :
+                            lead.platform === 'Google' ? 'portal-badge-success' :
+                            lead.platform === 'YouTube' ? 'portal-badge-danger' : 'portal-badge-muted';
+                            
+                          return (
+                            <tr key={lead.id}>
+                              <td>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <span style={{ fontWeight: '800', color: '#000000' }}>{lead.name}</span>
+                                  {lead.email && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{lead.email}</span>}
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '800' }}>{lead.phone}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <span className={`portal-badge ${platformBadge}`}>{lead.platform}</span>
+                                  <span className="portal-badge" style={{ background: '#f3e8ff', color: '#6b21a8', border: '1px solid #c084fc' }}>
+                                    {lead.source === 'call' ? `📞 Call (${lead.call_duration_seconds || 0}s)` : '📝 Form'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ fontSize: '0.8rem', fontWeight: '800' }}>
+                                {lead.campaign_name || 'Direct / Organic'}
+                              </td>
+                              <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                                {new Date(lead.created_at.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '150px' }}>
+                                  <select 
+                                    value={lead.lead_status || 'Pending'}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === 'Rejected') {
+                                        handleUpdateLeadStatus(lead.id, 'Rejected', lead.rejection_reason || 'Out of Budget');
+                                      } else {
+                                        handleUpdateLeadStatus(lead.id, val, '');
+                                      }
+                                    }}
+                                    className="portal-select"
+                                    style={{ 
+                                      borderWidth: '2px', 
+                                      borderColor: statusBorderColor,
+                                      padding: '4px 8px',
+                                      fontSize: '0.8rem'
+                                    }}
+                                  >
+                                    <option value="Pending">⌛ Pending</option>
+                                    <option value="Qualified">✅ Qualified</option>
+                                    <option value="Appointment Booked">📅 Appointment Booked</option>
+                                    <option value="Rejected">❌ Rejected</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td>
+                                {lead.lead_status === 'Rejected' ? (
+                                  <select 
+                                    value={lead.rejection_reason || 'Out of Budget'}
+                                    onChange={(e) => handleUpdateLeadStatus(lead.id, 'Rejected', e.target.value)}
+                                    className="portal-select"
+                                    style={{ 
+                                      borderWidth: '2px', 
+                                      borderColor: '#ef4444',
+                                      padding: '4px 8px',
+                                      fontSize: '0.8rem',
+                                      minWidth: '150px'
+                                    }}
+                                  >
+                                    <option value="Out of Budget">💰 Out of Budget</option>
+                                    <option value="Not Interested">🙅 Not Interested</option>
+                                    <option value="Wrong Number / Spam">🚫 Spam / Wrong No.</option>
+                                    <option value="Location Issue">📍 Location Issue</option>
+                                    <option value="Already Serviced">✅ Already Serviced</option>
+                                    <option value="Other">📝 Other</option>
+                                  </select>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {renderPagination(leadsPage, leads.length, ITEMS_PER_PAGE_LEADS, setLeadsPage)}
+                </>
+              )}
             </div>
 
           </div>

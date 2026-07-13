@@ -186,17 +186,33 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                     {client.portal_enabled && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {client.portal_token ? (
-                          <button
-                            onClick={() => {
-                              const url = `${window.location.origin}/portal/${client.portal_token}`;
-                              navigator.clipboard.writeText(url);
-                              showToast('Portal link copied to clipboard!', 'success');
-                            }}
-                            className="btn btn-primary"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
-                          >
-                            Copy Portal Link
-                          </button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <button
+                              onClick={() => {
+                                const url = `${window.location.origin}/portal/${client.portal_token}`;
+                                navigator.clipboard.writeText(url);
+                                showToast('Portal link copied to clipboard!', 'success');
+                              }}
+                              className="btn btn-primary"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
+                            >
+                              Copy Portal Link
+                            </button>
+                            {(client.client_type === 'marketing' || client.client_type === 'both') && (
+                              <button
+                                onClick={() => {
+                                  const url = `${window.location.origin}/api/portal/${client.portal_token}/leads/capture`;
+                                  navigator.clipboard.writeText(url);
+                                  showToast('Lead capture webhook URL copied!', 'success');
+                                }}
+                                className="btn btn-primary"
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content', background: '#0ea5e9', border: 'none' }}
+                                title="Copy Lead Capture Webhook API URL for Ads Manager"
+                              >
+                                Copy Webhook URL
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <button
                             onClick={() => generatePortalToken(client)}

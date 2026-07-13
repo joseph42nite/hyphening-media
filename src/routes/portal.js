@@ -115,13 +115,12 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       WHERE client_id = ? AND is_tracked = 1
     `).get(clientId);
 
-    const adStats = db.prepare(`
+    const leadStats = db.prepare(`
       SELECT 
-        SUM(leads) as total_leads,
-        ROUND(AVG(roas), 2) as avg_roas,
-        SUM(total_ad_spend_inr) as total_spend,
-        SUM(revenue_generated) as total_revenue
-      FROM marketing_ad_campaigns 
+        COUNT(*) as total_leads,
+        SUM(CASE WHEN lead_status = 'Qualified' THEN 1 ELSE 0 END) as qualified_leads,
+        SUM(CASE WHEN lead_status = 'Appointment Booked' THEN 1 ELSE 0 END) as appointments_booked
+      FROM campaign_leads 
       WHERE client_id = ?
     `).get(clientId);
 
@@ -139,8 +138,8 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     `).all(clientId);
 
     const adsBreakdown = db.prepare(`
-      SELECT platform, SUM(total_ad_spend_inr) as spend, SUM(leads) as leads
-      FROM marketing_ad_campaigns
+      SELECT platform, COUNT(*) as leads
+      FROM campaign_leads
       WHERE client_id = ?
       GROUP BY platform
     `).all(clientId);
@@ -171,8 +170,9 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     res.json({
       client_name: req.portalClient.name,
       client_type: req.portalClient.client_type,
+      lead_alerts_enabled: req.portalClient.lead_alerts_enabled,
       content: contentStats,
-      ads: adStats,
+      ads: leadStats,
       pending_approvals: pendingApprovals.count,
       platform_breakdown: platformBreakdown,
       ads_breakdown: adsBreakdown,
@@ -269,21 +269,125 @@ router.get('/:token/content', portalAuth, (req, res) => {
 });
 
 /**
- * GET /api/portal/:token/ads
- * Ad campaign data.
+ * GET /api/portal/:token/leads
+ * Get captured leads for client.
  */
-router.get('/:token/ads', portalAuth, (req, res) => {
+router.get('/:token/leads', portalAuth, (req, res) => {
   try {
-    const ads = db.prepare(`
-      SELECT platform, ad_campaign_name, leads, total_ad_spend_inr, impressions, clicks,
-        ctr_pct, cpc_inr, cpl_inr, revenue_generated, roas
-      FROM marketing_ad_campaigns WHERE client_id = ?
+    const leads = db.prepare(`
+      SELECT id, name, email, phone, platform, source, campaign_name, lead_status, rejection_reason, call_duration_seconds, additional_data, created_at
+      FROM campaign_leads
+      WHERE client_id = ?
       ORDER BY created_at DESC
     `).all(req.portalClient.id);
 
-    res.json({ ads });
+    res.json({ leads });
   } catch (err) {
-    console.error('[PORTAL] Ads error:', err);
+    console.error('[PORTAL] Get leads error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/portal/:token/leads/:leadId/status
+ * Update qualification status and rejection reason for a lead.
+ */
+router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { status, rejection_reason } = req.body;
+
+    const lead = db.prepare('SELECT id FROM campaign_leads WHERE id = ? AND client_id = ?').get(leadId, req.portalClient.id);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    if (!['Pending', 'Qualified', 'Appointment Booked', 'Rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    db.prepare(`
+      UPDATE campaign_leads
+      SET lead_status = ?, rejection_reason = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(status, status === 'Rejected' ? rejection_reason : null, leadId);
+
+    res.json({ success: true, lead_status: status, rejection_reason });
+  } catch (err) {
+    console.error('[PORTAL] Update lead status error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/portal/:token/lead-alerts
+ * Toggle leads alerts setting (toggles lead_alerts_enabled).
+ */
+router.post('/:token/lead-alerts', portalAuth, (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const val = enabled ? 1 : 0;
+
+    db.prepare('UPDATE crm_clients SET lead_alerts_enabled = ? WHERE id = ?')
+      .run(val, req.portalClient.id);
+
+    res.json({ success: true, lead_alerts_enabled: val === 1 });
+  } catch (err) {
+    console.error('[PORTAL] Toggle lead alerts error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/portal/:token/leads/capture
+ * Webhook-ready lead capture API. No PIN authentication required.
+ */
+router.post('/:token/leads/capture', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { name, email, phone, platform, source, campaign_name, call_duration_seconds, additional_data } = req.body;
+
+    const client = db.prepare(
+      'SELECT id, name, lead_alerts_enabled FROM crm_clients WHERE portal_token = ? AND portal_enabled = 1 AND is_active = 1'
+    ).get(token);
+
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found or portal disabled' });
+    }
+
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'Name and Phone are required fields' });
+    }
+
+    const cleanPlatform = ['YouTube', 'Meta', 'Google', 'Other'].includes(platform) ? platform : 'Other';
+    const cleanSource = ['form', 'call'].includes(source) ? source : 'form';
+    const additionalDataStr = additional_data ? JSON.stringify(additional_data) : null;
+
+    const result = db.prepare(`
+      INSERT INTO campaign_leads (
+        client_id, name, email, phone, platform, source, campaign_name, call_duration_seconds, additional_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      client.id,
+      name,
+      email || null,
+      phone,
+      cleanPlatform,
+      cleanSource,
+      campaign_name || null,
+      call_duration_seconds || null,
+      additionalDataStr
+    );
+
+    // Send telegram notification to admin/SMM if lead alerts are enabled for this client
+    if (client.lead_alerts_enabled) {
+      const alertMsg = `🔔 *New Lead Captured!*\n\n*Client:* ${client.name}\n*Lead Name:* ${name}\n*Phone:* ${phone}\n*Platform:* ${cleanPlatform}\n*Source:* ${cleanSource === 'call' ? '📞 Call' : '📝 Form'}\n*Campaign:* ${campaign_name || 'N/A'}`;
+      notifyAdmin(alertMsg);
+    }
+
+    res.json({ success: true, lead_id: result.lastInsertRowid });
+  } catch (err) {
+    console.error('[PORTAL] Capture lead error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
