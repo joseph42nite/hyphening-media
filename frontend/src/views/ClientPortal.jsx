@@ -1149,17 +1149,21 @@ export default function ClientPortal({ showToast }) {
   };
 
 
-  const handleApprove = async (id) => {
-    if (!window.confirm('Are you sure you want to approve this content?')) return;
+  const handleApprove = async (id, contentId = null) => {
+    if (!window.confirm('Are you sure you want to approve this?')) return;
     try {
-      const response = await fetch(`${API_BASE}/api/portal/${token}/content-plan/${id}/approve`, {
+      const url = contentId 
+        ? `${API_BASE}/api/portal/${token}/content-plan/${contentId}/approve`
+        : `${API_BASE}/api/portal/${token}/content-plan/script/${id}/approve`;
+        
+      const response = await fetch(url, {
         method: 'POST',
         credentials: 'include'
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to approve');
       
-      showToast('Content approved successfully', 'success');
+      showToast('Approved successfully', 'success');
       fetchData();
       checkPortalAuth();
     } catch (err) {
@@ -1167,14 +1171,18 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
-  const handleReject = async (id, comment) => {
+  const handleReject = async (id, comment, contentId = null) => {
     if (!comment.trim()) {
       showToast('Please enter your comments before submitting.', 'error');
       return;
     }
     setSubmittingDecision(true);
     try {
-      const response = await fetch(`${API_BASE}/api/portal/${token}/content-plan/${id}/reject`, {
+      const url = contentId
+        ? `${API_BASE}/api/portal/${token}/content-plan/${contentId}/reject`
+        : `${API_BASE}/api/portal/${token}/content-plan/script/${id}/reject`;
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment }),
@@ -1816,13 +1824,17 @@ export default function ClientPortal({ showToast }) {
                             <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>
                               {item.format === 'long_format' ? 'Long Format' : 'Reel'}
                             </span>
-                            {item.content_status && (
+                            {item.content_status ? (
                               <span className={`portal-badge ${
                                 isApproved ? 'portal-badge-success' :
                                 item.content_status === 'Pending Client Approval' ? 'portal-badge-warning' :
                                 item.content_status === 'Client Rejected' ? 'portal-badge-danger' : 'portal-badge-muted'
                               }`} style={{ textTransform: 'uppercase' }}>
                                 {item.content_status === 'Pending' ? 'Approved (Pending Posting)' : item.content_status}
+                              </span>
+                            ) : (
+                              <span className="portal-badge portal-badge-warning" style={{ textTransform: 'uppercase' }}>
+                                Pending Client Approval
                               </span>
                             )}
                           </div>
@@ -1869,11 +1881,7 @@ export default function ClientPortal({ showToast }) {
 
                       {/* Comment & Actions Form or Status Message */}
                       <div style={{ borderTop: '2px solid #000000', paddingTop: '20px' }}>
-                        {!item.content_id ? (
-                          <div style={{ background: '#f4f4f5', border: '2px solid #e4e4e7', padding: '16px', borderRadius: '8px', color: '#71717a', fontSize: '0.9rem', fontWeight: '600' }}>
-                            ℹ️ This script has not been scheduled in the content tracker yet. Once linked by the manager, you will be able to comment and approve here.
-                          </div>
-                        ) : !isApproved ? (
+                        {!isApproved ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {item.content_status === 'Client Rejected' && item.client_comments && (
                               <div style={{ background: '#fffbeb', border: '2px solid #fbbf24', borderRadius: '6px', padding: '10px 14px', color: '#92400e', fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>
@@ -1896,7 +1904,7 @@ export default function ClientPortal({ showToast }) {
 
                             <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
                               <button 
-                                onClick={() => handleReject(item.content_id, contentCommentText)}
+                                onClick={() => handleReject(item.id, contentCommentText, item.content_id)}
                                 className="portal-btn portal-btn-danger" 
                                 style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
                                 disabled={submittingDecision}
@@ -1904,7 +1912,7 @@ export default function ClientPortal({ showToast }) {
                                 <X size={16} /> Request Changes with Comment
                               </button>
                               <button 
-                                onClick={() => handleApprove(item.content_id)}
+                                onClick={() => handleApprove(item.id, item.content_id)}
                                 className="portal-btn portal-btn-success" 
                                 style={{ flexGrow: 1, justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
                                 disabled={submittingDecision}
