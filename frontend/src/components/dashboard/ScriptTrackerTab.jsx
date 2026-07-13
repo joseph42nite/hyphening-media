@@ -71,6 +71,25 @@ export default function ScriptTrackerTab({
     }
   };
 
+  const handleStatusChange = async (scriptId, newStatus) => {
+    if (!selectedScriptClient) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update status');
+
+      showToast('Script status updated successfully', 'success');
+      fetchMarketingData(selectedScriptClient.id);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   if (!isAdmin && !isSMM) return null;
 
   const monthlyScripts = marketingScripts.filter(item => item.month === scriptMonth);
@@ -223,6 +242,61 @@ export default function ScriptTrackerTab({
                       🎬 Reaction Video
                     </a>
                   )}
+                </div>
+              )}
+
+              {/* Script Status and Dropdown Selection */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                flexWrap: 'wrap', 
+                gap: '12px', 
+                borderTop: '1px solid rgba(255,255,255,0.15)', 
+                paddingTop: '12px', 
+                marginTop: '6px' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Status:</span>
+                  <span
+                    className={`badge badge-${
+                      ['Client Approved', 'Posted'].includes(item.content_status) ? 'success' :
+                      item.content_status === 'Client Rejected' ? 'danger' : 'warning'
+                    }`}
+                    style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase' }}
+                  >
+                    {item.content_status || 'Pending Client Approval'}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <select
+                    className="form-control"
+                    value={item.content_status || 'Pending Client Approval'}
+                    onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                    style={{ fontSize: '0.8rem', padding: '4px 8px', width: 'auto', display: 'inline-block', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
+                  >
+                    <option value="Pending Client Approval">Pending Client Approval</option>
+                    <option value="Client Approved">Client Approved</option>
+                    <option value="Client Rejected">Client Rejected</option>
+                    <option value="Posted">Posted</option>
+                  </select>
+                </div>
+              </div>
+
+              {item.client_comments && (
+                <div style={{ 
+                  background: 'rgba(239, 68, 68, 0.1)', 
+                  border: '1px solid rgba(239, 68, 68, 0.3)', 
+                  borderRadius: '4px', 
+                  padding: '8px 12px', 
+                  fontSize: '0.8rem', 
+                  color: '#f87171', 
+                  fontWeight: 600, 
+                  textAlign: 'left',
+                  marginTop: '4px'
+                }}>
+                  💬 <strong>Client Revision Note:</strong> "{item.client_comments}"
                 </div>
               )}
             </div>

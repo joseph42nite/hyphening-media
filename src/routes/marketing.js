@@ -641,15 +641,22 @@ router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manag
 router.get('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const { month } = req.query;
-    let query = 'SELECT * FROM marketing_scripts WHERE client_id = ?';
+    let query = `
+      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
+             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
+      FROM marketing_scripts s
+      LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
+      LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
+      WHERE s.client_id = ?
+    `;
     const params = [req.params.id];
 
     if (month) {
-      query += ' AND month = ?';
+      query += ' AND s.month = ?';
       params.push(month);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY s.created_at DESC';
     const scripts = db.prepare(query).all(...params);
     res.json({ scripts });
   } catch (err) {
@@ -763,6 +770,91 @@ router.delete('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social
     res.json({ message: 'Script deleted successfully' });
   } catch (err) {
     console.error('[MARKETING] Script delete error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/clients/:id/marketing/scripts/:scriptId/status
+ * Manually change/override a script's approval status.
+ */
+router.put('/:id/marketing/scripts/:scriptId/status', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const { status, rejection_reason } = req.body;
+    if (!status) return res.status(400).json({ error: 'Status is required' });
+
+    const clientId = req.params.id;
+    const scriptId = req.params.scriptId;
+
+    // Check if script exists
+    const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?').get(scriptId, clientId);
+    if (!script) return res.status(404).json({ error: 'Script not found' });
+
+    // Find linked content tracker entry
+    let relation = db.prepare(`
+      SELECT t.* FROM marketing_content_tracker t
+      JOIN marketing_content_script_relation r ON t.id = r.content_id
+      WHERE r.script_id = ? AND t.client_id = ?
+    `).get(scriptId, clientId);
+
+    const now = new Date().toISOString();
+
+    if (!relation) {
+      // Create one on the fly
+      const scheduledDate = script.month ? `${script.month}-01` : null;
+      const platform = script.format === 'long_format' ? 'youtube' : 'instagram';
+      const postType = script.format === 'long_format' ? 'Youtube' : 'Reel';
+
+      const insertResult = db.prepare(`
+        INSERT INTO marketing_content_tracker (
+          client_id, platform, date, post_type, title, script, status, client_approved, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, ?)
+      `).run(
+        clientId,
+        platform,
+        scheduledDate,
+        postType,
+        script.title,
+        script.script_text,
+        status,
+        now,
+        now
+      );
+
+      const contentId = insertResult.lastInsertRowid;
+
+      // Link relation
+      db.prepare(`
+        INSERT INTO marketing_content_script_relation (content_id, script_id)
+        VALUES (?, ?)
+      `).run(contentId, scriptId);
+
+      relation = { id: contentId };
+    }
+
+    const clientApproved = ['Client Approved', 'Posted'].includes(status) ? 1 : 0;
+    
+    db.prepare(`
+      UPDATE marketing_content_tracker
+      SET status = ?, client_approved = ?, client_comments = ?, updated_at = ?
+      WHERE id = ?
+    `).run(status, clientApproved, rejection_reason || null, now, relation.id);
+
+    syncContentToKanbanTask(relation.id, db);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'update_status',
+      entityType: 'content',
+      entityId: relation.id,
+      diff: { status, client_approved: clientApproved, client_comments: rejection_reason },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, status, relation_id: relation.id });
+  } catch (err) {
+    console.error('[MARKETING] Script status update error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
