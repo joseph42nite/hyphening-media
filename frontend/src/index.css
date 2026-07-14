@@ -631,35 +631,18 @@ tr:hover td {
 }
 
 .calendar-cell.today {
-  background: #000000 !important;
-  color: #ffffff !important;
-  border-color: #000000 !important;
+  background: #f3e8ff !important;
+  color: #6b21a8 !important;
+  border-color: #6b21a8 !important;
+  border-width: 3px !important;
 }
 
 .calendar-cell.today .calendar-day-num {
-  color: #ffffff !important;
+  color: #6b21a8 !important;
 }
 
 .calendar-cell.today .calendar-cell-events div {
-  color: #ffffff !important;
-}
-
-.calendar-cell.today .calendar-event-task {
-  background: #1e3a8a !important;
-  color: #ffffff !important;
-  border-color: #3b82f6 !important;
-}
-
-.calendar-cell.today .calendar-event-gig {
-  background: #78350f !important;
-  color: #ffffff !important;
-  border-color: #f59e0b !important;
-}
-
-.calendar-cell.today .calendar-event-content {
-  background: #581c87 !important;
-  color: #ffffff !important;
-  border-color: #c084fc !important;
+  color: #6b21a8 !important;
 }
 
 .calendar-day-num {
