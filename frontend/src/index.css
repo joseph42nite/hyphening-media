@@ -644,8 +644,22 @@ tr:hover td {
   color: #ffffff !important;
 }
 
-.calendar-cell.today .calendar-event-tag {
-  border-color: #ffffff !important;
+.calendar-cell.today .calendar-event-task {
+  background: #1e3a8a !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+}
+
+.calendar-cell.today .calendar-event-gig {
+  background: #78350f !important;
+  color: #ffffff !important;
+  border-color: #f59e0b !important;
+}
+
+.calendar-cell.today .calendar-event-content {
+  background: #581c87 !important;
+  color: #ffffff !important;
+  border-color: #c084fc !important;
 }
 
 .calendar-day-num {
