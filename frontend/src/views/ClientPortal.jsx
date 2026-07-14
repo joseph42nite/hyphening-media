@@ -2084,6 +2084,43 @@ export default function ClientPortal({ showToast }) {
                 const info = integrations[app.key] || {};
                 const isConn = info.connected;
 
+                if (isConn) {
+                  return (
+                    <div key={app.key} className="portal-bento-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: '#f0fdf4', borderColor: '#bbf7d0', position: 'relative' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>{app.icon}</span>
+                        <div>
+                          <h3 style={{ fontSize: '0.8rem', margin: 0, fontWeight: 800, color: '#166534', lineHeight: 1.1 }}>
+                            {app.name.split(' ')[0]} ✓
+                          </h3>
+                          {info.accountName && (
+                            <span style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600, display: 'block', marginTop: '2px' }}>
+                              @{info.accountName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => handleConnectApp(app.key)}
+                        disabled={connectingApp === app.key}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#166534',
+                          fontSize: '0.65rem',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: 0
+                        }}
+                      >
+                        {connectingApp === app.key ? '...' : 'Switch'}
+                      </button>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={app.key} className="portal-bento-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px', position: 'relative', overflow: 'hidden', padding: '12px 14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
