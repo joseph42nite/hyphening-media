@@ -2073,34 +2073,34 @@ export default function ClientPortal({ showToast }) {
             </div>
 
             {/* Section A: Connected Accounts Bento Grid */}
-            <div className="portal-metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+            <div className="portal-metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px' }}>
               {[
-                { key: 'instagram', name: 'Instagram Business', desc: 'Reels, Posts & Direct Video Stream', icon: '📸' },
-                { key: 'youtube', name: 'YouTube Channel', desc: 'Shorts & Long-form Retention Graphs', icon: '▶️' },
-                { key: 'linkedin', name: 'LinkedIn Company', desc: 'Organization & Professional Video', icon: '💼' },
-                { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Social Engagement', icon: '📘' },
-                { key: 'x', name: 'X (Twitter)', desc: 'Direct Video Posts & Tweet Stream', icon: '𝕏' }
+                { key: 'instagram', name: 'Instagram Business', desc: 'Reels, Posts & Video Stream', icon: '📸' },
+                { key: 'youtube', name: 'YouTube Channel', desc: 'Shorts & retention graphs', icon: '▶️' },
+                { key: 'linkedin', name: 'LinkedIn Company', desc: 'Professional Video Posts', icon: '💼' },
+                { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Engagement', icon: '📘' },
+                { key: 'x', name: 'X (Twitter)', desc: 'Direct Video Posts', icon: '𝕏' }
               ].map(app => {
                 const info = integrations[app.key] || {};
                 const isConn = info.connected;
 
                 return (
-                  <div key={app.key} className="portal-bento-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '1.6rem' }}>{app.icon}</span>
+                  <div key={app.key} className="portal-bento-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px', position: 'relative', overflow: 'hidden', padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>{app.icon}</span>
                         <div>
-                          <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: 800, color: '#000000' }}>{app.name}</h3>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{app.desc}</span>
+                          <h3 style={{ fontSize: '0.85rem', margin: 0, fontWeight: 800, color: '#000000', lineHeight: 1.2 }}>{app.name}</h3>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{app.desc}</span>
                         </div>
                       </div>
-                      <span className={`portal-badge ${isConn ? 'portal-badge-success' : 'portal-badge-warning'}`}>
-                        {isConn ? 'Connected ✓' : 'Not Connected'}
+                      <span className={`portal-badge ${isConn ? 'portal-badge-success' : 'portal-badge-warning'}`} style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                        {isConn ? 'Connected' : 'Unlinked'}
                       </span>
                     </div>
 
                     {isConn && info.accountName && (
-                      <div style={{ fontSize: '0.8rem', background: '#f4f4f5', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e4e4e7', color: '#000000', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.75rem', background: '#f4f4f5', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e4e4e7', color: '#000000', fontWeight: 600 }}>
                         Account: <strong>@{info.accountName}</strong>
                       </div>
                     )}
@@ -2114,8 +2114,9 @@ export default function ClientPortal({ showToast }) {
                         justify: 'center',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.85rem',
+                        gap: '4px',
+                        fontSize: '0.75rem',
+                        padding: '6px 12px',
                         marginTop: 'auto',
                         background: isConn ? '#dcfce7' : '#000000',
                         color: isConn ? '#166534' : '#ffffff',
@@ -2125,9 +2126,9 @@ export default function ClientPortal({ showToast }) {
                       {connectingApp === app.key ? (
                         <>Connecting...</>
                       ) : isConn ? (
-                        <><CheckCircle size={14} /> Reconnect / Switch</>
+                        <><CheckCircle size={12} /> Reconnect / Switch</>
                       ) : (
-                        <><Zap size={14} /> Connect {app.name.split(' ')[0]}</>
+                        <><Zap size={12} /> Connect {app.name.split(' ')[0]}</>
                       )}
                     </button>
                   </div>
