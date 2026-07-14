@@ -24,7 +24,7 @@ function autoExtractIds(link, platform, target) {
         target.youtube_video_id = match[1];
       }
     } else if (plat.includes('facebook')) {
-      const fbRegex = /(?:posts|permalink\.php\?story_fbid=|videos|story_fbid=|fbid=|\/)([0-9]{8,20})/i;
+      const fbRegex = /(?:(?:posts|videos|reel|watch|story)\/|permalink\.php\?story_fbid=|story_fbid=|fbid=|[?&]v=)([0-9]{8,20})/i;
       const match = link.match(fbRegex);
       if (match && match[1]) {
         target.facebook_post_id = match[1];
