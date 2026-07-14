@@ -12,6 +12,49 @@ import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js'
 
 const router = Router();
 
+function autoExtractIds(link, platform, target) {
+  if (!link) return;
+  const plat = (platform || '').toLowerCase();
+
+  try {
+    if (plat.includes('youtube')) {
+      const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|shorts\/|watch\?v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+      const match = link.match(ytRegex);
+      if (match && match[1]) {
+        target.youtube_video_id = match[1];
+      }
+    } else if (plat.includes('facebook')) {
+      const fbRegex = /(?:posts|permalink\.php\?story_fbid=|videos|story_fbid=|fbid=|\/)([0-9]{8,20})/i;
+      const match = link.match(fbRegex);
+      if (match && match[1]) {
+        target.facebook_post_id = match[1];
+      }
+    } else if (plat.includes('instagram')) {
+      const igRegex = /instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9-_]+)/i;
+      const match = link.match(igRegex);
+      if (match && match[1]) {
+        const shortcode = match[1];
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+        let id = 0n;
+        let valid = true;
+        for (let i = 0; i < shortcode.length; i++) {
+          const idx = alphabet.indexOf(shortcode[i]);
+          if (idx === -1) {
+            valid = false;
+            break;
+          }
+          id = id * 64n + BigInt(idx);
+        }
+        if (valid) {
+          target.instagram_media_id = id.toString();
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[AUTO-EXTRACT] Error parsing link:', err.message);
+  }
+}
+
 router.use(authenticate);
 
 // =========================================
@@ -127,6 +170,18 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
     };
     const computed = computeContentMetrics(rowForMetrics);
 
+    let finalFacebookPostId = facebook_post_id || null;
+    let finalInstagramMediaId = instagram_media_id || null;
+    let finalYoutubeVideoId = youtube_video_id || null;
+
+    if (link) {
+      const extracted = {};
+      autoExtractIds(link, platform, extracted);
+      if (extracted.facebook_post_id) finalFacebookPostId = extracted.facebook_post_id;
+      if (extracted.instagram_media_id) finalInstagramMediaId = extracted.instagram_media_id;
+      if (extracted.youtube_video_id) finalYoutubeVideoId = extracted.youtube_video_id;
+    }
+
     const result = db.prepare(`
       INSERT INTO marketing_content_tracker (
         client_id, platform, date, post_type, title, script, link, time, caption, status, client_comments, client_approved, source,
@@ -163,9 +218,9 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       computed.engagement_rate_pct,
       computed.save_rate_pct,
       computed.content_score,
-      facebook_post_id || null,
-      instagram_media_id || null,
-      youtube_video_id || null,
+      finalFacebookPostId,
+      finalInstagramMediaId,
+      finalYoutubeVideoId,
       finalAssignedTo
     );
 
@@ -267,6 +322,15 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
 
     if (Object.keys(updates).length === 0 && req.body.script_id === undefined) {
       return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    if (updates.link !== undefined) {
+      const targetPlatform = updates.platform || content.platform || '';
+      const extracted = {};
+      autoExtractIds(updates.link, targetPlatform, extracted);
+      if (extracted.facebook_post_id) updates.facebook_post_id = extracted.facebook_post_id;
+      if (extracted.instagram_media_id) updates.instagram_media_id = extracted.instagram_media_id;
+      if (extracted.youtube_video_id) updates.youtube_video_id = extracted.youtube_video_id;
     }
 
     if (updates.post_type !== undefined && ['reel', 'youtube', 'short'].includes((updates.post_type || '').toLowerCase())) {
