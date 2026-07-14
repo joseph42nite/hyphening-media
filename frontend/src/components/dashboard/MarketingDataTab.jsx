@@ -29,7 +29,7 @@ export default function MarketingDataTab({
     platform: 'instagram', date: '', post_type: 'Reel', title: '', script: '', script_id: '', status: 'Draft', link: '', time: '', caption: '',
     views: '', likes: '', comments: '', shares: '', saves: '', follows: '', avg_watch_time_pct: '', boosted: 'No',
     youtube_views: '', youtube_watch_time: '', youtube_avg_view_duration: '', youtube_ctr: '',
-    facebook_post_id: '', instagram_media_id: '', youtube_video_id: '',
+    facebook_post_id: '', instagram_media_id: '', youtube_video_id: '', linkedin_post_id: '',
     instagram_link: '', youtube_link: '', facebook_link: '', linkedin_link: '',
     assigned_to: ''
   });
@@ -91,6 +91,7 @@ export default function MarketingDataTab({
         facebook_post_id: content.facebook_post_id || '',
         instagram_media_id: content.instagram_media_id || '',
         youtube_video_id: content.youtube_video_id || '',
+        linkedin_post_id: content.linkedin_post_id || '',
         instagram_link: content.instagram_link || '',
         youtube_link: content.youtube_link || '',
         facebook_link: content.facebook_link || '',
@@ -103,7 +104,7 @@ export default function MarketingDataTab({
         platform: 'instagram', date: '', post_type: 'Reel', title: '', script: '', script_id: '', status: 'Draft', link: '', time: '', caption: '',
         views: '', likes: '', comments: '', shares: '', saves: '', follows: '', avg_watch_time_pct: '', boosted: 'No',
         youtube_views: '', youtube_watch_time: '', youtube_avg_view_duration: '', youtube_ctr: '',
-        facebook_post_id: '', instagram_media_id: '', youtube_video_id: '',
+        facebook_post_id: '', instagram_media_id: '', youtube_video_id: '', linkedin_post_id: '',
         instagram_link: '', youtube_link: '', facebook_link: '', linkedin_link: '',
         assigned_to: ''
       });
@@ -146,6 +147,7 @@ export default function MarketingDataTab({
       facebook_post_id: contentFormData.facebook_post_id || null,
       instagram_media_id: contentFormData.instagram_media_id || null,
       youtube_video_id: contentFormData.youtube_video_id || null,
+      linkedin_post_id: contentFormData.linkedin_post_id || null,
       instagram_link: contentFormData.instagram_link || null,
       youtube_link: contentFormData.youtube_link || null,
       facebook_link: contentFormData.facebook_link || null,

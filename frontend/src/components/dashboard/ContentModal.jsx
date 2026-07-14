@@ -254,7 +254,7 @@ export default function ContentModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div className="form-group">
               <label className="form-label">Facebook Post ID</label>
               <input
@@ -283,6 +283,16 @@ export default function ContentModal({
                 placeholder="yt_..."
                 value={contentFormData.youtube_video_id}
                 onChange={e => setContentFormData({ ...contentFormData, youtube_video_id: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">LinkedIn Post ID</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="urn:li:share:..."
+                value={contentFormData.linkedin_post_id || ''}
+                onChange={e => setContentFormData({ ...contentFormData, linkedin_post_id: e.target.value })}
               />
             </div>
           </div>
