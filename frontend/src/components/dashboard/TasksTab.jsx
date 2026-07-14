@@ -557,11 +557,14 @@ export default function TasksTab({
               <div className="calendar-grid">
                 {getCalendarCells().map((cell, idx) => {
                   const isSelected = cell.dateStr === selectedDateStr;
+                  const today = new Date();
+                  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                  const isToday = cell.dateStr === todayStr;
                   return (
                     <div
                       key={idx}
                       onClick={() => cell.isCurrentMonth && setSelectedDateStr(cell.dateStr)}
-                      className={`calendar-cell ${!cell.isCurrentMonth ? 'outside-month' : ''} ${isSelected ? 'selected' : ''}`}
+                      className={`calendar-cell ${!cell.isCurrentMonth ? 'outside-month' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
                     >
                       <div className="calendar-day-num">
                         {cell.dayNum}

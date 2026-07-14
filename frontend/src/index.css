@@ -630,6 +630,24 @@ tr:hover td {
   box-shadow: var(--shadow-sm);
 }
 
+.calendar-cell.today {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+.calendar-cell.today .calendar-day-num {
+  color: #ffffff !important;
+}
+
+.calendar-cell.today .calendar-cell-events div {
+  color: #ffffff !important;
+}
+
+.calendar-cell.today .calendar-event-tag {
+  border-color: #ffffff !important;
+}
+
 .calendar-day-num {
   font-weight: 800;
   font-size: 0.95rem;

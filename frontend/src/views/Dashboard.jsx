@@ -1112,8 +1112,41 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         <button onClick={() => setActiveTab('tasks')} className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`}>
           <Layers size={16} /> Kanban Tasks
         </button>
-        <button onClick={() => setActiveTab('client-workspaces')} className={`btn ${activeTab === 'client-workspaces' ? 'btn-primary' : 'btn-secondary'}`}>
+        <button 
+          onClick={() => setActiveTab('client-workspaces')} 
+          className={`btn ${activeTab === 'client-workspaces' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ position: 'relative' }}
+        >
           <MessageSquare size={16} /> Client Workspace
+          {(() => {
+            const totalUnseen = Object.values(unseenCounts).reduce((acc, curr) => acc + (curr || 0), 0);
+            if (totalUnseen > 0) {
+              return (
+                <span style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '-8px',
+                  background: 'var(--warning)',
+                  color: '#000',
+                  border: '2px solid #000',
+                  borderRadius: '50%',
+                  minWidth: '20px',
+                  height: '20px',
+                  padding: '2px',
+                  fontSize: '0.65rem',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '1px 1px 0px #000',
+                  zIndex: 10
+                }}>
+                  {totalUnseen}
+                </span>
+              );
+            }
+            return null;
+          })()}
         </button>
         <button onClick={() => setActiveTab('calendar')} className={`btn ${activeTab === 'calendar' ? 'btn-primary' : 'btn-secondary'}`}>
           <Calendar size={16} /> Calendar
