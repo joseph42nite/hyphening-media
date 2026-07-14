@@ -420,7 +420,7 @@ router.get('/:token/scripts', portalAuth, (req, res) => {
   try {
     const scripts = db.prepare(`
       SELECT s.id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.updated_at,
-             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
+             t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
       LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
@@ -455,57 +455,7 @@ router.get('/:token/seo-reports', portalAuth, (req, res) => {
   }
 });
 
-// Helper: auto-link a standalone script to the content tracker upon client approval/rejection
-const getOrCreateContentForScript = (db, scriptId, clientId) => {
-  // Check if relation already exists
-  const existing = db.prepare(`
-    SELECT t.* FROM marketing_content_tracker t
-    JOIN marketing_content_script_relation r ON t.id = r.content_id
-    WHERE r.script_id = ? AND t.client_id = ?
-  `).get(scriptId, clientId);
 
-  if (existing) {
-    return existing;
-  }
-
-  // Load script
-  const script = db.prepare(
-    'SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?'
-  ).get(scriptId, clientId);
-
-  if (!script) return null;
-
-  // Create content tracker entry
-  const scheduledDate = script.month ? `${script.month}-01` : null;
-  const platform = script.format === 'long_format' ? 'youtube' : 'instagram';
-  const postType = script.format === 'long_format' ? 'Youtube' : 'Reel';
-
-  const result = db.prepare(`
-    INSERT INTO marketing_content_tracker (
-      client_id, platform, date, post_type, title, script, status, client_approved, source, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, ?)
-  `).run(
-    clientId,
-    platform,
-    scheduledDate,
-    postType,
-    script.title,
-    script.script_text,
-    'Pending Client Approval',
-    new Date().toISOString(),
-    new Date().toISOString()
-  );
-
-  const contentId = result.lastInsertRowid;
-
-  // Insert relation
-  db.prepare(`
-    INSERT INTO marketing_content_script_relation (content_id, script_id)
-    VALUES (?, ?)
-  `).run(contentId, scriptId);
-
-  return db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ?').get(contentId);
-};
 
 /**
  * POST /api/portal/:token/content-plan/script/:scriptId/approve
@@ -513,24 +463,43 @@ const getOrCreateContentForScript = (db, scriptId, clientId) => {
  */
 router.post('/:token/content-plan/script/:scriptId/approve', portalAuth, (req, res) => {
   try {
-    const content = getOrCreateContentForScript(db, req.params.scriptId, req.portalClient.id);
-    if (!content) return res.status(404).json({ error: 'Script not found' });
+    const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?')
+      .get(req.params.scriptId, req.portalClient.id);
+    if (!script) return res.status(404).json({ error: 'Script not found' });
 
+    const now = new Date().toISOString();
+
+    // 1. Update script itself
     db.prepare(`
-      UPDATE marketing_content_tracker 
-      SET client_approved = 1, status = 'Client Approved', updated_at = ?
+      UPDATE marketing_scripts
+      SET status = 'Client Approved', client_comments = NULL, updated_at = ?
       WHERE id = ?
-    `).run(new Date().toISOString(), content.id);
+    `).run(now, req.params.scriptId);
 
-    syncContentToKanbanTask(content.id, db);
+    // 2. Find linked content tracker entry
+    const relation = db.prepare(`
+      SELECT t.* FROM marketing_content_tracker t
+      JOIN marketing_content_script_relation r ON t.id = r.content_id
+      WHERE r.script_id = ? AND t.client_id = ?
+    `).get(req.params.scriptId, req.portalClient.id);
+
+    if (relation) {
+      db.prepare(`
+        UPDATE marketing_content_tracker 
+        SET client_approved = 1, status = 'Client Approved', client_comments = NULL, updated_at = ?
+        WHERE id = ?
+      `).run(now, relation.id);
+
+      syncContentToKanbanTask(relation.id, db);
+    }
 
     logAction({
       actorId: null,
       actorEmail: req.portalClient.contact_email,
       action: 'client_approve',
-      entityType: 'content',
-      entityId: content.id,
-      diff: { client: req.portalClient.name },
+      entityType: 'script',
+      entityId: parseInt(req.params.scriptId),
+      diff: { client: req.portalClient.name, is_standalone_script: !relation },
     });
 
     res.json({ message: 'Script approved', status: 'Client Approved' });
@@ -549,27 +518,46 @@ router.post('/:token/content-plan/script/:scriptId/reject', portalAuth, (req, re
     const { comment } = req.body;
     if (!comment) return res.status(400).json({ error: 'A comment is required when requesting changes' });
 
-    const content = getOrCreateContentForScript(db, req.params.scriptId, req.portalClient.id);
-    if (!content) return res.status(404).json({ error: 'Script not found' });
+    const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?')
+      .get(req.params.scriptId, req.portalClient.id);
+    if (!script) return res.status(404).json({ error: 'Script not found' });
 
+    const now = new Date().toISOString();
+
+    // 1. Update script itself
     db.prepare(`
-      UPDATE marketing_content_tracker 
-      SET client_approved = 0, status = 'Client Rejected', client_comments = ?, updated_at = ?
+      UPDATE marketing_scripts
+      SET status = 'Client Rejected', client_comments = ?, updated_at = ?
       WHERE id = ?
-    `).run(comment, new Date().toISOString(), content.id);
+    `).run(comment, now, req.params.scriptId);
 
-    syncContentToKanbanTask(content.id, db);
+    // 2. Find linked content tracker entry
+    const relation = db.prepare(`
+      SELECT t.* FROM marketing_content_tracker t
+      JOIN marketing_content_script_relation r ON t.id = r.content_id
+      WHERE r.script_id = ? AND t.client_id = ?
+    `).get(req.params.scriptId, req.portalClient.id);
+
+    if (relation) {
+      db.prepare(`
+        UPDATE marketing_content_tracker 
+        SET client_approved = 0, status = 'Client Rejected', client_comments = ?, updated_at = ?
+        WHERE id = ?
+      `).run(comment, now, relation.id);
+
+      syncContentToKanbanTask(relation.id, db);
+    }
 
     logAction({
       actorId: null,
       actorEmail: req.portalClient.contact_email,
       action: 'client_reject',
-      entityType: 'content',
-      entityId: content.id,
-      diff: { client: req.portalClient.name, comment },
+      entityType: 'script',
+      entityId: parseInt(req.params.scriptId),
+      diff: { client: req.portalClient.name, comment, is_standalone_script: !relation },
     });
 
-    notifyAdmin(`⚠️ *Client Revision Request*\nClient *${req.portalClient.name}* requested changes on script *"${content.title}"*\n\n💬 *Feedback:* ${comment}`);
+    notifyAdmin(`⚠️ *Client Revision Request*\nClient *${req.portalClient.name}* requested changes on script *"${script.title}"*\n\n💬 *Feedback:* ${comment}`);
 
     res.json({ message: 'Changes requested', status: 'Client Rejected' });
   } catch (err) {

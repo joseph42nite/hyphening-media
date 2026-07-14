@@ -83,15 +83,25 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
     } = req.body;
 
     let finalTitle = title;
+    let finalScriptText = script;
+    let finalStatus = status || 'Draft';
+    let finalClientComments = null;
+    let finalClientApproved = 0;
+
     if (script_id) {
-      const scriptObj = db.prepare('SELECT title FROM marketing_scripts WHERE id = ?').get(script_id);
-      if (scriptObj && scriptObj.title) {
-        finalTitle = scriptObj.title;
+      const scriptObj = db.prepare('SELECT title, script_text, status, client_comments FROM marketing_scripts WHERE id = ?').get(script_id);
+      if (scriptObj) {
+        if (!finalTitle) finalTitle = scriptObj.title;
+        if (!finalScriptText) finalScriptText = scriptObj.script_text;
+        if (!status) finalStatus = scriptObj.status || 'Draft';
+        finalClientComments = scriptObj.client_comments;
+        finalClientApproved = ['Client Approved', 'Posted'].includes(finalStatus) ? 1 : 0;
       }
     }
+
     if (!finalTitle) {
-      if (script) {
-        finalTitle = script.slice(0, 30) + (script.length > 30 ? '...' : '');
+      if (finalScriptText) {
+        finalTitle = finalScriptText.slice(0, 30) + (finalScriptText.length > 30 ? '...' : '');
       } else if (caption) {
         finalTitle = caption.slice(0, 30) + (caption.length > 30 ? '...' : '');
       } else {
@@ -119,23 +129,25 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
 
     const result = db.prepare(`
       INSERT INTO marketing_content_tracker (
-        client_id, platform, date, post_type, title, script, link, time, caption, status, source,
+        client_id, platform, date, post_type, title, script, link, time, caption, status, client_comments, client_approved, source,
         views, likes, comments, shares, saves, avg_watch_time_pct, boosted, follows,
         youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
         engagement_rate_pct, save_rate_pct, content_score,
         facebook_post_id, instagram_media_id, youtube_video_id, assigned_to
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       clientId,
       platform || null,
       date || null,
       post_type || null,
       finalTitle,
-      script || null,
+      finalScriptText || null,
       link || null,
       time || null,
       caption || null,
-      status || 'Draft',
+      finalStatus,
+      finalClientComments,
+      finalClientApproved,
       views || 0,
       likes || 0,
       comments || 0,
@@ -291,10 +303,22 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
         db.prepare('INSERT INTO marketing_content_script_relation (content_id, script_id) VALUES (?, ?)')
           .run(req.params.contentId, script_id);
         
-        const scriptObj = db.prepare('SELECT title FROM marketing_scripts WHERE id = ?').get(script_id);
-        if (scriptObj && scriptObj.title) {
-          db.prepare('UPDATE marketing_content_tracker SET title = ? WHERE id = ?')
-            .run(scriptObj.title, req.params.contentId);
+        const scriptObj = db.prepare('SELECT title, script_text, status, client_comments FROM marketing_scripts WHERE id = ?').get(script_id);
+        if (scriptObj) {
+          const clientApproved = ['Client Approved', 'Posted'].includes(scriptObj.status) ? 1 : 0;
+          db.prepare(`
+            UPDATE marketing_content_tracker 
+            SET title = ?, script = ?, status = ?, client_comments = ?, client_approved = ?, updated_at = ?
+            WHERE id = ?
+          `).run(
+            scriptObj.title, 
+            scriptObj.script_text, 
+            scriptObj.status || 'Draft', 
+            scriptObj.client_comments || null, 
+            clientApproved, 
+            new Date().toISOString(),
+            req.params.contentId
+          );
         }
       }
     }
@@ -639,54 +663,33 @@ const setScriptStatusAndComments = (db, clientId, scriptId, status, clientCommen
   const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?').get(scriptId, clientId);
   if (!script) return;
 
+  const now = new Date().toISOString();
+
+  // 1. Update the status and comments directly on the script itself
+  db.prepare(`
+    UPDATE marketing_scripts
+    SET status = ?, client_comments = ?, updated_at = ?
+    WHERE id = ?
+  `).run(status, clientComments || null, now, scriptId);
+
+  // 2. Find linked content tracker entry
   let relation = db.prepare(`
     SELECT t.* FROM marketing_content_tracker t
     JOIN marketing_content_script_relation r ON t.id = r.content_id
     WHERE r.script_id = ? AND t.client_id = ?
   `).get(scriptId, clientId);
 
-  const now = new Date().toISOString();
-
-  if (!relation) {
-    const scheduledDate = script.month ? `${script.month}-01` : null;
-    const platform = script.format === 'long_format' ? 'youtube' : 'instagram';
-    const postType = script.format === 'long_format' ? 'Youtube' : 'Reel';
-
-    const insertResult = db.prepare(`
-      INSERT INTO marketing_content_tracker (
-        client_id, platform, date, post_type, title, script, status, client_approved, source, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, ?)
-    `).run(
-      clientId,
-      platform,
-      scheduledDate,
-      postType,
-      script.title,
-      script.script_text,
-      status,
-      now,
-      now
-    );
-
-    const contentId = insertResult.lastInsertRowid;
-
+  // 3. If there is a relation, sync the status and client approved state, and trigger Kanban task sync
+  if (relation) {
+    const clientApproved = ['Client Approved', 'Posted'].includes(status) ? 1 : 0;
     db.prepare(`
-      INSERT INTO marketing_content_script_relation (content_id, script_id)
-      VALUES (?, ?)
-    `).run(contentId, scriptId);
+      UPDATE marketing_content_tracker
+      SET status = ?, client_approved = ?, client_comments = ?, updated_at = ?
+      WHERE id = ?
+    `).run(status, clientApproved, clientComments || null, now, relation.id);
 
-    relation = { id: contentId };
+    syncContentToKanbanTask(relation.id, db);
   }
-
-  const clientApproved = ['Client Approved', 'Posted'].includes(status) ? 1 : 0;
-
-  db.prepare(`
-    UPDATE marketing_content_tracker
-    SET status = ?, client_approved = ?, client_comments = ?, updated_at = ?
-    WHERE id = ?
-  `).run(status, clientApproved, clientComments || null, now, relation.id);
-
-  syncContentToKanbanTask(relation.id, db);
 };
 
 /**
@@ -698,7 +701,7 @@ router.get('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manage
     const { month } = req.query;
     let query = `
       SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
-             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
+             t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
       LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
@@ -732,15 +735,21 @@ router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manag
     }
 
     const result = db.prepare(`
-      INSERT INTO marketing_scripts (client_id, month, title, script_text, reference_video_link, reaction_video_link, format)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(req.params.id, month, title, script_text, reference_video_link || null, reaction_video_link || null, format || 'reel');
+      INSERT INTO marketing_scripts (client_id, month, title, script_text, reference_video_link, reaction_video_link, format, status, client_comments)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      req.params.id, 
+      month, 
+      title, 
+      script_text, 
+      reference_video_link || null, 
+      reaction_video_link || null, 
+      format || 'reel',
+      status || 'Pending Client Approval',
+      client_comments || null
+    );
 
     const newScriptId = result.lastInsertRowid;
-
-    if (status) {
-      setScriptStatusAndComments(db, req.params.id, newScriptId, status, client_comments);
-    }
 
     logAction({
       actorId: req.user.id,
@@ -748,13 +757,13 @@ router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manag
       action: 'create',
       entityType: 'script',
       entityId: newScriptId,
-      diff: { title, month, status },
+      diff: { title, month, status: status || 'Pending Client Approval' },
       ip: req.ip,
     });
 
     const script = db.prepare(`
       SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
-             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
+             t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
       LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
@@ -810,7 +819,7 @@ router.patch('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_
 
     const updatedScript = db.prepare(`
       SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
-             t.id AS content_id, t.status AS content_status, t.client_comments AS client_comments
+             t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
       LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
@@ -869,6 +878,15 @@ router.put('/:id/marketing/scripts/:scriptId/status', authorize('admin', 'ops_so
     const script = db.prepare('SELECT * FROM marketing_scripts WHERE id = ? AND client_id = ?').get(scriptId, clientId);
     if (!script) return res.status(404).json({ error: 'Script not found' });
 
+    const now = new Date().toISOString();
+
+    // 1. Update status on script itself
+    db.prepare(`
+      UPDATE marketing_scripts
+      SET status = ?, client_comments = ?, updated_at = ?
+      WHERE id = ?
+    `).run(status, rejection_reason || null, now, scriptId);
+
     // Find linked content tracker entry
     let relation = db.prepare(`
       SELECT t.* FROM marketing_content_tracker t
@@ -876,58 +894,25 @@ router.put('/:id/marketing/scripts/:scriptId/status', authorize('admin', 'ops_so
       WHERE r.script_id = ? AND t.client_id = ?
     `).get(scriptId, clientId);
 
-    const now = new Date().toISOString();
-
-    if (!relation) {
-      // Create one on the fly
-      const scheduledDate = script.month ? `${script.month}-01` : null;
-      const platform = script.format === 'long_format' ? 'youtube' : 'instagram';
-      const postType = script.format === 'long_format' ? 'Youtube' : 'Reel';
-
-      const insertResult = db.prepare(`
-        INSERT INTO marketing_content_tracker (
-          client_id, platform, date, post_type, title, script, status, client_approved, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'manual', ?, ?)
-      `).run(
-        clientId,
-        platform,
-        scheduledDate,
-        postType,
-        script.title,
-        script.script_text,
-        status,
-        now,
-        now
-      );
-
-      const contentId = insertResult.lastInsertRowid;
-
-      // Link relation
+    if (relation) {
+      const clientApproved = ['Client Approved', 'Posted'].includes(status) ? 1 : 0;
+      
       db.prepare(`
-        INSERT INTO marketing_content_script_relation (content_id, script_id)
-        VALUES (?, ?)
-      `).run(contentId, scriptId);
+        UPDATE marketing_content_tracker
+        SET status = ?, client_approved = ?, client_comments = ?, updated_at = ?
+        WHERE id = ?
+      `).run(status, clientApproved, rejection_reason || null, now, relation.id);
 
-      relation = { id: contentId };
+      syncContentToKanbanTask(relation.id, db);
     }
-
-    const clientApproved = ['Client Approved', 'Posted'].includes(status) ? 1 : 0;
-    
-    db.prepare(`
-      UPDATE marketing_content_tracker
-      SET status = ?, client_approved = ?, client_comments = ?, updated_at = ?
-      WHERE id = ?
-    `).run(status, clientApproved, rejection_reason || null, now, relation.id);
-
-    syncContentToKanbanTask(relation.id, db);
 
     logAction({
       actorId: req.user.id,
       actorEmail: req.user.email,
       action: 'update_status',
-      entityType: 'content',
-      entityId: relation.id,
-      diff: { status, client_approved: clientApproved, client_comments: rejection_reason },
+      entityType: 'script',
+      entityId: parseInt(scriptId),
+      diff: { status, client_comments: rejection_reason, is_standalone_script: !relation },
       ip: req.ip,
     });
 
