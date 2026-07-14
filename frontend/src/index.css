@@ -631,17 +631,11 @@ tr:hover td {
 }
 
 .calendar-cell.today {
-  background: #f3e8ff !important;
-  color: #6b21a8 !important;
   border-color: #6b21a8 !important;
   border-width: 3px !important;
 }
 
 .calendar-cell.today .calendar-day-num {
-  color: #6b21a8 !important;
-}
-
-.calendar-cell.today .calendar-cell-events div {
   color: #6b21a8 !important;
 }
 
