@@ -169,6 +169,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     facebook_post_id: '',
     instagram_media_id: '',
     youtube_video_id: '',
+    instagram_link: '',
+    youtube_link: '',
+    facebook_link: '',
+    linkedin_link: '',
     assigned_to: ''
   });
 
@@ -858,6 +862,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         facebook_post_id: content.facebook_post_id || '',
         instagram_media_id: content.instagram_media_id || '',
         youtube_video_id: content.youtube_video_id || '',
+        instagram_link: content.instagram_link || '',
+        youtube_link: content.youtube_link || '',
+        facebook_link: content.facebook_link || '',
+        linkedin_link: content.linkedin_link || '',
         assigned_to: content.assigned_to !== null && content.assigned_to !== undefined ? String(content.assigned_to) : ''
       });
     } else {
@@ -896,6 +904,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         facebook_post_id: '',
         instagram_media_id: '',
         youtube_video_id: '',
+        instagram_link: '',
+        youtube_link: '',
+        facebook_link: '',
+        linkedin_link: '',
         assigned_to: videoEditor ? String(videoEditor.id) : ''
       });
     }
@@ -937,6 +949,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       facebook_post_id: contentFormData.facebook_post_id || null,
       instagram_media_id: contentFormData.instagram_media_id || null,
       youtube_video_id: contentFormData.youtube_video_id || null,
+      instagram_link: contentFormData.instagram_link || null,
+      youtube_link: contentFormData.youtube_link || null,
+      facebook_link: contentFormData.facebook_link || null,
+      linkedin_link: contentFormData.linkedin_link || null,
       assigned_to: contentFormData.assigned_to !== '' ? parseInt(contentFormData.assigned_to) : null
     };
 

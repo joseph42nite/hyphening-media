@@ -122,6 +122,7 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       follows, youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
       script_id,
       facebook_post_id, instagram_media_id, youtube_video_id,
+      instagram_link, youtube_link, facebook_link, linkedin_link,
       assigned_to
     } = req.body;
 
@@ -181,6 +182,21 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       if (extracted.instagram_media_id) finalInstagramMediaId = extracted.instagram_media_id;
       if (extracted.youtube_video_id) finalYoutubeVideoId = extracted.youtube_video_id;
     }
+    if (instagram_link) {
+      const ext = {};
+      autoExtractIds(instagram_link, 'instagram', ext);
+      if (ext.instagram_media_id) finalInstagramMediaId = ext.instagram_media_id;
+    }
+    if (youtube_link) {
+      const ext = {};
+      autoExtractIds(youtube_link, 'youtube', ext);
+      if (ext.youtube_video_id) finalYoutubeVideoId = ext.youtube_video_id;
+    }
+    if (facebook_link) {
+      const ext = {};
+      autoExtractIds(facebook_link, 'facebook', ext);
+      if (ext.facebook_post_id) finalFacebookPostId = ext.facebook_post_id;
+    }
 
     const result = db.prepare(`
       INSERT INTO marketing_content_tracker (
@@ -188,8 +204,9 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
         views, likes, comments, shares, saves, avg_watch_time_pct, boosted, follows,
         youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
         engagement_rate_pct, save_rate_pct, content_score,
-        facebook_post_id, instagram_media_id, youtube_video_id, assigned_to
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        facebook_post_id, instagram_media_id, youtube_video_id, assigned_to,
+        instagram_link, youtube_link, facebook_link, linkedin_link
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       clientId,
       platform || null,
@@ -221,7 +238,11 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       finalFacebookPostId,
       finalInstagramMediaId,
       finalYoutubeVideoId,
-      finalAssignedTo
+      finalAssignedTo,
+      instagram_link || null,
+      youtube_link || null,
+      facebook_link || null,
+      linkedin_link || null
     );
 
     if (script_id) {
@@ -310,7 +331,8 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       'boosted', 'metric_override',
       'link', 'time', 'caption', 'follows',
       'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr',
-      'facebook_post_id', 'instagram_media_id', 'youtube_video_id', 'assigned_to'
+      'facebook_post_id', 'instagram_media_id', 'youtube_video_id', 'assigned_to',
+      'instagram_link', 'youtube_link', 'facebook_link', 'linkedin_link'
     ];
 
     const updates = {};
@@ -331,6 +353,21 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       if (extracted.facebook_post_id) updates.facebook_post_id = extracted.facebook_post_id;
       if (extracted.instagram_media_id) updates.instagram_media_id = extracted.instagram_media_id;
       if (extracted.youtube_video_id) updates.youtube_video_id = extracted.youtube_video_id;
+    }
+    if (updates.instagram_link !== undefined) {
+      const extracted = {};
+      autoExtractIds(updates.instagram_link, 'instagram', extracted);
+      if (extracted.instagram_media_id) updates.instagram_media_id = extracted.instagram_media_id;
+    }
+    if (updates.youtube_link !== undefined) {
+      const extracted = {};
+      autoExtractIds(updates.youtube_link, 'youtube', extracted);
+      if (extracted.youtube_video_id) updates.youtube_video_id = extracted.youtube_video_id;
+    }
+    if (updates.facebook_link !== undefined) {
+      const extracted = {};
+      autoExtractIds(updates.facebook_link, 'facebook', extracted);
+      if (extracted.facebook_post_id) updates.facebook_post_id = extracted.facebook_post_id;
     }
 
     if (updates.post_type !== undefined && ['reel', 'youtube', 'short'].includes((updates.post_type || '').toLowerCase())) {

@@ -119,23 +119,46 @@ export default function ContentModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
-              <label className="form-label">Link</label>
+              <label className="form-label">Instagram Link (Cross-Post)</label>
               <input
                 type="url"
                 className="form-control"
-                value={contentFormData.link}
-                onChange={e => setContentFormData({ ...contentFormData, link: e.target.value })}
-                placeholder="https://..."
+                value={contentFormData.instagram_link || ''}
+                onChange={e => setContentFormData({ ...contentFormData, instagram_link: e.target.value })}
+                placeholder="https://instagram.com/p/..."
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Time</label>
+              <label className="form-label">YouTube Link (Cross-Post)</label>
               <input
-                type="text"
+                type="url"
                 className="form-control"
-                value={contentFormData.time}
-                onChange={e => setContentFormData({ ...contentFormData, time: e.target.value })}
-                placeholder="e.g. 18:00"
+                value={contentFormData.youtube_link || ''}
+                onChange={e => setContentFormData({ ...contentFormData, youtube_link: e.target.value })}
+                placeholder="https://youtube.com/watch?v=..."
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px', marginBottom: '12px' }}>
+            <div className="form-group">
+              <label className="form-label">Facebook Link (Cross-Post)</label>
+              <input
+                type="url"
+                className="form-control"
+                value={contentFormData.facebook_link || ''}
+                onChange={e => setContentFormData({ ...contentFormData, facebook_link: e.target.value })}
+                placeholder="https://facebook.com/..."
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">LinkedIn Link (Cross-Post)</label>
+              <input
+                type="url"
+                className="form-control"
+                value={contentFormData.linkedin_link || ''}
+                onChange={e => setContentFormData({ ...contentFormData, linkedin_link: e.target.value })}
+                placeholder="https://linkedin.com/..."
               />
             </div>
           </div>
@@ -204,6 +227,16 @@ export default function ContentModal({
 
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Time</label>
+              <input
+                type="text"
+                className="form-control"
+                value={contentFormData.time}
+                onChange={e => setContentFormData({ ...contentFormData, time: e.target.value })}
+                placeholder="e.g. 18:00"
+              />
+            </div>
             <div className="form-group">
               <label className="form-label">Assignee (Staff)</label>
               <select
