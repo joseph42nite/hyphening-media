@@ -7,59 +7,11 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { syncContentToKanbanTask, formatDateStr } from '../services/kanbanSync.js';
+import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
+import { extractAllPlatformIds } from '../services/linkExtractor.js';
 
 const router = Router();
-
-function autoExtractIds(link, platform, target) {
-  if (!link) return;
-  const plat = (platform || '').toLowerCase();
-
-  try {
-    if (plat.includes('youtube')) {
-      const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|shorts\/|watch\?v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
-      const match = link.match(ytRegex);
-      if (match && match[1]) {
-        target.youtube_video_id = match[1];
-      }
-    } else if (plat.includes('facebook')) {
-      const fbRegex = /(?:(?:posts|videos|reel|watch|story)\/|permalink\.php\?story_fbid=|story_fbid=|fbid=|[?&]v=)([0-9]{8,20})/i;
-      const match = link.match(fbRegex);
-      if (match && match[1]) {
-        target.facebook_post_id = match[1];
-      }
-    } else if (plat.includes('instagram')) {
-      const igRegex = /instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9-_]+)/i;
-      const match = link.match(igRegex);
-      if (match && match[1]) {
-        const shortcode = match[1];
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-        let id = 0n;
-        let valid = true;
-        for (let i = 0; i < shortcode.length; i++) {
-          const idx = alphabet.indexOf(shortcode[i]);
-          if (idx === -1) {
-            valid = false;
-            break;
-          }
-          id = id * 64n + BigInt(idx);
-        }
-        if (valid) {
-          target.instagram_media_id = id.toString();
-        }
-      }
-    } else if (plat.includes('linkedin')) {
-      const lnRegex = /activity[-:]([0-9]+)/i;
-      const match = link.match(lnRegex);
-      if (match && match[1]) {
-        target.linkedin_post_id = match[1];
-      }
-    }
-  } catch (err) {
-    console.error('[AUTO-EXTRACT] Error parsing link:', err.message);
-  }
-}
 
 router.use(authenticate);
 
@@ -177,39 +129,10 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
     };
     const computed = computeContentMetrics(rowForMetrics);
 
-    let finalFacebookPostId = facebook_post_id || null;
-    let finalInstagramMediaId = instagram_media_id || null;
-    let finalYoutubeVideoId = youtube_video_id || null;
-    let finalLinkedinPostId = linkedin_post_id || null;
-
-    if (link) {
-      const extracted = {};
-      autoExtractIds(link, platform, extracted);
-      if (extracted.facebook_post_id) finalFacebookPostId = extracted.facebook_post_id;
-      if (extracted.instagram_media_id) finalInstagramMediaId = extracted.instagram_media_id;
-      if (extracted.youtube_video_id) finalYoutubeVideoId = extracted.youtube_video_id;
-      if (extracted.linkedin_post_id) finalLinkedinPostId = extracted.linkedin_post_id;
-    }
-    if (instagram_link) {
-      const ext = {};
-      autoExtractIds(instagram_link, 'instagram', ext);
-      if (ext.instagram_media_id) finalInstagramMediaId = ext.instagram_media_id;
-    }
-    if (youtube_link) {
-      const ext = {};
-      autoExtractIds(youtube_link, 'youtube', ext);
-      if (ext.youtube_video_id) finalYoutubeVideoId = ext.youtube_video_id;
-    }
-    if (facebook_link) {
-      const ext = {};
-      autoExtractIds(facebook_link, 'facebook', ext);
-      if (ext.facebook_post_id) finalFacebookPostId = ext.facebook_post_id;
-    }
-    if (linkedin_link) {
-      const ext = {};
-      autoExtractIds(linkedin_link, 'linkedin', ext);
-      if (ext.linkedin_post_id) finalLinkedinPostId = ext.linkedin_post_id;
-    }
+    const extractedIds = extractAllPlatformIds({
+      facebook_post_id, instagram_media_id, youtube_video_id, linkedin_post_id,
+      link, platform, instagram_link, youtube_link, facebook_link, linkedin_link
+    });
 
     const result = db.prepare(`
       INSERT INTO marketing_content_tracker (
@@ -248,10 +171,10 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       computed.engagement_rate_pct,
       computed.save_rate_pct,
       computed.content_score,
-      finalFacebookPostId,
-      finalInstagramMediaId,
-      finalYoutubeVideoId,
-      finalLinkedinPostId,
+      extractedIds.facebook_post_id,
+      extractedIds.instagram_media_id,
+      extractedIds.youtube_video_id,
+      extractedIds.linkedin_post_id,
       finalAssignedTo,
       instagram_link || null,
       youtube_link || null,
@@ -360,34 +283,28 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
-    if (updates.link !== undefined) {
-      const targetPlatform = updates.platform || content.platform || '';
-      const extracted = {};
-      autoExtractIds(updates.link, targetPlatform, extracted);
-      if (extracted.facebook_post_id) updates.facebook_post_id = extracted.facebook_post_id;
-      if (extracted.instagram_media_id) updates.instagram_media_id = extracted.instagram_media_id;
-      if (extracted.youtube_video_id) updates.youtube_video_id = extracted.youtube_video_id;
-      if (extracted.linkedin_post_id) updates.linkedin_post_id = extracted.linkedin_post_id;
-    }
-    if (updates.instagram_link !== undefined) {
-      const extracted = {};
-      autoExtractIds(updates.instagram_link, 'instagram', extracted);
-      if (extracted.instagram_media_id) updates.instagram_media_id = extracted.instagram_media_id;
-    }
-    if (updates.youtube_link !== undefined) {
-      const extracted = {};
-      autoExtractIds(updates.youtube_link, 'youtube', extracted);
-      if (extracted.youtube_video_id) updates.youtube_video_id = extracted.youtube_video_id;
-    }
-    if (updates.facebook_link !== undefined) {
-      const extracted = {};
-      autoExtractIds(updates.facebook_link, 'facebook', extracted);
-      if (extracted.facebook_post_id) updates.facebook_post_id = extracted.facebook_post_id;
-    }
-    if (updates.linkedin_link !== undefined) {
-      const extracted = {};
-      autoExtractIds(updates.linkedin_link, 'linkedin', extracted);
-      if (extracted.linkedin_post_id) updates.linkedin_post_id = extracted.linkedin_post_id;
+    const mergedLinks = {
+      facebook_post_id: updates.facebook_post_id !== undefined ? updates.facebook_post_id : content.facebook_post_id,
+      instagram_media_id: updates.instagram_media_id !== undefined ? updates.instagram_media_id : content.instagram_media_id,
+      youtube_video_id: updates.youtube_video_id !== undefined ? updates.youtube_video_id : content.youtube_video_id,
+      linkedin_post_id: updates.linkedin_post_id !== undefined ? updates.linkedin_post_id : content.linkedin_post_id,
+      link: updates.link !== undefined ? updates.link : content.link,
+      platform: updates.platform !== undefined ? updates.platform : content.platform,
+      instagram_link: updates.instagram_link !== undefined ? updates.instagram_link : content.instagram_link,
+      youtube_link: updates.youtube_link !== undefined ? updates.youtube_link : content.youtube_link,
+      facebook_link: updates.facebook_link !== undefined ? updates.facebook_link : content.facebook_link,
+      linkedin_link: updates.linkedin_link !== undefined ? updates.linkedin_link : content.linkedin_link,
+    };
+
+    const linkKeys = ['link', 'platform', 'instagram_link', 'youtube_link', 'facebook_link', 'linkedin_link'];
+    const anyLinkChanged = linkKeys.some(k => updates[k] !== undefined);
+
+    if (anyLinkChanged) {
+      const extractedIds = extractAllPlatformIds(mergedLinks);
+      if (extractedIds.facebook_post_id) updates.facebook_post_id = extractedIds.facebook_post_id;
+      if (extractedIds.instagram_media_id) updates.instagram_media_id = extractedIds.instagram_media_id;
+      if (extractedIds.youtube_video_id) updates.youtube_video_id = extractedIds.youtube_video_id;
+      if (extractedIds.linkedin_post_id) updates.linkedin_post_id = extractedIds.linkedin_post_id;
     }
 
     if (updates.post_type !== undefined && ['reel', 'youtube', 'short'].includes((updates.post_type || '').toLowerCase())) {

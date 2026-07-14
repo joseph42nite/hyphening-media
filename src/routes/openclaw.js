@@ -12,6 +12,7 @@ import { logAction } from '../services/auditLogger.js';
 import { notifyAdmin, sendMessage } from '../services/telegram.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
+import { extractAllPlatformIds } from '../services/linkExtractor.js';
 
 const router = Router();
 
@@ -506,14 +507,28 @@ function handleCreateContent(payload) {
     views, likes, comments, shares, saves, avg_watch_time_pct: awt
   });
 
+  const extractedIds = extractAllPlatformIds({
+    facebook_post_id: payload.facebook_post_id,
+    instagram_media_id: payload.instagram_media_id,
+    youtube_video_id: payload.youtube_video_id,
+    linkedin_post_id: payload.linkedin_post_id,
+    link: payload.link,
+    platform: payload.platform,
+    instagram_link: payload.instagram_link,
+    youtube_link: payload.youtube_link,
+    facebook_link: payload.facebook_link,
+    linkedin_link: payload.linkedin_link
+  });
+
   const result = db.prepare(`
     INSERT INTO marketing_content_tracker (
       client_id, platform, date, post_type, title, script, link, time, caption, status, source,
       views, likes, comments, shares, saves, avg_watch_time_pct, boosted, follows,
       youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
       engagement_rate_pct, save_rate_pct, content_score,
-      facebook_post_id, instagram_media_id, youtube_video_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      facebook_post_id, instagram_media_id, youtube_video_id, linkedin_post_id, assigned_to,
+      instagram_link, youtube_link, facebook_link, linkedin_link
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payload.client_id,
     payload.platform || null,
@@ -534,9 +549,15 @@ function handleCreateContent(payload) {
     payload.youtube_avg_view_duration || null,
     payload.youtube_ctr || 0.0,
     engagement_rate_pct, save_rate_pct, content_score,
-    payload.facebook_post_id || null,
-    payload.instagram_media_id || null,
-    payload.youtube_video_id || null
+    extractedIds.facebook_post_id,
+    extractedIds.instagram_media_id,
+    extractedIds.youtube_video_id,
+    extractedIds.linkedin_post_id,
+    payload.assigned_to || null,
+    payload.instagram_link || null,
+    payload.youtube_link || null,
+    payload.facebook_link || null,
+    payload.linkedin_link || null
   );
 
   // Link script if provided
@@ -589,7 +610,8 @@ function handleUpdateContent(payload) {
     'views', 'likes', 'comments', 'shares', 'saves', 'avg_watch_time_pct',
     'boosted', 'link', 'time', 'caption', 'follows',
     'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr',
-    'facebook_post_id', 'instagram_media_id', 'youtube_video_id'
+    'facebook_post_id', 'instagram_media_id', 'youtube_video_id', 'linkedin_post_id', 'assigned_to',
+    'instagram_link', 'youtube_link', 'facebook_link', 'linkedin_link'
   ];
 
   const updates = {};
@@ -599,6 +621,30 @@ function handleUpdateContent(payload) {
 
   if (Object.keys(updates).length === 0 && payload.script_id === undefined) {
     return { success: false, summary: 'No valid fields to update' };
+  }
+
+  const mergedLinks = {
+    facebook_post_id: updates.facebook_post_id !== undefined ? updates.facebook_post_id : content.facebook_post_id,
+    instagram_media_id: updates.instagram_media_id !== undefined ? updates.instagram_media_id : content.instagram_media_id,
+    youtube_video_id: updates.youtube_video_id !== undefined ? updates.youtube_video_id : content.youtube_video_id,
+    linkedin_post_id: updates.linkedin_post_id !== undefined ? updates.linkedin_post_id : content.linkedin_post_id,
+    link: updates.link !== undefined ? updates.link : content.link,
+    platform: updates.platform !== undefined ? updates.platform : content.platform,
+    instagram_link: updates.instagram_link !== undefined ? updates.instagram_link : content.instagram_link,
+    youtube_link: updates.youtube_link !== undefined ? updates.youtube_link : content.youtube_link,
+    facebook_link: updates.facebook_link !== undefined ? updates.facebook_link : content.facebook_link,
+    linkedin_link: updates.linkedin_link !== undefined ? updates.linkedin_link : content.linkedin_link,
+  };
+
+  const linkKeys = ['link', 'platform', 'instagram_link', 'youtube_link', 'facebook_link', 'linkedin_link'];
+  const anyLinkChanged = linkKeys.some(k => updates[k] !== undefined);
+
+  if (anyLinkChanged) {
+    const extractedIds = extractAllPlatformIds(mergedLinks);
+    if (extractedIds.facebook_post_id) updates.facebook_post_id = extractedIds.facebook_post_id;
+    if (extractedIds.instagram_media_id) updates.instagram_media_id = extractedIds.instagram_media_id;
+    if (extractedIds.youtube_video_id) updates.youtube_video_id = extractedIds.youtube_video_id;
+    if (extractedIds.linkedin_post_id) updates.linkedin_post_id = extractedIds.linkedin_post_id;
   }
 
   if (Object.keys(updates).length > 0) {

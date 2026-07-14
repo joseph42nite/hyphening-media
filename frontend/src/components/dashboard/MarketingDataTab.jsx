@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, FileDown } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ContentModal from './ContentModal.jsx';
+import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from './contentFormHelper.js';
 
 export default function MarketingDataTab({
   auth,
@@ -25,14 +26,7 @@ export default function MarketingDataTab({
   // Modal local states (Content Row)
   const [showContentModal, setShowContentModal] = useState(false);
   const [editingContent, setEditingContent] = useState(null);
-  const [contentFormData, setContentFormData] = useState({
-    platform: 'instagram', date: '', post_type: 'Reel', title: '', script: '', script_id: '', status: 'Draft', link: '', time: '', caption: '',
-    views: '', likes: '', comments: '', shares: '', saves: '', follows: '', avg_watch_time_pct: '', boosted: 'No',
-    youtube_views: '', youtube_watch_time: '', youtube_avg_view_duration: '', youtube_ctr: '',
-    facebook_post_id: '', instagram_media_id: '', youtube_video_id: '', linkedin_post_id: '',
-    instagram_link: '', youtube_link: '', facebook_link: '', linkedin_link: '',
-    assigned_to: ''
-  });
+  const [contentFormData, setContentFormData] = useState({ ...CONTENT_FORM_DEFAULTS });
 
   // Modal local states (Monthly Report)
   const [showMonthlyModal, setShowMonthlyModal] = useState(false);
@@ -65,49 +59,10 @@ export default function MarketingDataTab({
   const openContentModal = (content = null) => {
     if (content) {
       setEditingContent(content);
-      setContentFormData({
-        platform: content.platform || 'instagram',
-        date: content.date || '',
-        post_type: content.post_type || 'Reel',
-        title: content.title || '',
-        script: content.script || '',
-        script_id: content.script_id || '',
-        status: content.status || 'Draft',
-        link: content.link || '',
-        time: content.time || '',
-        caption: content.caption || '',
-        views: content.views !== null && content.views !== undefined ? String(content.views) : '',
-        likes: content.likes !== null && content.likes !== undefined ? String(content.likes) : '',
-        comments: content.comments !== null && content.comments !== undefined ? String(content.comments) : '',
-        shares: content.shares !== null && content.shares !== undefined ? String(content.shares) : '',
-        saves: content.saves !== null && content.saves !== undefined ? String(content.saves) : '',
-        follows: content.follows !== null && content.follows !== undefined ? String(content.follows) : '',
-        avg_watch_time_pct: content.avg_watch_time_pct !== null && content.avg_watch_time_pct !== undefined ? String(content.avg_watch_time_pct) : '',
-        boosted: content.boosted || 'No',
-        youtube_views: content.youtube_views !== null && content.youtube_views !== undefined ? String(content.youtube_views) : '',
-        youtube_watch_time: content.youtube_watch_time !== null && content.youtube_watch_time !== undefined ? String(content.youtube_watch_time) : '',
-        youtube_avg_view_duration: content.youtube_avg_view_duration || '',
-        youtube_ctr: content.youtube_ctr !== null && content.youtube_ctr !== undefined ? String(content.youtube_ctr) : '',
-        facebook_post_id: content.facebook_post_id || '',
-        instagram_media_id: content.instagram_media_id || '',
-        youtube_video_id: content.youtube_video_id || '',
-        linkedin_post_id: content.linkedin_post_id || '',
-        instagram_link: content.instagram_link || '',
-        youtube_link: content.youtube_link || '',
-        facebook_link: content.facebook_link || '',
-        linkedin_link: content.linkedin_link || '',
-        assigned_to: content.assigned_to !== null && content.assigned_to !== undefined ? String(content.assigned_to) : ''
-      });
+      setContentFormData(buildContentFormState(content));
     } else {
       setEditingContent(null);
-      setContentFormData({
-        platform: 'instagram', date: '', post_type: 'Reel', title: '', script: '', script_id: '', status: 'Draft', link: '', time: '', caption: '',
-        views: '', likes: '', comments: '', shares: '', saves: '', follows: '', avg_watch_time_pct: '', boosted: 'No',
-        youtube_views: '', youtube_watch_time: '', youtube_avg_view_duration: '', youtube_ctr: '',
-        facebook_post_id: '', instagram_media_id: '', youtube_video_id: '', linkedin_post_id: '',
-        instagram_link: '', youtube_link: '', facebook_link: '', linkedin_link: '',
-        assigned_to: ''
-      });
+      setContentFormData({ ...CONTENT_FORM_DEFAULTS });
     }
     setShowContentModal(true);
   };
@@ -121,39 +76,7 @@ export default function MarketingDataTab({
       : `/api/clients/${selectedClientForReports.id}/marketing/content`;
     const method = editingContent ? 'PATCH' : 'POST';
 
-    const bodyData = {
-      platform: contentFormData.platform,
-      date: contentFormData.date || null,
-      post_type: contentFormData.post_type || null,
-      title: contentFormData.title || null,
-      script: contentFormData.script || null,
-      script_id: contentFormData.script_id || null,
-      status: contentFormData.status || 'Draft',
-      link: contentFormData.link || null,
-      time: contentFormData.time || null,
-      caption: contentFormData.caption || null,
-      views: contentFormData.views !== '' ? parseInt(contentFormData.views) : null,
-      likes: contentFormData.likes !== '' ? parseInt(contentFormData.likes) : null,
-      comments: contentFormData.comments !== '' ? parseInt(contentFormData.comments) : null,
-      shares: contentFormData.shares !== '' ? parseInt(contentFormData.shares) : null,
-      saves: contentFormData.saves !== '' ? parseInt(contentFormData.saves) : null,
-      follows: contentFormData.follows !== '' ? parseInt(contentFormData.follows) : null,
-      avg_watch_time_pct: contentFormData.avg_watch_time_pct !== '' ? parseFloat(contentFormData.avg_watch_time_pct) : null,
-      boosted: contentFormData.boosted || 'No',
-      youtube_views: contentFormData.youtube_views !== '' ? parseInt(contentFormData.youtube_views) : null,
-      youtube_watch_time: contentFormData.youtube_watch_time !== '' ? parseFloat(contentFormData.youtube_watch_time) : null,
-      youtube_avg_view_duration: contentFormData.youtube_avg_view_duration || null,
-      youtube_ctr: contentFormData.youtube_ctr !== '' ? parseFloat(contentFormData.youtube_ctr) : null,
-      facebook_post_id: contentFormData.facebook_post_id || null,
-      instagram_media_id: contentFormData.instagram_media_id || null,
-      youtube_video_id: contentFormData.youtube_video_id || null,
-      linkedin_post_id: contentFormData.linkedin_post_id || null,
-      instagram_link: contentFormData.instagram_link || null,
-      youtube_link: contentFormData.youtube_link || null,
-      facebook_link: contentFormData.facebook_link || null,
-      linkedin_link: contentFormData.linkedin_link || null,
-      assigned_to: contentFormData.assigned_to !== '' ? parseInt(contentFormData.assigned_to) : null
-    };
+    const bodyData = buildContentPayload(contentFormData);
 
     try {
       const res = await fetch(`${API_BASE}${url}`, {

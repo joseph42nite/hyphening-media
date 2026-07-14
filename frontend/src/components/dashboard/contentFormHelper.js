@@ -1,0 +1,111 @@
+/**
+ * Content Form Helpers
+ * Shared default states, payload builders, and state converters for the Content Tracker form modal.
+ */
+
+export const CONTENT_FORM_DEFAULTS = {
+  platform: 'instagram',
+  date: '',
+  post_type: 'Reel',
+  title: '',
+  script: '',
+  script_id: '',
+  status: 'Draft',
+  link: '',
+  time: '',
+  caption: '',
+  views: '',
+  likes: '',
+  comments: '',
+  shares: '',
+  saves: '',
+  follows: '',
+  avg_watch_time_pct: '',
+  boosted: 'No',
+  youtube_views: '',
+  youtube_watch_time: '',
+  youtube_avg_view_duration: '',
+  youtube_ctr: '',
+  facebook_post_id: '',
+  instagram_media_id: '',
+  youtube_video_id: '',
+  linkedin_post_id: '',
+  instagram_link: '',
+  youtube_link: '',
+  facebook_link: '',
+  linkedin_link: '',
+  assigned_to: ''
+};
+
+export function buildContentPayload(formData) {
+  return {
+    platform: formData.platform,
+    date: formData.date || null,
+    post_type: formData.post_type || null,
+    title: formData.title || null,
+    script: formData.script || null,
+    script_id: formData.script_id || null,
+    status: formData.status || 'Draft',
+    link: formData.link || null,
+    time: formData.time || null,
+    caption: formData.caption || null,
+    views: formData.views !== '' ? parseInt(formData.views) : null,
+    likes: formData.likes !== '' ? parseInt(formData.likes) : null,
+    comments: formData.comments !== '' ? parseInt(formData.comments) : null,
+    shares: formData.shares !== '' ? parseInt(formData.shares) : null,
+    saves: formData.saves !== '' ? parseInt(formData.saves) : null,
+    follows: formData.follows !== '' ? parseInt(formData.follows) : null,
+    avg_watch_time_pct: formData.avg_watch_time_pct !== '' ? parseFloat(formData.avg_watch_time_pct) : null,
+    boosted: formData.boosted || 'No',
+    youtube_views: formData.youtube_views !== '' ? parseInt(formData.youtube_views) : null,
+    youtube_watch_time: formData.youtube_watch_time !== '' ? parseFloat(formData.youtube_watch_time) : null,
+    youtube_avg_view_duration: formData.youtube_avg_view_duration || null,
+    youtube_ctr: formData.youtube_ctr !== '' ? parseFloat(formData.youtube_ctr) : null,
+    facebook_post_id: formData.facebook_post_id || null,
+    instagram_media_id: formData.instagram_media_id || null,
+    youtube_video_id: formData.youtube_video_id || null,
+    linkedin_post_id: formData.linkedin_post_id || null,
+    instagram_link: formData.instagram_link || null,
+    youtube_link: formData.youtube_link || null,
+    facebook_link: formData.facebook_link || null,
+    linkedin_link: formData.linkedin_link || null,
+    assigned_to: formData.assigned_to !== '' ? parseInt(formData.assigned_to) : null
+  };
+}
+
+export function buildContentFormState(content) {
+  if (!content) return { ...CONTENT_FORM_DEFAULTS };
+  return {
+    platform: content.platform || 'instagram',
+    date: content.date || '',
+    post_type: content.post_type || 'Reel',
+    title: content.title || '',
+    script: content.script || '',
+    script_id: content.script_id || '',
+    status: content.status || 'Draft',
+    link: content.link || '',
+    time: content.time || '',
+    caption: content.caption || '',
+    views: content.views !== null && content.views !== undefined ? String(content.views) : '',
+    likes: content.likes !== null && content.likes !== undefined ? String(content.likes) : '',
+    comments: content.comments !== null && content.comments !== undefined ? String(content.comments) : '',
+    shares: content.shares !== null && content.shares !== undefined ? String(content.shares) : '',
+    saves: content.saves !== null && content.saves !== undefined ? String(content.saves) : '',
+    follows: content.follows !== null && content.follows !== undefined ? String(content.follows) : '',
+    avg_watch_time_pct: content.avg_watch_time_pct !== null && content.avg_watch_time_pct !== undefined ? String(content.avg_watch_time_pct) : '',
+    boosted: content.boosted || 'No',
+    youtube_views: content.youtube_views !== null && content.youtube_views !== undefined ? String(content.youtube_views) : '',
+    youtube_watch_time: content.youtube_watch_time !== null && content.youtube_watch_time !== undefined ? String(content.youtube_watch_time) : '',
+    youtube_avg_view_duration: content.youtube_avg_view_duration || '',
+    youtube_ctr: content.youtube_ctr !== null && content.youtube_ctr !== undefined ? String(content.youtube_ctr) : '',
+    facebook_post_id: content.facebook_post_id || '',
+    instagram_media_id: content.instagram_media_id || '',
+    youtube_video_id: content.youtube_video_id || '',
+    linkedin_post_id: content.linkedin_post_id || '',
+    instagram_link: content.instagram_link || '',
+    youtube_link: content.youtube_link || '',
+    facebook_link: content.facebook_link || '',
+    linkedin_link: content.linkedin_link || '',
+    assigned_to: content.assigned_to !== null && content.assigned_to !== undefined ? String(content.assigned_to) : ''
+  };
+}
