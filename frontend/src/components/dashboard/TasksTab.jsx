@@ -24,6 +24,7 @@ export default function TasksTab({
   // Kanban filters/search
   const [taskSearch, setTaskSearch] = useState('');
   const [taskClientFilter, setTaskClientFilter] = useState('');
+  const [taskFormatFilter, setTaskFormatFilter] = useState('');
 
   // Calendar states
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -70,6 +71,12 @@ export default function TasksTab({
   const getTasksByStatus = (status) => {
     const filteredTasks = tasks.filter(t => {
       if (taskClientFilter && String(t.client_id) !== taskClientFilter) return false;
+      if (taskFormatFilter) {
+        const desc = (t.description || '').toLowerCase();
+        if (taskFormatFilter === 'reel' && !desc.includes('post type: reel')) return false;
+        if (taskFormatFilter === 'carousel' && !desc.includes('post type: carousel')) return false;
+        if (taskFormatFilter === 'long_format' && !(desc.includes('post type: youtube') || desc.includes('post type: long_format'))) return false;
+      }
       if (taskSearch) {
         const matchTitle = t.title.toLowerCase().includes(taskSearch.toLowerCase());
         const matchClient = t.client_name && t.client_name.toLowerCase().includes(taskSearch.toLowerCase());
@@ -427,6 +434,17 @@ export default function TasksTab({
                     {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
                   </option>
                 ))}
+              </select>
+              <select
+                className="form-control"
+                value={taskFormatFilter}
+                onChange={(e) => setTaskFormatFilter(e.target.value)}
+                style={{ width: '160px' }}
+              >
+                <option value="">All Formats</option>
+                <option value="reel">Reel</option>
+                <option value="carousel">Carousel</option>
+                <option value="long_format">Long Form</option>
               </select>
             </div>
             {isAdmin && (
