@@ -2422,7 +2422,7 @@ export default function ClientPortal({ showToast }) {
                               <td>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '150px' }}>
                                   <select 
-                                    value={lead.appointment_status || 'Pending'}
+                                    value={lead.appointment_status || 'Follow Up'}
                                     onChange={(e) => handleUpdateLead(lead.id, { appointment_status: e.target.value })}
                                     className="portal-select"
                                     style={{ 
@@ -2432,7 +2432,7 @@ export default function ClientPortal({ showToast }) {
                                       fontSize: '0.8rem'
                                     }}
                                   >
-                                    <option value="Pending">⌛ Pending</option>
+                                    <option value="Follow Up">📞 Follow Up</option>
                                     <option value="Booked">📅 Booked</option>
                                     <option value="Not Booked">🚫 Not Booked</option>
                                   </select>

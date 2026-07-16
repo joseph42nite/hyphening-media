@@ -325,7 +325,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
     if (newCall && !['Pending', 'Picked Up', 'No Answer', 'Other'].includes(newCall)) {
       return res.status(400).json({ error: 'Invalid call outcome' });
     }
-    if (newApptStatus && !['Pending', 'Booked', 'Not Booked'].includes(newApptStatus)) {
+    if (newApptStatus && !['Follow Up', 'Booked', 'Not Booked'].includes(newApptStatus)) {
       return res.status(400).json({ error: 'Invalid appointment status' });
     }
 
