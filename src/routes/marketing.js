@@ -469,13 +469,54 @@ router.post('/:id/marketing/content/review/:contentId', authorize('admin', 'ops_
 // AD CAMPAIGNS
 // =========================================
 
+// Helper to fetch campaign with its captured and qualified lead counts from campaign_leads
+const getAdWithLeads = (adId) => {
+  return db.prepare(`
+    SELECT 
+      a.*,
+      (
+        SELECT COUNT(l.id) 
+        FROM campaign_leads l 
+        WHERE l.client_id = a.client_id 
+          AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
+      ) as actual_leads,
+      (
+        SELECT COUNT(l.id) 
+        FROM campaign_leads l 
+        WHERE l.client_id = a.client_id 
+          AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
+          AND l.qualification_status = 'Qualified'
+      ) as actual_qualified_leads
+    FROM marketing_ad_campaigns a
+    WHERE a.id = ?
+  `).get(adId);
+};
+
 /**
  * GET /api/clients/:id/marketing/ads
  */
 router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
-    const ads = db.prepare('SELECT * FROM marketing_ad_campaigns WHERE client_id = ? ORDER BY created_at DESC')
-      .all(req.params.id);
+    const ads = db.prepare(`
+      SELECT 
+        a.*,
+        (
+          SELECT COUNT(l.id) 
+          FROM campaign_leads l 
+          WHERE l.client_id = a.client_id 
+            AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
+        ) as actual_leads,
+        (
+          SELECT COUNT(l.id) 
+          FROM campaign_leads l 
+          WHERE l.client_id = a.client_id 
+            AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
+            AND l.qualification_status = 'Qualified'
+        ) as actual_qualified_leads
+      FROM marketing_ad_campaigns a
+      WHERE a.client_id = ?
+      ORDER BY a.created_at DESC
+    `).all(req.params.id);
     res.json({ ads });
   } catch (err) {
     console.error('[MARKETING] Ads list error:', err);
@@ -519,7 +560,7 @@ router.post('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager')
       ip: req.ip,
     });
 
-    res.status(201).json(db.prepare('SELECT * FROM marketing_ad_campaigns WHERE id = ?').get(result.lastInsertRowid));
+    res.status(201).json(getAdWithLeads(result.lastInsertRowid));
   } catch (err) {
     console.error('[MARKETING] Ad create error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -557,7 +598,7 @@ router.patch('/:id/marketing/ads/:adId', authorize('admin', 'ops_social_media_ma
     db.prepare(`UPDATE marketing_ad_campaigns SET ${setClauses} WHERE id = ?`)
       .run(...Object.values(updates), req.params.adId);
 
-    res.json(db.prepare('SELECT * FROM marketing_ad_campaigns WHERE id = ?').get(req.params.adId));
+    res.json(getAdWithLeads(req.params.adId));
   } catch (err) {
     console.error('[MARKETING] Ad update error:', err);
     res.status(500).json({ error: 'Internal server error' });
