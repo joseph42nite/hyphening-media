@@ -362,7 +362,8 @@ tr:hover td {
 }
 
 .kanban-column {
-  flex: 0 0 310px;
+  flex: 1;
+  min-width: 250px;
   background: #ffffff;
   padding: 12px;
   max-height: calc(100vh - 240px);
