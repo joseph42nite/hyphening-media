@@ -362,7 +362,7 @@ tr:hover td {
 }
 
 .kanban-column {
-  flex: 0 0 280px;
+  flex: 0 0 310px;
   background: #ffffff;
   padding: 12px;
   max-height: calc(100vh - 240px);
@@ -406,12 +406,19 @@ tr:hover td {
 }
 
 .kanban-card {
-  padding: 10px 12px;
+  border: 2px solid #000000 !important;
+  box-shadow: 2.5px 2.5px 0px #000000 !important;
+  padding: 8px 10px;
+}
+
+.kanban-card:hover {
+  transform: translate(-1.5px, -1.5px) !important;
+  box-shadow: 4px 4px 0px #000000 !important;
 }
 
 .kanban-card-overdue {
   border-color: #ef4444 !important;
-  box-shadow: 4px 4px 0px #ef4444 !important;
+  box-shadow: 2.5px 2.5px 0px #ef4444 !important;
   background-color: #fff5f5 !important;
 }
 
@@ -755,7 +762,7 @@ tr:hover td {
   }
 
   .kanban-card {
-    padding: 10px 12px !important;
+    padding: 8px 10px !important;
   }
   
   .dashboard-toolbar {

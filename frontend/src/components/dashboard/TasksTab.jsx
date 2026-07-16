@@ -475,14 +475,14 @@ export default function TasksTab({
                         style={{ cursor: ((task.content_id && (isAdmin || isSMM)) || (!task.content_id && isAdmin)) ? 'pointer' : 'default' }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <span className="badge badge-muted" style={{ fontSize: '0.62rem', padding: '3px 8px' }}>{task.task_type}</span>
+                          <span className="badge badge-muted" style={{ fontSize: '0.62rem', padding: '2px 5px', borderWidth: '1.5px' }}>{task.task_type}</span>
                           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                             {isOverdue(task) && (
-                              <span className="badge" style={{ fontSize: '0.62rem', background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444', display: 'flex', alignItems: 'center', gap: '2px', padding: '2px 6px' }}>
+                              <span className="badge" style={{ fontSize: '0.62rem', background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444', display: 'flex', alignItems: 'center', gap: '2px', padding: '2px 5px', borderWidth: '1.5px' }}>
                                 <AlertTriangle size={9} /> OVERDUE
                               </span>
                             )}
-                            <span className={`badge badge-${getPriorityBadgeClass(getTaskPriority(task))}`} style={{ fontSize: '0.62rem', padding: '3px 8px' }}>
+                            <span className={`badge badge-${getPriorityBadgeClass(getTaskPriority(task))}`} style={{ fontSize: '0.62rem', padding: '2px 5px', borderWidth: '1.5px' }}>
                               {getTaskPriority(task)}
                             </span>
                           </div>
@@ -514,7 +514,7 @@ export default function TasksTab({
                             className="form-control"
                             value={col}
                             onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                            style={{ padding: '2px 6px', fontSize: '0.7rem', width: 'auto', background: 'var(--bg-input)' }}
+                            style={{ padding: '2px 6px', fontSize: '0.68rem', width: 'auto', background: 'var(--bg-input)', borderWidth: '1.5px', height: '24px', borderRadius: '4px' }}
                           >
                             {columns.map(status => (
                               <option key={status} value={status}>{status === 'todo' ? 'To - Do - Today' : status.replace('_', ' ')}</option>
