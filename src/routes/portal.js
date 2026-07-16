@@ -275,7 +275,10 @@ router.get('/:token/content', portalAuth, (req, res) => {
 router.get('/:token/leads', portalAuth, (req, res) => {
   try {
     const leads = db.prepare(`
-      SELECT id, name, email, phone, platform, source, campaign_name, lead_status, rejection_reason, call_duration_seconds, additional_data, created_at
+      SELECT 
+        id, name, email, phone, platform, source, campaign_name, lead_status, rejection_reason, 
+        call_duration_seconds, additional_data, created_at,
+        qualification_status, call_outcome, appointment_status, appointment_date
       FROM campaign_leads
       WHERE client_id = ?
       ORDER BY created_at DESC
@@ -290,29 +293,82 @@ router.get('/:token/leads', portalAuth, (req, res) => {
 
 /**
  * POST /api/portal/:token/leads/:leadId/status
- * Update qualification status and rejection reason for a lead.
+ * Update progressive qualification, call, and appointment status for a lead.
  */
 router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
   try {
     const { leadId } = req.params;
-    const { status, rejection_reason } = req.body;
+    const { 
+      qualification_status, 
+      call_outcome, 
+      appointment_status, 
+      appointment_date, 
+      rejection_reason 
+    } = req.body;
 
-    const lead = db.prepare('SELECT id FROM campaign_leads WHERE id = ? AND client_id = ?').get(leadId, req.portalClient.id);
+    const lead = db.prepare('SELECT * FROM campaign_leads WHERE id = ? AND client_id = ?').get(leadId, req.portalClient.id);
     if (!lead) {
       return res.status(404).json({ error: 'Lead not found' });
     }
 
-    if (!['Pending', 'Qualified', 'Appointment Booked', 'Rejected'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+    // Merge or fallback to existing values
+    const newQual = qualification_status !== undefined ? qualification_status : lead.qualification_status;
+    const newCall = call_outcome !== undefined ? call_outcome : lead.call_outcome;
+    const newApptStatus = appointment_status !== undefined ? appointment_status : lead.appointment_status;
+    const newApptDate = appointment_date !== undefined ? appointment_date : lead.appointment_date;
+    const newRejection = rejection_reason !== undefined ? rejection_reason : lead.rejection_reason;
+
+    // Validate inputs
+    if (newQual && !['Pending', 'Qualified', 'Disqualified'].includes(newQual)) {
+      return res.status(400).json({ error: 'Invalid qualification status' });
+    }
+    if (newCall && !['Pending', 'Picked Up', 'No Answer', 'Other'].includes(newCall)) {
+      return res.status(400).json({ error: 'Invalid call outcome' });
+    }
+    if (newApptStatus && !['Pending', 'Booked', 'Not Booked'].includes(newApptStatus)) {
+      return res.status(400).json({ error: 'Invalid appointment status' });
+    }
+
+    // Compute lead_status for backward compatibility with dashboard metrics
+    let calculatedLeadStatus = 'Pending';
+    if (newQual === 'Disqualified') {
+      calculatedLeadStatus = 'Rejected';
+    } else if (newApptStatus === 'Booked') {
+      calculatedLeadStatus = 'Appointment Booked';
+    } else if (newQual === 'Qualified') {
+      calculatedLeadStatus = 'Qualified';
     }
 
     db.prepare(`
       UPDATE campaign_leads
-      SET lead_status = ?, rejection_reason = ?, updated_at = datetime('now')
+      SET 
+        qualification_status = ?, 
+        call_outcome = ?, 
+        appointment_status = ?, 
+        appointment_date = ?, 
+        rejection_reason = ?,
+        lead_status = ?,
+        updated_at = datetime('now')
       WHERE id = ?
-    `).run(status, status === 'Rejected' ? rejection_reason : null, leadId);
+    `).run(
+      newQual, 
+      newCall, 
+      newApptStatus, 
+      newApptStatus === 'Booked' ? newApptDate : null, 
+      (newQual === 'Disqualified' || newApptStatus === 'Not Booked') ? newRejection : null, 
+      calculatedLeadStatus,
+      leadId
+    );
 
-    res.json({ success: true, lead_status: status, rejection_reason });
+    res.json({ 
+      success: true, 
+      qualification_status: newQual,
+      call_outcome: newCall,
+      appointment_status: newApptStatus,
+      appointment_date: newApptStatus === 'Booked' ? newApptDate : null,
+      rejection_reason: (newQual === 'Disqualified' || newApptStatus === 'Not Booked') ? newRejection : null,
+      lead_status: calculatedLeadStatus
+    });
   } catch (err) {
     console.error('[PORTAL] Update lead status error:', err);
     res.status(500).json({ error: 'Internal server error' });
