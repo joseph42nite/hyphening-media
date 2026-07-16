@@ -1006,9 +1006,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
       {/* Tabs Menu */}
       <div className="dashboard-tabs">
+        {/* 1. Kanban Tasks */}
         <button onClick={() => setActiveTab('tasks')} className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`}>
           <Layers size={16} /> Kanban Tasks
         </button>
+
+        {/* 2. Client Workspace */}
         <button 
           onClick={() => setActiveTab('client-workspaces')} 
           className={`btn ${activeTab === 'client-workspaces' ? 'btn-primary' : 'btn-secondary'}`}
@@ -1045,49 +1048,61 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             return null;
           })()}
         </button>
+
+        {/* 3. Marketing Data */}
+        {(isAdmin || isSMM) && (
+          <button onClick={() => setActiveTab('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>
+            <FileSpreadsheet size={16} /> Marketing Data
+          </button>
+        )}
+
+        {/* 4. Scripts */}
+        {(isAdmin || isSMM) && (
+          <button onClick={() => {
+            setActiveTab('scripts');
+            if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
+          }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`}>
+            <FileText size={16} /> Scripts
+          </button>
+        )}
+
+        {/* 5. Calendar */}
         <button onClick={() => setActiveTab('calendar')} className={`btn ${activeTab === 'calendar' ? 'btn-primary' : 'btn-secondary'}`}>
           <Calendar size={16} /> Calendar
         </button>
 
-        {/* Admin only tabs */}
+        {/* 6. Artist Curation */}
         {isAdmin && (
-          <>
-            <button onClick={() => setActiveTab('clients')} className={`btn ${activeTab === 'clients' ? 'btn-primary' : 'btn-secondary'}`}>
-              <Folder size={16} /> Clients
-            </button>
-            <button onClick={() => setActiveTab('freelancers')} className={`btn ${activeTab === 'freelancers' ? 'btn-primary' : 'btn-secondary'}`}>
-              <Users size={16} /> Freelancers
-            </button>
-            <button onClick={() => setActiveTab('curation')} className={`btn ${activeTab === 'curation' ? 'btn-primary' : 'btn-secondary'}`}>
-              <Calendar size={16} /> Artist Curation
-            </button>
-          </>
-        )}
-
-        {/* Social / Admin tabs */}
-        {(isAdmin || isSMM) && (
-          <>
-            <button onClick={() => {
-              setActiveTab('scripts');
-              if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
-            }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`}>
-              <FileText size={16} /> Script Tracker
-            </button>
-            <button onClick={() => setActiveTab('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>
-              <FileSpreadsheet size={16} /> Marketing Data
-            </button>
-          </>
-        )}
-
-        {/* Super admin only tabs */}
-        {isAdmin && (
-          <button onClick={() => setActiveTab('audit')} className={`btn ${activeTab === 'audit' ? 'btn-primary' : 'btn-secondary'}`}>
-            <Shield size={16} /> Audit Logs
+          <button onClick={() => setActiveTab('curation')} className={`btn ${activeTab === 'curation' ? 'btn-primary' : 'btn-secondary'}`}>
+            <Calendar size={16} /> Artist Curation
           </button>
         )}
+
+        {/* 7. Blogs */}
         {isAdmin && (
           <button onClick={() => setActiveTab('blog')} className={`btn ${activeTab === 'blog' ? 'btn-primary' : 'btn-secondary'}`}>
-            <FileText size={16} /> Blog
+            <FileText size={16} /> Blogs
+          </button>
+        )}
+
+        {/* 8. Clients */}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('clients')} className={`btn ${activeTab === 'clients' ? 'btn-primary' : 'btn-secondary'}`}>
+            <Folder size={16} /> Clients
+          </button>
+        )}
+
+        {/* 9. Freelancers */}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('freelancers')} className={`btn ${activeTab === 'freelancers' ? 'btn-primary' : 'btn-secondary'}`}>
+            <Users size={16} /> Freelancers
+          </button>
+        )}
+
+        {/* 10. Audit Log */}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('audit')} className={`btn ${activeTab === 'audit' ? 'btn-primary' : 'btn-secondary'}`}>
+            <Shield size={16} /> Audit Log
           </button>
         )}
       </div>

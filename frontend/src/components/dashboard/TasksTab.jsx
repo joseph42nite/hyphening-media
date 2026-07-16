@@ -474,47 +474,47 @@ export default function TasksTab({
                         onClick={() => handleKanbanCardClick(task)}
                         style={{ cursor: ((task.content_id && (isAdmin || isSMM)) || (!task.content_id && isAdmin)) ? 'pointer' : 'default' }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <span className="badge badge-muted" style={{ fontSize: '0.65rem' }}>{task.task_type}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span className="badge badge-muted" style={{ fontSize: '0.62rem', padding: '3px 8px' }}>{task.task_type}</span>
                           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                             {isOverdue(task) && (
-                              <span className="badge" style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444', display: 'flex', alignItems: 'center', gap: '2px', padding: '4px 8px' }}>
-                                <AlertTriangle size={10} /> OVERDUE
+                              <span className="badge" style={{ fontSize: '0.62rem', background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444', display: 'flex', alignItems: 'center', gap: '2px', padding: '2px 6px' }}>
+                                <AlertTriangle size={9} /> OVERDUE
                               </span>
                             )}
-                            <span className={`badge badge-${getPriorityBadgeClass(getTaskPriority(task))}`} style={{ fontSize: '0.65rem' }}>
+                            <span className={`badge badge-${getPriorityBadgeClass(getTaskPriority(task))}`} style={{ fontSize: '0.62rem', padding: '3px 8px' }}>
                               {getTaskPriority(task)}
                             </span>
                           </div>
                         </div>
                         <div className="kanban-card-title">{task.title}</div>
                         {task.client_name && (
-                          <div style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-primary)', marginTop: '4px' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-primary)', marginTop: '3px' }}>
                             Client: {task.client_name}
                           </div>
                         )}
                         {task.due_date && (
                           <div style={{
-                            fontSize: '0.75rem',
+                            fontSize: '0.7rem',
                             color: isOverdue(task) ? 'var(--danger)' : 'var(--text-muted)',
                             fontWeight: isOverdue(task) ? 'bold' : 'normal',
-                            marginTop: '2px'
+                            marginTop: '1px'
                           }}>
                             {formatDateStr(task.due_date)} {isOverdue(task) && '⚠️'}
                           </div>
                         )}
                         {task.freelancer_name && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 'bold' }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px', fontWeight: 'bold' }}>
                             Assigned: {task.freelancer_name}
                           </div>
                         )}
 
-                        <div className="kanban-card-footer" onClick={e => e.stopPropagation()}>
+                        <div className="kanban-card-footer" style={{ marginTop: '6px' }} onClick={e => e.stopPropagation()}>
                           <select
                             className="form-control"
                             value={col}
                             onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                            style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'auto', background: 'var(--bg-input)' }}
+                            style={{ padding: '2px 6px', fontSize: '0.7rem', width: 'auto', background: 'var(--bg-input)' }}
                           >
                             {columns.map(status => (
                               <option key={status} value={status}>{status === 'todo' ? 'To - Do - Today' : status.replace('_', ' ')}</option>

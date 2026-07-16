@@ -353,18 +353,18 @@ tr:hover td {
 /* Kanban Board Styling */
 .kanban-board {
   display: flex;
-  gap: 20px;
+  gap: 12px;
   overflow-x: auto;
   max-width: 100%;
   width: 100%;
-  padding: 16px 0;
+  padding: 12px 0;
   min-height: calc(100vh - 250px);
 }
 
 .kanban-column {
-  flex: 0 0 340px;
+  flex: 0 0 280px;
   background: #ffffff;
-  padding: 20px;
+  padding: 12px;
   max-height: calc(100vh - 240px);
   overflow-y: auto;
 }
@@ -374,11 +374,11 @@ tr:hover td {
   justify-content: space-between;
   align-items: center;
   border-bottom: var(--border-width) solid var(--border-color);
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 }
 
 .kanban-column-title {
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   font-weight: 800;
 }
 
@@ -386,12 +386,12 @@ tr:hover td {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
   border-radius: var(--radius-full);
-  font-size: 0.8rem;
-  margin-left: 8px;
+  font-size: 0.75rem;
+  margin-left: 6px;
   font-weight: 800;
   border: 2px solid #000000;
   background: #f4f4f5;
@@ -401,23 +401,24 @@ tr:hover td {
 .kanban-cards {
   display: flex;
   flex-direction: column;
-  margin-top: 16px;
-  gap: 16px;
+  margin-top: 10px;
+  gap: 8px;
 }
 
 .kanban-card {
-  padding: 18px;
+  padding: 10px 12px;
 }
 
 .kanban-card-overdue {
   border-color: #ef4444 !important;
-  box-shadow: 5px 5px 0px #ef4444 !important;
+  box-shadow: 4px 4px 0px #ef4444 !important;
   background-color: #fff5f5 !important;
 }
 
 .kanban-card-title {
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1.25;
 }
 
 /* Modals */
@@ -745,8 +746,16 @@ tr:hover td {
   }
 
   /* Reduce mobile bento padding */
-  .glass, .glass-premium, .kanban-column, .kanban-card, .card-metric {
+  .glass, .glass-premium, .card-metric {
     padding: 16px !important;
+  }
+
+  .kanban-column {
+    padding: 12px !important;
+  }
+
+  .kanban-card {
+    padding: 10px 12px !important;
   }
   
   .dashboard-toolbar {
