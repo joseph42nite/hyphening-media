@@ -95,7 +95,7 @@ export default function ApprovalCenterTab({ showToast }) {
                   <td style={{ fontWeight: 'bold' }}>{action.client_name || 'System / Global'}</td>
                   <td>
                     <span className="badge badge-info" style={{ border: '1px solid #000' }}>
-                      {action.action_type.replace(/_/g, ' ')}
+                      {(action.action_type || action.event_type || '').replace(/_/g, ' ')}
                     </span>
                   </td>
                   <td>
@@ -191,7 +191,7 @@ export default function ApprovalCenterTab({ showToast }) {
                   <td style={{ fontWeight: 'bold' }}>{action.client_name || 'System / Global'}</td>
                   <td>
                     <span className="badge badge-info" style={{ border: '1px solid #000' }}>
-                      {action.action_type.replace(/_/g, ' ')}
+                      {(action.action_type || action.event_type || '').replace(/_/g, ' ')}
                     </span>
                   </td>
                   <td>
