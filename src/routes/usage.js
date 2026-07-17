@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import db from '../../database.js';
-import { authorize } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 
 const router = Router();
+router.use(authenticate);
 
 /**
  * GET /api/usage/summary

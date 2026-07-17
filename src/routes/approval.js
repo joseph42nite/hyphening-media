@@ -2,7 +2,7 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,13 +15,99 @@ router.use(authenticate);
 // Helper to spawn runner process
 function spawnAgent(clientId, agentType, model, requestedBy) {
   const runnerPath = path.resolve(__dirname, '../../openclaw_seo_runner.js');
-  const command = `/usr/local/bin/node ${runnerPath} --clientId ${clientId} --skill ${agentType} --model ${model} --triggeredBy "${requestedBy}"`;
-  
-  console.log(`[APPROVAL] Spawning queued runner: ${command}`);
-  exec(command, { cwd: path.resolve(__dirname, '../..') }, (err, stdout, stderr) => {
-    if (err) {
-      console.error(`[APPROVAL] Spawning runner failed for action:`, err);
-    }
+  const args = [
+    runnerPath,
+    '--clientId', clientId,
+    '--skill', agentType,
+    '--model', model,
+    '--triggeredBy', requestedBy
+  ];
+
+  console.log(`[APPROVAL] Spawning queued runner: node ${args.join(' ')}`);
+
+  import('../../server.js').then(({ broadcastEvent }) => {
+    // Notify frontend agent is now running
+    broadcastEvent('seo_agent_status', {
+      clientId,
+      agentType,
+      status: 'running'
+    });
+
+    const child = spawn(process.execPath || 'node', args, {
+      cwd: path.resolve(__dirname, '../..')
+    });
+
+    let stdoutBuffer = '';
+    child.stdout.on('data', (chunk) => {
+      stdoutBuffer += chunk.toString();
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop();
+      for (const line of lines) {
+        if (line.trim()) {
+          broadcastEvent('seo_agent_log', {
+            clientId,
+            agentType,
+            log: line
+          });
+        }
+      }
+    });
+
+    let stderrBuffer = '';
+    child.stderr.on('data', (chunk) => {
+      stderrBuffer += chunk.toString();
+      const lines = stderrBuffer.split('\n');
+      stderrBuffer = lines.pop();
+      for (const line of lines) {
+        if (line.trim()) {
+          broadcastEvent('seo_agent_log', {
+            clientId,
+            agentType,
+            log: `[ERROR] ${line}`
+          });
+        }
+      }
+    });
+
+    child.on('close', (code) => {
+      if (stdoutBuffer.trim()) {
+        broadcastEvent('seo_agent_log', {
+          clientId,
+          agentType,
+          log: stdoutBuffer
+        });
+      }
+      if (stderrBuffer.trim()) {
+        broadcastEvent('seo_agent_log', {
+          clientId,
+          agentType,
+          log: `[ERROR] ${stderrBuffer}`
+        });
+      }
+
+      const finalStatus = code === 0 ? 'completed' : 'failed';
+      broadcastEvent('seo_agent_status', {
+        clientId,
+        agentType,
+        status: finalStatus
+      });
+    });
+
+    child.on('error', (err) => {
+      console.error(`[APPROVAL] Spawning runner failed for ${agentType}:`, err);
+      broadcastEvent('seo_agent_log', {
+        clientId,
+        agentType,
+        log: `[SYSTEM ERROR] Failed to spawn agent: ${err.message}`
+      });
+      broadcastEvent('seo_agent_status', {
+        clientId,
+        agentType,
+        status: 'failed'
+      });
+    });
+  }).catch(err => {
+    console.error(`[APPROVAL] Failed to import broadcastEvent:`, err);
   });
 }
 
