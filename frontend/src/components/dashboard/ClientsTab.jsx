@@ -260,7 +260,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
 
       {showClientModal && (
         <div className="modal-overlay" onClick={() => setShowClientModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '700px' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>{editingClient ? 'Edit Client' : 'Add Client'}</h2>
             <form onSubmit={handleClientSubmit} style={{ marginTop: '20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>

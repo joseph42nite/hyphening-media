@@ -511,7 +511,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       {/* Assign to SMM / Kanban conversion popover */}
       {showAssignModal && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '500px' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ margin: '0 0 14px', fontWeight: 'bold' }}>Assign to SMM / Convert Task</h3>
             <form onSubmit={handleAssignSubmit}>
               <div className="form-group" style={{ marginBottom: '12px' }}>
