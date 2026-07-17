@@ -234,7 +234,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               }}
             >
               <option value="">-- Choose Client --</option>
-              {clients.map(c => (
+              {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
                 <option key={c.id} value={c.id}>{c.name} ({c.client_type})</option>
               ))}
             </select>

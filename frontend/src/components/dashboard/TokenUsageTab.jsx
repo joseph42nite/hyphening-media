@@ -135,7 +135,7 @@ export default function TokenUsageTab({ clients, showToast }) {
               onChange={e => setSelectedClientId(e.target.value)}
             >
               <option value="">-- Choose Client --</option>
-              {clients.map(c => (
+              {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
