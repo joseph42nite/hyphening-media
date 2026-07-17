@@ -191,7 +191,7 @@ router.post('/webhook', (req, res) => {
       'create_artist', 'update_artist', 'create_venue', 'update_venue',
       'create_gig', 'update_gig', 'create_freelancer', 'update_freelancer',
       'send_chat_message', 'update_knowledge', 'optimize_queue',
-      'create_blog_post', 'update_blog_post'
+      'create_blog_post', 'update_blog_post', 'create_seo_audit'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -437,6 +437,7 @@ function executeEvent(eventType, payload) {
       case 'optimize_queue': return handleOptimizeQueue(payload);
       case 'create_blog_post': return handleCreateBlogPost(payload);
       case 'update_blog_post': return handleUpdateBlogPost(payload);
+      case 'create_seo_audit': return handleCreateSeoAudit(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -1285,8 +1286,150 @@ function recalculateArtistRollups(artistId) {
   `).run(
     stats.total_gigs, stats.average_fee_inr || 0, stats.total_amount_paid_inr,
     stats.total_amount_pending_inr, payment_status, reliability_score, stats.paid_gigs || 0,
-    last_perf_date, new Date().toISOString(), artistId
+    stats.last_perf_date, new Date().toISOString(), artistId
   );
+}
+
+function handleCreateSeoAudit(payload) {
+  if (!payload?.client_id || !payload?.audit_type || !payload?.url) {
+    return { success: false, summary: 'client_id, audit_type, and url are required' };
+  }
+
+  // 1. Insert into seo_audits
+  const auditResult = db.prepare(`
+    INSERT INTO seo_audits (
+      client_id, audit_type, url, health_score, technical_score, content_score,
+      on_page_score, schema_score, performance_score, geo_score, backlinks_score,
+      local_score, sxo_score, summary, report_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    payload.client_id,
+    payload.audit_type,
+    payload.url,
+    payload.health_score ?? null,
+    payload.technical_score ?? null,
+    payload.content_score ?? null,
+    payload.on_page_score ?? null,
+    payload.schema_score ?? null,
+    payload.performance_score ?? null,
+    payload.geo_score ?? null,
+    payload.backlinks_score ?? null,
+    payload.local_score ?? null,
+    payload.sxo_score ?? null,
+    payload.summary ?? null,
+    payload.report_json ? JSON.stringify(payload.report_json) : null
+  );
+
+  const auditId = auditResult.lastInsertRowid;
+
+  // 2. Batch-insert recommendations into seo_recommendations
+  if (Array.isArray(payload.recommendations)) {
+    const insertRec = db.prepare(`
+      INSERT INTO seo_recommendations (
+        audit_id, client_id, priority, metric, issue, action_required,
+        observation, dependency, failure_check, leading_indicator, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+    `);
+
+    for (const rec of payload.recommendations) {
+      insertRec.run(
+        auditId,
+        payload.client_id,
+        rec.priority || 'Medium',
+        rec.metric || '',
+        rec.issue || '',
+        rec.action_required || '',
+        rec.observation || null,
+        rec.dependency || null,
+        rec.failure_check || null,
+        rec.leading_indicator || null
+      );
+    }
+  }
+
+  // 3. If backlinks, parse referring domains and upsert into outreach_targets
+  if (payload.audit_type === 'backlinks' && payload.report_json) {
+    const report = payload.report_json;
+    const targets = report.outreach_targets || report.competitor_gap || [];
+    if (Array.isArray(targets)) {
+      const insertTarget = db.prepare(`
+        INSERT INTO outreach_targets (client_id, site_name, site_url, source, category, domain_authority, vetting_status)
+        VALUES (?, ?, ?, 'seo_backlinks_gap', ?, ?, 'unvetted')
+      `);
+      for (const t of targets) {
+        if (t.site_url) {
+          insertTarget.run(
+            payload.client_id,
+            t.site_name || t.site_url,
+            t.site_url,
+            t.category || 'guest_post',
+            t.domain_authority || t.da || null
+          );
+        }
+      }
+    }
+  }
+
+  // 4. Token Cost Logging
+  if (payload.token_usage) {
+    const usage = payload.token_usage;
+    db.prepare(`
+      INSERT INTO token_usage_log (
+        client_id, audit_id, agent_type, model, triggered_by,
+        input_tokens, output_tokens, estimated_cost_usd, external_api_cost_usd,
+        duration_seconds, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+    `).run(
+      payload.client_id,
+      auditId,
+      payload.audit_type,
+      usage.model || 'claude',
+      payload.triggered_by || 'system',
+      usage.input_tokens || 0,
+      usage.output_tokens || 0,
+      usage.estimated_cost_usd || 0,
+      usage.external_api_cost_usd || 0,
+      usage.duration_seconds || null
+    );
+  }
+
+  // 5. Sync overall scores with marketing_monthly_report
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const existingReport = db.prepare('SELECT id FROM marketing_monthly_report WHERE client_id = ? AND month = ?').get(payload.client_id, currentMonth);
+
+  if (existingReport) {
+    db.prepare(`
+      UPDATE marketing_monthly_report SET
+        on_page_score = COALESCE(?, on_page_score),
+        da = COALESCE(?, da),
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      payload.on_page_score ?? payload.health_score ?? null,
+      payload.backlinks_score ?? null,
+      existingReport.id
+    );
+  } else {
+    db.prepare(`
+      INSERT INTO marketing_monthly_report (
+        client_id, month, on_page_score, da
+      ) VALUES (?, ?, ?, ?)
+    `).run(
+      payload.client_id,
+      currentMonth,
+      payload.on_page_score ?? payload.health_score ?? null,
+      payload.backlinks_score ?? null
+    );
+  }
+
+  logAction({
+    action: 'create',
+    entityType: 'seo_audit',
+    entityId: auditId,
+    diff: { audit_type: payload.audit_type, client_id: payload.client_id }
+  });
+
+  return { success: true, summary: `SEO Audit #${auditId} (${payload.audit_type}) completed.` };
 }
 
 // ============================================================

@@ -1,0 +1,567 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ArrowRight } from 'lucide-react';
+import { API_BASE } from '../../api.js';
+
+export default function SeoMonitorTab({ auth, clients, showToast }) {
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [agents, setAgents] = useState([]);
+  const [audits, setAudits] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
+  const [selectedAuditId, setSelectedAuditId] = useState('');
+  
+  // Real-time terminal log stream state
+  const [activeConsoleAgent, setActiveConsoleAgent] = useState(null);
+  const [consoleLogs, setConsoleLogs] = useState([]);
+  const [agentRunningStates, setAgentRunningStates] = useState({}); // e.g. { technical: 'running' }
+  const terminalEndRef = useRef(null);
+
+  // Freshness confirmation modal
+  const [showFreshModal, setShowFreshModal] = useState(false);
+  const [freshModalAgent, setFreshModalAgent] = useState(null);
+
+  // Assign to SMM modal
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningRec, setAssigningRec] = useState(null);
+  const [freelancers, setFreelancers] = useState([]);
+  const [assignForm, setAssignForm] = useState({
+    assigned_to: '',
+    priority: 'medium',
+    due_date: ''
+  });
+
+  const selectedClient = clients.find(c => String(c.id) === String(selectedClientId));
+
+  // Fetch freelancers for the assignment modal
+  useEffect(() => {
+    fetch(`${API_BASE}/api/freelancers`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => setFreelancers(data))
+      .catch(err => console.error('[SEO TAB] Fetch freelancers failed:', err));
+  }, []);
+
+  // Fetch agent status & recommendations on client change
+  const fetchClientData = async (clientId) => {
+    if (!clientId) return;
+    try {
+      // 1. Fetch agent freshness states
+      const agentRes = await fetch(`${API_BASE}/api/clients/${clientId}/seo/agents/status`, { credentials: 'include' });
+      const agentData = await agentRes.json();
+      if (agentRes.ok) setAgents(agentData.agents || []);
+
+      // 2. Fetch past audits
+      const auditRes = await fetch(`${API_BASE}/api/clients/${clientId}/seo/audits`, { credentials: 'include' });
+      const auditData = await auditRes.json();
+      if (auditRes.ok) {
+        setAudits(auditData.audits || []);
+        if (auditData.audits?.length > 0) {
+          setSelectedAuditId(auditData.audits[0].id);
+        } else {
+          setSelectedAuditId('');
+          setRecommendations([]);
+        }
+      }
+    } catch (err) {
+      showToast('Failed to load SEO client metrics', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (selectedClientId) {
+      fetchClientData(selectedClientId);
+    }
+  }, [selectedClientId]);
+
+  // Fetch recommendations when selected audit changes
+  useEffect(() => {
+    if (selectedClientId && selectedAuditId) {
+      fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/audits/${selectedAuditId}`, { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          setRecommendations(data.recommendations || []);
+        })
+        .catch(err => console.error('[SEO TAB] Recommendations fetch failed:', err));
+    }
+  }, [selectedAuditId, selectedClientId]);
+
+  // Set up SSE EventSource for real-time console log streaming
+  useEffect(() => {
+    const eventSource = new EventSource(`${API_BASE}/api/events`, { withCredentials: true });
+
+    eventSource.addEventListener('seo_agent_log', (e) => {
+      const data = JSON.parse(e.data);
+      if (String(data.clientId) === String(selectedClientId) && data.agentType === activeConsoleAgent) {
+        setConsoleLogs(prev => [...prev, data.log]);
+      }
+    });
+
+    eventSource.addEventListener('seo_agent_status', (e) => {
+      const data = JSON.parse(e.data);
+      if (String(data.clientId) === String(selectedClientId)) {
+        setAgentRunningStates(prev => ({
+          ...prev,
+          [data.agentType]: data.status // 'queued' | 'running' | 'completed' | 'failed'
+        }));
+        
+        if (data.status === 'completed' || data.status === 'failed') {
+          showToast(`Agent '${data.agentType}' audit ${data.status}!`, data.status === 'completed' ? 'success' : 'error');
+          // Refresh dashboard scores
+          fetchClientData(selectedClientId);
+        }
+      }
+    });
+
+    eventSource.addEventListener('pending_action_created', (e) => {
+      const data = JSON.parse(e.data);
+      showToast(`New trigger approval request queued for ${data.agentType}!`, 'info');
+      fetchClientData(selectedClientId);
+    });
+
+    return () => {
+      eventSource.close();
+    };
+  }, [selectedClientId, activeConsoleAgent]);
+
+  // Auto-scroll terminal drawer to bottom
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [consoleLogs]);
+
+  // Trigger agent execution
+  const triggerAgent = async (agentType, force = false) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/trigger/${agentType}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || data.error);
+
+      if (data.requiresConfirmation) {
+        setFreshModalAgent(agentType);
+        setShowFreshModal(true);
+        return;
+      }
+
+      showToast(data.message, 'success');
+      
+      // Update local running state indicator
+      setAgentRunningStates(prev => ({
+        ...prev,
+        [agentType]: data.status === 'auto_approved' ? 'queued' : 'pending_approval'
+      }));
+
+      // Open log drawer for queued runs immediately
+      if (data.status === 'auto_approved') {
+        setActiveConsoleAgent(agentType);
+        setConsoleLogs([`[SYSTEM] Trigger approved. Placing '${agentType}' in queue...`]);
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  // Convert Recommendation to Kanban Task
+  const handleAssignSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/recommendations/${assigningRec.id}/convert-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assignForm),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      showToast('Assigned to SMM & linked to Kanban board!', 'success');
+      setShowAssignModal(false);
+      
+      // Refresh recommendations list
+      if (selectedAuditId) {
+        const detailRes = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/audits/${selectedAuditId}`, { credentials: 'include' });
+        const detailData = await detailRes.json();
+        if (detailRes.ok) setRecommendations(detailData.recommendations || []);
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  // Helper to resolve card border & freshness color indicators
+  const getFreshnessColor = (freshness) => {
+    switch (freshness) {
+      case 'fresh': return '#22c55e'; // Green
+      case 'stale': return '#eab308'; // Amber
+      default: return '#ef4444'; // Red (never run)
+    }
+  };
+
+  // Filters applicable agents by client type
+  const getFilteredAgents = () => {
+    if (!selectedClient) return [];
+    return agents.filter(agent => {
+      const type = agent.agentType;
+      if (type === 'ecommerce' && selectedClient.client_type === 'artist_curation') return false;
+      if (type === 'local' && selectedClient.client_type === 'marketing' && !selectedClient.contact_phone) return false;
+      return true;
+    });
+  };
+
+  return (
+    <div style={{ textAlign: 'left' }} className="seo-monitor-container">
+      {/* Dropdown selector panel */}
+      <div className="card glass-premium" style={{ marginBottom: '20px', padding: '16px', border: '2px solid #000' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h3 style={{ margin: 0, fontWeight: 'bold' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
+            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Active Client:</span>
+            <select
+              className="form-control"
+              style={{ minWidth: '220px', fontWeight: 'bold', border: '2px solid #000' }}
+              value={selectedClientId}
+              onChange={e => {
+                setSelectedClientId(e.target.value);
+                setActiveConsoleAgent(null);
+                setConsoleLogs([]);
+              }}
+            >
+              <option value="">-- Choose Client --</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.client_type})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {!selectedClientId ? (
+        <div style={{ textAlign: 'center', padding: '40px', background: '#f4f4f5', borderRadius: '4px', border: '2px dashed #000' }}>
+          <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--text-muted)' }}>Choose an active workspace client from the dropdown above to load the agent fleet.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: activeConsoleAgent ? '1.5fr 1fr' : '1fr', gap: '20px', transition: 'all 0.3s ease' }}>
+          
+          {/* Main Workspace Area */}
+          <div>
+            {/* 25-Agent Bento Grid */}
+            <h3 style={{ marginBottom: '12px', fontWeight: 'bold' }}>Agent Fleet Matrix ({getFilteredAgents().length} active)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+              {getFilteredAgents().map(agent => {
+                const isRunning = agentRunningStates[agent.agentType] === 'running' || agentRunningStates[agent.agentType] === 'queued';
+                const isPending = agentRunningStates[agent.agentType] === 'pending_approval';
+                
+                return (
+                  <div 
+                    key={agent.agentType}
+                    className="card"
+                    style={{
+                      border: '2px solid #000',
+                      borderTop: `6px solid ${getFreshnessColor(agent.freshness)}`,
+                      padding: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      background: activeConsoleAgent === agent.agentType ? '#faf5ff' : '#fff',
+                      position: 'relative'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{agent.agentType}</span>
+                        <span 
+                          className="badge" 
+                          style={{ 
+                            background: getFreshnessColor(agent.freshness), 
+                            color: '#fff', 
+                            fontSize: '0.65rem',
+                            fontWeight: 'bold',
+                            padding: '2px 6px'
+                          }}
+                        >
+                          {agent.freshness.replace('_', ' ')}
+                        </span>
+                      </div>
+                      
+                      <div style={{ margin: '8px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <div>Cadence: {agent.staleAfterDays} days</div>
+                        <div>Last Run: {agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleDateString() : 'Never'}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                        {agent.score !== null ? `${agent.score}%` : '--'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          onClick={() => {
+                            setActiveConsoleAgent(agent.agentType);
+                            setConsoleLogs([`[SYSTEM] Subscribed to logs for '${agent.agentType}' agent.`]);
+                          }}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 6px', border: '1px solid #000' }}
+                          title="Open logs terminal drawer"
+                        >
+                          <Terminal size={14} />
+                        </button>
+                        
+                        {isRunning ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                            <Loader2 size={12} className="animate-spin" /> {agentRunningStates[agent.agentType]}
+                          </div>
+                        ) : isPending ? (
+                          <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title="Waiting for admin approval">
+                            Pending
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => triggerAgent(agent.agentType)}
+                            className="btn btn-primary"
+                            style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '2px solid #000' }}
+                          >
+                            <Play size={12} fill="currentColor" /> Run
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Recommendations & Audit logs */}
+            <div className="card" style={{ border: '2px solid #000', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ margin: 0, fontWeight: 'bold' }}>Audit Recommendations &amp; Findings</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>View Audit:</span>
+                  <select
+                    className="form-control"
+                    style={{ border: '2px solid #000', padding: '4px 8px', fontSize: '0.85rem' }}
+                    value={selectedAuditId}
+                    onChange={e => setSelectedAuditId(e.target.value)}
+                    disabled={audits.length === 0}
+                  >
+                    {audits.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {new Date(a.created_at).toLocaleString()} - {a.audit_type} ({a.health_score ?? a.technical_score ?? a.local_score ?? '--'}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {recommendations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: '4px' }}>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>No recommendations loaded. Run an agent audit above to populate recommendations.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {recommendations.map(rec => (
+                    <div 
+                      key={rec.id} 
+                      className="recommendation-card" 
+                      style={{ 
+                        border: '2px solid #000', 
+                        padding: '14px', 
+                        borderRadius: '4px',
+                        background: rec.priority === 'Critical' ? '#fff1f2' : rec.priority === 'High' ? '#fffbeb' : '#fff'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className={`badge badge-${rec.priority === 'Critical' ? 'danger' : rec.priority === 'High' ? 'warning' : 'info'}`} style={{ border: '1px solid #000' }}>
+                            {rec.priority}
+                          </span>
+                          <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{rec.metric}</span>
+                        </div>
+                        <span className="badge" style={{ background: '#f1f5f9', border: '1px solid #000', textTransform: 'capitalize' }}>
+                          Status: {rec.status}
+                        </span>
+                      </div>
+                      
+                      <div style={{ fontSize: '0.85rem', marginBottom: '8px' }}>
+                        <strong>Issue:</strong> {rec.issue}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', marginBottom: '12px' }}>
+                        <strong>Required Action:</strong> {rec.action_required}
+                      </div>
+
+                      {rec.status === 'open' && (
+                        <button
+                          onClick={() => {
+                            setAssigningRec(rec);
+                            setShowAssignModal(true);
+                          }}
+                          className="btn btn-primary"
+                          style={{
+                            padding: '4px 12px',
+                            fontSize: '0.75rem',
+                            border: '2px solid #000',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            width: 'fit-content'
+                          }}
+                        >
+                          Assign to SMM / Convert Task <ArrowRight size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Real-time SSE Terminal Console Drawer */}
+          {activeConsoleAgent && (
+            <div 
+              style={{ 
+                border: '2px solid #000', 
+                background: '#090d16', 
+                color: '#22c55e', 
+                padding: '16px', 
+                borderRadius: '4px',
+                display: 'flex',
+                flexDirection: 'column',
+                height: 'calc(100vh - 120px)',
+                position: 'sticky',
+                top: '20px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '10px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Terminal size={16} />
+                  <span style={{ fontWeight: 'bold', color: '#fff' }}>Terminal: {activeConsoleAgent}</span>
+                </div>
+                <button 
+                  onClick={() => setActiveConsoleAgent(null)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div 
+                style={{ 
+                  flex: 1, 
+                  overflowY: 'auto', 
+                  fontFamily: 'monospace', 
+                  fontSize: '0.8rem',
+                  lineHeight: '1.4',
+                  whiteSpace: 'pre-wrap',
+                  textAlign: 'left'
+                }}
+              >
+                {consoleLogs.map((log, idx) => (
+                  <div key={idx} style={{ marginBottom: '4px' }}>{log}</div>
+                ))}
+                <div ref={terminalEndRef} />
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* Freshness Confirmation Warning Dialog */}
+      {showFreshModal && (
+        <div className="modal-overlay" onClick={() => setShowFreshModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '450px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', color: 'var(--accent)' }}>
+              <AlertTriangle size={20} />
+              <h3 style={{ margin: 0, fontWeight: 'bold' }}>Agent Audit Still Fresh</h3>
+            </div>
+            <p style={{ fontSize: '0.9rem', lineHeight: '1.4', margin: '0 0 20px' }}>
+              This check was run recently and has not exceeded its stale limit period. Running it again will consume API tokens unnecessarily. Do you still want to proceed?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowFreshModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ border: '2px solid #000' }}
+                onClick={() => {
+                  triggerAgent(freshModalAgent, true);
+                  setShowFreshModal(false);
+                }}
+              >
+                Force Run
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign to SMM / Kanban conversion popover */}
+      {showAssignModal && (
+        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '500px' }}>
+            <h3 style={{ margin: '0 0 14px', fontWeight: 'bold' }}>Assign to SMM / Convert Task</h3>
+            <form onSubmit={handleAssignSubmit}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Assignee</label>
+                <select 
+                  className="form-control" 
+                  value={assignForm.assigned_to} 
+                  onChange={e => setAssignForm({ ...assignForm, assigned_to: e.target.value })}
+                  required
+                >
+                  <option value="">-- Select SMM / Team Member --</option>
+                  {freelancers.map(f => (
+                    <option key={f.id} value={f.id}>{f.name} ({f.role || 'Freelancer'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Priority</label>
+                  <select 
+                    className="form-control" 
+                    value={assignForm.priority} 
+                    onChange={e => setAssignForm({ ...assignForm, priority: e.target.value })}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Due Date</label>
+                  <input 
+                    type="date" 
+                    className="form-control" 
+                    value={assignForm.due_date} 
+                    onChange={e => setAssignForm({ ...assignForm, due_date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ border: '2px solid #000' }}>Confirm Assignment</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

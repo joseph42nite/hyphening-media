@@ -130,7 +130,8 @@ router.post('/', authorize('admin'), (req, res) => {
       calendar_sync_link, drive_folder_link,
       instagram_access_token, instagram_business_account_id,
       youtube_channel_id, youtube_api_key,
-      google_ads_customer_id, parent_id
+      google_ads_customer_id, parent_id,
+      website_url, instagram_url, youtube_url
     } = req.body;
 
     if (!name) {
@@ -145,8 +146,9 @@ router.post('/', authorize('admin'), (req, res) => {
         calendar_sync_link, drive_folder_link,
         instagram_access_token_enc, instagram_business_account_id,
         youtube_channel_id, youtube_api_key_enc,
-        google_ads_customer_id, parent_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        google_ads_customer_id, parent_id,
+        website_url, instagram_url, youtube_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       client_type || 'marketing',
@@ -160,7 +162,10 @@ router.post('/', authorize('admin'), (req, res) => {
       youtube_channel_id || null,
       youtube_api_key && apiKey ? encrypt(youtube_api_key, apiKey) : null,
       google_ads_customer_id || null,
-      parent_id && !isNaN(parseInt(parent_id)) ? parseInt(parent_id) : null
+      parent_id && !isNaN(parseInt(parent_id)) ? parseInt(parent_id) : null,
+      website_url || null,
+      instagram_url || null,
+      youtube_url || null
     );
 
     logAction({
@@ -201,7 +206,8 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       'name', 'client_type', 'contact_person', 'contact_email', 'contact_phone',
       'calendar_sync_link', 'drive_folder_link',
       'instagram_business_account_id', 'youtube_channel_id', 'google_ads_customer_id',
-      'is_active', 'portal_enabled', 'parent_id'
+      'is_active', 'portal_enabled', 'parent_id',
+      'website_url', 'instagram_url', 'youtube_url'
     ];
 
     const updates = {};

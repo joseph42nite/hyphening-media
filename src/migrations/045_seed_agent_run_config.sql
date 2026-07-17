@@ -1,0 +1,26 @@
+-- Migration: 045_seed_agent_run_config.sql
+
+INSERT INTO agent_run_config (audit_type, stale_after_days, default_model, notes) VALUES
+('full', 30, 'claude', 'On-demand/monthly'),
+('technical', 30, 'deepseek-v4-flash', 'Structured checks — cheap model candidate'),
+('content', 30, 'claude', 'Judgment-heavy — keep on Claude'),
+('content_brief', 9999, 'claude', 'On-demand, tied to content calendar'),
+('schema', 9999, 'deepseek-v4-flash', 'Structured extraction — cheap model candidate'),
+('sitemap', 9999, 'deepseek-v4-flash', 'Structured — cheap model candidate'),
+('images', 30, 'deepseek-v4-flash', 'Structured checks — cheap model candidate'),
+('geo', 30, 'claude', 'Nuanced citability judgment'),
+('local', 7, 'claude', 'Weekly'),
+('maps', 7, 'claude', 'Weekly, needs DataForSEO'),
+('hreflang', 9999, 'deepseek-v4-flash', 'Structured validation'),
+('google', 7, 'claude', 'Weekly'),
+('backlinks', 7, 'claude', 'Weekly, feeds outreach — needs judgment on link quality'),
+('cluster', 30, 'claude', 'Monthly'),
+('sxo', 30, 'claude', 'Monthly, judgment-heavy'),
+('drift', 7, 'claude', 'Automatic weekly, not manually triggered'),
+('ecommerce', 30, 'claude', 'Conditional'),
+('flow', 90, 'claude', 'Quarterly strategy'),
+('competitor_pages', 9999, 'claude', 'On-demand'),
+('plan', 9999, 'claude', 'Once per onboarding'),
+('programmatic', 9999, 'claude', 'On-demand, conditional'),
+('dataforseo', 9999, 'claude', 'Budget-gated, on-demand'),
+('image_gen', 9999, 'claude', 'On-demand creative');

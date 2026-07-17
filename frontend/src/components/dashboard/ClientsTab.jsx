@@ -12,7 +12,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
     calendar_sync_link: '', drive_folder_link: '', instagram_business_account_id: '',
     instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: '',
-    parent_id: ''
+    parent_id: '', website_url: '', instagram_url: '', youtube_url: ''
   });
 
   const filteredClients = clients.filter(c =>
@@ -35,7 +35,10 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
         youtube_channel_id: client.youtube_channel_id || '',
         youtube_api_key: '',
         google_ads_customer_id: client.google_ads_customer_id || '',
-        parent_id: client.parent_id || ''
+        parent_id: client.parent_id || '',
+        website_url: client.website_url || '',
+        instagram_url: client.instagram_url || '',
+        youtube_url: client.youtube_url || ''
       });
     } else {
       setEditingClient(null);
@@ -43,7 +46,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
         calendar_sync_link: '', drive_folder_link: '', instagram_business_account_id: '',
         instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: '',
-        parent_id: ''
+        parent_id: '', website_url: '', instagram_url: '', youtube_url: ''
       });
     }
     setShowClientModal(true);
@@ -165,8 +168,17 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                 </td>
                 <td>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span className={`badge ${client.instagram_business_account_id ? 'badge-success' : 'badge-muted'}`}>Instagram</span>
-                    <span className={`badge ${client.youtube_channel_id ? 'badge-success' : 'badge-muted'}`}>YouTube</span>
+                    <span className={`badge ${client.instagram_business_account_id ? 'badge-success' : 'badge-muted'}`}>Instagram API</span>
+                    <span className={`badge ${client.youtube_channel_id ? 'badge-success' : 'badge-muted'}`}>YouTube API</span>
+                    {client.website_url && (
+                      <a href={client.website_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>Website</a>
+                    )}
+                    {client.instagram_url && (
+                      <a href={client.instagram_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>Instagram</a>
+                    )}
+                    {client.youtube_url && (
+                      <a href={client.youtube_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>YouTube</a>
+                    )}
                   </div>
                 </td>
                 <td>
@@ -329,6 +341,22 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
               <div className="form-group">
                 <label className="form-label">Google Ads Customer ID</label>
                 <input type="text" className="form-control" value={clientFormData.google_ads_customer_id} onChange={e => setClientFormData({...clientFormData, google_ads_customer_id: e.target.value})} />
+              </div>
+
+              <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Public Profile Links</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Website URL</label>
+                  <input type="url" className="form-control" placeholder="https://..." value={clientFormData.website_url} onChange={e => setClientFormData({...clientFormData, website_url: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Instagram Profile URL</label>
+                  <input type="url" className="form-control" placeholder="https://..." value={clientFormData.instagram_url} onChange={e => setClientFormData({...clientFormData, instagram_url: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">YouTube Channel URL</label>
+                  <input type="url" className="form-control" placeholder="https://..." value={clientFormData.youtube_url} onChange={e => setClientFormData({...clientFormData, youtube_url: e.target.value})} />
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>

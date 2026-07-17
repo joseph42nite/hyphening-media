@@ -41,6 +41,9 @@ import openclawRoutes from './src/routes/openclaw.js';
 import blogRoutes from './src/routes/blog.js';
 import integrationsRoutes from './src/routes/integrations.js';
 import { publicGigConfirmRoute } from './src/routes/artists.js';
+import seoRoutes from './src/routes/seo.js';
+import approvalRoutes from './src/routes/approval.js';
+import usageRoutes from './src/routes/usage.js';
 
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
@@ -50,6 +53,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.set('trust proxy', 1);
+app.set('broadcastEvent', broadcastEvent);
 const PORT = process.env.PORT || 3000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -180,6 +184,11 @@ app.get('/api/public/gigs/confirm/:token', publicGigConfirmRoute);
 
 // OpenClaw webhook
 app.use('/api/openclaw', openclawRoutes);
+
+// SEO & Audit integration routes
+app.use('/api/clients', seoRoutes);
+app.use('/api/approval', approvalRoutes);
+app.use('/api/usage', usageRoutes);
 
 // Blog (public + admin)
 app.use('/api/blog', blogRoutes);

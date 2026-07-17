@@ -6,7 +6,7 @@ import {
   Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
   Search, Share2, FileDown, Eye, HelpCircle, Check, X, ShieldAlert,
-  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff
+  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu
 } from 'lucide-react';
 
 import TasksTab from '../components/dashboard/TasksTab.jsx';
@@ -19,6 +19,9 @@ import ChatTab from '../components/dashboard/ChatTab.jsx';
 import ContentModal from '../components/dashboard/ContentModal.jsx';
 import BlogTab from '../components/dashboard/BlogTab.jsx';
 import ClientsTab from '../components/dashboard/ClientsTab.jsx';
+import SeoMonitorTab from '../components/dashboard/SeoMonitorTab.jsx';
+import ApprovalCenterTab from '../components/dashboard/ApprovalCenterTab.jsx';
+import TokenUsageTab from '../components/dashboard/TokenUsageTab.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from '../components/dashboard/contentFormHelper.js';
 
 let isRefreshing = false;
@@ -1056,6 +1059,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
+        {/* SEO Monitor */}
+        {(isAdmin || isSMM) && (
+          <button onClick={() => setActiveTab('seo')} className={`btn ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}>
+            <Cpu size={16} /> SEO Monitor
+          </button>
+        )}
+
         {/* 4. Scripts */}
         {(isAdmin || isSMM) && (
           <button onClick={() => {
@@ -1085,6 +1095,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
+        {/* Approvals */}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('approval')} className={`btn ${activeTab === 'approval' ? 'btn-primary' : 'btn-secondary'}`}>
+            <ShieldAlert size={16} /> Approvals
+          </button>
+        )}
+
         {/* 8. Clients */}
         {isAdmin && (
           <button onClick={() => setActiveTab('clients')} className={`btn ${activeTab === 'clients' ? 'btn-primary' : 'btn-secondary'}`}>
@@ -1096,6 +1113,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {isAdmin && (
           <button onClick={() => setActiveTab('freelancers')} className={`btn ${activeTab === 'freelancers' ? 'btn-primary' : 'btn-secondary'}`}>
             <Users size={16} /> Freelancers
+          </button>
+        )}
+
+        {/* Token Usage */}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('usage')} className={`btn ${activeTab === 'usage' ? 'btn-primary' : 'btn-secondary'}`}>
+            <DollarSign size={16} /> Token Usage
           </button>
         )}
 
@@ -1229,6 +1253,30 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* BLOG TAB */}
         {activeTab === 'blog' && (
           <BlogTab showToast={showToast} />
+        )}
+
+        {/* SEO MONITOR TAB */}
+        {activeTab === 'seo' && (isAdmin || isSMM) && (
+          <SeoMonitorTab
+            auth={auth}
+            clients={clients}
+            showToast={showToast}
+          />
+        )}
+
+        {/* APPROVAL CENTER TAB */}
+        {activeTab === 'approval' && isAdmin && (
+          <ApprovalCenterTab
+            showToast={showToast}
+          />
+        )}
+
+        {/* TOKEN USAGE TAB */}
+        {activeTab === 'usage' && isAdmin && (
+          <TokenUsageTab
+            clients={clients}
+            showToast={showToast}
+          />
         )}
 
 
