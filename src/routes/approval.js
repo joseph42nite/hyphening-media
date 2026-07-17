@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../../database.js';
-import { authorize } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { exec } from 'child_process';
 import path from 'path';
@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = Router();
+router.use(authenticate);
 
 // Helper to spawn runner process
 function spawnAgent(clientId, agentType, model, requestedBy) {
@@ -52,6 +53,40 @@ router.get('/pending', authorize('admin'), (req, res) => {
     res.json({ pending: mapped });
   } catch (err) {
     console.error('[APPROVAL] Pending fetch error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/approval/history
+ * Lists resolved/historical actions
+ */
+router.get('/history', authorize('admin'), (req, res) => {
+  try {
+    const history = db.prepare(`
+      SELECT p.*, c.name AS client_name, u.email AS requester_email
+      FROM openclaw_pending_actions p
+      LEFT JOIN crm_clients c ON p.client_id = c.id
+      LEFT JOIN users u ON p.requested_by = u.id
+      WHERE p.status IN ('accepted', 'rejected', 'auto_approved')
+      ORDER BY p.resolved_at DESC, p.created_at DESC
+      LIMIT 50
+    `).all();
+
+    // Parse JSON action payloads for display
+    const mapped = history.map(row => {
+      let parsed = {};
+      try {
+        parsed = JSON.parse(row.action_payload);
+      } catch (e) {
+        parsed = { error: 'Invalid payload JSON' };
+      }
+      return { ...row, action_payload: parsed };
+    });
+
+    res.json({ history: mapped });
+  } catch (err) {
+    console.error('[APPROVAL] History fetch error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -4,6 +4,7 @@ import { API_BASE } from '../../api.js';
 
 export default function ApprovalCenterTab({ showToast }) {
   const [pendingActions, setPendingActions] = useState([]);
+  const [historyActions, setHistoryActions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPending = async () => {
@@ -14,14 +15,30 @@ export default function ApprovalCenterTab({ showToast }) {
         setPendingActions(data.pending || []);
       }
     } catch (err) {
-      console.error('[APPROVAL CENTER] Fetch failed:', err);
-    } finally {
-      setLoading(false);
+      console.error('[APPROVAL CENTER] Fetch pending failed:', err);
     }
   };
 
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/approval/history`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        setHistoryActions(data.history || []);
+      }
+    } catch (err) {
+      console.error('[APPROVAL CENTER] Fetch history failed:', err);
+    }
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    await Promise.all([fetchPending(), fetchHistory()]);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    fetchPending();
+    fetchData();
   }, []);
 
   const handleResolve = async (actionId, resolution) => {
@@ -34,7 +51,7 @@ export default function ApprovalCenterTab({ showToast }) {
       if (!res.ok) throw new Error(data.error);
 
       showToast(`Action successfully ${resolution === 'approve' ? 'approved & started' : 'rejected'}.`, 'success');
-      fetchPending();
+      fetchData();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -127,6 +144,81 @@ export default function ApprovalCenterTab({ showToast }) {
                         <XCircle size={14} /> Reject
                       </button>
                     </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Spacer and History section */}
+      <div className="card glass-premium" style={{ marginTop: '30px', marginBottom: '20px', padding: '16px', border: '2px solid #000' }}>
+        <h3 style={{ margin: 0, fontWeight: 'bold' }}>Action Approval &amp; Execution History</h3>
+        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Audit logs of previously approved or rejected agent runs and execution statuses.</p>
+      </div>
+
+      {historyActions.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '30px', background: '#f4f4f5', borderRadius: '4px', border: '2px dashed #000', marginBottom: '20px' }}>
+          <p style={{ margin: 0, color: 'var(--text-muted)' }}>No historical actions recorded yet.</p>
+        </div>
+      ) : (
+        <div className="table-container" style={{ marginBottom: '20px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th>Requested At / Resolved At</th>
+                <th>Client</th>
+                <th>Action Type</th>
+                <th>Configuration Parameters</th>
+                <th>Requested By</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historyActions.map(action => (
+                <tr key={action.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td>
+                    <div style={{ fontSize: '0.8rem' }}>
+                      <strong>Req:</strong> {new Date(action.created_at).toLocaleString()}
+                    </div>
+                    {action.resolved_at && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <strong>Res:</strong> {new Date(action.resolved_at).toLocaleString()}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ fontWeight: 'bold' }}>{action.client_name || 'System / Global'}</td>
+                  <td>
+                    <span className="badge badge-info" style={{ border: '1px solid #000' }}>
+                      {action.action_type.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: '#f8fafc', padding: '6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                      <div><strong>Agent:</strong> {action.action_payload?.agentType || '--'}</div>
+                      <div><strong>Model:</strong> {action.action_payload?.model || '--'}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{action.requester_email || 'system'}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Role: {action.requested_role}</div>
+                  </td>
+                  <td>
+                    <span 
+                      className="badge" 
+                      style={{ 
+                        background: action.status === 'accepted' ? '#22c55e' : action.status === 'rejected' ? '#ef4444' : '#6b7280',
+                        color: '#fff',
+                        border: '1px solid #000',
+                        fontWeight: 'bold',
+                        padding: '4px 8px',
+                        textTransform: 'uppercase',
+                        fontSize: '0.7rem'
+                      }}
+                    >
+                      {action.status === 'accepted' ? 'Approved' : action.status === 'rejected' ? 'Rejected' : action.status.replace('_', ' ')}
+                    </span>
                   </td>
                 </tr>
               ))}

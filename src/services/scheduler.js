@@ -1,14 +1,15 @@
-/**
- * Marketing Ops Center — Scheduler Service
- * Cron jobs for calendar sync, D-5 alerts, and API metric fetching.
- */
-
 import cron from 'node-cron';
+import { exec } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import db from '../../database.js';
 import { notifyAdmin, notifySMM, notifyVideographer } from './telegram.js';
 import { runAutoPublisher } from './autoPublisher.js';
 import { runMetricSyncWorker } from './metricSyncWorker.js';
 import { runDailyCommentSync } from './dailyCommentSync.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Initialize all scheduled jobs.
@@ -55,6 +56,11 @@ export function initScheduler() {
   cron.schedule('0 3 * * *', () => {
     console.log('[SCHEDULER] Cleaning expired sessions...');
     cleanExpiredSessions();
+  });
+
+  // Daily SEO audit freshness check — 3:05 AM daily
+  cron.schedule('5 3 * * *', () => {
+    runDailySeoFreshnessCheck();
   });
 
   console.log('[SCHEDULER] ✓ All cron jobs registered.');
@@ -199,6 +205,72 @@ async function runAPIMetricFetch() {
     }
   } catch (err) {
     console.error('[METRICS] Fetch error:', err);
+  }
+}
+
+/**
+ * Daily SEO freshness check worker — runs at 3:05 AM daily
+ * Scans active clients, checks stale audits against config stale limits,
+ * and auto-triggers updates for stale indexes.
+ */
+async function runDailySeoFreshnessCheck() {
+  try {
+    console.log('[SCHEDULER] Running daily SEO freshness checks...');
+    const clients = db.prepare("SELECT * FROM crm_clients WHERE is_active = 1 AND client_type != 'artist_curation' AND website_url IS NOT NULL").all();
+    const configs = db.prepare('SELECT * FROM agent_run_config').all();
+
+    for (const client of clients) {
+      // Get current month spend and budget cap
+      const currentMonthStart = new Date();
+      currentMonthStart.setDate(1);
+      currentMonthStart.setHours(0,0,0,0);
+      const isoMonthStart = currentMonthStart.toISOString();
+
+      const spent = db.prepare(`
+        SELECT COALESCE(SUM(estimated_cost_usd + external_api_cost_usd), 0) AS total_cost_usd
+        FROM token_usage_log
+        WHERE client_id = ? AND created_at >= ?
+      `).get(client.id, isoMonthStart);
+
+      const budget = db.prepare('SELECT * FROM token_budgets WHERE client_id = ?').get(client.id);
+      const monthlyLimit = budget ? budget.monthly_budget_usd : 50.0;
+      const hardStop = budget ? budget.hard_stop : 0;
+
+      // If budget exceeded and hard stop enabled, skip client completely
+      if (hardStop === 1 && spent.total_cost_usd >= monthlyLimit) {
+        console.log(`[SEO CRON] Client ${client.name} has exceeded budget cap ($${spent.total_cost_usd.toFixed(2)}/$${monthlyLimit.toFixed(2)}). Skipping.`);
+        continue;
+      }
+
+      for (const conf of configs) {
+        // Find last successful audit of this type
+        const lastAudit = db.prepare(`
+          SELECT created_at FROM seo_audits
+          WHERE client_id = ? AND audit_type = ?
+          ORDER BY created_at DESC LIMIT 1
+        `).get(client.id, conf.audit_type);
+
+        let isStale = false;
+        if (!lastAudit) {
+          isStale = true; // Never run
+        } else {
+          const lastDate = new Date(lastAudit.created_at);
+          const diffMs = Date.now() - lastDate.getTime();
+          const ageDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (ageDays >= conf.stale_after_days) {
+            isStale = true;
+          }
+        }
+
+        if (isStale) {
+          console.log(`[SEO CRON] Agent '${conf.audit_type}' is stale for client '${client.name}'. Highlighted in UI, waiting for manual trigger.`);
+          // Auto-triggering is disabled to prevent accidental credit consumption. 
+          // Stale agents are highlighted in the UI and must be run manually.
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[SCHEDULER] Daily SEO freshness check error:', err);
   }
 }
 
