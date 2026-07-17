@@ -240,7 +240,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   };
 
   return (
-    <div style={{ textAlign: 'left' }} className="seo-monitor-container">
+    <div style={{ textAlign: 'left', paddingBottom: activeConsoleAgent ? '260px' : '0px', transition: 'padding 0.3s ease' }} className="seo-monitor-container">
       {/* Dropdown selector panel */}
       <div className="card glass-premium" style={{ marginBottom: '20px', padding: '16px', border: '2px solid #000' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
@@ -285,7 +285,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
           <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--text-muted)' }}>Choose an active workspace client from the dropdown above to load the agent fleet.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: activeConsoleAgent ? '1.5fr 1fr' : '1fr', gap: '20px', transition: 'all 0.3s ease' }}>
+        <div>
           
           {/* Main Workspace Area */}
           <div>
@@ -386,21 +386,42 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>View Audit:</span>
-                  <select
-                    className="form-control"
-                    style={{ border: '2px solid #000', padding: '4px 8px', fontSize: '0.85rem' }}
-                    value={selectedAuditId}
-                    onChange={e => setSelectedAuditId(e.target.value)}
-                    disabled={audits.length === 0}
-                  >
-                    {audits.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {new Date(a.created_at).toLocaleString()} - {a.audit_type} ({a.health_score ?? a.technical_score ?? a.local_score ?? '--'}%)
-                      </option>
-                    ))}
-                  </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  {currentAudit && (
+                    <div 
+                      style={{ 
+                        border: '2px solid #000', 
+                        background: '#f8fafc', 
+                        padding: '4px 8px', 
+                        borderRadius: '4px', 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '6px',
+                        height: '32px'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--text-muted)' }}>Score:</span>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#22c55e' }}>
+                        {currentAudit.health_score ?? currentAudit.technical_score ?? currentAudit.local_score ?? '--'}%
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>View Audit:</span>
+                    <select
+                      className="form-control"
+                      style={{ border: '2px solid #000', padding: '4px 8px', fontSize: '0.85rem', height: '32px' }}
+                      value={selectedAuditId}
+                      onChange={e => setSelectedAuditId(e.target.value)}
+                      disabled={audits.length === 0}
+                    >
+                      {audits.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {new Date(a.created_at).toLocaleString()} - {a.audit_type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -431,6 +452,10 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         <span className="badge" style={{ background: '#f1f5f9', border: '1px solid #000', textTransform: 'capitalize' }}>
                           Status: {rec.status}
                         </span>
+                      </div>
+                      
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'left' }}>
+                        <strong>Target URL Path:</strong> <a href={currentAudit?.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{currentAudit?.url}</a>
                       </div>
                       
                       <div style={{ fontSize: '0.85rem', marginBottom: '8px' }}>
@@ -492,26 +517,29 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
           {activeConsoleAgent && (
             <div 
               style={{ 
-                border: '2px solid #000', 
+                borderTop: '3px solid #000', 
                 background: '#090d16', 
                 color: '#22c55e', 
-                padding: '16px', 
-                borderRadius: '4px',
+                padding: '12px 20px', 
                 display: 'flex',
                 flexDirection: 'column',
-                height: 'calc(100vh - 120px)',
-                position: 'sticky',
-                top: '20px'
+                height: '240px',
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 1050,
+                boxShadow: '0 -4px 10px rgba(0,0,0,0.15)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '10px', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '6px', marginBottom: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Terminal size={16} />
-                  <span style={{ fontWeight: 'bold', color: '#fff' }}>Terminal: {activeConsoleAgent}</span>
+                  <Terminal size={14} style={{ color: '#22c55e' }} />
+                  <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.85rem' }}>Live Console Stream: {activeConsoleAgent}</span>
                 </div>
                 <button 
                   onClick={() => setActiveConsoleAgent(null)}
-                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.25rem', fontWeight: 'bold', padding: 0 }}
                 >
                   &times;
                 </button>
@@ -522,14 +550,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   flex: 1, 
                   overflowY: 'auto', 
                   fontFamily: 'monospace', 
-                  fontSize: '0.8rem',
+                  fontSize: '0.75rem',
                   lineHeight: '1.4',
                   whiteSpace: 'pre-wrap',
                   textAlign: 'left'
                 }}
               >
                 {consoleLogs.map((log, idx) => (
-                  <div key={idx} style={{ marginBottom: '4px' }}>{log}</div>
+                  <div key={idx} style={{ marginBottom: '2px' }}>{log}</div>
                 ))}
                 <div ref={terminalEndRef} />
               </div>
