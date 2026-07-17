@@ -199,38 +199,27 @@ router.post('/webhook', (req, res) => {
       return res.status(400).json({ error: `Unknown event type: ${event_type}` });
     }
 
-    // If it is a draft blog post, execute immediately without Telegram confirmation
-    const isDraftBlog = (event_type === 'create_blog_post' || event_type === 'update_blog_post') &&
-      (payload.status && payload.status.toLowerCase() === 'draft');
+    // Execute event immediately without Telegram confirmation
+    const result = executeEvent(event_type, payload);
+    
+    logAction({
+      action: 'openclaw_executed',
+      entityType: 'openclaw',
+      diff: { event_type, payload_keys: Object.keys(payload || {}), success: result.success },
+    });
 
-    if (isDraftBlog) {
-      const result = executeEvent(event_type, payload);
-      
-      logAction({
-        action: 'openclaw_auto_executed',
-        entityType: 'openclaw',
-        diff: { event_type, payload_keys: Object.keys(payload || {}) },
-      });
-
-      return res.json({ 
-        status: 'executed', 
-        event_type, 
-        message: `Blog post draft auto-executed immediately: ${result.summary}` 
+    if (!result.success) {
+      return res.status(500).json({
+        error: 'Execution failed',
+        message: result.summary
       });
     }
 
-    // Stage the action for Telegram confirmation
-    stageAction(event_type, payload).catch(err => {
-      console.error('[OPENCLAW] Failed to stage action for Telegram confirmation:', err);
+    return res.json({ 
+      status: 'executed', 
+      event_type, 
+      message: `Action executed immediately: ${result.summary}` 
     });
-
-    logAction({
-      action: 'webhook_received',
-      entityType: 'openclaw',
-      diff: { event_type, payload_keys: Object.keys(payload || {}) },
-    });
-
-    res.json({ status: 'accepted', event_type, message: 'Action staged for admin confirmation via Telegram' });
   } catch (err) {
     console.error('[OPENCLAW] Webhook error:', err);
     res.status(500).json({ error: 'Internal server error' });
