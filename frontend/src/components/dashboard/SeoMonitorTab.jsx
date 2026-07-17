@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function SeoMonitorTab({ auth, clients, showToast }) {
@@ -14,6 +14,40 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   const [consoleLogs, setConsoleLogs] = useState([]);
   const [agentRunningStates, setAgentRunningStates] = useState({}); // e.g. { technical: 'running' }
   const terminalEndRef = useRef(null);
+
+  // Terminal drag-to-resize and collapse/expand controls
+  const [terminalHeight, setTerminalHeight] = useState(240);
+  const [isTerminalCollapsed, setIsTerminalCollapsed] = useState(false);
+  const [isDraggingTerminal, setIsDraggingTerminal] = useState(false);
+
+  const startResizeTerminal = (e) => {
+    setIsDraggingTerminal(true);
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDraggingTerminal) return;
+      const newHeight = window.innerHeight - e.clientY;
+      if (newHeight >= 100 && newHeight <= window.innerHeight - 80) {
+        setTerminalHeight(newHeight);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingTerminal(false);
+    };
+
+    if (isDraggingTerminal) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingTerminal]);
 
   // Freshness confirmation modal
   const [showFreshModal, setShowFreshModal] = useState(false);
@@ -239,8 +273,12 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     });
   };
 
+  const calculatedPadding = activeConsoleAgent 
+    ? (isTerminalCollapsed ? '56px' : `${terminalHeight + 20}px`) 
+    : '0px';
+
   return (
-    <div style={{ textAlign: 'left', paddingBottom: activeConsoleAgent ? '260px' : '0px', transition: 'padding 0.3s ease' }} className="seo-monitor-container">
+    <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
       {/* Dropdown selector panel */}
       <div className="card glass-premium" style={{ marginBottom: '20px', padding: '16px', border: '2px solid #000' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
@@ -520,47 +558,80 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 borderTop: '3px solid #000', 
                 background: '#090d16', 
                 color: '#22c55e', 
-                padding: '12px 20px', 
+                padding: isTerminalCollapsed ? '6px 20px 0' : '12px 20px', 
                 display: 'flex',
                 flexDirection: 'column',
-                height: '240px',
+                height: isTerminalCollapsed ? '36px' : `${terminalHeight}px`,
                 position: 'fixed',
                 bottom: 0,
                 left: 0,
                 right: 0,
                 zIndex: 1050,
-                boxShadow: '0 -4px 10px rgba(0,0,0,0.15)'
+                boxShadow: '0 -4px 10px rgba(0,0,0,0.15)',
+                transition: isDraggingTerminal ? 'none' : 'height 0.2s ease, padding 0.2s ease',
+                overflow: 'hidden'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '6px', marginBottom: '6px' }}>
+              {/* Resize Handle (only active when not collapsed) */}
+              {!isTerminalCollapsed && (
+                <div 
+                  onMouseDown={startResizeTerminal}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '6px',
+                    cursor: 'row-resize',
+                    background: '#1e293b',
+                    zIndex: 1060
+                  }}
+                  title="Drag to resize terminal height"
+                />
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isTerminalCollapsed ? 'none' : '1px solid #1e293b', paddingBottom: isTerminalCollapsed ? '0' : '6px', marginBottom: isTerminalCollapsed ? '0' : '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Terminal size={14} style={{ color: '#22c55e' }} />
                   <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.85rem' }}>Live Console Stream: {activeConsoleAgent}</span>
                 </div>
-                <button 
-                  onClick={() => setActiveConsoleAgent(null)}
-                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.25rem', fontWeight: 'bold', padding: 0 }}
-                >
-                  &times;
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
+                    style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', marginRight: '14px', padding: 0 }}
+                    title={isTerminalCollapsed ? "Expand Console" : "Collapse Console"}
+                  >
+                    {isTerminalCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                  <button 
+                    onClick={() => setActiveConsoleAgent(null)}
+                    style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.25rem', fontWeight: 'bold', padding: 0, display: 'flex', alignItems: 'center' }}
+                    title="Close Console"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
 
-              <div 
-                style={{ 
-                  flex: 1, 
-                  overflowY: 'auto', 
-                  fontFamily: 'monospace', 
-                  fontSize: '0.75rem',
-                  lineHeight: '1.4',
-                  whiteSpace: 'pre-wrap',
-                  textAlign: 'left'
-                }}
-              >
-                {consoleLogs.map((log, idx) => (
-                  <div key={idx} style={{ marginBottom: '2px' }}>{log}</div>
-                ))}
-                <div ref={terminalEndRef} />
-              </div>
+              {!isTerminalCollapsed && (
+                <div 
+                  style={{ 
+                    flex: 1, 
+                    overflowY: 'auto', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.75rem',
+                    lineHeight: '1.4',
+                    whiteSpace: 'pre-wrap',
+                    textAlign: 'left',
+                    marginTop: '4px'
+                  }}
+                >
+                  {consoleLogs.map((log, idx) => (
+                    <div key={idx} style={{ marginBottom: '2px' }}>{log}</div>
+                  ))}
+                  <div ref={terminalEndRef} />
+                </div>
+              )}
             </div>
           )}
 
