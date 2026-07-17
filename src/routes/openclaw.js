@@ -1316,8 +1316,8 @@ function handleCreateSeoAudit(payload) {
     const insertRec = db.prepare(`
       INSERT INTO seo_recommendations (
         audit_id, client_id, priority, metric, issue, action_required,
-        observation, dependency, failure_check, leading_indicator, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+        observation, dependency, failure_check, leading_indicator, page_url, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
     `);
 
     for (const rec of payload.recommendations) {
@@ -1331,7 +1331,8 @@ function handleCreateSeoAudit(payload) {
         rec.observation || null,
         rec.dependency || null,
         rec.failure_check || null,
-        rec.leading_indicator || null
+        rec.leading_indicator || null,
+        rec.page_url || null
       );
     }
   }

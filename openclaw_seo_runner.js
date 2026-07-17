@@ -173,14 +173,16 @@ function getMockRecommendations(type) {
         observation: 'Home route takes too long to load due to uncompressed images',
         dependency: 'Frontend Developer resources',
         failure_check: 'LCP > 2.5 seconds',
-        leading_indicator: 'Initial server response latency'
+        leading_indicator: 'Initial server response latency',
+        page_url: `${targetUrl}/`
       },
       {
         priority: 'High',
         metric: 'Image Alt Tags',
         issue: '3 primary client portfolio images lack alternate accessibility text descriptions',
         action_required: 'Add alt attributes to all img tags under client detail routes',
-        observation: 'Impacts image indexation and search indexing visibility'
+        observation: 'Impacts image indexation and search indexing visibility',
+        page_url: `${targetUrl}/gallery/`
       }
     ];
   } else if (type === 'backlinks') {
@@ -190,7 +192,8 @@ function getMockRecommendations(type) {
         metric: 'Backlink Authority Gap',
         issue: 'Competitor HealthLine Clinic holds backlinks from healthlineclinic.com which drives referral traffic',
         action_required: 'Prepare customized outreach pitch offering guest editorial posts',
-        observation: 'Target has a DA of 65 and accepts topically aligned guest contributions'
+        observation: 'Target has a DA of 65 and accepts topically aligned guest contributions',
+        page_url: `${targetUrl}`
       }
     ];
   } else {
@@ -200,7 +203,8 @@ function getMockRecommendations(type) {
         metric: `${type.toUpperCase()} Optimization`,
         issue: `Unoptimized metric fields identified during ${type} checks`,
         action_required: `Resolve tag formatting and structure errors flagged in ${type} reports`,
-        observation: 'Improves SEO relevancy scores'
+        observation: 'Improves SEO relevancy scores',
+        page_url: `${targetUrl}/${type}/`
       }
     ];
   }

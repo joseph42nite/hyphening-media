@@ -493,7 +493,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       </div>
                       
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'left' }}>
-                        <strong>Target URL Path:</strong> <a href={currentAudit?.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{currentAudit?.url}</a>
+                        <strong>Target URL Path:</strong> <a href={rec.page_url || currentAudit?.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{rec.page_url || currentAudit?.url}</a>
                       </div>
                       
                       <div style={{ fontSize: '0.85rem', marginBottom: '8px' }}>
