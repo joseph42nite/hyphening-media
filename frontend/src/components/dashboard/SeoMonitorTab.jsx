@@ -221,23 +221,34 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
             <h3 style={{ margin: 0, fontWeight: 'bold' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
             <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Active Client:</span>
-            <select
-              className="form-control"
-              style={{ minWidth: '220px', fontWeight: 'bold', border: '2px solid #000' }}
-              value={selectedClientId}
-              onChange={e => {
-                setSelectedClientId(e.target.value);
-                setActiveConsoleAgent(null);
-                setConsoleLogs([]);
-              }}
-            >
-              <option value="">-- Choose Client --</option>
-              {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
-                <option key={c.id} value={c.id}>{c.name} ({c.client_type})</option>
-              ))}
-            </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Active Client:</span>
+              <select
+                className="form-control"
+                style={{ minWidth: '220px', fontWeight: 'bold', border: '2px solid #000' }}
+                value={selectedClientId}
+                onChange={e => {
+                  setSelectedClientId(e.target.value);
+                  setActiveConsoleAgent(null);
+                  setConsoleLogs([]);
+                }}
+              >
+                <option value="">-- Choose Client --</option>
+                {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.client_type})</option>
+                ))}
+              </select>
+            </div>
+            {selectedClientId && (
+              <button
+                onClick={() => triggerAgent('full')}
+                className="btn btn-primary"
+                style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold' }}
+              >
+                🚀 Run Full Audit (Master)
+              </button>
+            )}
           </div>
         </div>
       </div>
