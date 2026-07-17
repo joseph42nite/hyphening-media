@@ -30,6 +30,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   });
 
   const selectedClient = clients.find(c => String(c.id) === String(selectedClientId));
+  const currentAudit = audits.find(a => String(a.id) === String(selectedAuditId));
 
   // Fetch freelancers for the assignment modal
   useEffect(() => {
@@ -159,6 +160,32 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       if (data.status === 'auto_approved') {
         setActiveConsoleAgent(agentType);
         setConsoleLogs([`[SYSTEM] Trigger approved. Placing '${agentType}' in queue...`]);
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  // Toggle Recommendation Status directly
+  const toggleRecStatus = async (recId, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'completed' ? 'open' : 'completed';
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/recommendations/${recId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      showToast(`Recommendation marked as ${newStatus === 'completed' ? 'Done' : 'Not Done'}!`, 'success');
+      
+      // Refresh recommendations list
+      if (selectedAuditId) {
+        const detailRes = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/audits/${selectedAuditId}`, { credentials: 'include' });
+        const detailData = await detailRes.json();
+        if (detailRes.ok) setRecommendations(detailData.recommendations || []);
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -351,7 +378,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
             {/* Recommendations & Audit logs */}
             <div className="card" style={{ border: '2px solid #000', padding: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                <h3 style={{ margin: 0, fontWeight: 'bold' }}>Audit Recommendations &amp; Findings</h3>
+                <div>
+                  <h3 style={{ margin: 0, fontWeight: 'bold' }}>Audit Recommendations &amp; Findings</h3>
+                  {currentAudit && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      <strong>Audited URL Tree:</strong> <a href={currentAudit.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{currentAudit.url}</a>
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>View Audit:</span>
                   <select
@@ -406,13 +440,31 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         <strong>Required Action:</strong> {rec.action_required}
                       </div>
 
-                      {rec.status === 'open' && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                        {rec.status === 'open' && (
+                          <button
+                            onClick={() => {
+                              setAssigningRec(rec);
+                              setShowAssignModal(true);
+                            }}
+                            className="btn btn-primary"
+                            style={{
+                              padding: '4px 12px',
+                              fontSize: '0.75rem',
+                              border: '2px solid #000',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              width: 'fit-content'
+                            }}
+                          >
+                            Assign to SMM / Convert Task <ArrowRight size={12} />
+                          </button>
+                        )}
+                        
                         <button
-                          onClick={() => {
-                            setAssigningRec(rec);
-                            setShowAssignModal(true);
-                          }}
-                          className="btn btn-primary"
+                          onClick={() => toggleRecStatus(rec.id, rec.status)}
+                          className="btn"
                           style={{
                             padding: '4px 12px',
                             fontSize: '0.75rem',
@@ -420,12 +472,15 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px',
-                            width: 'fit-content'
+                            width: 'fit-content',
+                            background: rec.status === 'completed' ? '#f1f5f9' : '#22c55e',
+                            color: rec.status === 'completed' ? '#000' : '#fff',
+                            fontWeight: 'bold'
                           }}
                         >
-                          Assign to SMM / Convert Task <ArrowRight size={12} />
+                          {rec.status === 'completed' ? '↩ Mark as Not Done' : '✅ Mark as Done'}
                         </button>
-                      )}
+                      </div>
                     </div>
                   ))}
                 </div>
