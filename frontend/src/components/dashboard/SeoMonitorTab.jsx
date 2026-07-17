@@ -164,7 +164,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   }, [consoleLogs]);
 
   // Trigger agent execution
-  const triggerAgent = async (agentType, force = false) => {
+  const triggerAgent = async (agentType, force = false, autoOpenConsole = true) => {
     try {
       const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/trigger/${agentType}`, {
         method: 'POST',
@@ -191,7 +191,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       }));
 
       // Open log drawer for queued runs immediately
-      if (data.status === 'auto_approved') {
+      if (data.status === 'auto_approved' && autoOpenConsole) {
         setActiveConsoleAgent(agentType);
         setConsoleLogs([`[SYSTEM] Trigger approved. Placing '${agentType}' in queue...`]);
       }
@@ -224,6 +224,25 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     } catch (err) {
       showToast(err.message, 'error');
     }
+  };
+
+  // Trigger Master Audit for all agents sequentially
+  const triggerFullAuditMaster = async () => {
+    const activeAgents = getFilteredAgents();
+    showToast(`Starting Master Audit: Queuing ${activeAgents.length} agents...`, 'info');
+    
+    for (const agent of activeAgents) {
+      if (agent.agentType === 'full') continue;
+      
+      try {
+        await triggerAgent(agent.agentType, true, false);
+        // Short delay to avoid SQLite database locking
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } catch (err) {
+        console.error(`[MASTER AUDIT] Failed to trigger ${agent.agentType}:`, err);
+      }
+    }
+    showToast('All agents queued successfully!', 'success');
   };
 
   // Convert Recommendation to Kanban Task
@@ -307,7 +326,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
             </div>
             {selectedClientId && (
               <button
-                onClick={() => triggerAgent('full')}
+                onClick={triggerFullAuditMaster}
                 className="btn btn-primary"
                 style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold' }}
               >
