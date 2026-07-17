@@ -28,7 +28,7 @@ function spawnAgent(client, agentType, model, requestedBy) {
  * GET /api/clients/:id/seo/audits
  * List client audits
  */
-router.get('/seo/audits', (req, res) => {
+router.get('/:id/seo/audits', (req, res) => {
   try {
     const { type } = req.query;
     let query = 'SELECT * FROM seo_audits WHERE client_id = ?';
@@ -52,7 +52,7 @@ router.get('/seo/audits', (req, res) => {
  * GET /api/clients/:id/seo/audits/:auditId
  * Get audit detail + recommendations
  */
-router.get('/seo/audits/:auditId', (req, res) => {
+router.get('/:id/seo/audits/:auditId', (req, res) => {
   try {
     const audit = db.prepare('SELECT * FROM seo_audits WHERE id = ? AND client_id = ?').get(req.params.auditId, req.params.id);
     if (!audit) return res.status(404).json({ error: 'Audit not found' });
@@ -69,7 +69,7 @@ router.get('/seo/audits/:auditId', (req, res) => {
  * GET /api/clients/:id/seo/agents/status
  * Returns freshness status and score details for each agent
  */
-router.get('/seo/agents/status', (req, res) => {
+router.get('/:id/seo/agents/status', (req, res) => {
   try {
     const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(req.params.id);
     if (!client) return res.status(404).json({ error: 'Client not found' });
@@ -129,7 +129,7 @@ router.get('/seo/agents/status', (req, res) => {
  * POST /api/clients/:id/seo/trigger/:agentType
  * Submit an agent run request
  */
-router.post('/seo/trigger/:agentType', (req, res) => {
+router.post('/:id/seo/trigger/:agentType', (req, res) => {
   try {
     const { force, model } = req.body;
     const agentType = req.params.agentType;
@@ -266,7 +266,7 @@ router.post('/seo/trigger/:agentType', (req, res) => {
  * POST /api/clients/:id/seo/recommendations/:recId/convert-task
  * Converts an SEO audit recommendation into a Kanban Task card.
  */
-router.post('/seo/recommendations/:recId/convert-task', (req, res) => {
+router.post('/:id/seo/recommendations/:recId/convert-task', (req, res) => {
   try {
     const { assigned_to, due_date, priority } = req.body;
     const clientId = req.params.id;
@@ -326,7 +326,7 @@ router.post('/seo/recommendations/:recId/convert-task', (req, res) => {
  * PATCH /api/clients/:id/seo/recommendations/:recId
  * Update recommendation status directly
  */
-router.patch('/seo/recommendations/:recId', (req, res) => {
+router.patch('/:id/seo/recommendations/:recId', (req, res) => {
   try {
     const { status } = req.body;
     const recId = req.params.recId;
