@@ -1432,10 +1432,18 @@ function handleCreateSeoAudit(payload) {
  */
 router.get('/pending', (req, res) => {
   try {
-    const pending = db.prepare(
-      'SELECT * FROM openclaw_pending_actions WHERE status = ? ORDER BY created_at DESC'
-    ).all('pending');
-    res.json({ pending_actions: pending });
+    const status = req.query.status;
+    let query = 'SELECT * FROM openclaw_pending_actions';
+    const params = [];
+    
+    if (status) {
+      query += ' WHERE status = ?';
+      params.push(status);
+    }
+    query += ' ORDER BY created_at DESC LIMIT 50';
+    
+    const actions = db.prepare(query).all(...params);
+    res.json({ pending_actions: actions });
   } catch (err) {
     console.error('[OPENCLAW] Pending list error:', err);
     res.status(500).json({ error: 'Internal server error' });

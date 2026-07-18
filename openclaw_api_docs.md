@@ -836,7 +836,130 @@ Reserved for task queue reordering.
 
 ---
 
+### W. Create SEO Audit (`create_seo_audit`)
+
+Submits audit results and recommendations back from an agent run.
+
+```json
+{
+  "event_type": "create_seo_audit",
+  "payload": {
+    "client_id": 1,
+    "audit_type": "technical",
+    "url": "https://www.drdivyasharma.com",
+    "health_score": 87,
+    "technical_score": 87,
+    "backlinks_score": null,
+    "local_score": null,
+    "summary": "Completed technical audit. LCP is high on mobile.",
+    "recommendations": [
+      {
+        "priority": "Critical",
+        "metric": "Core Web Vitals",
+        "issue": "Largest Contentful Paint (LCP) takes 4.2 seconds on mobile",
+        "action_required": "Optimize and compress hero images on home route, delay third-party tag managers execution",
+        "observation": "Home route takes too long to load due to uncompressed images",
+        "dependency": "Frontend Developer resources",
+        "failure_check": "LCP > 2.5 seconds",
+        "leading_indicator": "Initial server response latency",
+        "page_url": "https://www.drdivyasharma.com/"
+      }
+    ],
+    "report_json": {
+      "timestamp": "2026-07-17T16:25:50Z",
+      "target": "https://www.drdivyasharma.com"
+    },
+    "token_usage": {
+      "model": "deepseek-v4-flash",
+      "triggered_by": "joseph@hyphening.com",
+      "input_tokens": 1200,
+      "output_tokens": 400,
+      "estimated_cost_usd": 0.002,
+      "external_api_cost_usd": 0.0,
+      "duration_seconds": 12
+    }
+  }
+}
+```
+
+| Parameter | Type | Required | Allowed Values | Default |
+| :--- | :--- | :--- | :--- | :--- |
+| `client_id` | Integer | ✅ Yes | Valid `crm_clients.id` | — |
+| `audit_type` | String | ✅ Yes | `full`, `page`, `technical`, `content`, `content_brief`, `schema`, `sitemap`, `images`, `geo`, `local`, `maps`, `hreflang`, `google`, `backlinks`, `cluster`, `sxo`, `drift`, `ecommerce`, `flow`, `competitor_pages`, `plan`, `programmatic`, `dataforseo`, `image_gen` | — |
+| `url` | String | ✅ Yes | Target website URL | — |
+| `health_score` | Integer | No | 0–100 | `null` |
+| `technical_score`, `backlinks_score`, `local_score` | Integer | No | 0–100 | `null` |
+| `summary` | String | No | Free text summary of the audit findings | `null` |
+| `recommendations` | Array | No | Array of recommendation objects (priority, metric, issue, action_required, observation, dependency, failure_check, leading_indicator, page_url) | `[]` |
+| `report_json` | Object | No | Arbitrary JSON payload of the raw data/findings | `null` |
+| `token_usage` | Object | No | Token metrics (model, input_tokens, output_tokens, estimated_cost_usd, external_api_cost_usd, duration_seconds) | `null` |
+
+---
+
+## 3.5. OpenClaw Action Queue Polling
+
+To check for triggered audits, OpenClaw can poll the action queue:
+
+* **Endpoint**: `GET /api/openclaw/pending`
+* **Query Parameters**:
+  * `status`: Optional filter (e.g. `pending`, `accepted`, `auto_approved`, etc.). If omitted, returns all recent actions (up to 50).
+* **Response Format**:
+  ```json
+  {
+    "pending_actions": [
+      {
+        "id": 1,
+        "action_id": "c3b15528-d731-4750-be9a-a97a01f81d9a",
+        "client_id": 1,
+        "event_type": "create_seo_audit",
+        "action_type": "run_seo_agent",
+        "action_payload": "{\"client_id\":1,\"agentType\":\"technical\",\"url\":\"https://www.drdivyasharma.com\",\"model\":\"deepseek-v4-flash\"}",
+        "requested_by": "joseph@hyphening.com",
+        "requested_role": "admin",
+        "status": "auto_approved",
+        "created_at": "2026-07-17 16:25:50"
+      }
+    ]
+  }
+  ```
+
+---
+
 ## 4. Complete Database Schema Reference
+
+### `seo_audits`
+| Column | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | INTEGER PK | Auto-increment |
+| `client_id` | INTEGER FK | → `crm_clients.id` |
+| `audit_type` | TEXT | Not null. Type of audit run (e.g. `technical`, `local`, `full`) |
+| `url` | TEXT | Target URL audited |
+| `health_score` | INTEGER | Overall score (0-100) |
+| `technical_score` | INTEGER | Technical category score |
+| `backlinks_score` | INTEGER | Backlinks category score |
+| `local_score` | INTEGER | Local/GMB category score |
+| `summary` | TEXT | Summary overview |
+| `report_json` | TEXT | Raw JSON findings object |
+| `created_at` | TEXT | ISO datetime |
+
+### `seo_recommendations`
+| Column | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | INTEGER PK | Auto-increment |
+| `audit_id` | INTEGER FK | → `seo_audits.id` |
+| `client_id` | INTEGER FK | → `crm_clients.id` |
+| `priority` | TEXT | `Critical`, `High`, `Medium`, `Low` |
+| `metric` | TEXT | Category / Tag name |
+| `issue` | TEXT | Detailed description of the issue found |
+| `action_required` | TEXT | Action item / remediation required |
+| `observation` | TEXT | Initial observation context |
+| `dependency` | TEXT | Relational dependency |
+| `failure_check` | TEXT | Diagnostic test |
+| `leading_indicator` | TEXT | Real-time metric target |
+| `status` | TEXT | `open`, `in_progress`, `completed`, `ignored` |
+| `page_url` | TEXT | Target subpath / page URL audited |
+| `kanban_task_id` | INTEGER FK | → `kanban_tasks.id` |
+| `created_at` | TEXT | ISO datetime |
 
 ### `users`
 | Column | Type | Notes |
