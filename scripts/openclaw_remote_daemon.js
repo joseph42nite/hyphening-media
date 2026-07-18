@@ -5,7 +5,7 @@
  * and automatically triggers the claude-seo skill command line in Claude Code.
  */
 
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 
 const API_URL = process.env.HYPHENING_API_URL || 'https://hypheningmedia.com';
 const POLL_INTERVAL_MS = 10000; // Polls every 10 seconds
@@ -41,17 +41,16 @@ async function checkQueue() {
       const cmdSkill = agentType === 'full' ? 'audit' : agentType;
 
       console.log(`\n[TRIGGER] Received approved run #${run.id}: ${agentType} on ${targetUrl}`);
+      console.log(`[DAEMON] Running: openclaw "/seo ${cmdSkill} ${targetUrl}"`);
 
-      // Command to launch OpenClaw and run the corresponding skill
-      const command = `openclaw "/seo ${cmdSkill} ${targetUrl}"`;
-      console.log(`[DAEMON] Running: ${command}`);
+      // Spawn OpenClaw with stdio: inherit to stream interactive logs directly
+      const child = spawn('openclaw', [`/seo ${cmdSkill} ${targetUrl}`], {
+        shell: true,
+        stdio: 'inherit'
+      });
 
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`[ERROR] Command failed for run #${run.id}:`, error.message);
-          return;
-        }
-        console.log(`[SUCCESS] Run #${run.id} completed. Webhook callback registered.`);
+      child.on('close', (code) => {
+        console.log(`[DAEMON] Run #${run.id} finished with code ${code}.`);
       });
     }
   } catch (err) {
