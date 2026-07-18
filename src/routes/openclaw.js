@@ -191,7 +191,8 @@ router.post('/webhook', (req, res) => {
       'create_artist', 'update_artist', 'create_venue', 'update_venue',
       'create_gig', 'update_gig', 'create_freelancer', 'update_freelancer',
       'send_chat_message', 'update_knowledge', 'optimize_queue',
-      'create_blog_post', 'update_blog_post', 'create_seo_audit'
+      'create_blog_post', 'update_blog_post', 'create_seo_audit',
+      'agent_activity_log'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -427,6 +428,7 @@ function executeEvent(eventType, payload) {
       case 'create_blog_post': return handleCreateBlogPost(payload);
       case 'update_blog_post': return handleUpdateBlogPost(payload);
       case 'create_seo_audit': return handleCreateSeoAudit(payload);
+      case 'agent_activity_log': return handleAgentActivityLog(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -439,6 +441,20 @@ function executeEvent(eventType, payload) {
 // ============================================================
 // HANDLER IMPLEMENTATIONS
 // ============================================================
+
+function handleAgentActivityLog(payload) {
+  const { action, status, summary, client, details } = payload;
+  if (!action || !status || !summary) {
+    return { success: false, summary: 'action, status, and summary are required for activity log' };
+  }
+
+  db.prepare(`
+    INSERT INTO openclaw_activity_log (action, status, summary, client, details)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(action, status, summary, client || null, details ? JSON.stringify(details) : null);
+
+  return { success: true, summary: `Logged activity: ${summary}` };
+}
 
 function handleCreateTask(payload) {
   if (!payload?.title) return { success: false, summary: 'Title is required' };
@@ -1446,6 +1462,45 @@ router.get('/pending', (req, res) => {
     res.json({ pending_actions: actions });
   } catch (err) {
     console.error('[OPENCLAW] Pending list error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/openclaw/activity
+ * List all activity logs.
+ */
+router.get('/activity', (req, res) => {
+  try {
+    const { limit = 50, offset = 0, action } = req.query;
+
+    let query = 'SELECT * FROM openclaw_activity_log';
+    const params = [];
+
+    if (action) {
+      query += ' WHERE action = ?';
+      params.push(action);
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit, 10));
+    params.push(parseInt(offset, 10));
+
+    const logs = db.prepare(query).all(...params);
+    
+    // Also get total count for pagination
+    let countQuery = 'SELECT COUNT(*) as count FROM openclaw_activity_log';
+    if (action) {
+      countQuery += ' WHERE action = ?';
+      const countResult = db.prepare(countQuery).get(action);
+      res.json({ logs, total: countResult.count });
+    } else {
+      const countResult = db.prepare(countQuery).get();
+      res.json({ logs, total: countResult.count });
+    }
+
+  } catch (err) {
+    console.error('[OPENCLAW] Activity log fetch error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
