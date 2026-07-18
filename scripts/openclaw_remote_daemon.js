@@ -42,8 +42,8 @@ async function checkQueue() {
 
       console.log(`\n[TRIGGER] Received approved run #${run.id}: ${agentType} on ${targetUrl}`);
 
-      // Command to launch Claude Code and run the corresponding skill
-      const command = `claude "/seo ${cmdSkill} ${targetUrl}"`;
+      // Command to launch OpenClaw and run the corresponding skill
+      const command = `openclaw "/seo ${cmdSkill} ${targetUrl}"`;
       console.log(`[DAEMON] Running: ${command}`);
 
       exec(command, (error, stdout, stderr) => {
