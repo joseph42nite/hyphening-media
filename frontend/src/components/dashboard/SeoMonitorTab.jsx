@@ -3,11 +3,27 @@ import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, Arrow
 import { API_BASE } from '../../api.js';
 
 export default function SeoMonitorTab({ auth, clients, showToast }) {
-  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem('seo_monitor_selected_client_id') || '');
   const [agents, setAgents] = useState([]);
   const [audits, setAudits] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [selectedAuditId, setSelectedAuditId] = useState('');
+  
+  // Default to first active client if stored is missing or invalid
+  useEffect(() => {
+    const activeClients = clients.filter(c => c.client_type !== 'artist_curation');
+    if (activeClients.length > 0) {
+      const stored = localStorage.getItem('seo_monitor_selected_client_id');
+      const isValidStored = activeClients.some(c => String(c.id) === String(stored));
+      if (isValidStored) {
+        setSelectedClientId(String(stored));
+      } else {
+        const firstId = String(activeClients[0].id);
+        setSelectedClientId(firstId);
+        localStorage.setItem('seo_monitor_selected_client_id', firstId);
+      }
+    }
+  }, [clients]);
   
   // Real-time terminal log stream state
   const [activeConsoleAgent, setActiveConsoleAgent] = useState(null);
@@ -313,12 +329,13 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 style={{ minWidth: '220px', fontWeight: 'bold', border: '2px solid #000' }}
                 value={selectedClientId}
                 onChange={e => {
-                  setSelectedClientId(e.target.value);
+                  const newId = e.target.value;
+                  setSelectedClientId(newId);
+                  localStorage.setItem('seo_monitor_selected_client_id', newId);
                   setActiveConsoleAgent(null);
                   setConsoleLogs([]);
                 }}
               >
-                <option value="">-- Choose Client --</option>
                 {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.client_type})</option>
                 ))}
