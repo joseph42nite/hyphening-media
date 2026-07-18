@@ -40,11 +40,21 @@ async function checkQueue() {
       const targetUrl = payload.url;
       const cmdSkill = agentType === 'full' ? 'audit' : agentType;
 
+      const message = `seo ${cmdSkill} ${targetUrl}`;
       console.log(`\n[TRIGGER] Received approved run #${run.id}: ${agentType} on ${targetUrl}`);
-      console.log(`[DAEMON] Running: openclaw "seo ${cmdSkill} ${targetUrl}"`);
+      console.log(`[DAEMON] Sending message: openclaw message send --channel telegram --target 6439186232 --message "${message}"`);
 
       // Spawn OpenClaw with stdio: inherit to stream interactive logs directly
-      const child = spawn('openclaw', [`seo ${cmdSkill} ${targetUrl}`], {
+      const child = spawn('openclaw', [
+        'message',
+        'send',
+        '--channel',
+        'telegram',
+        '--target',
+        '6439186232',
+        '--message',
+        message
+      ], {
         shell: true,
         stdio: 'inherit'
       });
