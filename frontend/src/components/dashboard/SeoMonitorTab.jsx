@@ -198,6 +198,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       setConsoleLogs(prev => [...prev, { type: 'agent_activity_log', data, timestamp: new Date() }]);
     });
 
+    eventSource.addEventListener('seo_audit_created', (e) => {
+      const data = JSON.parse(e.data);
+      if (String(data.clientId) === String(selectedClientId)) {
+        showToast('New SEO audit received, refreshing list...', 'info');
+        fetchClientData(selectedClientId);
+      }
+    });
+
     return () => {
       eventSource.close();
     };
@@ -707,16 +715,33 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                                     [AGENT {logEntry.data.agentType.toUpperCase()}] Status: {logEntry.data.status}
                                   </span>
                                 )}
-                                {logEntry.type === 'agent_activity_log' && (
-                                  <>
-                                    <span className={getStatusColor(logEntry.data.status)}>[{logEntry.data.status.toUpperCase()}]</span>{' '}
-                                    <span className="text-cyan-400">{logEntry.data.action}</span>{' '}
-                                    <span>{logEntry.data.summary}</span>
-                                    {logEntry.data.client && <span className="text-purple-400"> (Client: {logEntry.data.client})</span>}
-                                    {logEntry.data.details && <pre className="text-xs text-gray-400 mt-1 ml-4 bg-gray-800 p-2 rounded">{JSON.stringify(JSON.parse(logEntry.data.details), null, 2)}</pre>}
-                                  </>
-                                )}
-                                {logEntry.type === 'system_message' && (
+                                                      {logEntry.type === 'agent_activity_log' && (
+                                                        <>
+                                                          <span className={getStatusColor(logEntry.data.status)}>[{logEntry.data.status.toUpperCase()}]</span>{' '}
+                                                          <span className="text-cyan-400">{logEntry.data.action}</span>{' '}
+                                                          <span>{logEntry.data.summary}</span>
+                                                          {logEntry.data.client && <span className="text-purple-400"> (Client: {logEntry.data.client})</span>}
+                                                          {logEntry.data.details && (() => {
+                                                            const parsedDetails = JSON.parse(logEntry.data.details);
+                                                            return (
+                                                              <>
+                                                                {parsedDetails.urls && parsedDetails.urls.length > 0 && (
+                                                                  <div className="mt-1 ml-4 text-gray-400">
+                                                                    {parsedDetails.urls.map((url, urlIdx) => (
+                                                                      <a key={urlIdx} href={url} target="_blank" rel="noopener noreferrer" className="block text-blue-400 hover:underline">{url}</a>
+                                                                    ))}
+                                                                  </div>
+                                                                )}
+                                                                {Object.keys(parsedDetails).filter(key => key !== 'urls').length > 0 && (
+                                                                  <pre className="text-xs text-gray-400 mt-1 ml-4 bg-gray-800 p-2 rounded">
+                                                                    {JSON.stringify(parsedDetails, null, 2)}
+                                                                  </pre>
+                                                                )}
+                                                              </>
+                                                            );
+                                                          })()}
+                                                        </>
+                                                      )}                                {logEntry.type === 'system_message' && (
                                   <span className="text-gray-500">{logEntry.data.log}</span>
                                 )}
                               </div>

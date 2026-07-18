@@ -1435,6 +1435,11 @@ function handleCreateSeoAudit(payload) {
     diff: { audit_type: payload.audit_type, client_id: payload.client_id }
   });
 
+  // Notify frontend to refetch audits list
+  import('../../server.js').then(({ broadcastEvent }) => {
+    broadcastEvent('seo_audit_created', { clientId: payload.client_id });
+  }).catch(err => console.error('[OPENCLAW] Broadcast seo_audit_created failed:', err));
+
   return { success: true, summary: `SEO Audit #${auditId} (${payload.audit_type}) completed.` };
 }
 
