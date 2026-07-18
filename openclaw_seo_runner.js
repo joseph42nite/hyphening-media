@@ -1,14 +1,16 @@
 /**
  * openclaw_seo_runner.js
- * CLI agent runner script that simulates execution of claude-seo sub-skills.
- * Prints stdout logs in real-time, estimates token usage, and posts the
- * signed webhook payload back to the backend callback endpoint.
+ * Triggers an OpenClaw agent by calling the OpenClaw API Gateway.
+ * This script is spawned by the main backend when an SEO audit is approved.
  */
 
-import crypto from 'crypto';
 import db from './database.js';
 
-// Parse arguments
+// --- Configuration ---
+const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:18789/v1/chat/completions';
+const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+
+// --- Argument Parsing ---
 const args = {};
 for (let i = 2; i < process.argv.length; i += 2) {
   const flag = process.argv[i].replace(/^--/, '');
@@ -18,64 +20,84 @@ for (let i = 2; i < process.argv.length; i += 2) {
 
 const clientId = parseInt(args.clientId);
 const agentType = args.skill || 'technical';
-const model = args.model || 'claude';
+const model = args.model || 'primary'; // Use 'primary' as per the new API spec
 const triggeredBy = args.triggeredBy || 'system';
 
+// --- Validation ---
 if (isNaN(clientId)) {
   console.error('[RUNNER] Error: --clientId is required.');
   process.exit(1);
 }
+if (!OPENCLAW_GATEWAY_TOKEN) {
+  console.error('[RUNNER] Error: OPENCLAW_GATEWAY_TOKEN environment variable is not set.');
+  process.exit(1);
+}
 
-// Lookup client info
+// --- Client & URL Lookup ---
 const client = db.prepare('SELECT * FROM crm_clients WHERE id = ?').get(clientId);
 if (!client) {
   console.error(`[RUNNER] Error: Client #${clientId} not found.`);
   process.exit(1);
 }
-
 const targetUrl = client.website_url;
 if (!targetUrl) {
   console.error(`[RUNNER] Error: Client website_url is not configured.`);
   process.exit(1);
 }
 
-async function run() {
-  console.log(`[INIT] Initializing '${agentType}' agent request for target: ${targetUrl}`);
-  console.log(`[CONFIG] Target Model: ${model} | Triggered By: ${triggeredBy}`);
-  await sleep(1000);
+/**
+ * Calls the OpenClaw Chat Completions endpoint.
+ * @param {string} userMessage The message to send to the agent.
+ */
+async function askOpenClaw(userMessage) {
+  console.log(`[GATEWAY] Sending request to OpenClaw...`);
+  console.log(`[GATEWAY]   - Model: ${model}`);
+  console.log(`[GATEWAY]   - Message: "${userMessage}"`);
 
-  console.log(`[DATABASE] Checking status of action queue...`);
-  await sleep(1000);
+  try {
+    const response = await fetch(OPENCLAW_GATEWAY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENCLAW_GATEWAY_TOKEN}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: "user", content: userMessage }]
+      })
+    });
 
-  // Find the action in openclaw_pending_actions
-  const action = db.prepare(`
-    SELECT * FROM openclaw_pending_actions 
-    WHERE client_id = ? AND action_type = 'run_seo_agent'
-    ORDER BY id DESC LIMIT 1
-  `).get(clientId);
-
-  if (action) {
-    console.log(`[QUEUE] Found record ID: #${action.id} | Status: ${action.status}`);
-    await sleep(500);
-    if (action.status === 'auto_approved' || action.status === 'accepted') {
-      console.log(`[SYSTEM] Trigger request is APPROVED.`);
-      console.log(`[SYSTEM] Awaiting remote OpenClaw agent execution on the other server...`);
-      console.log(`[SYSTEM] OpenClaw will execute '/seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl}'`);
-      console.log(`[SYSTEM] Real-time logs and findings will be generated remotely.`);
-      console.log(`[SYSTEM] Results will be delivered to the webhook when complete.`);
-    } else {
-      console.log(`[SYSTEM] Trigger request is PENDING administrator approval.`);
-      console.log(`[SYSTEM] Please approve this run request in the Approval Center tab.`);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Gateway returned ${response.status}: ${errorBody}`);
     }
-  } else {
-    console.log(`[QUEUE] No queue record found. Please verify trigger API.`);
-  }
 
-  process.exit(0);
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('[GATEWAY] Error calling OpenClaw API:', error.message);
+    return null;
+  }
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+/**
+ * Main execution function.
+ */
+async function run() {
+  console.log(`[INIT] Initializing '${agentType}' agent request for target: ${targetUrl}`);
+  
+  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl}`;
+  
+  const confirmation = await askOpenClaw(userMessage);
+
+  if (confirmation) {
+    console.log(`[GATEWAY] Response from OpenClaw: "${confirmation}"`);
+    console.log('[SUCCESS] Agent triggered successfully. Results will be delivered via webhook.');
+    process.exit(0);
+  } else {
+    console.error('[FAILURE] Failed to trigger agent via API Gateway.');
+    process.exit(1);
+  }
 }
 
 run();

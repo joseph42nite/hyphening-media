@@ -1,7 +1,7 @@
 /**
  * Marketing Ops Center — OpenClaw Integration Routes
  * Webhook with HMAC-SHA256 verification, replay attack prevention,
- * Telegram confirmation flow, and handlers for all dashboard entities.
+ * and handlers for all dashboard entities.
  */
 
 import { Router } from 'express';
@@ -9,7 +9,6 @@ import crypto from 'crypto';
 import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
-import { notifyAdmin, sendMessage } from '../services/telegram.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
@@ -20,8 +19,6 @@ router.use(webhookLimiter);
 
 const HMAC_SECRET = process.env.OPENCLAW_HMAC_SECRET || '';
 const REPLAY_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
 
 /**
  * Verify HMAC-SHA256 signature.
@@ -62,101 +59,13 @@ function checkReplay(timestamp, nonce) {
 }
 
 // ============================================================
-// TELEGRAM CONFIRMATION HELPERS
-// ============================================================
-
-/**
- * Generate a unique action ID for pending actions.
- */
-function generateActionId() {
-  return crypto.randomUUID();
-}
-
-/**
- * Build a human-readable summary of the proposed action for Telegram.
- */
-function buildConfirmationMessage(eventType, payload) {
-  const actionVerb = eventType.startsWith('create_') ? 'Create' : eventType.startsWith('update_') ? 'Update' : eventType.startsWith('upsert_') ? 'Create/Update' : 'Execute';
-  const entityName = eventType.replace(/^(create_|update_|upsert_)/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-  let details = '';
-  for (const [key, value] of Object.entries(payload)) {
-    if (value !== null && value !== undefined && typeof value !== 'object') {
-      details += `• *${key}:* ${value}\n`;
-    } else if (typeof value === 'object' && value !== null) {
-      details += `• *${key}:* ${JSON.stringify(value).slice(0, 100)}${JSON.stringify(value).length > 100 ? '...' : ''}\n`;
-    }
-  }
-
-  const isReel = (eventType.includes('content') || payload.post_type) && 
-    (String(payload.post_type || '').toLowerCase().includes('reel') || String(payload.post_type || '').toLowerCase().includes('video') || String(payload.link || '').includes('drive.google.com'));
-
-  const trialNote = isReel ? `\n🧪 *Trial Posting Question:* Do you want to post this Reel as a Trial / Test Post first?\n` : '';
-
-  return `🤖 *OpenClaw — Confirmation Required*\n\n` +
-    `*Action:* ${actionVerb} ${entityName}\n\n` +
-    `📋 *Proposed Changes:*\n${details}${trialNote}` +
-    `---\nTap a button below to proceed:`;
-}
-
-/**
- * Stage an action as pending and send Telegram confirmation.
- */
-async function stageAction(eventType, payload) {
-  const actionId = generateActionId();
-  const message = buildConfirmationMessage(eventType, payload);
-
-  // Check if item is Reel/Video content
-  const isReel = (eventType.includes('content') || payload.post_type) && 
-    (String(payload.post_type || '').toLowerCase().includes('reel') || String(payload.post_type || '').toLowerCase().includes('video') || String(payload.link || '').includes('drive.google.com'));
-
-  // Build inline keyboard with optional Trial button
-  const inlineButtons = [
-    [
-      { text: '✅ Accept & Schedule', callback_data: `openclaw_accept:${actionId}` },
-      { text: '❌ Reject', callback_data: `openclaw_reject:${actionId}` }
-    ]
-  ];
-
-  if (isReel) {
-    inlineButtons.unshift([
-      { text: '🧪 Post as Trial', callback_data: `openclaw_trial:${actionId}` }
-    ]);
-  } else {
-    inlineButtons.push([
-      { text: '✏️ Update', callback_data: `openclaw_update:${actionId}` }
-    ]);
-  }
-
-  // Store pending action in DB
-  db.prepare(`
-    INSERT INTO openclaw_pending_actions (action_id, event_type, payload, status, telegram_chat_id)
-    VALUES (?, ?, ?, 'pending', ?)
-  `).run(actionId, eventType, JSON.stringify(payload), ADMIN_CHAT_ID || '');
-
-  // Send Telegram message with inline keyboard
-  const replyMarkup = { inline_keyboard: inlineButtons };
-
-  const result = await notifyAdmin(message, replyMarkup);
-
-  // Store the Telegram message IDs as a JSON string so we can edit them later
-  if (result) {
-    const resultsArray = Array.isArray(result) ? result : [result];
-    db.prepare('UPDATE openclaw_pending_actions SET telegram_message_id = ? WHERE action_id = ?')
-      .run(JSON.stringify(resultsArray), actionId);
-  }
-
-  return actionId;
-}
-
-// ============================================================
 // MAIN WEBHOOK HANDLER
 // ============================================================
 
 /**
  * POST /api/openclaw/webhook
  * Process incoming webhook events from OpenClaw.
- * Events are staged as pending and confirmed via Telegram.
+ * Events are executed immediately.
  */
 router.post('/webhook', (req, res) => {
   try {
@@ -200,7 +109,7 @@ router.post('/webhook', (req, res) => {
       return res.status(400).json({ error: `Unknown event type: ${event_type}` });
     }
 
-    // Execute event immediately without Telegram confirmation
+    // Execute event immediately
     const result = executeEvent(event_type, payload);
     
     logAction({
@@ -228,176 +137,11 @@ router.post('/webhook', (req, res) => {
 });
 
 // ============================================================
-// TELEGRAM CALLBACK HANDLER
-// ============================================================
-
-/**
- * POST /api/openclaw/telegram-callback
- * Handles Telegram bot callback queries (Accept/Reject/Update buttons).
- * This should be registered as the Telegram bot webhook URL.
- */
-router.post('/telegram-callback', async (req, res) => {
-  try {
-    const { callback_query } = req.body;
-
-    if (!callback_query) {
-      return res.json({ ok: true }); // Not a callback query, ignore
-    }
-
-    const callbackData = callback_query.data;
-    const chatId = callback_query.message?.chat?.id;
-    const messageId = callback_query.message?.message_id;
-
-    if (!callbackData || !callbackData.startsWith('openclaw_')) {
-      return res.json({ ok: true });
-    }
-
-    // Authorization check to ensure the user clicking the button is an authorized admin
-    const userTelegramId = String(callback_query.from?.id || '');
-    const authorizedAdminIds = process.env.TELEGRAM_ADMIN_CHAT_ID
-      ? process.env.TELEGRAM_ADMIN_CHAT_ID.split(',').map(id => id.trim()).filter(Boolean)
-      : [];
-
-    if (authorizedAdminIds.length > 0 && !authorizedAdminIds.includes(userTelegramId)) {
-      await answerCallbackQuery(callback_query.id, '❌ You are not authorized to perform this action.');
-      return res.json({ ok: true });
-    }
-
-    const [action, actionId] = callbackData.split(':');
-
-    // Lookup the pending action
-    const pendingAction = db.prepare(
-      'SELECT * FROM openclaw_pending_actions WHERE action_id = ? AND status = ?'
-    ).get(actionId, 'pending');
-
-    if (!pendingAction) {
-      // Answer the callback to dismiss the loading indicator
-      await answerCallbackQuery(callback_query.id, '⚠️ Action already processed or not found.');
-      return res.json({ ok: true });
-    }
-
-    const eventType = pendingAction.event_type;
-    const payload = JSON.parse(pendingAction.payload);
-
-    // Get all sent messages to update them all
-    let sentMessages = [];
-    try {
-      const parsed = JSON.parse(pendingAction.telegram_message_id || '[]');
-      sentMessages = Array.isArray(parsed) ? parsed : [parsed];
-    } catch (e) {
-      if (pendingAction.telegram_message_id && pendingAction.telegram_chat_id) {
-        sentMessages = [{ chat_id: pendingAction.telegram_chat_id, message_id: pendingAction.telegram_message_id }];
-      }
-    }
-
-    if (action === 'openclaw_accept' || action === 'openclaw_trial') {
-      const isTrial = action === 'openclaw_trial';
-      if (isTrial) {
-        payload.is_trial = 1;
-      }
-
-      // Execute the action
-      const result = executeEvent(eventType, payload);
-
-      // Update pending action status
-      db.prepare('UPDATE openclaw_pending_actions SET status = ?, resolved_at = datetime(?) WHERE action_id = ?')
-        .run('accepted', new Date().toISOString(), actionId);
-
-      // Edit the Telegram message to show it was accepted in all admin chats
-      const entityName = eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      const statusBadge = isTrial ? '🧪 *Executed as Trial Reel!*' : '✅ *Done!*';
-      const updatedText = `${statusBadge} ${entityName} has been scheduled/posted.\n\n${result.summary || ''}`;
-      
-      for (const msg of sentMessages) {
-        if (msg && msg.chat_id && msg.message_id) {
-          await editMessageText(msg.chat_id, msg.message_id, updatedText);
-        }
-      }
-
-      await answerCallbackQuery(callback_query.id, isTrial ? '🧪 Trial Reel scheduled!' : '✅ Action executed!');
-
-      logAction({
-        action: isTrial ? 'openclaw_trial_scheduled' : 'openclaw_confirmed',
-        entityType: 'openclaw',
-        diff: { event_type: eventType, action_id: actionId, is_trial: isTrial ? 1 : 0 },
-      });
-
-    } else if (action === 'openclaw_reject') {
-      // Reject the action
-      db.prepare('UPDATE openclaw_pending_actions SET status = ?, resolved_at = datetime(?) WHERE action_id = ?')
-        .run('rejected', new Date().toISOString(), actionId);
-
-      const updatedText = `❌ *Action Cancelled.* No changes were made.\n\nOriginal request: ${eventType}`;
-      for (const msg of sentMessages) {
-        if (msg && msg.chat_id && msg.message_id) {
-          await editMessageText(msg.chat_id, msg.message_id, updatedText);
-        }
-      }
-
-      await answerCallbackQuery(callback_query.id, '❌ Action rejected.');
-
-      logAction({
-        action: 'openclaw_rejected',
-        entityType: 'openclaw',
-        diff: { event_type: eventType, action_id: actionId },
-      });
-
-    } else if (action === 'openclaw_update') {
-      // Prompt user to send updated instructions
-      await answerCallbackQuery(callback_query.id, '✏️ Please reply with your changes.');
-      await sendMessage(chatId, `✏️ *Update Requested*\n\nReply to this message with your changes for the *${eventType.replace(/_/g, ' ')}* action. OpenClaw will re-submit with your amendments.`);
-    }
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('[OPENCLAW] Telegram callback error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * Answer a Telegram callback query (dismisses the button loading indicator).
- */
-async function answerCallbackQuery(callbackQueryId, text) {
-  if (!BOT_TOKEN) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ callback_query_id: callbackQueryId, text })
-    });
-  } catch (err) {
-    console.error('[TELEGRAM] Answer callback error:', err.message);
-  }
-}
-
-/**
- * Edit an existing Telegram message text.
- */
-async function editMessageText(chatId, messageId, text) {
-  if (!BOT_TOKEN) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId,
-        text,
-        parse_mode: 'Markdown'
-      })
-    });
-  } catch (err) {
-    console.error('[TELEGRAM] Edit message error:', err.message);
-  }
-}
-
-// ============================================================
 // EVENT EXECUTION ENGINE
 // ============================================================
 
 /**
- * Execute a confirmed event. Routes to the appropriate handler.
+ * Execute an event. Routes to the appropriate handler.
  * Returns { success: boolean, summary: string }
  */
 function executeEvent(eventType, payload) {
@@ -452,6 +196,11 @@ function handleAgentActivityLog(payload) {
     INSERT INTO openclaw_activity_log (action, status, summary, client, details)
     VALUES (?, ?, ?, ?, ?)
   `).run(action, status, summary, client || null, details ? JSON.stringify(details) : null);
+
+  // Broadcast activity log to frontend in real-time
+  import('../../server.js').then(({ broadcastEvent }) => {
+    broadcastEvent('agent_activity_log', payload);
+  }).catch(err => console.error('[OPENCLAW] Broadcast agent_activity_log failed:', err));
 
   return { success: true, summary: `Logged activity: ${summary}` };
 }
