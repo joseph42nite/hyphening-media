@@ -53,7 +53,7 @@ async function askOpenClaw(userMessage) {
   console.log(`[GATEWAY] Sending request to OpenClaw hook endpoint...`);
   console.log(`[GATEWAY]   - URL: ${OPENCLAW_GATEWAY_URL}`);
   console.log(`[GATEWAY]   - Message: "${userMessage}"`);
-  console.log(`[GATEWAY]   - Requested model: ${model} (not yet sent to gateway — pending confirmation of how OpenClaw expects model selection)`);
+  console.log(`[GATEWAY]   - Requested model: ${model} (not sent — OpenClaw confirmed model selection is fully determined by its own per-skill config)`);
 
   try {
     const response = await fetch(OPENCLAW_GATEWAY_URL, {
@@ -75,6 +75,16 @@ async function askOpenClaw(userMessage) {
 
     if (!response.ok) {
       throw new Error(`Gateway returned ${response.status}: ${rawBody}`);
+    }
+
+    // Confirmed shape: { "ok": true, "runId": "<uuid>" }
+    try {
+      const parsed = JSON.parse(rawBody);
+      if (parsed?.runId) {
+        console.log(`[GATEWAY] OpenClaw accepted the request. Run ID: ${parsed.runId}`);
+      }
+    } catch {
+      // Non-JSON response body — fall back to logging the raw text below.
     }
 
     return rawBody || 'accepted';

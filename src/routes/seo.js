@@ -100,7 +100,7 @@ function spawnAgent(clientId, agentType, model, requestedBy) {
           broadcastEvent('seo_agent_log', {
             clientId,
             agentType,
-            log: '[TIMEOUT] No audit result received from OpenClaw within 15 minutes.'
+            log: '[TIMEOUT] No audit result received from OpenClaw within the expected time window for this audit type.'
           });
           broadcastEvent('seo_agent_status', {
             clientId,

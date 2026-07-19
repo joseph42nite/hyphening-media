@@ -7,7 +7,14 @@
  */
 
 const pending = new Map();
-const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const EXTENDED_TIMEOUT_MS = 45 * 60 * 1000; // 45 minutes
+
+// Skills OpenClaw confirmed routinely exceed 15 minutes due to heavy
+// external API calls (DataForSEO, backlink providers, image generation).
+const EXTENDED_TIMEOUT_SKILLS = new Set([
+  'backlinks', 'dataforseo', 'competitor_pages', 'image_gen', 'maps'
+]);
 
 function key(clientId, agentType) {
   return `${clientId}:${agentType}`;
@@ -16,10 +23,11 @@ function key(clientId, agentType) {
 export function registerPendingAudit(clientId, agentType, onTimeout) {
   const k = key(clientId, agentType);
   clearPendingAudit(clientId, agentType);
+  const timeoutMs = EXTENDED_TIMEOUT_SKILLS.has(agentType) ? EXTENDED_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
   const handle = setTimeout(() => {
     pending.delete(k);
     onTimeout();
-  }, TIMEOUT_MS);
+  }, timeoutMs);
   pending.set(k, handle);
 }
 
