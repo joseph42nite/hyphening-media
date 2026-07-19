@@ -4,6 +4,32 @@ import { API_BASE } from '../../api.js';
 
 const REQUIRES_DATAFORSEO = new Set(['backlinks', 'maps', 'competitor_pages', 'dataforseo']);
 
+// report_json is stored as a JSON-stringified column; it may itself be plain
+// text (not an object) if OpenClaw sent a long-form text report instead of
+// structured JSON — both are valid, so this never throws.
+function parseReportJson(raw) {
+  if (raw == null) return null;
+  if (typeof raw !== 'string') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+// Short preview shown in the quote box. Prefers an explicit summary if OpenClaw
+// sent one, but falls back to truncating report_json directly so OpenClaw
+// doesn't have to author a separate condensed version of the same findings.
+function getPreviewText(audit) {
+  if (audit.summary) return audit.summary;
+  const parsed = parseReportJson(audit.report_json);
+  if (parsed == null) return null;
+  const text = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  return trimmed.length > 280 ? `${trimmed.slice(0, 280).trim()}…` : trimmed;
+}
+
 // Renders an arbitrary report_json object as readable nested key/value
 // text instead of a raw JSON dump — OpenClaw's report shape varies by skill.
 function ReportValue({ value, depth = 0 }) {
@@ -568,7 +594,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       )}
                     </div>
                   )}
-                  {currentAudit?.summary && (
+                  {currentAudit && (getPreviewText(currentAudit) || currentAudit.report_json) && (
                     <div style={{
                       fontSize: '0.82rem',
                       color: '#334155',
@@ -579,7 +605,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       borderRadius: '2px',
                       maxWidth: '640px'
                     }}>
-                      {currentAudit.summary}
+                      {getPreviewText(currentAudit)}
                       {currentAudit.report_json && (
                         <div style={{ marginTop: '6px' }}>
                           <button
@@ -889,20 +915,12 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
             </div>
             <div style={{ fontSize: '0.85rem', lineHeight: '1.6' }}>
               {(() => {
-                let parsed = null;
-                try {
-                  parsed = typeof currentAudit.report_json === 'string' ? JSON.parse(currentAudit.report_json) : currentAudit.report_json;
-                } catch {
-                  // Not valid JSON at all — show the raw text as-is, line breaks preserved.
-                  return <div style={{ whiteSpace: 'pre-wrap' }}>{String(currentAudit.report_json)}</div>;
-                }
-                // A plain string that happened to parse as valid JSON (e.g. a
-                // long-form text report) — render with line breaks preserved
-                // rather than collapsing it into one unformatted line.
-                if (typeof parsed === 'string') {
-                  return <div style={{ whiteSpace: 'pre-wrap' }}>{parsed}</div>;
-                }
-                return <ReportValue value={parsed} />;
+                const parsed = parseReportJson(currentAudit.report_json);
+                // A plain-text report renders with line breaks preserved rather
+                // than collapsing onto one line via the object/array renderer.
+                return typeof parsed === 'string'
+                  ? <div style={{ whiteSpace: 'pre-wrap' }}>{parsed}</div>
+                  : <ReportValue value={parsed} />;
               })()}
             </div>
           </div>
