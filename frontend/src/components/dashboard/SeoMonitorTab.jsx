@@ -893,7 +893,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 try {
                   parsed = typeof currentAudit.report_json === 'string' ? JSON.parse(currentAudit.report_json) : currentAudit.report_json;
                 } catch {
-                  return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem' }}>{String(currentAudit.report_json)}</pre>;
+                  // Not valid JSON at all — show the raw text as-is, line breaks preserved.
+                  return <div style={{ whiteSpace: 'pre-wrap' }}>{String(currentAudit.report_json)}</div>;
+                }
+                // A plain string that happened to parse as valid JSON (e.g. a
+                // long-form text report) — render with line breaks preserved
+                // rather than collapsing it into one unformatted line.
+                if (typeof parsed === 'string') {
+                  return <div style={{ whiteSpace: 'pre-wrap' }}>{parsed}</div>;
                 }
                 return <ReportValue value={parsed} />;
               })()}
