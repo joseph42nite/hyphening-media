@@ -4,6 +4,39 @@ import { API_BASE } from '../../api.js';
 
 const REQUIRES_DATAFORSEO = new Set(['backlinks', 'maps', 'competitor_pages', 'dataforseo']);
 
+// Renders an arbitrary report_json object as readable nested key/value
+// text instead of a raw JSON dump — OpenClaw's report shape varies by skill.
+function ReportValue({ value, depth = 0 }) {
+  if (value === null || value === undefined) {
+    return <span style={{ color: '#94a3b8' }}>—</span>;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span style={{ color: '#94a3b8' }}>none</span>;
+    return (
+      <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+        {value.map((item, i) => (
+          <li key={i} style={{ marginBottom: '4px' }}>
+            {typeof item === 'object' && item !== null ? <ReportValue value={item} depth={depth + 1} /> : String(item)}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (typeof value === 'object') {
+    return (
+      <div style={{ marginLeft: depth > 0 ? '14px' : 0 }}>
+        {Object.entries(value).map(([k, v]) => (
+          <div key={k} style={{ marginBottom: '6px' }}>
+            <strong style={{ textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}:</strong>{' '}
+            {typeof v === 'object' && v !== null ? <ReportValue value={v} depth={depth + 1} /> : String(v)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <span>{String(value)}</span>;
+}
+
 export default function SeoMonitorTab({ auth, clients, showToast }) {
   const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem('seo_monitor_selected_client_id') || '');
   const [agents, setAgents] = useState([]);
@@ -73,6 +106,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   // Freshness confirmation modal
   const [showFreshModal, setShowFreshModal] = useState(false);
   const [freshModalAgent, setFreshModalAgent] = useState(null);
+
+  // Full report modal (report_json behind "View Full Report")
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Assign to SMM modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -389,6 +425,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   setActiveConsoleAgent(null);
                   setConsoleLogs([]);
                   setFocusedAgentType(null);
+                  setShowReportModal(false);
                 }}
               >
                 {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
@@ -543,6 +580,16 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       maxWidth: '640px'
                     }}>
                       {currentAudit.summary}
+                      {currentAudit.report_json && (
+                        <div style={{ marginTop: '6px' }}>
+                          <button
+                            onClick={() => setShowReportModal(true)}
+                            style={{ background: 'none', border: 'none', color: '#7c3aed', fontWeight: 'bold', fontSize: '0.78rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                          >
+                            View Full Report →
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -821,6 +868,37 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         )}
                       </div>
                     )}
+        </div>
+      )}
+
+      {/* Full Report Modal */}
+      {showReportModal && currentAudit?.report_json && (
+        <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0, fontWeight: 'bold' }}>Full Audit Report</h3>
+              <button
+                onClick={() => setShowReportModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.4rem', fontWeight: 'bold', padding: 0, lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+              {currentAudit.audit_type} — {currentAudit.page_url || currentAudit.url}
+            </div>
+            <div style={{ fontSize: '0.85rem', lineHeight: '1.6' }}>
+              {(() => {
+                let parsed = null;
+                try {
+                  parsed = typeof currentAudit.report_json === 'string' ? JSON.parse(currentAudit.report_json) : currentAudit.report_json;
+                } catch {
+                  return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem' }}>{String(currentAudit.report_json)}</pre>;
+                }
+                return <ReportValue value={parsed} />;
+              })()}
+            </div>
+          </div>
         </div>
       )}
 
