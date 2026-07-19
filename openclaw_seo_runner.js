@@ -86,7 +86,7 @@ async function askOpenClaw(userMessage) {
 async function run() {
   console.log(`[INIT] Initializing '${agentType}' agent request for target: ${targetUrl}`);
   
-  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl}`;
+  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]`;
   
   const confirmation = await askOpenClaw(userMessage);
 
