@@ -531,6 +531,20 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       )}
                     </div>
                   )}
+                  {currentAudit?.summary && (
+                    <div style={{
+                      fontSize: '0.82rem',
+                      color: '#334155',
+                      marginTop: '8px',
+                      padding: '8px 10px',
+                      background: '#f8fafc',
+                      borderLeft: '3px solid #7c3aed',
+                      borderRadius: '2px',
+                      maxWidth: '640px'
+                    }}>
+                      {currentAudit.summary}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                   {currentAudit && (
