@@ -415,42 +415,22 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 return (
                   <div
                     key={agent.agentType}
-                    className={`card${isRunning ? ' animate-pulse' : ''}`}
+                    className="card"
                     style={{
-                      border: isRunning ? '2px solid #3b82f6' : '2px solid #000',
-                      borderTop: `6px solid ${isRunning ? '#3b82f6' : getFreshnessColor(agent.freshness)}`,
+                      border: '2px solid #000',
+                      borderTop: `6px solid ${getFreshnessColor(agent.freshness)}`,
                       padding: '12px',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
                       background: activeConsoleAgent === agent.agentType ? '#faf5ff' : '#fff',
                       position: 'relative',
-                      boxShadow: isRunning ? '0 0 0 3px rgba(59, 130, 246, 0.25)' : 'none',
-                      transition: 'border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
+                      transition: 'opacity 0.2s ease',
                       opacity: needsDataForSEO ? 0.5 : 1,
                       cursor: needsDataForSEO ? 'not-allowed' : 'pointer'
                     }}
                     title={needsDataForSEO ? 'Requires DataForSEO configuration' : ''}
                   >
-                    {isRunning && (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'rgba(255,255,255,0.75)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        borderRadius: '4px',
-                        zIndex: 5
-                      }}>
-                        <Loader2 size={22} className="animate-spin" style={{ color: '#3b82f6' }} />
-                        <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#1e40af', textTransform: 'capitalize' }}>
-                          {agentRunningStates[agent.agentType]}...
-                        </span>
-                      </div>
-                    )}
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{agent.agentType}</span>
@@ -492,9 +472,12 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         </button>
                         
                         {isRunning ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                            <Loader2 size={12} className="animate-spin" /> {agentRunningStates[agent.agentType]}
-                          </div>
+                          <button
+                            disabled
+                            style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '2px solid #000', background: '#fbbf24', color: '#000', fontWeight: 'bold', borderRadius: '4px', cursor: 'default' }}
+                          >
+                            <Loader2 size={12} className="animate-spin" /> Running...
+                          </button>
                         ) : isPending ? (
                           <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title="Waiting for admin approval">
                             Pending
