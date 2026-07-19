@@ -27,6 +27,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     }
   }, [clients]);
   
+  // Which card's audits the "View Audit" dropdown is filtered to (null = show all)
+  const [focusedAgentType, setFocusedAgentType] = useState(null);
+
   // Real-time terminal log stream state
   const [activeConsoleAgent, setActiveConsoleAgent] = useState(null);
   const [consoleLogs, setConsoleLogs] = useState([]);
@@ -83,6 +86,16 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
 
   const selectedClient = clients.find(c => String(c.id) === String(selectedClientId));
   const currentAudit = audits.find(a => String(a.id) === String(selectedAuditId));
+  const dropdownAudits = focusedAgentType ? audits.filter(a => a.audit_type === focusedAgentType) : audits;
+
+  // Clicking a card focuses the "View Audit" dropdown to that agent's history
+  // and jumps to its most recent result (audits are already newest-first).
+  const focusCardAudits = (agentType) => {
+    setFocusedAgentType(agentType);
+    const latest = audits.find(a => a.audit_type === agentType);
+    setSelectedAuditId(latest ? latest.id : '');
+    if (!latest) setRecommendations([]);
+  };
 
   // Helper to get status color for terminal logs
   const getStatusColor = (status) => {
@@ -375,6 +388,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   localStorage.setItem('seo_monitor_selected_client_id', newId);
                   setActiveConsoleAgent(null);
                   setConsoleLogs([]);
+                  setFocusedAgentType(null);
                 }}
               >
                 {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
@@ -416,20 +430,21 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   <div
                     key={agent.agentType}
                     className="card"
+                    onClick={() => { if (!needsDataForSEO) focusCardAudits(agent.agentType); }}
                     style={{
-                      border: '2px solid #000',
+                      border: focusedAgentType === agent.agentType ? '2px solid #7c3aed' : '2px solid #000',
                       borderTop: `6px solid ${getFreshnessColor(agent.freshness)}`,
                       padding: '12px',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
-                      background: activeConsoleAgent === agent.agentType ? '#faf5ff' : '#fff',
+                      background: activeConsoleAgent === agent.agentType ? '#faf5ff' : (focusedAgentType === agent.agentType ? '#f5f3ff' : '#fff'),
                       position: 'relative',
-                      transition: 'opacity 0.2s ease',
+                      transition: 'opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease',
                       opacity: needsDataForSEO ? 0.5 : 1,
                       cursor: needsDataForSEO ? 'not-allowed' : 'pointer'
                     }}
-                    title={needsDataForSEO ? 'Requires DataForSEO configuration' : ''}
+                    title={needsDataForSEO ? 'Requires DataForSEO configuration' : 'Click to view this agent\'s audit history'}
                   >
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -460,7 +475,8 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setActiveConsoleAgent(agent.agentType);
                             setConsoleLogs([`[SYSTEM] Subscribed to logs for '${agent.agentType}' agent.`]);
                           }}
@@ -470,7 +486,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         >
                           <Terminal size={14} />
                         </button>
-                        
+
                         {isRunning ? (
                           <button
                             disabled
@@ -488,7 +504,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           </div>
                         ) : (
                           <button
-                            onClick={() => triggerAgent(agent.agentType)}
+                            onClick={(e) => { e.stopPropagation(); triggerAgent(agent.agentType); }}
                             className="btn btn-primary"
                             style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '2px solid #000' }}
                           >
@@ -537,15 +553,17 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                     </div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>View Audit:</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
+                      View Audit{focusedAgentType ? ` (${focusedAgentType})` : ''}:
+                    </span>
                     <select
                       className="form-control"
                       style={{ border: '2px solid #000', padding: '4px 8px', fontSize: '0.85rem', height: '32px' }}
                       value={selectedAuditId}
                       onChange={e => setSelectedAuditId(e.target.value)}
-                      disabled={audits.length === 0}
+                      disabled={dropdownAudits.length === 0}
                     >
-                      {audits.map(a => {
+                      {dropdownAudits.map(a => {
                         let pagePath = '';
                         if (a.page_url) {
                           try {
@@ -562,6 +580,16 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         );
                       })}
                     </select>
+                    {focusedAgentType && (
+                      <button
+                        onClick={() => setFocusedAgentType(null)}
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: '0.75rem', border: '1px solid #000' }}
+                        title="Show audits from every agent again"
+                      >
+                        Show All
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
