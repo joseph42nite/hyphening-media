@@ -7,8 +7,8 @@
 import db from './database.js';
 
 // --- Configuration ---
-const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:18789/v1/chat/completions';
-const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789/hooks/agent';
+const OPENCLAW_HOOK_TOKEN = process.env.OPENCLAW_HOOK_TOKEN || '';
 
 // --- Argument Parsing ---
 const args = {};
@@ -28,8 +28,8 @@ if (isNaN(clientId)) {
   console.error('[RUNNER] Error: --clientId is required.');
   process.exit(1);
 }
-if (!OPENCLAW_GATEWAY_TOKEN) {
-  console.error('[RUNNER] Error: OPENCLAW_GATEWAY_TOKEN environment variable is not set.');
+if (!OPENCLAW_HOOK_TOKEN) {
+  console.error('[RUNNER] Error: OPENCLAW_HOOK_TOKEN environment variable is not set.');
   process.exit(1);
 }
 
@@ -46,36 +46,40 @@ if (!targetUrl) {
 }
 
 /**
- * Calls the OpenClaw Chat Completions endpoint.
+ * Calls the OpenClaw hook endpoint to wake the SEO agent.
  * @param {string} userMessage The message to send to the agent.
  */
 async function askOpenClaw(userMessage) {
-  console.log(`[GATEWAY] Sending request to OpenClaw...`);
-  console.log(`[GATEWAY]   - Model: ${model}`);
+  console.log(`[GATEWAY] Sending request to OpenClaw hook endpoint...`);
+  console.log(`[GATEWAY]   - URL: ${OPENCLAW_GATEWAY_URL}`);
   console.log(`[GATEWAY]   - Message: "${userMessage}"`);
+  console.log(`[GATEWAY]   - Requested model: ${model} (not yet sent to gateway — pending confirmation of how OpenClaw expects model selection)`);
 
   try {
     const response = await fetch(OPENCLAW_GATEWAY_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENCLAW_GATEWAY_TOKEN}`
+        "Authorization": `Bearer ${OPENCLAW_HOOK_TOKEN}`
       },
       body: JSON.stringify({
-        model: model,
-        messages: [{ role: "user", content: userMessage }]
+        message: userMessage,
+        name: `SEO ${agentType} — client #${clientId}`,
+        agentId: "main",
+        wakeMode: "now",
+        deliver: false
       })
     });
 
+    const rawBody = await response.text();
+
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Gateway returned ${response.status}: ${errorBody}`);
+      throw new Error(`Gateway returned ${response.status}: ${rawBody}`);
     }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+    return rawBody || 'accepted';
   } catch (error) {
-    console.error('[GATEWAY] Error calling OpenClaw API:', error.message);
+    console.error('[GATEWAY] Error calling OpenClaw hook endpoint:', error.message);
     return null;
   }
 }
@@ -85,9 +89,9 @@ async function askOpenClaw(userMessage) {
  */
 async function run() {
   console.log(`[INIT] Initializing '${agentType}' agent request for target: ${targetUrl}`);
-  
+
   const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]`;
-  
+
   const confirmation = await askOpenClaw(userMessage);
 
   if (confirmation) {
