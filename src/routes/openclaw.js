@@ -1178,11 +1178,17 @@ function handleCreateSeoAudit(payload) {
     );
   }
 
+  // OpenClaw sends this event both for a genuine audit result and for a
+  // failed/aborted run (null scores + a summary explaining what happened).
+  // payload.status distinguishes the two so the dashboard card doesn't show
+  // a misleading "completed" badge for a run that actually failed.
+  const auditFailed = payload.status === 'error' || payload.status === 'failed';
+
   logAction({
     action: 'create',
     entityType: 'seo_audit',
     entityId: auditId,
-    diff: { audit_type: payload.audit_type, client_id: payload.client_id }
+    diff: { audit_type: payload.audit_type, client_id: payload.client_id, status: auditFailed ? 'failed' : 'completed' }
   });
 
   // The real audit result has arrived — stop waiting on the timeout and
@@ -1193,12 +1199,17 @@ function handleCreateSeoAudit(payload) {
     broadcastEvent('seo_agent_status', {
       clientId: payload.client_id,
       agentType: payload.audit_type,
-      status: 'completed'
+      status: auditFailed ? 'failed' : 'completed'
     });
     broadcastEvent('seo_audit_created', { clientId: payload.client_id, agentType: payload.audit_type });
   }).catch(err => console.error('[OPENCLAW] Broadcast seo_audit_created failed:', err));
 
-  return { success: true, summary: `SEO Audit #${auditId} (${payload.audit_type}) completed.` };
+  return {
+    success: true,
+    summary: auditFailed
+      ? `SEO Audit #${auditId} (${payload.audit_type}) reported failure: ${payload.summary || 'no summary provided'}`
+      : `SEO Audit #${auditId} (${payload.audit_type}) completed.`
+  };
 }
 
 // ============================================================
