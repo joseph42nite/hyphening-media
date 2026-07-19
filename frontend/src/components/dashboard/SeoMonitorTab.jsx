@@ -510,6 +510,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   {currentAudit && (
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       <strong>Audited URL Tree:</strong> <a href={currentAudit.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{currentAudit.url}</a>
+                      {currentAudit.page_url && currentAudit.page_url !== currentAudit.url && (
+                        <span> — <strong>Page:</strong> <a href={currentAudit.page_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{currentAudit.page_url}</a></span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -542,11 +545,22 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       onChange={e => setSelectedAuditId(e.target.value)}
                       disabled={audits.length === 0}
                     >
-                      {audits.map(a => (
-                        <option key={a.id} value={a.id}>
-                          {new Date(a.created_at).toLocaleString()} - {a.audit_type}
-                        </option>
-                      ))}
+                      {audits.map(a => {
+                        let pagePath = '';
+                        if (a.page_url) {
+                          try {
+                            const parsed = new URL(a.page_url);
+                            pagePath = parsed.pathname === '/' ? '/' : parsed.pathname;
+                          } catch {
+                            pagePath = a.page_url;
+                          }
+                        }
+                        return (
+                          <option key={a.id} value={a.id}>
+                            {new Date(a.created_at).toLocaleString()} - {a.audit_type}{pagePath ? ` - ${pagePath}` : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>

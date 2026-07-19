@@ -1050,106 +1050,123 @@ function handleCreateSeoAudit(payload) {
     return { success: false, summary: 'client_id, audit_type, and url are required' };
   }
 
-  // 1. Insert into seo_audits
-  const auditResult = db.prepare(`
+  // Support two formats:
+  // 1. Single audit: {client_id, audit_type, url, page_url, health_score, ...}
+  // 2. Multi-URL: {client_id, audit_type, url, results: [{page_url, health_score, ...}, ...]}
+
+  const results = payload.results && Array.isArray(payload.results)
+    ? payload.results
+    : [{ page_url: payload.page_url || payload.url, health_score: payload.health_score, technical_score: payload.technical_score, content_score: payload.content_score, on_page_score: payload.on_page_score, schema_score: payload.schema_score, performance_score: payload.performance_score, geo_score: payload.geo_score, backlinks_score: payload.backlinks_score, local_score: payload.local_score, sxo_score: payload.sxo_score, summary: payload.summary, report_json: payload.report_json, recommendations: payload.recommendations, token_usage: payload.token_usage }];
+
+  let totalAuditsCreated = 0;
+
+  // Insert one audit row per URL
+  const insertAudit = db.prepare(`
     INSERT INTO seo_audits (
-      client_id, audit_type, url, health_score, technical_score, content_score,
+      client_id, audit_type, url, page_url, health_score, technical_score, content_score,
       on_page_score, schema_score, performance_score, geo_score, backlinks_score,
       local_score, sxo_score, summary, report_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    payload.client_id,
-    payload.audit_type,
-    payload.url,
-    payload.health_score ?? null,
-    payload.technical_score ?? null,
-    payload.content_score ?? null,
-    payload.on_page_score ?? null,
-    payload.schema_score ?? null,
-    payload.performance_score ?? null,
-    payload.geo_score ?? null,
-    payload.backlinks_score ?? null,
-    payload.local_score ?? null,
-    payload.sxo_score ?? null,
-    payload.summary ?? null,
-    payload.report_json ? JSON.stringify(payload.report_json) : null
-  );
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
 
-  const auditId = auditResult.lastInsertRowid;
+  for (const result of results) {
+    const auditResult = insertAudit.run(
+      payload.client_id,
+      payload.audit_type,
+      payload.url,
+      result.page_url || payload.url,
+      result.health_score ?? null,
+      result.technical_score ?? null,
+      result.content_score ?? null,
+      result.on_page_score ?? null,
+      result.schema_score ?? null,
+      result.performance_score ?? null,
+      result.geo_score ?? null,
+      result.backlinks_score ?? null,
+      result.local_score ?? null,
+      result.sxo_score ?? null,
+      result.summary ?? null,
+      result.report_json ? JSON.stringify(result.report_json) : null
+    );
 
-  // 2. Batch-insert recommendations into seo_recommendations
-  if (Array.isArray(payload.recommendations)) {
-    const insertRec = db.prepare(`
-      INSERT INTO seo_recommendations (
-        audit_id, client_id, priority, metric, issue, action_required,
-        observation, dependency, failure_check, leading_indicator, page_url, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
-    `);
+    const auditId = auditResult.lastInsertRowid;
+    totalAuditsCreated++;
 
-    for (const rec of payload.recommendations) {
-      insertRec.run(
-        auditId,
+    // Insert recommendations for this specific audit/page
+    if (Array.isArray(result.recommendations)) {
+      const insertRec = db.prepare(`
+        INSERT INTO seo_recommendations (
+          audit_id, client_id, priority, metric, issue, action_required,
+          observation, dependency, failure_check, leading_indicator, page_url, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+      `);
+
+      for (const rec of result.recommendations) {
+        insertRec.run(
+          auditId,
+          payload.client_id,
+          rec.priority || 'Medium',
+          rec.metric || '',
+          rec.issue || '',
+          rec.action_required || '',
+          rec.observation || null,
+          rec.dependency || null,
+          rec.failure_check || null,
+          rec.leading_indicator || null,
+          rec.page_url || result.page_url || payload.url
+        );
+      }
+    }
+
+    // Backlinks: parse referring domains and upsert into outreach_targets
+    if (payload.audit_type === 'backlinks' && result.report_json) {
+      const report = result.report_json;
+      const targets = report.outreach_targets || report.competitor_gap || [];
+      if (Array.isArray(targets)) {
+        const insertTarget = db.prepare(`
+          INSERT INTO outreach_targets (client_id, site_name, site_url, source, category, domain_authority, vetting_status)
+          VALUES (?, ?, ?, 'seo_backlinks_gap', ?, ?, 'unvetted')
+        `);
+        for (const t of targets) {
+          if (t.site_url) {
+            insertTarget.run(
+              payload.client_id,
+              t.site_name || t.site_url,
+              t.site_url,
+              t.category || 'guest_post',
+              t.domain_authority || t.da || null
+            );
+          }
+        }
+      }
+    }
+
+    // Token cost logging
+    if (result.token_usage) {
+      const usage = result.token_usage;
+      db.prepare(`
+        INSERT INTO token_usage_log (
+          client_id, audit_id, agent_type, model, triggered_by,
+          input_tokens, output_tokens, estimated_cost_usd, external_api_cost_usd,
+          duration_seconds, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+      `).run(
         payload.client_id,
-        rec.priority || 'Medium',
-        rec.metric || '',
-        rec.issue || '',
-        rec.action_required || '',
-        rec.observation || null,
-        rec.dependency || null,
-        rec.failure_check || null,
-        rec.leading_indicator || null,
-        rec.page_url || null
+        auditId,
+        payload.audit_type,
+        usage.model || 'claude',
+        payload.triggered_by || 'system',
+        usage.input_tokens || 0,
+        usage.output_tokens || 0,
+        usage.estimated_cost_usd || 0,
+        usage.external_api_cost_usd || 0,
+        usage.duration_seconds || null
       );
     }
   }
 
-  // 3. If backlinks, parse referring domains and upsert into outreach_targets
-  if (payload.audit_type === 'backlinks' && payload.report_json) {
-    const report = payload.report_json;
-    const targets = report.outreach_targets || report.competitor_gap || [];
-    if (Array.isArray(targets)) {
-      const insertTarget = db.prepare(`
-        INSERT INTO outreach_targets (client_id, site_name, site_url, source, category, domain_authority, vetting_status)
-        VALUES (?, ?, ?, 'seo_backlinks_gap', ?, ?, 'unvetted')
-      `);
-      for (const t of targets) {
-        if (t.site_url) {
-          insertTarget.run(
-            payload.client_id,
-            t.site_name || t.site_url,
-            t.site_url,
-            t.category || 'guest_post',
-            t.domain_authority || t.da || null
-          );
-        }
-      }
-    }
-  }
-
-  // 4. Token Cost Logging
-  if (payload.token_usage) {
-    const usage = payload.token_usage;
-    db.prepare(`
-      INSERT INTO token_usage_log (
-        client_id, audit_id, agent_type, model, triggered_by,
-        input_tokens, output_tokens, estimated_cost_usd, external_api_cost_usd,
-        duration_seconds, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
-    `).run(
-      payload.client_id,
-      auditId,
-      payload.audit_type,
-      usage.model || 'claude',
-      payload.triggered_by || 'system',
-      usage.input_tokens || 0,
-      usage.output_tokens || 0,
-      usage.estimated_cost_usd || 0,
-      usage.external_api_cost_usd || 0,
-      usage.duration_seconds || null
-    );
-  }
-
-  // 5. Sync overall scores with marketing_monthly_report
+  // Sync overall scores with marketing_monthly_report (use first result's scores)
+  const firstResult = results[0];
   const currentMonth = new Date().toISOString().slice(0, 7);
   const existingReport = db.prepare('SELECT id FROM marketing_monthly_report WHERE client_id = ? AND month = ?').get(payload.client_id, currentMonth);
 
@@ -1161,8 +1178,8 @@ function handleCreateSeoAudit(payload) {
         updated_at = datetime('now')
       WHERE id = ?
     `).run(
-      payload.on_page_score ?? payload.health_score ?? null,
-      payload.backlinks_score ?? null,
+      firstResult.on_page_score ?? firstResult.health_score ?? null,
+      firstResult.backlinks_score ?? null,
       existingReport.id
     );
   } else {
@@ -1173,26 +1190,23 @@ function handleCreateSeoAudit(payload) {
     `).run(
       payload.client_id,
       currentMonth,
-      payload.on_page_score ?? payload.health_score ?? null,
-      payload.backlinks_score ?? null
+      firstResult.on_page_score ?? firstResult.health_score ?? null,
+      firstResult.backlinks_score ?? null
     );
   }
 
-  // OpenClaw sends this event both for a genuine audit result and for a
-  // failed/aborted run (null scores + a summary explaining what happened).
-  // payload.status distinguishes the two so the dashboard card doesn't show
-  // a misleading "completed" badge for a run that actually failed.
+  // Check if any result failed
   const auditFailed = payload.status === 'error' || payload.status === 'failed';
 
   logAction({
     action: 'create',
     entityType: 'seo_audit',
-    entityId: auditId,
-    diff: { audit_type: payload.audit_type, client_id: payload.client_id, status: auditFailed ? 'failed' : 'completed' }
+    entityId: null,
+    diff: { audit_type: payload.audit_type, client_id: payload.client_id, results_count: totalAuditsCreated, status: auditFailed ? 'failed' : 'completed' }
   });
 
-  // The real audit result has arrived — stop waiting on the timeout and
-  // flip the dashboard card out of its loading state.
+  // The real audit results have arrived — stop waiting on the timeout and
+  // flip the dashboard cards out of their loading state.
   clearPendingAudit(payload.client_id, payload.audit_type);
 
   import('../../server.js').then(({ broadcastEvent }) => {
@@ -1207,8 +1221,8 @@ function handleCreateSeoAudit(payload) {
   return {
     success: true,
     summary: auditFailed
-      ? `SEO Audit #${auditId} (${payload.audit_type}) reported failure: ${payload.summary || 'no summary provided'}`
-      : `SEO Audit #${auditId} (${payload.audit_type}) completed.`
+      ? `SEO Audit (${payload.audit_type}) reported failure: ${payload.summary || 'no summary provided'}`
+      : `SEO Audit (${payload.audit_type}) completed with ${totalAuditsCreated} per-URL result(s).`
   };
 }
 
