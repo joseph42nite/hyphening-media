@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
+import { registerPendingAudit } from '../services/pendingAudits.js';
 import { exec, spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -85,12 +86,35 @@ function spawnAgent(clientId, agentType, model, requestedBy) {
         });
       }
 
-      const finalStatus = code === 0 ? 'completed' : 'failed';
-      broadcastEvent('seo_agent_status', {
-        clientId,
-        agentType,
-        status: finalStatus
-      });
+      if (code === 0) {
+        // Trigger hand-off succeeded — the actual audit is still running on
+        // OpenClaw's side. Stay in 'running' and wait for the
+        // create_seo_audit webhook to mark completion; fall back to
+        // 'failed' if OpenClaw never reports back.
+        broadcastEvent('seo_agent_log', {
+          clientId,
+          agentType,
+          log: '[SYSTEM] Trigger accepted by OpenClaw. Awaiting audit results...'
+        });
+        registerPendingAudit(clientId, agentType, () => {
+          broadcastEvent('seo_agent_log', {
+            clientId,
+            agentType,
+            log: '[TIMEOUT] No audit result received from OpenClaw within 15 minutes.'
+          });
+          broadcastEvent('seo_agent_status', {
+            clientId,
+            agentType,
+            status: 'failed'
+          });
+        });
+      } else {
+        broadcastEvent('seo_agent_status', {
+          clientId,
+          agentType,
+          status: 'failed'
+        });
+      }
     });
 
     child.on('error', (err) => {

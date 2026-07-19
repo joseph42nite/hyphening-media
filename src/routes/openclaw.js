@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
+import { clearPendingAudit } from '../services/pendingAudits.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
@@ -1184,9 +1185,17 @@ function handleCreateSeoAudit(payload) {
     diff: { audit_type: payload.audit_type, client_id: payload.client_id }
   });
 
-  // Notify frontend to refetch audits list
+  // The real audit result has arrived — stop waiting on the timeout and
+  // flip the dashboard card out of its loading state.
+  clearPendingAudit(payload.client_id, payload.audit_type);
+
   import('../../server.js').then(({ broadcastEvent }) => {
-    broadcastEvent('seo_audit_created', { clientId: payload.client_id });
+    broadcastEvent('seo_agent_status', {
+      clientId: payload.client_id,
+      agentType: payload.audit_type,
+      status: 'completed'
+    });
+    broadcastEvent('seo_audit_created', { clientId: payload.client_id, agentType: payload.audit_type });
   }).catch(err => console.error('[OPENCLAW] Broadcast seo_audit_created failed:', err));
 
   return { success: true, summary: `SEO Audit #${auditId} (${payload.audit_type}) completed.` };
