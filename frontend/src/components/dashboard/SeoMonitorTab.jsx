@@ -2,7 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
-const REQUIRES_DATAFORSEO = new Set(['backlinks', 'maps', 'competitor_pages', 'dataforseo']);
+// Skills still blocked: maps/competitor_pages/dataforseo need DataForSEO
+// configured (confirmed by OpenClaw, 2026-07-20). drift is excluded per its
+// own agent_run_config note — "Automatic weekly, not manually triggered" —
+// a design choice independent of whether it's installed.
+const UNAVAILABLE_SKILLS = new Map([
+  ['maps', 'Requires DataForSEO configuration'],
+  ['competitor_pages', 'Requires DataForSEO configuration'],
+  ['dataforseo', 'Requires DataForSEO configuration'],
+  ['drift', 'Automatic weekly check — not manually triggered'],
+]);
 
 // report_json is stored as a JSON-stringified column; it may itself be plain
 // text (not an object) if OpenClaw sent a long-form text report instead of
@@ -487,13 +496,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               {getFilteredAgents().map(agent => {
                 const isRunning = agentRunningStates[agent.agentType] === 'running' || agentRunningStates[agent.agentType] === 'queued';
                 const isPending = agentRunningStates[agent.agentType] === 'pending_approval';
-                const needsDataForSEO = REQUIRES_DATAFORSEO.has(agent.agentType);
+                const unavailableReason = UNAVAILABLE_SKILLS.get(agent.agentType);
+                const isUnavailable = !!unavailableReason;
 
                 return (
                   <div
                     key={agent.agentType}
                     className="card"
-                    onClick={() => { if (!needsDataForSEO) focusCardAudits(agent.agentType); }}
+                    onClick={() => { if (!isUnavailable) focusCardAudits(agent.agentType); }}
                     style={{
                       border: focusedAgentType === agent.agentType ? '2px solid #7c3aed' : '2px solid #000',
                       borderTop: `6px solid ${getFreshnessColor(agent.freshness)}`,
@@ -504,10 +514,10 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       background: activeConsoleAgent === agent.agentType ? '#faf5ff' : (focusedAgentType === agent.agentType ? '#f5f3ff' : '#fff'),
                       position: 'relative',
                       transition: 'opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease',
-                      opacity: needsDataForSEO ? 0.5 : 1,
-                      cursor: needsDataForSEO ? 'not-allowed' : 'pointer'
+                      opacity: isUnavailable ? 0.5 : 1,
+                      cursor: isUnavailable ? 'not-allowed' : 'pointer'
                     }}
-                    title={needsDataForSEO ? 'Requires DataForSEO configuration' : 'Click to view this agent\'s audit history'}
+                    title={unavailableReason || 'Click to view this agent\'s audit history'}
                   >
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -561,8 +571,8 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title="Waiting for admin approval">
                             Pending
                           </div>
-                        ) : needsDataForSEO ? (
-                          <div style={{ background: '#e5e7eb', color: '#6b7280', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title="DataForSEO not configured">
+                        ) : isUnavailable ? (
+                          <div style={{ background: '#e5e7eb', color: '#6b7280', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title={unavailableReason}>
                             Unavailable
                           </div>
                         ) : (
