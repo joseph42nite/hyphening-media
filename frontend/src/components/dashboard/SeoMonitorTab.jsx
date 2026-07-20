@@ -26,17 +26,20 @@ function parseReportJson(raw) {
   }
 }
 
-// Short preview shown in the quote box. Prefers an explicit summary if OpenClaw
-// sent one, but falls back to truncating report_json directly so OpenClaw
-// doesn't have to author a separate condensed version of the same findings.
+// Short preview shown in the quote box. Always derived from report_json
+// (the exact same content "View Full Report" shows, just truncated) so the
+// preview and the full report can never say different things. summary is
+// only used as a last resort for old audits that predate report_json.
 function getPreviewText(audit) {
-  if (audit.summary) return audit.summary;
   const parsed = parseReportJson(audit.report_json);
-  if (parsed == null) return null;
-  const text = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  return trimmed.length > 280 ? `${trimmed.slice(0, 280).trim()}…` : trimmed;
+  if (parsed != null) {
+    const text = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
+    const trimmed = text.trim();
+    if (trimmed) {
+      return trimmed.length > 280 ? `${trimmed.slice(0, 280).trim()}…` : trimmed;
+    }
+  }
+  return audit.summary || null;
 }
 
 // Renders an arbitrary report_json object as readable nested key/value
