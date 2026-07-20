@@ -369,14 +369,19 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
 
   // Trigger Master Audit for all agents sequentially
   const triggerFullAuditMaster = async () => {
-    const activeAgents = getFilteredAgents();
+    // Skip 'full' itself, skills that are blocked/excluded, and anything
+    // already fresh — forcing a re-run of a skill that doesn't need one
+    // wastes tokens on every single click of this button.
+    const activeAgents = getFilteredAgents().filter(agent =>
+      agent.agentType !== 'full' &&
+      !UNAVAILABLE_SKILLS.has(agent.agentType) &&
+      agent.freshness !== 'fresh'
+    );
     showToast(`Starting Master Audit: Queuing ${activeAgents.length} agents...`, 'info');
-    
+
     for (const agent of activeAgents) {
-      if (agent.agentType === 'full') continue;
-      
       try {
-        await triggerAgent(agent.agentType, true, false);
+        await triggerAgent(agent.agentType, false, false);
         // Short delay to avoid SQLite database locking
         await new Promise(resolve => setTimeout(resolve, 1500));
       } catch (err) {
