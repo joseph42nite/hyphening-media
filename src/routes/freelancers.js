@@ -18,19 +18,25 @@ router.use(authenticate);
 router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
   try {
     const { is_active, specialization } = req.query;
-    let query = 'SELECT * FROM freelancers WHERE 1=1';
+    let query = `
+      SELECT f.*,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id) AS total_videos,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id AND status = 'Posted') AS posted_videos
+      FROM freelancers f
+      WHERE 1=1
+    `;
     const params = [];
 
     if (is_active !== undefined) {
-      query += ' AND is_active = ?';
+      query += ' AND f.is_active = ?';
       params.push(parseInt(is_active));
     }
     if (specialization) {
-      query += ' AND specialization = ?';
+      query += ' AND f.specialization = ?';
       params.push(specialization);
     }
 
-    query += ' ORDER BY name ASC';
+    query += ' ORDER BY f.name ASC';
     res.json({ freelancers: db.prepare(query).all(...params) });
   } catch (err) {
     console.error('[FREELANCERS] List error:', err);
@@ -43,7 +49,13 @@ router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager
  */
 router.get('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
   try {
-    const freelancer = db.prepare('SELECT * FROM freelancers WHERE id = ?').get(req.params.id);
+    const freelancer = db.prepare(`
+      SELECT f.*,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id) AS total_videos,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id AND status = 'Posted') AS posted_videos
+      FROM freelancers f
+      WHERE f.id = ?
+    `).get(req.params.id);
     if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
     res.json(freelancer);
   } catch (err) {
@@ -57,14 +69,14 @@ router.get('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_mana
  */
 router.post('/', authorize('admin'), (req, res) => {
   try {
-    const { name, email, phone, company_name, specialization, rate_per_video } = req.body;
+    const { name, email, phone, company_name, specialization, rate_per_video, videos_paid } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Freelancer name is required' });
 
     const result = db.prepare(`
-      INSERT INTO freelancers (name, email, phone, company_name, specialization, rate_per_video)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, email || null, phone || null, company_name || null, specialization || null, rate_per_video || null);
+      INSERT INTO freelancers (name, email, phone, company_name, specialization, rate_per_video, videos_paid)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(name, email || null, phone || null, company_name || null, specialization || null, rate_per_video || null, videos_paid !== undefined ? parseInt(videos_paid) : 0);
 
     logAction({
       actorId: req.user.id,
@@ -76,7 +88,13 @@ router.post('/', authorize('admin'), (req, res) => {
       ip: req.ip,
     });
 
-    const newFreelancer = db.prepare('SELECT * FROM freelancers WHERE id = ?').get(result.lastInsertRowid);
+    const newFreelancer = db.prepare(`
+      SELECT f.*,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id) AS total_videos,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id AND status = 'Posted') AS posted_videos
+      FROM freelancers f
+      WHERE f.id = ?
+    `).get(result.lastInsertRowid);
     res.status(201).json(newFreelancer);
   } catch (err) {
     console.error('[FREELANCERS] Create error:', err);
@@ -92,7 +110,7 @@ router.patch('/:id', authorize('admin'), (req, res) => {
     const freelancer = db.prepare('SELECT * FROM freelancers WHERE id = ?').get(req.params.id);
     if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
 
-    const allowedFields = ['name', 'email', 'phone', 'company_name', 'specialization', 'rate_per_video', 'is_active'];
+    const allowedFields = ['name', 'email', 'phone', 'company_name', 'specialization', 'rate_per_video', 'is_active', 'videos_paid'];
     const updates = {};
     const diff = {};
 
@@ -121,7 +139,13 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       ip: req.ip,
     });
 
-    res.json(db.prepare('SELECT * FROM freelancers WHERE id = ?').get(req.params.id));
+    res.json(db.prepare(`
+      SELECT f.*,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id) AS total_videos,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id AND status = 'Posted') AS posted_videos
+      FROM freelancers f
+      WHERE f.id = ?
+    `).get(req.params.id));
   } catch (err) {
     console.error('[FREELANCERS] Update error:', err);
     res.status(500).json({ error: 'Internal server error' });

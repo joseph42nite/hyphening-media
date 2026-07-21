@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, CheckCircle, DollarSign } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function FreelancersTab({
@@ -14,7 +14,7 @@ export default function FreelancersTab({
   const [showFreelancerModal, setShowFreelancerModal] = useState(false);
   const [editingFreelancer, setEditingFreelancer] = useState(null);
   const [freelancerFormData, setFreelancerFormData] = useState({
-    name: '', email: '', phone: '', company_name: '', specialization: '', rate_per_video: ''
+    name: '', email: '', phone: '', company_name: '', specialization: '', rate_per_video: '', videos_paid: '0'
   });
 
   const openFreelancerModal = (freelancer = null) => {
@@ -26,12 +26,13 @@ export default function FreelancersTab({
         phone: freelancer.phone || '',
         company_name: freelancer.company_name || '',
         specialization: freelancer.specialization || '',
-        rate_per_video: freelancer.rate_per_video !== null && freelancer.rate_per_video !== undefined ? String(freelancer.rate_per_video) : ''
+        rate_per_video: freelancer.rate_per_video !== null && freelancer.rate_per_video !== undefined ? String(freelancer.rate_per_video) : '',
+        videos_paid: freelancer.videos_paid !== null && freelancer.videos_paid !== undefined ? String(freelancer.videos_paid) : '0'
       });
     } else {
       setEditingFreelancer(null);
       setFreelancerFormData({
-        name: '', email: '', phone: '', company_name: '', specialization: '', rate_per_video: ''
+        name: '', email: '', phone: '', company_name: '', specialization: '', rate_per_video: '', videos_paid: '0'
       });
     }
     setShowFreelancerModal(true);
@@ -48,7 +49,8 @@ export default function FreelancersTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...freelancerFormData,
-          rate_per_video: freelancerFormData.rate_per_video ? parseFloat(freelancerFormData.rate_per_video) : null
+          rate_per_video: freelancerFormData.rate_per_video ? parseFloat(freelancerFormData.rate_per_video) : null,
+          videos_paid: freelancerFormData.videos_paid ? parseInt(freelancerFormData.videos_paid) : 0
         }),
         credentials: 'include'
       });
@@ -57,6 +59,27 @@ export default function FreelancersTab({
 
       showToast(`Freelancer ${editingFreelancer ? 'updated' : 'added'} successfully`, 'success');
       setShowFreelancerModal(false);
+      fetchFreelancers();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleQuickIncrementPaid = async (freelancer) => {
+    const currentPaid = freelancer.videos_paid || 0;
+    const newPaid = currentPaid + 1;
+    try {
+      const res = await fetch(`${API_BASE}/api/freelancers/${freelancer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videos_paid: newPaid }),
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update payment count');
+      }
+      showToast(`Logged +1 video paid for ${freelancer.name} (Total: ${newPaid})`, 'success');
       fetchFreelancers();
     } catch (err) {
       showToast(err.message, 'error');
@@ -91,7 +114,12 @@ export default function FreelancersTab({
   return (
     <div style={{ textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3>Freelancer Roster</h3>
+        <div>
+          <h3>Freelancer Roster & Payment Tracker</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            Track assigned content count, completed videos, payment history, and balance due.
+          </p>
+        </div>
         <button onClick={() => openFreelancerModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={16} /> Add Freelancer
         </button>
@@ -102,51 +130,118 @@ export default function FreelancersTab({
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Company</th>
+              <th>Contact / Company</th>
               <th>Specialization</th>
-              <th>Rate/Video</th>
+              <th>Rate / Video</th>
+              <th>Videos Done</th>
+              <th>Videos Paid</th>
+              <th>Balance Due</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {freelancers.map(free => (
-              <tr key={free.id} style={{ opacity: free.is_active === 1 ? 1 : 0.6 }}>
-                <td style={{ fontWeight: 'bold' }}>{free.name}</td>
-                <td>{free.email || '-'}</td>
-                <td>{free.phone || '-'}</td>
-                <td>{free.company_name || '-'}</td>
-                <td>
-                  {free.specialization ? (
-                    <span className="badge badge-muted" style={{ fontSize: '0.75rem' }}>
-                      {free.specialization}
-                    </span>
-                  ) : '-'}
-                </td>
-                <td>{free.rate_per_video !== null && free.rate_per_video !== undefined ? `₹${free.rate_per_video.toLocaleString()}` : '-'}</td>
-                <td>
-                  <span className={`badge badge-${free.is_active === 1 ? 'success' : 'danger'}`}>
-                    {free.is_active === 1 ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => openFreelancerModal(free)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => toggleFreelancerStatus(free)}
-                      className={`btn btn-${free.is_active === 1 ? 'secondary' : 'primary'}`}
-                      style={{ padding: '6px 10px', fontSize: '0.8rem' }}
-                    >
-                      {free.is_active === 1 ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </div>
+            {freelancers.length === 0 ? (
+              <tr>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  No freelancers added yet.
                 </td>
               </tr>
-            ))}
+            ) : (
+              freelancers.map(free => {
+                const rate = free.rate_per_video || 0;
+                const posted = free.posted_videos || 0;
+                const total = free.total_videos || 0;
+                const paid = free.videos_paid || 0;
+                const unpaidCount = Math.max(0, posted - paid);
+                const balanceDue = unpaidCount * rate;
+                const totalEarned = posted * rate;
+
+                return (
+                  <tr key={free.id} style={{ opacity: free.is_active === 1 ? 1 : 0.6 }}>
+                    <td style={{ fontWeight: 'bold' }}>
+                      {free.name}
+                    </td>
+                    <td>
+                      <div>{free.email || free.phone || '-'}</div>
+                      {free.company_name && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{free.company_name}</div>
+                      )}
+                    </td>
+                    <td>
+                      {free.specialization ? (
+                        <span className="badge badge-muted" style={{ fontSize: '0.75rem' }}>
+                          {free.specialization}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td style={{ fontWeight: '600' }}>
+                      {free.rate_per_video !== null && free.rate_per_video !== undefined ? `₹${free.rate_per_video.toLocaleString()}` : '-'}
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {posted} posted
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        ({total} assigned total)
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: '800', fontSize: '0.95rem' }}>{paid}</span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleQuickIncrementPaid(free)}
+                            className="btn btn-secondary"
+                            style={{ padding: '2px 8px', fontSize: '0.7rem', fontWeight: 'bold' }}
+                            title="Log +1 video paid"
+                          >
+                            +1 Paid
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div>
+                        {unpaidCount > 0 ? (
+                          <span className="badge badge-warning" style={{ fontWeight: '800', background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' }}>
+                            ₹{balanceDue.toLocaleString()} ({unpaidCount} unpaid)
+                          </span>
+                        ) : (
+                          <span className="badge badge-success" style={{ fontWeight: '800', background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' }}>
+                            ✓ Fully Paid
+                          </span>
+                        )}
+                        {rate > 0 && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                            Earned: ₹{totalEarned.toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${free.is_active === 1 ? 'success' : 'danger'}`}>
+                        {free.is_active === 1 ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => openFreelancerModal(free)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => toggleFreelancerStatus(free)}
+                          className={`btn btn-${free.is_active === 1 ? 'secondary' : 'primary'}`}
+                          style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                        >
+                          {free.is_active === 1 ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
@@ -200,13 +295,13 @@ export default function FreelancersTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Specialization</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. Editor, Camera Guy, Motion Graphics"
+                    placeholder="e.g. Video Editor"
                     value={freelancerFormData.specialization}
                     onChange={e => setFreelancerFormData({ ...freelancerFormData, specialization: e.target.value })}
                   />
@@ -216,8 +311,19 @@ export default function FreelancersTab({
                   <input
                     type="number"
                     className="form-control"
+                    placeholder="e.g. 2500"
                     value={freelancerFormData.rate_per_video}
                     onChange={e => setFreelancerFormData({ ...freelancerFormData, rate_per_video: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Videos Paid For</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="form-control"
+                    value={freelancerFormData.videos_paid}
+                    onChange={e => setFreelancerFormData({ ...freelancerFormData, videos_paid: e.target.value })}
                   />
                 </div>
               </div>
