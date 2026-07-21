@@ -2419,84 +2419,31 @@ export default function ClientPortal({ showToast }) {
                 'Not Booked': leads.filter(l => l.appointment_status === 'Not Booked').length,
               };
 
+              const qualCounts = {
+                all: leads.length,
+                Pending: leads.filter(l => (l.qualification_status || 'Pending') === 'Pending').length,
+                Qualified: leads.filter(l => l.qualification_status === 'Qualified').length,
+                Disqualified: leads.filter(l => l.qualification_status === 'Disqualified').length,
+              };
+
               return (
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', margin: '0 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>Captured Leads Log</h3>
-                  
-                  {/* Filters & Appointment Selector Toolbar */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-                    {/* Appointment Status Quick Selector Pills */}
-                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                      {[
-                        { key: 'all', label: `All Leads (${apptCounts.all})` },
-                        { key: 'Booked', label: `📅 Booked (${apptCounts.Booked})` },
-                        { key: 'Follow Up', label: `📞 Follow Up (${apptCounts['Follow Up']})` },
-                        { key: 'Not Booked', label: `🚫 Not Booked (${apptCounts['Not Booked']})` }
-                      ].map(pill => (
-                        <button
-                          key={pill.key}
-                          onClick={() => { setAppointmentFilter(pill.key); setLeadsPage(1); }}
-                          className={`portal-month-tab ${appointmentFilter === pill.key ? 'active' : ''}`}
-                          style={{
-                            padding: '8px 14px',
-                            fontSize: '0.8rem',
-                            fontWeight: 800,
-                            border: '2px solid #000000',
-                            borderRadius: '9999px',
-                            cursor: 'pointer',
-                            background: appointmentFilter === pill.key ? '#000000' : '#ffffff',
-                            color: appointmentFilter === pill.key ? '#ffffff' : '#000000',
-                            boxShadow: appointmentFilter === pill.key ? 'none' : '2px 2px 0px #000000'
-                          }}
-                        >
-                          {pill.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Search & Qualification Dropdown Bar */}
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        className="portal-control"
-                        placeholder="Search by name, phone, email, campaign..."
-                        value={leadSearchQuery}
-                        onChange={(e) => { setLeadSearchQuery(e.target.value); setLeadsPage(1); }}
-                        style={{ flex: '1 1 240px', padding: '8px 14px', fontSize: '0.85rem' }}
-                      />
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                          Qualification:
-                        </label>
-                        <select
-                          className="portal-select"
-                          value={qualificationFilter}
-                          onChange={(e) => { setQualificationFilter(e.target.value); setLeadsPage(1); }}
-                          style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: 800 }}
-                        >
-                          <option value="all">All Qualifications</option>
-                          <option value="Pending">⌛ Pending</option>
-                          <option value="Qualified">✅ Qualified</option>
-                          <option value="Disqualified">❌ Disqualified</option>
-                        </select>
-                      </div>
-
-                      {(appointmentFilter !== 'all' || qualificationFilter !== 'all' || leadSearchQuery !== '') && (
-                        <button
-                          onClick={() => {
-                            setAppointmentFilter('all');
-                            setQualificationFilter('all');
-                            setLeadSearchQuery('');
-                            setLeadsPage(1);
-                          }}
-                          className="portal-btn"
-                          style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: 800 }}
-                        >
-                          Reset Filters
-                        </button>
-                      )}
-                    </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h3 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'uppercase', fontWeight: 800 }}>Captured Leads Log</h3>
+                    {(appointmentFilter !== 'all' || qualificationFilter !== 'all' || leadSearchQuery !== '') && (
+                      <button
+                        onClick={() => {
+                          setAppointmentFilter('all');
+                          setQualificationFilter('all');
+                          setLeadSearchQuery('');
+                          setLeadsPage(1);
+                        }}
+                        className="portal-btn"
+                        style={{ padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800 }}
+                      >
+                        Reset Filters
+                      </button>
+                    )}
                   </div>
 
                   {leads.length === 0 ? (
@@ -2522,13 +2469,83 @@ export default function ClientPortal({ showToast }) {
                         <table className="portal-table">
                           <thead>
                             <tr>
-                              <th>Lead Info</th>
-                              <th>Source / Campaign</th>
-                              <th>Captured Date</th>
-                              <th>Called?</th>
-                              <th>Qualification</th>
-                              <th>Appointment</th>
-                              <th>Rejection Reason</th>
+                              <th style={{ verticalAlign: 'top', minWidth: '150px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <span>Lead Info</span>
+                                  <input
+                                    type="text"
+                                    className="portal-control"
+                                    placeholder="Filter info..."
+                                    value={leadSearchQuery}
+                                    onChange={(e) => { setLeadSearchQuery(e.target.value); setLeadsPage(1); }}
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      background: leadSearchQuery ? '#fffbe6' : '#ffffff',
+                                      border: '2px solid #000000',
+                                      borderRadius: '4px',
+                                      textTransform: 'none'
+                                    }}
+                                  />
+                                </div>
+                              </th>
+                              <th style={{ verticalAlign: 'top' }}>Source / Campaign</th>
+                              <th style={{ verticalAlign: 'top' }}>Captured Date</th>
+                              <th style={{ verticalAlign: 'top' }}>Called?</th>
+                              <th style={{ verticalAlign: 'top', minWidth: '150px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <span>Qualification</span>
+                                  <select
+                                    value={qualificationFilter}
+                                    onChange={(e) => { setQualificationFilter(e.target.value); setLeadsPage(1); }}
+                                    className="portal-select"
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '800',
+                                      background: qualificationFilter !== 'all' ? '#10b981' : '#ffffff',
+                                      color: qualificationFilter !== 'all' ? '#ffffff' : '#000000',
+                                      border: '2px solid #000000',
+                                      borderRadius: '4px',
+                                      textTransform: 'none',
+                                      boxShadow: 'none'
+                                    }}
+                                  >
+                                    <option value="all" style={{ background: '#ffffff', color: '#000000' }}>All Qualifications</option>
+                                    <option value="Pending" style={{ background: '#ffffff', color: '#000000' }}>⌛ Pending ({qualCounts.Pending})</option>
+                                    <option value="Qualified" style={{ background: '#ffffff', color: '#000000' }}>✅ Qualified ({qualCounts.Qualified})</option>
+                                    <option value="Disqualified" style={{ background: '#ffffff', color: '#000000' }}>❌ Disqualified ({qualCounts.Disqualified})</option>
+                                  </select>
+                                </div>
+                              </th>
+                              <th style={{ verticalAlign: 'top', minWidth: '160px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  <span>Appointment</span>
+                                  <select
+                                    value={appointmentFilter}
+                                    onChange={(e) => { setAppointmentFilter(e.target.value); setLeadsPage(1); }}
+                                    className="portal-select"
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '800',
+                                      background: appointmentFilter !== 'all' ? '#3b82f6' : '#ffffff',
+                                      color: appointmentFilter !== 'all' ? '#ffffff' : '#000000',
+                                      border: '2px solid #000000',
+                                      borderRadius: '4px',
+                                      textTransform: 'none',
+                                      boxShadow: 'none'
+                                    }}
+                                  >
+                                    <option value="all" style={{ background: '#ffffff', color: '#000000' }}>All Appointments</option>
+                                    <option value="Booked" style={{ background: '#ffffff', color: '#000000' }}>📅 Booked ({apptCounts.Booked})</option>
+                                    <option value="Follow Up" style={{ background: '#ffffff', color: '#000000' }}>📞 Follow Up ({apptCounts['Follow Up']})</option>
+                                    <option value="Not Booked" style={{ background: '#ffffff', color: '#000000' }}>🚫 Not Booked ({apptCounts['Not Booked']})</option>
+                                  </select>
+                                </div>
+                              </th>
+                              <th style={{ verticalAlign: 'top' }}>Rejection Reason</th>
                             </tr>
                           </thead>
                           <tbody>
