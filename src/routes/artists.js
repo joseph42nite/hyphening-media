@@ -79,7 +79,7 @@ function recalculateRollups(artistId) {
 /**
  * GET /api/artists
  */
-router.get('/', authorize('admin'), (req, res) => {
+router.get('/', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const { category, city, is_active } = req.query;
     let query = 'SELECT * FROM artists WHERE 1=1';
@@ -108,7 +108,7 @@ router.get('/', authorize('admin'), (req, res) => {
 /**
  * POST /api/artists
  */
-router.post('/', authorize('admin'), (req, res) => {
+router.post('/', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const { name, category, city, phone, email, telegram_chat_id, bank_details,
             instruments, insta_link, description, rating, notes } = req.body;
@@ -152,7 +152,7 @@ router.post('/', authorize('admin'), (req, res) => {
 /**
  * PATCH /api/artists/:id
  */
-router.patch('/:id', authorize('admin'), (req, res) => {
+router.patch('/:id', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const artist = db.prepare('SELECT * FROM artists WHERE id = ?').get(req.params.id);
     if (!artist) return res.status(404).json({ error: 'Artist not found' });
@@ -238,7 +238,7 @@ router.get('/:id/bank', authorize(), (req, res) => {
 // VENUES
 // =========================================
 
-router.get('/venues', authorize('admin'), (req, res) => {
+router.get('/venues', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const venues = db.prepare(`
       SELECT v.*, c.name as client_name
@@ -253,7 +253,7 @@ router.get('/venues', authorize('admin'), (req, res) => {
   }
 });
 
-router.post('/venues', authorize('admin'), (req, res) => {
+router.post('/venues', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const { name, address, city, map_link, poc_name, poc_phone, poc_email, social_links, gig_confirmed_message, client_id } = req.body;
     if (!name) return res.status(400).json({ error: 'Venue name is required' });
@@ -288,7 +288,7 @@ router.post('/venues', authorize('admin'), (req, res) => {
   }
 });
 
-router.patch('/venues/:id', authorize('admin'), (req, res) => {
+router.patch('/venues/:id', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(req.params.id);
     if (!venue) return res.status(404).json({ error: 'Venue not found' });
@@ -329,7 +329,7 @@ router.patch('/venues/:id', authorize('admin'), (req, res) => {
 /**
  * GET /api/artists/gigs — list all gigs with joined artist/venue names
  */
-router.get('/gigs', authorize('admin'), (req, res) => {
+router.get('/gigs', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const gigs = db.prepare(`
       SELECT g.*, a.name as artist_name, a.artist_id as artist_code,
@@ -349,7 +349,7 @@ router.get('/gigs', authorize('admin'), (req, res) => {
 /**
  * POST /api/artists/gigs — create a new gig and recalculate rollups
  */
-router.post('/gigs', authorize('admin'), (req, res) => {
+router.post('/gigs', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const { artist_id, venue_id, gig_date, fee_inr, advance_paid, status, swiggy_link, zomato_link } = req.body;
     if (!artist_id || !gig_date) return res.status(400).json({ error: 'artist_id and gig_date are required' });
@@ -397,7 +397,7 @@ router.post('/gigs', authorize('admin'), (req, res) => {
   }
 });
 
-router.patch('/gigs/:id', authorize('admin'), (req, res) => {
+router.patch('/gigs/:id', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const gig = db.prepare('SELECT * FROM gig_status WHERE id = ?').get(req.params.id);
     if (!gig) return res.status(404).json({ error: 'Gig not found' });
@@ -451,7 +451,7 @@ router.patch('/gigs/:id', authorize('admin'), (req, res) => {
 /**
  * DELETE /api/artists/gigs/:id — delete a gig and recalculate rollups
  */
-router.delete('/gigs/:id', authorize('admin'), (req, res) => {
+router.delete('/gigs/:id', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
     const gig = db.prepare('SELECT * FROM gig_status WHERE id = ?').get(req.params.id);
     if (!gig) return res.status(404).json({ error: 'Gig not found' });

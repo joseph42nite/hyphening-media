@@ -14,6 +14,7 @@ export default function ArtistCurationTab({
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSuperAdmin = auth?.role === 'super_admin';
+  const isSMM = auth?.role === 'ops_social_media_manager';
 
   // Pagination states
   const [gigsPage, setGigsPage] = useState(1);
@@ -255,7 +256,7 @@ export default function ArtistCurationTab({
     }
   };
 
-  if (!isAdmin) return null;
+  if (!isAdmin && !isSMM) return null;
 
   return (
     <div style={{ textAlign: 'left' }}>

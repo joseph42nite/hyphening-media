@@ -335,7 +335,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     fetchStaffUsers();
     fetchClients();
     fetchFreelancers();
-    if (isAdmin) {
+    if (isAdmin || isSMM) {
       fetchCurationData();
     }
     if (isAdmin || isSMM) {
@@ -1082,7 +1082,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         </button>
 
         {/* 6. Artist Curation */}
-        {isAdmin && (
+        {(isAdmin || isSMM) && (
           <button onClick={() => setActiveTab('curation')} className={`btn ${activeTab === 'curation' ? 'btn-primary' : 'btn-secondary'}`}>
             <Calendar size={16} /> Artist Curation
           </button>
