@@ -334,8 +334,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     fetchTasks();
     fetchStaffUsers();
     fetchClients();
+    fetchFreelancers();
     if (isAdmin) {
-      fetchFreelancers();
       fetchCurationData();
     }
     if (isAdmin || isSMM) {
@@ -1220,6 +1220,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             formatDateStr={formatDateStr}
             marketingScripts={marketingScripts}
             staffUsers={staffUsers}
+            freelancers={freelancers}
           />
         )}
 
@@ -1293,6 +1294,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           clients={clients}
           staffUsers={staffUsers}
           marketingScripts={marketingScripts}
+          freelancers={freelancers}
         />
       )}
 

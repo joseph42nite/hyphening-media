@@ -9,7 +9,8 @@ export default function ContentModal({
   handleContentSubmit,
   clients,
   staffUsers,
-  marketingScripts
+  marketingScripts,
+  freelancers = []
 }) {
   if (!showContentModal) return null;
 
@@ -77,7 +78,7 @@ export default function ContentModal({
                   const newType = e.target.value;
                   let updatedAssignedTo = contentFormData.assigned_to;
                   if (['Reel', 'Youtube', 'Short'].includes(newType)) {
-                    const videoEditor = staffUsers.find(u => u.role === 'ops_video_editor');
+                    const videoEditor = (staffUsers || []).find(u => u.role === 'ops_video_editor');
                     if (videoEditor) {
                       updatedAssignedTo = String(videoEditor.id);
                     }
@@ -184,8 +185,8 @@ export default function ContentModal({
                 {(() => {
                   const selectedMonth = scriptFilterDate ? scriptFilterDate.slice(0, 7) : '';
                   const filteredScripts = selectedMonth
-                    ? marketingScripts.filter(s => s.month === selectedMonth)
-                    : marketingScripts;
+                    ? (marketingScripts || []).filter(s => s.month === selectedMonth)
+                    : (marketingScripts || []);
 
                   return filteredScripts.map(s => (
                     <option key={s.id} value={s.id}>
@@ -194,14 +195,14 @@ export default function ContentModal({
                   ));
                 })()}
               </select>
-              {marketingScripts.length === 0 ? (
+              {(marketingScripts || []).length === 0 ? (
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                   No scripts found. Create one in the Script Tracker tab.
                 </span>
               ) : (
                 (() => {
                   const selectedMonth = scriptFilterDate ? scriptFilterDate.slice(0, 7) : '';
-                  const filtered = selectedMonth ? marketingScripts.filter(s => s.month === selectedMonth) : marketingScripts;
+                  const filtered = selectedMonth ? (marketingScripts || []).filter(s => s.month === selectedMonth) : (marketingScripts || []);
                   if (filtered.length === 0 && selectedMonth) {
                     return (
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-warning)' }}>
@@ -226,7 +227,7 @@ export default function ContentModal({
           </div>
 
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div className="form-group">
               <label className="form-label">Time</label>
               <input
@@ -245,9 +246,24 @@ export default function ContentModal({
                 onChange={e => setContentFormData({ ...contentFormData, assigned_to: e.target.value })}
               >
                 <option value="">Select Staff</option>
-                {staffUsers.map(u => (
+                {(staffUsers || []).map(u => (
                   <option key={u.id} value={u.id}>
                     {u.name} ({u.role.replace('ops_', '').replace('_', ' ')})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Freelancer</label>
+              <select
+                className="form-control"
+                value={contentFormData.freelancer_id || ''}
+                onChange={e => setContentFormData({ ...contentFormData, freelancer_id: e.target.value })}
+              >
+                <option value="">Select Freelancer</option>
+                {(freelancers || []).map(f => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} {f.specialization ? `(${f.specialization})` : ''}
                   </option>
                 ))}
               </select>

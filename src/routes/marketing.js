@@ -31,11 +31,13 @@ router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manage
     const { is_tracked, platform, status } = req.query;
     let query = `
       SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
-             u.name AS assignee_name
+             u.name AS assignee_name,
+             f.name AS freelancer_name
       FROM marketing_content_tracker t
       LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
       LEFT JOIN marketing_scripts s ON r.script_id = s.id
       LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN freelancers f ON t.freelancer_id = f.id
       WHERE t.client_id = ?
     `;
     const params = [req.params.id];
@@ -81,7 +83,7 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       script_id,
       facebook_post_id, instagram_media_id, youtube_video_id, linkedin_post_id,
       instagram_link, youtube_link, facebook_link, linkedin_link,
-      assigned_to
+      assigned_to, freelancer_id
     } = req.body;
 
     let finalTitle = title;
@@ -140,9 +142,9 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
         views, likes, comments, shares, saves, avg_watch_time_pct, boosted, follows,
         youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr,
         engagement_rate_pct, save_rate_pct, content_score,
-        facebook_post_id, instagram_media_id, youtube_video_id, linkedin_post_id, assigned_to,
+        facebook_post_id, instagram_media_id, youtube_video_id, linkedin_post_id, assigned_to, freelancer_id,
         instagram_link, youtube_link, facebook_link, linkedin_link
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       clientId,
       platform || null,
@@ -176,6 +178,7 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       extractedIds.youtube_video_id,
       extractedIds.linkedin_post_id,
       finalAssignedTo,
+      freelancer_id || null,
       instagram_link || null,
       youtube_link || null,
       facebook_link || null,
@@ -203,11 +206,13 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
 
     const createdRow = db.prepare(`
       SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
-             u.name AS assignee_name
+             u.name AS assignee_name,
+             f.name AS freelancer_name
       FROM marketing_content_tracker t
       LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
       LEFT JOIN marketing_scripts s ON r.script_id = s.id
       LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN freelancers f ON t.freelancer_id = f.id
       WHERE t.id = ?
     `).get(result.lastInsertRowid);
 
@@ -233,11 +238,13 @@ router.get('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_m
 
     const row = db.prepare(`
       SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
-             u.name AS assignee_name
+             u.name AS assignee_name,
+             f.name AS freelancer_name
       FROM marketing_content_tracker t
       LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
       LEFT JOIN marketing_scripts s ON r.script_id = s.id
       LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN freelancers f ON t.freelancer_id = f.id
       WHERE t.client_id = ? AND t.id = ?
     `).get(req.params.id, req.params.contentId);
 
@@ -268,7 +275,7 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       'boosted', 'metric_override',
       'link', 'time', 'caption', 'follows',
       'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr',
-      'facebook_post_id', 'instagram_media_id', 'youtube_video_id', 'linkedin_post_id', 'assigned_to',
+      'facebook_post_id', 'instagram_media_id', 'youtube_video_id', 'linkedin_post_id', 'assigned_to', 'freelancer_id',
       'instagram_link', 'youtube_link', 'facebook_link', 'linkedin_link'
     ];
 

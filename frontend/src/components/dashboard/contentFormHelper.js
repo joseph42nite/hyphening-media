@@ -34,7 +34,8 @@ export const CONTENT_FORM_DEFAULTS = {
   youtube_link: '',
   facebook_link: '',
   linkedin_link: '',
-  assigned_to: ''
+  assigned_to: '',
+  freelancer_id: ''
 };
 
 export function buildContentPayload(formData) {
@@ -69,7 +70,8 @@ export function buildContentPayload(formData) {
     youtube_link: formData.youtube_link || null,
     facebook_link: formData.facebook_link || null,
     linkedin_link: formData.linkedin_link || null,
-    assigned_to: formData.assigned_to !== '' ? parseInt(formData.assigned_to) : null
+    assigned_to: formData.assigned_to !== '' ? parseInt(formData.assigned_to) : null,
+    freelancer_id: formData.freelancer_id !== '' ? parseInt(formData.freelancer_id) : null
   };
 }
 
@@ -106,6 +108,7 @@ export function buildContentFormState(content) {
     youtube_link: content.youtube_link || '',
     facebook_link: content.facebook_link || '',
     linkedin_link: content.linkedin_link || '',
-    assigned_to: content.assigned_to !== null && content.assigned_to !== undefined ? String(content.assigned_to) : ''
+    assigned_to: content.assigned_to !== null && content.assigned_to !== undefined ? String(content.assigned_to) : '',
+    freelancer_id: content.freelancer_id !== null && content.freelancer_id !== undefined ? String(content.freelancer_id) : ''
   };
 }

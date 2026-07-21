@@ -15,7 +15,7 @@ router.use(authenticate);
 /**
  * GET /api/freelancers
  */
-router.get('/', authorize('admin', 'ops_video_editor'), (req, res) => {
+router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
   try {
     const { is_active, specialization } = req.query;
     let query = 'SELECT * FROM freelancers WHERE 1=1';
@@ -41,7 +41,7 @@ router.get('/', authorize('admin', 'ops_video_editor'), (req, res) => {
 /**
  * GET /api/freelancers/:id
  */
-router.get('/:id', authorize('admin', 'ops_video_editor'), (req, res) => {
+router.get('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
   try {
     const freelancer = db.prepare('SELECT * FROM freelancers WHERE id = ?').get(req.params.id);
     if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });

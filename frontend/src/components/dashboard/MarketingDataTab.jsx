@@ -18,7 +18,8 @@ export default function MarketingDataTab({
   setSelectedClientForReports,
   formatDateStr,
   marketingScripts,
-  staffUsers
+  staffUsers,
+  freelancers = []
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSMM = auth?.role === 'ops_social_media_manager';
@@ -331,7 +332,14 @@ export default function MarketingDataTab({
                           <option value="Posted" style={{ color: '#065f46', background: '#d1fae5', fontWeight: '800' }}>Posted</option>
                         </select>
                       </td>
-                      <td>{item.assignee_name || '-'}</td>
+                      <td>
+                        {item.assignee_name || '-'}
+                        {item.freelancer_name && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '500' }}>
+                            🎨 {item.freelancer_name}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {item.link && (
@@ -575,6 +583,7 @@ export default function MarketingDataTab({
         clients={clients}
         staffUsers={staffUsers}
         marketingScripts={marketingScripts}
+        freelancers={freelancers}
       />
 
       {/* Monthly Report Modal */}
