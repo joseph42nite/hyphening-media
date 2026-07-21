@@ -292,6 +292,85 @@ router.get('/:token/leads', portalAuth, (req, res) => {
 });
 
 /**
+ * POST /api/portal/:token/leads
+ * Add a new lead manually from the Client Portal.
+ */
+router.post('/:token/leads', portalAuth, (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      platform,
+      source,
+      campaign_name,
+      qualification_status,
+      call_outcome,
+      appointment_status,
+      appointment_date,
+      rejection_reason
+    } = req.body;
+
+    if (!name || !name.trim() || !phone || !phone.trim()) {
+      return res.status(400).json({ error: 'Name and Phone are required fields' });
+    }
+
+    const cleanPlatform = ['YouTube', 'Meta', 'Google', 'Other'].includes(platform) ? platform : 'Other';
+    const cleanSource = ['form', 'call'].includes(source) ? source : 'form';
+    const cleanQual = ['Pending', 'Qualified', 'Disqualified'].includes(qualification_status) ? qualification_status : 'Pending';
+    const cleanCall = ['Pending', 'Picked Up', 'No Answer', 'Other'].includes(call_outcome) ? call_outcome : 'Pending';
+    const cleanAppt = ['Follow Up', 'Booked', 'Not Booked'].includes(appointment_status) ? appointment_status : 'Follow Up';
+
+    let calculatedLeadStatus = 'Pending';
+    if (cleanQual === 'Disqualified') {
+      calculatedLeadStatus = 'Rejected';
+    } else if (cleanAppt === 'Booked') {
+      calculatedLeadStatus = 'Appointment Booked';
+    } else if (cleanQual === 'Qualified') {
+      calculatedLeadStatus = 'Qualified';
+    }
+
+    const now = new Date().toISOString();
+
+    const result = db.prepare(`
+      INSERT INTO campaign_leads (
+        client_id, name, email, phone, platform, source, campaign_name,
+        qualification_status, call_outcome, appointment_status, appointment_date,
+        rejection_reason, lead_status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      req.portalClient.id,
+      name.trim(),
+      email && email.trim() ? email.trim() : null,
+      phone.trim(),
+      cleanPlatform,
+      cleanSource,
+      campaign_name && campaign_name.trim() ? campaign_name.trim() : 'Manual Entry',
+      cleanQual,
+      cleanCall,
+      cleanAppt,
+      cleanAppt === 'Booked' ? (appointment_date || null) : null,
+      (cleanQual === 'Disqualified' || cleanAppt === 'Not Booked') ? (rejection_reason || null) : null,
+      calculatedLeadStatus,
+      now,
+      now
+    );
+
+    if (req.portalClient.lead_alerts_enabled) {
+      const alertMsg = `🔔 *New Lead Manually Added!*\n\n*Client:* ${req.portalClient.name}\n*Lead Name:* ${name.trim()}\n*Phone:* ${phone.trim()}\n*Platform:* ${cleanPlatform}\n*Source:* Manual Entry`;
+      notifyAdmin(alertMsg);
+    }
+
+    const newLead = db.prepare('SELECT * FROM campaign_leads WHERE id = ?').get(result.lastInsertRowid);
+
+    res.status(201).json({ success: true, lead: newLead });
+  } catch (err) {
+    console.error('[PORTAL] Manual lead creation error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/portal/:token/leads/:leadId/status
  * Update progressive qualification, call, and appointment status for a lead.
  */

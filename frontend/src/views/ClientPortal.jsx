@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink,
-  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff
+  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus
 } from 'lucide-react';
 
 import { API_BASE } from '../api.js';
@@ -741,6 +741,23 @@ export default function ClientPortal({ showToast }) {
   const [rejectionReasons, setRejectionReasons] = useState({});
   const [leadsLoading, setLeadsLoading] = useState(false);
 
+  // Add Lead Modal state
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [submittingLead, setSubmittingLead] = useState(false);
+  const [newLeadData, setNewLeadData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    platform: 'Meta',
+    source: 'form',
+    campaign_name: 'Manual Entry',
+    qualification_status: 'Pending',
+    call_outcome: 'Pending',
+    appointment_status: 'Follow Up',
+    appointment_date: '',
+    rejection_reason: ''
+  });
+
   // Pagination states
   const [contentPage, setContentPage] = useState(1);
   const [seoPage, setSeoPage] = useState(1);
@@ -1073,6 +1090,55 @@ export default function ClientPortal({ showToast }) {
       }
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  };
+
+  const handleAddManualLead = async (e) => {
+    e.preventDefault();
+    if (!newLeadData.name.trim() || !newLeadData.phone.trim()) {
+      showToast('Name and Phone are required fields', 'error');
+      return;
+    }
+
+    setSubmittingLead(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLeadData),
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add lead');
+      }
+
+      showToast('Lead added successfully!', 'success');
+      setShowAddLeadModal(false);
+      setNewLeadData({
+        name: '',
+        phone: '',
+        email: '',
+        platform: 'Meta',
+        source: 'form',
+        campaign_name: 'Manual Entry',
+        qualification_status: 'Pending',
+        call_outcome: 'Pending',
+        appointment_status: 'Follow Up',
+        appointment_date: '',
+        rejection_reason: ''
+      });
+
+      if (data.lead) {
+        setLeads(prev => [data.lead, ...prev]);
+      } else {
+        fetchData();
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSubmittingLead(false);
     }
   };
 
@@ -2302,14 +2368,23 @@ export default function ClientPortal({ showToast }) {
                   Review leads captured from forms and calls. Confirm booking appointments or record rejection details.
                 </p>
               </div>
-              <button 
-                onClick={() => { fetchData(); showToast('Refreshing leads list...', 'info'); }}
-                className="portal-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
-                disabled={leadsLoading}
-              >
-                <RefreshCw size={14} className={leadsLoading ? 'spin' : ''} /> Refresh Leads
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={() => setShowAddLeadModal(true)}
+                  className="portal-btn portal-btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                >
+                  <UserPlus size={16} /> Add Lead Manually
+                </button>
+                <button 
+                  onClick={() => { fetchData(); showToast('Refreshing leads list...', 'info'); }}
+                  className="portal-btn"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                  disabled={leadsLoading}
+                >
+                  <RefreshCw size={14} className={leadsLoading ? 'spin' : ''} /> Refresh Leads
+                </button>
+              </div>
             </div>
 
             {/* Leads Table Container */}
@@ -2488,6 +2563,223 @@ export default function ClientPortal({ showToast }) {
               )}
             </div>
 
+          </div>
+        )}
+
+        {/* Add Lead Modal */}
+        {showAddLeadModal && (
+          <div className="portal-modal-overlay">
+            <div 
+              className="portal-bento-card" 
+              style={{ 
+                width: '100%', 
+                maxWidth: '560px', 
+                maxHeight: '90vh', 
+                overflowY: 'auto',
+                padding: '28px', 
+                margin: 0,
+                boxShadow: 'var(--shadow-lg)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #000000', paddingBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'inline-flex', padding: '8px', background: '#000000', color: '#ffffff', borderRadius: '8px' }}>
+                    <UserPlus size={20} />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', textTransform: 'uppercase', fontWeight: 800 }}>
+                    Add Lead Manually
+                  </h3>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setShowAddLeadModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddManualLead} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Name & Phone */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Full Name *</label>
+                    <input 
+                      type="text" 
+                      className="portal-control"
+                      placeholder="e.g. John Doe"
+                      value={newLeadData.name}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, name: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Phone Number *</label>
+                    <input 
+                      type="tel" 
+                      className="portal-control"
+                      placeholder="e.g. +91 9876543210"
+                      value={newLeadData.phone}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, phone: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Email & Campaign Name */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Email Address</label>
+                    <input 
+                      type="email" 
+                      className="portal-control"
+                      placeholder="e.g. john@example.com"
+                      value={newLeadData.email}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Campaign / Source Tag</label>
+                    <input 
+                      type="text" 
+                      className="portal-control"
+                      placeholder="e.g. Walk-in, Referral, Offline"
+                      value={newLeadData.campaign_name}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, campaign_name: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Platform & Source */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Platform</label>
+                    <select 
+                      className="portal-select"
+                      style={{ width: '100%', padding: '12px 14px' }}
+                      value={newLeadData.platform}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, platform: e.target.value }))}
+                    >
+                      <option value="Meta">Meta (FB / IG)</option>
+                      <option value="Google">Google</option>
+                      <option value="YouTube">YouTube</option>
+                      <option value="Other">Other / Direct</option>
+                    </select>
+                  </div>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Lead Type</label>
+                    <select 
+                      className="portal-select"
+                      style={{ width: '100%', padding: '12px 14px' }}
+                      value={newLeadData.source}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, source: e.target.value }))}
+                    >
+                      <option value="form">📝 Form Entry</option>
+                      <option value="call">📞 Phone Call</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Qualification & Call Outcome */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Qualification Status</label>
+                    <select 
+                      className="portal-select"
+                      style={{ width: '100%', padding: '12px 14px' }}
+                      value={newLeadData.qualification_status}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, qualification_status: e.target.value }))}
+                    >
+                      <option value="Pending">⌛ Pending</option>
+                      <option value="Qualified">✅ Qualified</option>
+                      <option value="Disqualified">❌ Disqualified</option>
+                    </select>
+                  </div>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Call Outcome</label>
+                    <select 
+                      className="portal-select"
+                      style={{ width: '100%', padding: '12px 14px' }}
+                      value={newLeadData.call_outcome}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, call_outcome: e.target.value }))}
+                    >
+                      <option value="Pending">⌛ Pending</option>
+                      <option value="Picked Up">📞 Picked Up</option>
+                      <option value="No Answer">🔇 No Answer</option>
+                      <option value="Other">❓ Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Appointment Status */}
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Appointment Status</label>
+                  <select 
+                    className="portal-select"
+                    style={{ width: '100%', padding: '12px 14px' }}
+                    value={newLeadData.appointment_status}
+                    onChange={(e) => setNewLeadData(prev => ({ ...prev, appointment_status: e.target.value }))}
+                  >
+                    <option value="Follow Up">📞 Follow Up</option>
+                    <option value="Booked">📅 Booked</option>
+                    <option value="Not Booked">🚫 Not Booked</option>
+                  </select>
+                </div>
+
+                {/* Conditional Appointment Date */}
+                {newLeadData.appointment_status === 'Booked' && (
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Appointment Date & Time</label>
+                    <input 
+                      type="datetime-local" 
+                      className="portal-control"
+                      value={newLeadData.appointment_date}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, appointment_date: e.target.value }))}
+                    />
+                  </div>
+                )}
+
+                {/* Conditional Rejection Reason */}
+                {(newLeadData.qualification_status === 'Disqualified' || newLeadData.appointment_status === 'Not Booked') && (
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Rejection / Disqualification Reason</label>
+                    <select 
+                      className="portal-select"
+                      style={{ width: '100%', padding: '12px 14px' }}
+                      value={newLeadData.rejection_reason || 'Out of Budget'}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, rejection_reason: e.target.value }))}
+                    >
+                      <option value="Out of Budget">💰 Out of Budget</option>
+                      <option value="Not Interested">🙅 Not Interested</option>
+                      <option value="Wrong Number / Spam">🚫 Spam / Wrong No.</option>
+                      <option value="Location Issue">📍 Location Issue</option>
+                      <option value="Already Serviced">✅ Already Serviced</option>
+                      <option value="Other">📝 Other</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Submit & Cancel Buttons */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                  <button 
+                    type="button" 
+                    className="portal-btn"
+                    onClick={() => setShowAddLeadModal(false)}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="portal-btn portal-btn-primary"
+                    disabled={submittingLead}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    {submittingLead ? 'Adding...' : 'Save Lead'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
