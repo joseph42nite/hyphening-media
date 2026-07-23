@@ -50,28 +50,31 @@ export async function getConnectUrl(clientId, appName, redirectUrl = '') {
       console.warn(`[COMPOSIO] Could not list authConfigs for ${cleanApp}:`, e.message);
     }
 
-    // 2. Direct user link generation
+    // 2. Direct user link generation (passing allowMultiple: true to prevent SDK errors)
     if (authConfigId) {
       const link = await composioClient.connectedAccounts.link(entityId, authConfigId, {
+        allowMultiple: true,
         callbackUrl: redirectUrl || undefined
       });
       logQuotaUsage('INITIATE_CONNECTION', clientId);
       return link.redirectUrl || link.url;
     } else {
-      const connection = await composioClient.toolkits.authorize(entityId, cleanApp, redirectUrl || undefined);
+      const connection = await composioClient.toolkits.authorize(entityId, cleanApp, {
+        allowMultiple: true,
+        callbackUrl: redirectUrl || undefined
+      });
       logQuotaUsage('INITIATE_CONNECTION', clientId);
       return connection.redirectUrl || connection.url;
     }
   } catch (err) {
     console.error(`[COMPOSIO] Connect error for ${appName}:`, err.message);
-    return `https://app.composio.dev/connect/${cleanApp}?client_id=${clientId}&mock=true`;
+    throw new Error(`Failed to generate ${appName} connection link: ${err.message}`);
   }
 }
 
 /**
- * Fetch connected account statuses for a given client.
- * Searches by userId first, then falls back to listing all active accounts
- * since Composio may not always set userId on connections made via link flow.
+ * Fetch connected account statuses for a given client entity.
+ * Only returns active connections strictly associated with this client's entityId.
  */
 export async function getClientConnectedAccounts(clientId) {
   if (!composioClient) {
@@ -80,29 +83,12 @@ export async function getClientConnectedAccounts(clientId) {
 
   try {
     const entityId = getEntityId(clientId);
+    const result = await composioClient.connectedAccounts.list({
+      userIds: [entityId],
+      statuses: ['ACTIVE']
+    });
 
-    // Try fetching by userId first
-    let accounts;
-    try {
-      const result = await composioClient.connectedAccounts.list({ userIds: [entityId] });
-      accounts = result?.items || [];
-    } catch (e) {
-      console.warn(`[COMPOSIO] userId lookup failed for ${entityId}:`, e.message);
-      accounts = [];
-    }
-
-    // If no userId-linked accounts found, fetch all active and return them
-    // (for projects with a single client or newly connected accounts)
-    if (accounts.length === 0) {
-      try {
-        const allResult = await composioClient.connectedAccounts.list({
-          statuses: ['ACTIVE']
-        });
-        accounts = allResult?.items || [];
-      } catch (e) {
-        console.warn('[COMPOSIO] Fallback list failed:', e.message);
-      }
-    }
+    const accounts = result?.items || [];
 
     // Normalize: SDK v0.13 uses toolkit.slug instead of appName
     const normalized = accounts.map(acc => ({
@@ -120,25 +106,6 @@ export async function getClientConnectedAccounts(clientId) {
 }
 
 /**
- * Find the first ACTIVE connected account for a given toolkit slug.
- * Used by executeClientAction to find the right connection.
- */
-async function findActiveConnection(toolkitSlug) {
-  if (!composioClient) return null;
-  try {
-    const result = await composioClient.connectedAccounts.list({
-      statuses: ['ACTIVE']
-    });
-    return (result?.items || []).find(
-      a => (a.toolkit?.slug || '').toLowerCase() === toolkitSlug.toLowerCase()
-    );
-  } catch (e) {
-    console.warn(`[COMPOSIO] findActiveConnection error:`, e.message);
-    return null;
-  }
-}
-
-/**
  * Execute a platform action (e.g. upload video, post reel, reply comment)
  */
 export async function executeClientAction(clientId, actionName, params = {}) {
@@ -148,29 +115,13 @@ export async function executeClientAction(clientId, actionName, params = {}) {
 
   const entityId = getEntityId(clientId);
 
-  // Determine which toolkit this action belongs to
-  const toolkitSlug = actionName.toLowerCase().startsWith('youtube') ? 'youtube'
-    : actionName.toLowerCase().startsWith('instagram') ? 'instagram'
-    : actionName.toLowerCase().startsWith('facebook') ? 'facebook'
-    : null;
-
-  // Find the active connected account for this toolkit
-  let connectedAccountId;
-  if (toolkitSlug) {
-    const conn = await findActiveConnection(toolkitSlug);
-    if (conn) {
-      connectedAccountId = conn.id;
-    }
-  }
-
   try {
-    const executeParams = {
-      connectedAccountId,
+    const response = await composioClient.tools.execute(actionName, {
+      userId: entityId,
       entityId,
-      ...params
-    };
-
-    const response = await composioClient.tools.execute(actionName, executeParams);
+      arguments: params,
+      params
+    });
 
     logQuotaUsage(actionName, clientId);
     return response;
