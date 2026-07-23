@@ -39,16 +39,31 @@ export async function getConnectUrl(clientId, appName, redirectUrl = '') {
   const cleanApp = appName.toLowerCase();
 
   try {
-    const connection = await composioClient.toolkits.authorize(
-      entityId,
-      cleanApp,
-      redirectUrl || undefined
-    );
-    logQuotaUsage('INITIATE_CONNECTION', clientId);
-    return connection.redirectUrl || connection.url || `https://app.composio.dev/connect/${cleanApp}?client_id=${clientId}`;
+    // 1. Fetch auth configs for this toolkit
+    let authConfigId;
+    try {
+      const configs = await composioClient.authConfigs.list({ toolkit: cleanApp });
+      if (configs?.items && configs.items.length > 0) {
+        authConfigId = configs.items[0].id;
+      }
+    } catch (e) {
+      console.warn(`[COMPOSIO] Could not list authConfigs for ${cleanApp}:`, e.message);
+    }
+
+    // 2. Direct user link generation
+    if (authConfigId) {
+      const link = await composioClient.connectedAccounts.link(entityId, authConfigId, {
+        callbackUrl: redirectUrl || undefined
+      });
+      logQuotaUsage('INITIATE_CONNECTION', clientId);
+      return link.redirectUrl || link.url;
+    } else {
+      const connection = await composioClient.toolkits.authorize(entityId, cleanApp, redirectUrl || undefined);
+      logQuotaUsage('INITIATE_CONNECTION', clientId);
+      return connection.redirectUrl || connection.url;
+    }
   } catch (err) {
     console.error(`[COMPOSIO] Connect error for ${appName}:`, err.message);
-    // Return graceful OAuth link fallback on API key restriction / missing auth config
     return `https://app.composio.dev/connect/${cleanApp}?client_id=${clientId}&mock=true`;
   }
 }
