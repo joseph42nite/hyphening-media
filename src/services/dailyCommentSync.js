@@ -9,29 +9,37 @@ export async function runDailyCommentSync() {
   try {
     console.log('[COMMENT-SYNC] Running daily comment ingestion job...');
 
-    // Fetch recent posted items (last 30 days)
+    // Fetch posted items with media IDs or links
     const recentPosts = db.prepare(`
       SELECT t.*, c.composio_entity_id
       FROM marketing_content_tracker t
       JOIN crm_clients c ON t.client_id = c.id
       WHERE t.status = 'Posted'
-        AND (t.platform_post_id IS NOT NULL OR t.instagram_media_id IS NOT NULL OR t.youtube_video_id IS NOT NULL)
-        AND julianday('now') - julianday(t.date) <= 30
+        AND (t.link IS NOT NULL OR t.platform_post_id IS NOT NULL OR t.instagram_media_id IS NOT NULL OR t.youtube_video_id IS NOT NULL)
     `).all();
 
     if (!recentPosts || recentPosts.length === 0) return;
 
     for (const post of recentPosts) {
-      const postId = post.platform_post_id || post.instagram_media_id || post.youtube_video_id;
+      let postId = post.instagram_media_id || post.platform_post_id || post.youtube_video_id;
+      if (!postId && post.link) {
+        const igMatch = post.link.match(/instagram\.com\/(?:reel|p)\/([A-Za-z0-9_-]+)/);
+        if (igMatch) postId = igMatch[1];
+        const ytMatch = post.link.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]+)/);
+        if (!postId && ytMatch) postId = ytMatch[1];
+      }
+
+      if (!postId) continue;
+
       const platform = (post.platform || 'instagram').toLowerCase();
 
       if (process.env.COMPOSIO_API_KEY) {
         try {
-          const action = platform.includes('youtube') ? 'YOUTUBE_GET_COMMENTS' : 'INSTAGRAM_GET_MEDIA_COMMENTS';
-          const paramKey = platform.includes('youtube') ? 'video_id' : 'media_id';
+          const action = platform.includes('youtube') ? 'YOUTUBE_GET_COMMENTS' : 'INSTAGRAM_GET_IG_MEDIA_COMMENTS';
+          const paramKey = platform.includes('youtube') ? 'video_id' : 'ig_media_id';
 
           const res = await executeClientAction(post.client_id, action, { [paramKey]: postId });
-          const comments = res?.comments || res?.data || [];
+          const comments = res?.comments || res?.data?.data || res?.data || [];
 
           for (const comm of comments) {
             db.prepare(`

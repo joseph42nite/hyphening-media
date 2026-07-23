@@ -2,7 +2,10 @@ import { Composio } from '@composio/core';
 import db from '../../database.js';
 
 const composioApiKey = process.env.COMPOSIO_API_KEY || '';
-const composioClient = composioApiKey ? new Composio({ apiKey: composioApiKey }) : null;
+const composioClient = composioApiKey ? new Composio({ 
+  apiKey: composioApiKey,
+  dangerouslySkipVersionCheck: true 
+}) : null;
 
 /**
  * Format client entity ID for Composio
@@ -118,9 +121,8 @@ export async function executeClientAction(clientId, actionName, params = {}) {
   try {
     const response = await composioClient.tools.execute(actionName, {
       userId: entityId,
-      entityId,
       arguments: params,
-      params
+      dangerouslySkipVersionCheck: true
     });
 
     logQuotaUsage(actionName, clientId);
