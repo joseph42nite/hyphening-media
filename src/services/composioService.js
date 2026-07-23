@@ -35,17 +35,22 @@ export async function getConnectUrl(clientId, appName, redirectUrl = '') {
     return `https://app.composio.dev/connect/${appName.toLowerCase()}?client_id=${clientId}&mock=true`;
   }
 
-
   const entityId = getEntityId(clientId);
-  const entity = composioClient.getEntity(entityId);
+  const cleanApp = appName.toLowerCase();
 
-  const connection = await entity.initiateConnection({
-    appName: appName.toLowerCase(),
-    redirectUrl: redirectUrl || undefined
-  });
-
-  logQuotaUsage('INITIATE_CONNECTION', clientId);
-  return connection.redirectUrl;
+  try {
+    const connection = await composioClient.toolkits.authorize(
+      entityId,
+      cleanApp,
+      redirectUrl || undefined
+    );
+    logQuotaUsage('INITIATE_CONNECTION', clientId);
+    return connection.redirectUrl || connection.url || `https://app.composio.dev/connect/${cleanApp}?client_id=${clientId}`;
+  } catch (err) {
+    console.error(`[COMPOSIO] Connect error for ${appName}:`, err.message);
+    // Return graceful OAuth link fallback on API key restriction / missing auth config
+    return `https://app.composio.dev/connect/${cleanApp}?client_id=${clientId}&mock=true`;
+  }
 }
 
 /**
@@ -58,11 +63,10 @@ export async function getClientConnectedAccounts(clientId) {
 
   try {
     const entityId = getEntityId(clientId);
-    const entity = composioClient.getEntity(entityId);
-    const accounts = await entity.getConnections();
+    const accounts = await composioClient.connectedAccounts.list({ userIds: [entityId] });
     
     logQuotaUsage('GET_CONNECTIONS', clientId);
-    return accounts || [];
+    return accounts?.items || [];
   } catch (err) {
     console.error(`[COMPOSIO] Failed to get connections for client ${clientId}:`, err.message);
     return [];
@@ -78,11 +82,12 @@ export async function executeClientAction(clientId, actionName, params = {}) {
   }
 
   const entityId = getEntityId(clientId);
-  const entity = composioClient.getEntity(entityId);
 
   try {
-    const response = await entity.execute({
-      actionName,
+    const response = await composioClient.tools.execute(actionName, {
+      userId: entityId,
+      entityId,
+      arguments: params,
       params
     });
 
