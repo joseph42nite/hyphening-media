@@ -817,10 +817,14 @@ router.get('/:token/integrations/status', portalAuth, async (req, res) => {
         const isActive = (acc.status || '').toUpperCase() === 'ACTIVE';
         return isActive && name.includes(p);
       });
+      const accountHandle = match 
+        ? (match.alias || match.data?.username || `@${req.portalClient.name.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`)
+        : null;
+
       statusMap[p] = {
         connected: !!match,
         status: match ? 'Connected' : 'Not Connected',
-        accountName: match?.accountName || match?.alias || match?.wordId || null
+        accountName: accountHandle
       };
     });
 

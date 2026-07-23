@@ -94,7 +94,7 @@ export async function getClientConnectedAccounts(clientId) {
     const normalized = accounts.map(acc => ({
       ...acc,
       appName: acc.appName || acc.toolkit?.slug || 'unknown',
-      accountName: acc.alias || acc.wordId || null
+      accountName: acc.alias || acc.data?.username || null
     }));
 
     logQuotaUsage('GET_CONNECTIONS', clientId);
