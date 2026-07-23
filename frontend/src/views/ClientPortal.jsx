@@ -7,6 +7,14 @@ import {
 
 import { API_BASE } from '../api.js';
 
+const PRESET_REASON_OPTIONS = [
+  'Out of Budget',
+  'Not Interested',
+  'Wrong Number / Spam',
+  'Location Issue',
+  'Already Serviced'
+];
+
 const PORTAL_STYLES = `
 /* Neo-Brutalist Bento Design System for Client Portal */
 .client-portal-wrapper {
@@ -2667,25 +2675,61 @@ export default function ClientPortal({ showToast }) {
                                   </td>
                                   <td>
                                     {(lead.qualification_status === 'Disqualified' || lead.appointment_status === 'Not Booked') ? (
-                                      <select 
-                                        value={lead.rejection_reason || 'Out of Budget'}
-                                        onChange={(e) => handleUpdateLead(lead.id, { rejection_reason: e.target.value })}
-                                        className="portal-select"
-                                        style={{ 
-                                          borderWidth: '2px', 
-                                          borderColor: '#ef4444',
-                                          padding: '4px 8px',
-                                          fontSize: '0.8rem',
-                                          minWidth: '150px'
-                                        }}
-                                      >
-                                        <option value="Out of Budget">💰 Out of Budget</option>
-                                        <option value="Not Interested">🙅 Not Interested</option>
-                                        <option value="Wrong Number / Spam">🚫 Spam / Wrong No.</option>
-                                        <option value="Location Issue">📍 Location Issue</option>
-                                        <option value="Already Serviced">✅ Already Serviced</option>
-                                        <option value="Other">📝 Other</option>
-                                      </select>
+                                      (() => {
+                                        const isPreset = PRESET_REASON_OPTIONS.includes(lead.rejection_reason);
+                                        const selectVal = isPreset ? (lead.rejection_reason || 'Out of Budget') : 'Other';
+                                        const showTextInput = !isPreset || lead.rejection_reason === 'Other';
+                                        return (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '150px' }}>
+                                            <select 
+                                              value={selectVal}
+                                              onChange={(e) => handleUpdateLead(lead.id, { rejection_reason: e.target.value })}
+                                              className="portal-select"
+                                              style={{ 
+                                                borderWidth: '2px', 
+                                                borderColor: '#ef4444',
+                                                padding: '4px 8px',
+                                                fontSize: '0.8rem',
+                                                width: '100%'
+                                              }}
+                                            >
+                                              <option value="Out of Budget">💰 Out of Budget</option>
+                                              <option value="Not Interested">🙅 Not Interested</option>
+                                              <option value="Wrong Number / Spam">🚫 Spam / Wrong No.</option>
+                                              <option value="Location Issue">📍 Location Issue</option>
+                                              <option value="Already Serviced">✅ Already Serviced</option>
+                                              <option value="Other">📝 Other</option>
+                                            </select>
+                                            {showTextInput && (
+                                              <input 
+                                                type="text"
+                                                placeholder="Type reason..."
+                                                defaultValue={lead.rejection_reason && lead.rejection_reason !== 'Other' ? lead.rejection_reason : ''}
+                                                key={`rej-input-${lead.id}-${lead.rejection_reason}`}
+                                                onBlur={(e) => {
+                                                  const val = e.target.value.trim();
+                                                  if (val && val !== lead.rejection_reason) {
+                                                    handleUpdateLead(lead.id, { rejection_reason: val });
+                                                  }
+                                                }}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter') {
+                                                    e.target.blur();
+                                                  }
+                                                }}
+                                                className="portal-select"
+                                                style={{ 
+                                                  padding: '4px 6px',
+                                                  fontSize: '0.75rem',
+                                                  width: '100%',
+                                                  borderColor: '#ef4444',
+                                                  marginTop: '2px'
+                                                }}
+                                              />
+                                            )}
+                                          </div>
+                                        );
+                                      })()
                                     ) : (
                                       <span style={{ color: 'var(--text-muted)' }}>-</span>
                                     )}
@@ -2886,8 +2930,11 @@ export default function ClientPortal({ showToast }) {
                     <select 
                       className="portal-select"
                       style={{ width: '100%', padding: '12px 14px' }}
-                      value={newLeadData.rejection_reason || 'Out of Budget'}
-                      onChange={(e) => setNewLeadData(prev => ({ ...prev, rejection_reason: e.target.value }))}
+                      value={PRESET_REASON_OPTIONS.includes(newLeadData.rejection_reason) ? newLeadData.rejection_reason : 'Other'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewLeadData(prev => ({ ...prev, rejection_reason: val }));
+                      }}
                     >
                       <option value="Out of Budget">💰 Out of Budget</option>
                       <option value="Not Interested">🙅 Not Interested</option>
@@ -2896,6 +2943,19 @@ export default function ClientPortal({ showToast }) {
                       <option value="Already Serviced">✅ Already Serviced</option>
                       <option value="Other">📝 Other</option>
                     </select>
+                    {(!PRESET_REASON_OPTIONS.includes(newLeadData.rejection_reason) || newLeadData.rejection_reason === 'Other') && (
+                      <input 
+                        type="text"
+                        className="portal-control"
+                        style={{ marginTop: '8px' }}
+                        placeholder="Type custom rejection reason..."
+                        value={newLeadData.rejection_reason === 'Other' ? '' : (newLeadData.rejection_reason || '')}
+                        onChange={(e) => {
+                          const customVal = e.target.value;
+                          setNewLeadData(prev => ({ ...prev, rejection_reason: customVal || 'Other' }));
+                        }}
+                      />
+                    )}
                   </div>
                 )}
 
