@@ -740,6 +740,7 @@ export default function ClientPortal({ showToast }) {
   const [replyTextMap, setReplyTextMap] = useState({});
   const [replyingId, setReplyingId] = useState(null);
   const [connectingApp, setConnectingApp] = useState(null);
+  const [syncingComments, setSyncingComments] = useState(false);
 
   // Leads & Alerts settings
   const [leadAlertsEnabled, setLeadAlertsEnabled] = useState(true);
@@ -1204,6 +1205,26 @@ export default function ClientPortal({ showToast }) {
       showToast(err.message, 'error');
     } finally {
       setConnectingApp(null);
+    }
+  };
+
+  const handleSyncComments = async () => {
+    try {
+      setSyncingComments(true);
+      showToast('Syncing comments from Instagram...', 'info');
+      const res = await fetch(`${API_BASE}/api/portal/${token}/comments/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to sync comments');
+      showToast(`Synced ${data.synced} comments from ${data.postsChecked} posts`, 'success');
+      fetchComments();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSyncingComments(false);
     }
   };
 
@@ -2271,13 +2292,23 @@ export default function ClientPortal({ showToast }) {
                     Incoming comments across Instagram Reels & YouTube Shorts. Reply live directly from your client portal!
                   </p>
                 </div>
-                <button 
-                  onClick={fetchComments}
-                  className="portal-btn"
-                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                >
-                  Fetch Recent Comments
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={handleSyncComments}
+                    className="portal-btn portal-btn-primary"
+                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                    disabled={syncingComments}
+                  >
+                    {syncingComments ? '⏳ Syncing...' : '🔄 Sync from Instagram'}
+                  </button>
+                  <button 
+                    onClick={fetchComments}
+                    className="portal-btn"
+                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                  >
+                    Refresh
+                  </button>
+                </div>
               </div>
 
               {commentsLoading ? (

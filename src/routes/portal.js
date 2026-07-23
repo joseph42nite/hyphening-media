@@ -812,11 +812,15 @@ router.get('/:token/integrations/status', portalAuth, async (req, res) => {
     const statusMap = {};
 
     platforms.forEach(p => {
-      const match = accounts.find(acc => acc.appName.toLowerCase().includes(p));
+      const match = accounts.find(acc => {
+        const name = (acc.appName || acc.toolkit?.slug || '').toLowerCase();
+        const isActive = (acc.status || '').toUpperCase() === 'ACTIVE';
+        return isActive && name.includes(p);
+      });
       statusMap[p] = {
         connected: !!match,
         status: match ? 'Connected' : 'Not Connected',
-        accountName: match?.accountName || null
+        accountName: match?.accountName || match?.alias || match?.wordId || null
       };
     });
 
@@ -843,6 +847,61 @@ router.post('/:token/integrations/connect', portalAuth, async (req, res) => {
   } catch (err) {
     console.error('[PORTAL-INTEGRATIONS] Connect error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to generate connect URL' });
+  }
+});
+
+/**
+ * POST /api/portal/:token/comments/sync
+ * Trigger a manual comment sync for this client's posted content
+ */
+router.post('/:token/comments/sync', portalAuth, async (req, res) => {
+  try {
+    const recentPosts = db.prepare(`
+      SELECT t.*
+      FROM marketing_content_tracker t
+      WHERE t.client_id = ?
+        AND t.status = 'Posted'
+        AND (t.platform_post_id IS NOT NULL OR t.instagram_media_id IS NOT NULL OR t.youtube_video_id IS NOT NULL)
+        AND julianday('now') - julianday(t.date) <= 30
+    `).all(req.portalClient.id);
+
+    let synced = 0;
+    for (const post of recentPosts) {
+      const postId = post.platform_post_id || post.instagram_media_id || post.youtube_video_id;
+      const platform = (post.platform || 'instagram').toLowerCase();
+
+      try {
+        const action = platform.includes('youtube') ? 'YOUTUBE_GET_COMMENTS' : 'INSTAGRAM_GET_MEDIA_COMMENTS';
+        const paramKey = platform.includes('youtube') ? 'video_id' : 'media_id';
+
+        const result = await executeClientAction(req.portalClient.id, action, { [paramKey]: postId });
+        const comments = result?.comments || result?.data || [];
+
+        for (const comm of comments) {
+          db.prepare(`
+            INSERT OR IGNORE INTO social_comments (
+              content_id, client_id, platform, comment_id, commenter_name, comment_text, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            post.id,
+            req.portalClient.id,
+            post.platform,
+            comm.id || comm.comment_id,
+            comm.username || comm.authorDisplayName || 'User',
+            comm.text || comm.textDisplay || '',
+            comm.timestamp || new Date().toISOString()
+          );
+          synced++;
+        }
+      } catch (err) {
+        console.error(`[PORTAL-COMMENTS] Sync failed for post #${post.id}:`, err.message);
+      }
+    }
+
+    res.json({ success: true, synced, postsChecked: recentPosts.length });
+  } catch (err) {
+    console.error('[PORTAL-COMMENTS] Manual sync error:', err.message);
+    res.status(500).json({ error: 'Failed to sync comments' });
   }
 });
 
