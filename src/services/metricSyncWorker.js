@@ -12,7 +12,84 @@ function extractInstagramShortcode(link) {
 }
 
 /**
- * Fetch and sync metrics (Views, Likes, Comments, Shares, Saves, Engagement Rate, Content Score) for a single post item
+ * Fetch the full Instagram media list for a client (cached per sync run)
+ */
+const mediaListCache = new Map();
+async function getClientMediaList(clientId) {
+  if (mediaListCache.has(clientId)) return mediaListCache.get(clientId);
+  try {
+    const userMedia = await executeClientAction(clientId, 'INSTAGRAM_GET_IG_USER_MEDIA', {
+      ig_user_id: 'me',
+      fields: 'id,caption,media_type,permalink,shortcode,like_count,comments_count,timestamp'
+    });
+    const list = Array.isArray(userMedia?.data?.data) ? userMedia.data.data : [];
+    mediaListCache.set(clientId, list);
+    return list;
+  } catch (e) {
+    console.warn(`[METRIC-SYNC] Could not fetch IG media list for client #${clientId}:`, e.message);
+    mediaListCache.set(clientId, []);
+    return [];
+  }
+}
+
+/**
+ * Match a content tracker row to an Instagram media item.
+ * Strategy: 1) Match by shortcode/link  2) Match by date proximity (±2 days)
+ */
+function findMatchingMedia(item, mediaList) {
+  const shortcode = extractInstagramShortcode(item.link);
+
+  // 1. Match by shortcode
+  if (shortcode) {
+    const match = mediaList.find(m =>
+      m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode))
+    );
+    if (match) return match;
+  }
+
+  // 2. Match by link containing shortcode
+  if (item.link) {
+    const match = mediaList.find(m => m.shortcode && item.link.includes(m.shortcode));
+    if (match) return match;
+  }
+
+  // 3. Match by date proximity (±2 days) + post_type alignment
+  if (item.date) {
+    const itemDate = new Date(item.date);
+    const postType = (item.post_type || '').toLowerCase();
+
+    // Filter by media type alignment
+    const candidates = mediaList.filter(m => {
+      if (!m.timestamp) return false;
+      const mediaDate = new Date(m.timestamp);
+      const diffDays = Math.abs((mediaDate - itemDate) / (1000 * 60 * 60 * 24));
+      if (diffDays > 2) return false;
+
+      // Align post_type with media_type
+      const mediaType = (m.media_type || '').toUpperCase();
+      if (postType === 'reel' && mediaType !== 'VIDEO') return false;
+      if (postType === 'carousel' && mediaType !== 'CAROUSEL_ALBUM') return false;
+      if (postType === 'static' && mediaType !== 'IMAGE') return false;
+
+      return true;
+    });
+
+    // Pick the closest by date
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => {
+        const diffA = Math.abs(new Date(a.timestamp) - itemDate);
+        const diffB = Math.abs(new Date(b.timestamp) - itemDate);
+        return diffA - diffB;
+      });
+      return candidates[0];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Fetch and sync metrics for a single post item
  */
 export async function syncSingleContentMetrics(contentId) {
   const item = db.prepare(`
@@ -27,8 +104,6 @@ export async function syncSingleContentMetrics(contentId) {
   }
 
   let numericMediaId = item.instagram_media_id || item.platform_post_id;
-  let shortcode = extractInstagramShortcode(item.link);
-
   const platform = (item.platform || 'instagram').toLowerCase();
   let metrics = {
     views: item.views || 0,
@@ -40,41 +115,28 @@ export async function syncSingleContentMetrics(contentId) {
 
   if (process.env.COMPOSIO_API_KEY && (platform.includes('instagram') || platform.includes('meta'))) {
     try {
-      // 1. If we don't have numeric Graph API media ID, resolve it via INSTAGRAM_GET_IG_USER_MEDIA
+      // 1. Resolve numeric Graph API media ID if we don't have a valid one
       if (!numericMediaId || !/^\d+$/.test(numericMediaId)) {
-        try {
-          const userMedia = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_USER_MEDIA', {
-            ig_user_id: 'me',
-            fields: 'id,caption,media_type,permalink,shortcode,like_count,comments_count,timestamp'
-          });
+        const mediaList = await getClientMediaList(item.client_id);
+        const matched = findMatchingMedia(item, mediaList);
 
-          const mediaList = Array.isArray(userMedia?.data?.data) ? userMedia.data.data : [];
-          const matched = mediaList.find(m => {
-            if (!m) return false;
-            if (shortcode && (m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode)))) {
-              return true;
-            }
-            if (item.link && m.permalink && item.link.includes(m.shortcode)) {
-              return true;
-            }
-            return false;
-          });
+        if (matched) {
+          numericMediaId = matched.id;
+          metrics.likes = matched.like_count || metrics.likes;
+          metrics.comments = matched.comments_count || metrics.comments;
 
-          if (matched) {
-            numericMediaId = matched.id;
-            metrics.likes = matched.like_count || metrics.likes;
-            metrics.comments = matched.comments_count || metrics.comments;
-
-            // Store resolved numeric ID in database for future syncs
-            db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = ? WHERE id = ?')
-              .run(numericMediaId, contentId);
+          // Store resolved ID and link back in database
+          const updateFields = { instagram_media_id: numericMediaId };
+          if (!item.link && matched.permalink) {
+            updateFields.link = matched.permalink;
           }
-        } catch (e) {
-          console.warn(`[METRIC-SYNC] Could not resolve media ID for post #${contentId}:`, e.message);
+          const setClauses = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
+          db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
+            .run(...Object.values(updateFields), contentId);
         }
       }
 
-      // 2. Fetch live insights (Views, Reach, Likes, Comments, Saved, Shares) via INSTAGRAM_GET_IG_MEDIA_INSIGHTS
+      // 2. Fetch live insights via INSTAGRAM_GET_IG_MEDIA_INSIGHTS
       if (numericMediaId && /^\d+$/.test(numericMediaId)) {
         try {
           const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
@@ -95,7 +157,7 @@ export async function syncSingleContentMetrics(contentId) {
           }
         } catch (e) {
           console.warn(`[METRIC-SYNC] Insights fetch failed for post #${contentId}:`, e.message);
-          // If the stored media ID failed, clear it so it re-resolves from Instagram on next sync
+          // Clear invalid media ID so it re-resolves on next sync
           db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = NULL WHERE id = ?').run(contentId);
         }
       }
@@ -137,13 +199,18 @@ export async function syncSingleContentMetrics(contentId) {
 }
 
 /**
- * Refresh metrics for all posted items in the database
+ * Refresh metrics for ALL posted items — including those without links.
+ * Fetches each client's IG feed once and auto-matches by shortcode or date.
  */
 export async function runMetricSyncWorker() {
   try {
+    // Clear cache at start of each run
+    mediaListCache.clear();
+
+    // Sync ALL posted items, not just those with links
     const itemsToRefresh = db.prepare(`
       SELECT id FROM marketing_content_tracker
-      WHERE status = 'Posted' AND (link IS NOT NULL OR instagram_media_id IS NOT NULL OR platform_post_id IS NOT NULL)
+      WHERE status = 'Posted'
     `).all();
 
     if (itemsToRefresh.length === 0) return;

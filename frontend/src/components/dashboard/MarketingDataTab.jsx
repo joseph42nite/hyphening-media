@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FileDown } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ContentModal from './ContentModal.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from './contentFormHelper.js';
@@ -50,10 +50,28 @@ export default function MarketingDataTab({
     return `${monthName} ${year}`;
   };
 
-  // CSV Export handler
-  const handleCSVExport = (type) => {
-    if (!selectedClientForReports) return;
-    window.open(`/api/clients/${selectedClientForReports.id}/export/${type}`, '_blank');
+  // Sync All Metrics handler
+  const [isSyncing, setIsSyncing] = useState(false);
+  const handleSyncAllMetrics = async () => {
+    if (!selectedClientForReports || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/marketing/content/sync-all-metrics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth?.token}` }
+      });
+      if (resp.ok) {
+        showToast?.('✅ All metrics synced successfully!');
+        fetchMarketingData(selectedClientForReports.id);
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        showToast?.(`❌ Sync failed: ${err.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      showToast?.(`❌ Sync error: ${e.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Content CRUD Handlers
@@ -221,28 +239,26 @@ export default function MarketingDataTab({
           </select>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button onClick={() => handleCSVExport('content')} className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
-            <FileDown size={14} /> Content CSV
-          </button>
-          <button onClick={() => handleCSVExport('ads')} className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
-            <FileDown size={14} /> Ads CSV
-          </button>
-          <button onClick={() => handleCSVExport('monthly')} className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
-            <FileDown size={14} /> Monthly CSV
-          </button>
-        </div>
+
       </div>
 
       {selectedClientForReports && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ margin: 0 }}>Content Performance Tracker</h3>
-            {(isAdmin || isSMM) && (
-              <button onClick={() => openContentModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                <Plus size={14} style={{ marginRight: '4px' }} /> Add Content Row
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {(isAdmin || isSMM) && (
+                <button onClick={handleSyncAllMetrics} disabled={isSyncing} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                  <RefreshCw size={14} style={{ marginRight: '4px', animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                  {isSyncing ? 'Syncing...' : '🔄 Sync All Metrics'}
+                </button>
+              )}
+              {(isAdmin || isSMM) && (
+                <button onClick={() => openContentModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                  <Plus size={14} style={{ marginRight: '4px' }} /> Add Content Row
+                </button>
+              )}
+            </div>
           </div>
           <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
             <table>
