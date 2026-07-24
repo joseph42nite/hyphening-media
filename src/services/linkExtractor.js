@@ -24,21 +24,10 @@ export function extractPlatformId(link, platform) {
       const igRegex = /instagram\.com\/(?:p|reels?|tv)\/([A-Za-z0-9-_]+)/i;
       const match = link.match(igRegex);
       if (match && match[1]) {
-        const shortcode = match[1];
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-        let id = 0n;
-        let valid = true;
-        for (let i = 0; i < shortcode.length; i++) {
-          const idx = alphabet.indexOf(shortcode[i]);
-          if (idx === -1) {
-            valid = false;
-            break;
-          }
-          id = id * 64n + BigInt(idx);
-        }
-        if (valid) {
-          return { instagram_media_id: id.toString() };
-        }
+        // Do NOT compute a fake numeric ID from shortcode math.
+        // The real Graph API media ID must come from INSTAGRAM_GET_IG_USER_MEDIA.
+        // Return empty — the metricSyncWorker will resolve the real ID.
+        return {};
       }
     } else if (plat.includes('linkedin')) {
       const lnRegex = /activity[-:]([0-9]+)/i;
