@@ -173,7 +173,7 @@ export default function ScriptTrackerTab({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '24px',
             marginBottom: '24px'
           }}

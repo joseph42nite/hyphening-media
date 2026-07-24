@@ -169,7 +169,7 @@ export default function TokenUsageTab({ clients, showToast }) {
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '14px' }}>
                 <div className="form-group">
                   <label className="form-label">Monthly Limit (USD)</label>
                   <input

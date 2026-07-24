@@ -263,7 +263,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
           <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>{editingClient ? 'Edit Client' : 'Add Client'}</h2>
             <form onSubmit={handleClientSubmit} style={{ marginTop: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Client Name</label>
                   <input type="text" className="form-control" value={clientFormData.name} onChange={e => setClientFormData({...clientFormData, name: e.target.value})} required />
@@ -288,7 +288,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div className="form-grid-3">
                 <div className="form-group">
                   <label className="form-label">Contact Person</label>
                   <input type="text" className="form-control" value={clientFormData.contact_person} onChange={e => setClientFormData({...clientFormData, contact_person: e.target.value})} />
@@ -305,7 +305,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
 
               <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Integrations &amp; Links</h4>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Calendar Sync Link</label>
                   <input type="url" className="form-control" value={clientFormData.calendar_sync_link} onChange={e => setClientFormData({...clientFormData, calendar_sync_link: e.target.value})} />
@@ -316,7 +316,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Instagram Business ID</label>
                   <input type="text" className="form-control" value={clientFormData.instagram_business_account_id} onChange={e => setClientFormData({...clientFormData, instagram_business_account_id: e.target.value})} />
@@ -327,7 +327,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">YouTube Channel ID</label>
                   <input type="text" className="form-control" value={clientFormData.youtube_channel_id} onChange={e => setClientFormData({...clientFormData, youtube_channel_id: e.target.value})} />
@@ -344,7 +344,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
               </div>
 
               <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Public Profile Links</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div className="form-grid-3">
                 <div className="form-group">
                   <label className="form-label">Website URL</label>
                   <input type="url" className="form-control" placeholder="https://..." value={clientFormData.website_url} onChange={e => setClientFormData({...clientFormData, website_url: e.target.value})} />

@@ -800,7 +800,7 @@ export default function ArtistCurationTab({
           <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>{editingVenue ? 'Edit Venue Details' : 'Add Venue'}</h2>
             <form onSubmit={handleVenueSubmit} style={{ marginTop: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Client Name (Association)</label>
                   <select
@@ -828,7 +828,7 @@ export default function ArtistCurationTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Address</label>
                   <input
@@ -849,7 +849,7 @@ export default function ArtistCurationTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Google Maps Link</label>
                   <input
@@ -873,7 +873,7 @@ export default function ArtistCurationTab({
 
               <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Point of Contact (POC)</h4>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div className="form-grid-3" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">POC Name</label>
                   <input
@@ -934,7 +934,7 @@ export default function ArtistCurationTab({
             <h2>{editingGig ? 'Edit Gig Status' : 'Add Gig Status'}</h2>
             <form onSubmit={handleGigSubmit} style={{ marginTop: '20px' }}>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label">Artist</label>
                   <input

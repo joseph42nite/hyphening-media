@@ -52,7 +52,7 @@ export default function AuditLogsTab({
 
       {/* Pagination Controls */}
       {totalAuditLogs > 0 && (
-        <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
             Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((auditPage - 1) * auditLimit + 1, totalAuditLogs)}</span> to{' '}
             <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(auditPage * auditLimit, totalAuditLogs)}</span> of{' '}

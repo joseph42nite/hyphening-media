@@ -218,7 +218,7 @@ export default function MarketingDataTab({
 
   return (
     <div style={{ textAlign: 'left' }}>
-      <div className="dashboard-toolbar">
+      <div className="dashboard-toolbar marketing-toolbar">
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1 }}>
           <label className="form-label" style={{ margin: 0 }}>Select Client:</label>
           <select
@@ -238,15 +238,13 @@ export default function MarketingDataTab({
             ))}
           </select>
         </div>
-
-
       </div>
 
       {selectedClientForReports && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div className="marketing-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ margin: 0 }}>Content Performance Tracker</h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="marketing-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {(isAdmin || isSMM) && (
                 <button onClick={handleSyncAllMetrics} disabled={isSyncing} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
                   <RefreshCw size={14} style={{ marginRight: '4px', animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
@@ -686,7 +684,7 @@ export default function MarketingDataTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">On Page Score</label>
                   <input
@@ -709,7 +707,7 @@ export default function MarketingDataTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Blogs</label>
                   <input
@@ -732,7 +730,7 @@ export default function MarketingDataTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Directions</label>
                   <input
@@ -755,7 +753,7 @@ export default function MarketingDataTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Avg. Rating</label>
                   <input
@@ -781,7 +779,7 @@ export default function MarketingDataTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Top 3 Keywords</label>
                   <input

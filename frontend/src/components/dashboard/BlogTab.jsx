@@ -218,7 +218,7 @@ export default function BlogTab({ showToast }) {
               </div>
 
               {/* Row 2: Category + Author */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Category</label>
                   <select className="form-control" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
@@ -257,7 +257,7 @@ export default function BlogTab({ showToast }) {
               </div>
 
               {/* Cover Image + Tags */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Cover Image URL</label>
                   <input className="form-control" value={formData.cover_image_url} onChange={e => setFormData({ ...formData, cover_image_url: e.target.value })} placeholder="https://images.unsplash.com/..." />

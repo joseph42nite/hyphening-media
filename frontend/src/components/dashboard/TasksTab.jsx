@@ -25,6 +25,7 @@ export default function TasksTab({
   const [taskSearch, setTaskSearch] = useState('');
   const [taskClientFilter, setTaskClientFilter] = useState('');
   const [taskFormatFilter, setTaskFormatFilter] = useState('');
+  const [mobileColumnFilter, setMobileColumnFilter] = useState('all');
 
   // Calendar states
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -412,21 +413,19 @@ export default function TasksTab({
     <>
       {activeTab === 'tasks' && (
         <div style={{ textAlign: 'left' }}>
-          <div className="dashboard-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="dashboard-toolbar tasks-toolbar">
+            <div className="tasks-toolbar-inputs">
               <input
                 type="text"
-                className="form-control"
+                className="form-control tasks-filter-search"
                 placeholder="Search tasks or client..."
                 value={taskSearch}
                 onChange={(e) => setTaskSearch(e.target.value)}
-                style={{ width: '260px' }}
               />
               <select
-                className="form-control"
+                className="form-control tasks-filter-select"
                 value={taskClientFilter}
                 onChange={(e) => setTaskClientFilter(e.target.value)}
-                style={{ width: '200px' }}
               >
                 <option value="">All Clients</option>
                 {clients.map(c => (
@@ -436,10 +435,9 @@ export default function TasksTab({
                 ))}
               </select>
               <select
-                className="form-control"
+                className="form-control tasks-filter-format"
                 value={taskFormatFilter}
                 onChange={(e) => setTaskFormatFilter(e.target.value)}
-                style={{ width: '160px' }}
               >
                 <option value="">All Formats</option>
                 <option value="reel">Reel</option>
@@ -448,17 +446,42 @@ export default function TasksTab({
               </select>
             </div>
             {isAdmin && (
-              <button onClick={() => openTaskModal()} className="btn btn-primary" style={{ flexShrink: 0 }}>
+              <button onClick={() => openTaskModal()} className="btn btn-primary tasks-create-btn">
                 <Plus size={16} /> Create Task
               </button>
             )}
           </div>
 
+          {/* Mobile Column Selector Pills */}
+          <div className="kanban-mobile-tabs">
+            <button 
+              className={`kanban-mobile-tab ${mobileColumnFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setMobileColumnFilter('all')}
+            >
+              All Columns
+            </button>
+            {columns.map(col => {
+              const count = getTasksByStatus(col).length;
+              const label = col === 'todo' ? 'To-Do Today' : col.replace('_', ' ');
+              return (
+                <button 
+                  key={col}
+                  className={`kanban-mobile-tab ${mobileColumnFilter === col ? 'active' : ''}`}
+                  onClick={() => setMobileColumnFilter(col)}
+                >
+                  <span style={{ textTransform: 'capitalize' }}>{label}</span>
+                  <span className="kanban-tab-badge">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="kanban-board">
             {columns.map(col => {
               const columnTasks = getTasksByStatus(col);
+              const isHiddenOnMobile = mobileColumnFilter !== 'all' && mobileColumnFilter !== col;
               return (
-                <div key={col} className="kanban-column">
+                <div key={col} className={`kanban-column ${isHiddenOnMobile ? 'kanban-column-hidden-mobile' : ''}`}>
                   <div className="kanban-column-header">
                     <span className="kanban-column-title">
                       {col === 'todo' ? 'TO - DO - TODAY' : col.replace('_', ' ').toUpperCase()}
@@ -738,7 +761,7 @@ export default function TasksTab({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-3">
                 <div className="form-group">
                   <label className="form-label">Client</label>
                   <select
@@ -786,7 +809,7 @@ export default function TasksTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Priority</label>
                   <select

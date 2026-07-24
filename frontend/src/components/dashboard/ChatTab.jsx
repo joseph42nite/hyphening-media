@@ -328,16 +328,7 @@ export default function ChatTab({
                   return (
                     <div
                       key={msg.id}
-                      style={{
-                        alignSelf: isMe ? 'flex-end' : 'flex-start',
-                        maxWidth: '70%',
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: '2px solid #000',
-                        background: isMe ? '#000' : '#fff',
-                        color: isMe ? '#fff' : '#000',
-                        boxShadow: '2px 2px 0px #000'
-                      }}
+                      className={`chat-message-bubble ${isMe ? 'chat-message-me' : 'chat-message-other'}`}
                     >
                       <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: isMe ? '#a1a1aa' : 'var(--text-muted)', marginBottom: '2px' }}>
                         {msg.sender_name} {showBrandName && `(${messageClient.name})`} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

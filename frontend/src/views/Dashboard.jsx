@@ -995,14 +995,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             )}
           </button>
 
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{auth?.name}</div>
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 'bold' }}>
+          <div className="dashboard-user-info">
+            <div className="dashboard-user-name">{auth?.name}</div>
+            <div className="dashboard-user-role">
               {userRole.replace('ops_', '').replace('_', ' ')}
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-secondary" style={{ padding: '8px 12px' }}>
-            <LogOut size={16} /> Logout
+          <button onClick={handleLogout} className="btn btn-secondary btn-logout">
+            <LogOut size={16} /> <span>Logout</span>
           </button>
         </div>
       </header>

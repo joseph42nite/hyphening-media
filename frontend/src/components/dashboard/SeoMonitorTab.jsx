@@ -449,17 +449,17 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
       {/* Dropdown selector panel */}
       <div className="card glass-premium" style={{ marginBottom: '20px', padding: '16px', border: '2px solid #000' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <div className="seo-command-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ margin: 0, fontWeight: 'bold' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
             <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Active Client:</span>
+          <div className="seo-command-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0 }}>Active Client:</span>
               <select
                 className="form-control"
-                style={{ minWidth: '220px', fontWeight: 'bold', border: '2px solid #000' }}
+                style={{ minWidth: '220px', fontWeight: 'bold', border: '2px solid #000', flexGrow: 1 }}
                 value={selectedClientId}
                 onChange={e => {
                   const newId = e.target.value;
@@ -480,7 +480,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               <button
                 onClick={triggerFullAuditMaster}
                 className="btn btn-primary"
-                style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold' }}
+                style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold', width: '100%' }}
               >
                 🚀 Run Full Audit (Master)
               </button>

@@ -61,7 +61,7 @@ export default function ContentModal({
         )}
         <form onSubmit={handleContentSubmit} style={{ marginTop: '20px' }}>
           {/* Primary Row Info */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label">Platform</label>
               <select
@@ -85,7 +85,7 @@ export default function ContentModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label">Post Type</label>
               <select
@@ -135,7 +135,7 @@ export default function ContentModal({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label">Script/Blog Month (Filter)</label>
               <input
@@ -183,7 +183,7 @@ export default function ContentModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          <div className="form-grid-2" style={{ marginBottom: '16px' }}>
             <div className="form-group">
               <label className="form-label">Assignee (Staff)</label>
               <select
@@ -268,7 +268,7 @@ export default function ContentModal({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-grid-2" style={{ marginBottom: '12px' }}>
                   <div className="form-group">
                     <label className="form-label">Instagram Link</label>
                     <input
@@ -291,7 +291,7 @@ export default function ContentModal({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-grid-2" style={{ marginBottom: '12px' }}>
                   <div className="form-group">
                     <label className="form-label">Facebook Link</label>
                     <input
@@ -314,7 +314,7 @@ export default function ContentModal({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
+                <div className="form-grid-4">
                   <div className="form-group">
                     <label className="form-label">IG Media ID</label>
                     <input
@@ -392,7 +392,7 @@ export default function ContentModal({
                 {contentFormData.platform === 'instagram' ? (
                   <div>
                     <h4 style={{ margin: '0 0 12px', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)' }}>Instagram Metrics</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div className="form-grid-3" style={{ marginBottom: '12px' }}>
                       <div className="form-group">
                         <label className="form-label">Views</label>
                         <input
@@ -421,7 +421,7 @@ export default function ContentModal({
                         />
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div className="form-grid-3" style={{ marginBottom: '12px' }}>
                       <div className="form-group">
                         <label className="form-label">Shares</label>
                         <input
@@ -450,7 +450,7 @@ export default function ContentModal({
                         />
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                    <div className="form-grid-3">
                       <div className="form-group">
                         <label className="form-label">Avg Watch Time %</label>
                         <input
@@ -486,7 +486,7 @@ export default function ContentModal({
                 ) : (
                   <div>
                     <h4 style={{ margin: '0 0 12px', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)' }}>YouTube Metrics</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div className="form-grid-2" style={{ marginBottom: '12px' }}>
                       <div className="form-group">
                         <label className="form-label">YouTube Views</label>
                         <input
@@ -507,7 +507,7 @@ export default function ContentModal({
                         />
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-grid-2">
                       <div className="form-group">
                         <label className="form-label">Avg View Duration</label>
                         <input

@@ -252,7 +252,7 @@ export default function FreelancersTab({
           <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '600px' }}>
             <h2>{editingFreelancer ? 'Edit Freelancer' : 'Add Freelancer'}</h2>
             <form onSubmit={handleFreelancerSubmit} style={{ marginTop: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Full Name</label>
                   <input
@@ -274,7 +274,7 @@ export default function FreelancersTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Phone</label>
                   <input
@@ -295,7 +295,7 @@ export default function FreelancersTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-3" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Specialization</label>
                   <input
