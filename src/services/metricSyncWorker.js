@@ -125,10 +125,19 @@ export async function syncSingleContentMetrics(contentId) {
           metrics.likes = matched.like_count || metrics.likes;
           metrics.comments = matched.comments_count || metrics.comments;
 
-          // Store resolved ID and link back in database
+          // Store resolved ID, link, and posting time back in database
           const updateFields = { instagram_media_id: numericMediaId };
           if (!item.link && matched.permalink) {
             updateFields.link = matched.permalink;
+          }
+          if (!item.time && matched.timestamp) {
+            // Convert UTC timestamp to IST (UTC+5:30) and format as HH:MM
+            const postDate = new Date(matched.timestamp);
+            const istOffset = 5.5 * 60 * 60 * 1000;
+            const istDate = new Date(postDate.getTime() + istOffset);
+            const hours = String(istDate.getUTCHours()).padStart(2, '0');
+            const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
+            updateFields.time = `${hours}:${minutes}`;
           }
           const setClauses = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
           db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
