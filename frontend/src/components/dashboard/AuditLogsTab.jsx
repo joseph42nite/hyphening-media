@@ -42,7 +42,7 @@ export default function AuditLogsTab({
                   <td style={{ fontWeight: '500' }}>{log.actor_email || 'System'}</td>
                   <td><span className="badge badge-info">{log.action}</span></td>
                   <td>{log.entity_type} #{log.entity_id}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{log.diff}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', minWidth: '220px' }}>{log.diff}</td>
                 </tr>
               ))
             )}
@@ -52,7 +52,7 @@ export default function AuditLogsTab({
 
       {/* Pagination Controls */}
       {totalAuditLogs > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="table-pagination-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
             Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((auditPage - 1) * auditLimit + 1, totalAuditLogs)}</span> to{' '}
             <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(auditPage * auditLimit, totalAuditLogs)}</span> of{' '}

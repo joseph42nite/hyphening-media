@@ -1138,6 +1138,13 @@ tr:hover td {
     max-width: 100% !important;
   }
 
+  .table-pagination-footer {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+    text-align: center !important;
+  }
+
   .calendar-events-desktop {
     display: none !important;
   }

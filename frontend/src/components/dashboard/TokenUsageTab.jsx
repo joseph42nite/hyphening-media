@@ -225,7 +225,7 @@ export default function TokenUsageTab({ clients, showToast }) {
           {/* Summary Overview */}
           <div className="card" style={{ border: '2px solid #000', padding: '16px', background: '#fff' }}>
             <h4 style={{ fontWeight: 'bold', margin: '0 0 12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Cost Breakdown</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-grid-2" style={{ marginBottom: '12px' }}>
               <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>LLM Model Cost (USD)</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}><DollarSign size={16} /> {totalLLMCost.toFixed(4)}</div>
@@ -272,13 +272,13 @@ export default function TokenUsageTab({ clients, showToast }) {
 
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+      <div className="form-grid-2" style={{ marginBottom: '24px' }}>
         
         {/* Full usage log database view */}
         <div className="card" style={{ border: '2px solid #000', padding: '16px' }}>
           <h4 style={{ fontWeight: 'bold', margin: '0 0 16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>Detailed Usage Logs</h4>
           
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+          <div className="form-grid-2" style={{ marginBottom: '16px' }}>
             <input
               type="text"
               placeholder="Filter by agent (e.g. technical)..."
