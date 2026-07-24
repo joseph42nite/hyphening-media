@@ -109,8 +109,13 @@ router.get('/:token/overview', portalAuth, (req, res) => {
         COUNT(*) as total_posts,
         ROUND(AVG(engagement_rate_pct), 2) as avg_engagement_rate,
         ROUND(AVG(content_score), 1) as avg_content_score,
+        ROUND(AVG(avg_watch_time_pct), 1) as avg_watch_time,
+        ROUND(AVG(skip_rate_pct), 1) as avg_skip_rate,
         SUM(views) as total_views,
-        SUM(likes) as total_likes
+        SUM(likes) as total_likes,
+        SUM(comments) as total_comments,
+        SUM(shares) as total_shares,
+        SUM(saves) as total_saves
       FROM marketing_content_tracker 
       WHERE client_id = ? AND is_tracked = 1
     `).get(clientId);

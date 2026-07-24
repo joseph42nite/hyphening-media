@@ -16,31 +16,30 @@ const PRESET_REASON_OPTIONS = [
 ];
 
 const PORTAL_STYLES = `
-/* Executive Slate & Glass Premium Design System for Client Portal */
+/* Neo-Brutalist Bento Design System for Client Portal */
 .client-portal-wrapper {
-  --bg-primary: #f8fafc;
+  --bg-primary: #f0f0f2;
   --bg-card: #ffffff;
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
-  --border-width: 1px;
+  --text-primary: #000000;
+  --text-secondary: #18181b;
+  --text-muted: #52525b;
+  --border-color: #000000;
+  --border-width: 3px;
   
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 30px -4px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 2px 2px 0px #000000;
+  --shadow-md: 5px 5px 0px #000000;
+  --shadow-lg: 8px 8px 0px #000000;
   
-  --radius-md: 16px;
+  --radius-md: 20px;
   --radius-sm: 8px;
   
-  --accent-purple: #7c3aed;
-  --accent-cyan: #0284c7;
-  --accent-rose: #e11d48;
-  --accent-blue: #2563eb;
-  --accent-emerald: #059669;
+  --accent-purple: #a855f7;
+  --accent-cyan: #06b6d4;
+  --accent-rose: #f43f5e;
+  --accent-blue: #3b82f6;
   
   box-sizing: border-box;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--text-primary);
   min-height: 100vh;
   padding: 32px 16px;
@@ -51,19 +50,19 @@ const PORTAL_STYLES = `
 }
 
 body.portal-active {
-  background-color: #f8fafc !important;
+  background-color: #f0f0f2 !important;
   padding: 0 !important;
   margin: 0 !important;
 }
 
 .portal-container {
   width: 100%;
-  max-width: 1240px;
+  max-width: 1200px;
   animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -74,11 +73,11 @@ body.portal-active {
 /* Bento Card styling */
 .portal-bento-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-color) !important;
+  border: var(--border-width) solid var(--border-color) !important;
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-md) !important;
   padding: 24px;
-  transition: all 0.2s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   position: relative;
   overflow: hidden;
   text-align: left;
@@ -86,55 +85,50 @@ body.portal-active {
 }
 
 .portal-bento-card:hover {
+  transform: translate(-2px, -2px);
   box-shadow: var(--shadow-lg) !important;
-  transform: translateY(-2px);
 }
 
 /* Header Banner */
 .portal-header-banner {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.2);
-  padding: 32px;
+  box-shadow: var(--shadow-md);
+  padding: 28px;
   margin-bottom: 24px;
   text-align: left;
-  color: #ffffff;
 }
 
 .portal-header-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: rgba(255, 255, 255, 0.12);
-  color: #38bdf8;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  letter-spacing: 0.05em;
+  background: #000000;
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 4px;
   margin-bottom: 12px;
 }
 
 .portal-header-title {
-  font-size: 2rem;
-  font-weight: 800;
-  text-transform: capitalize;
+  font-size: 2.2rem;
+  font-weight: 900;
+  text-transform: uppercase;
   margin: 0;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-  color: #ffffff;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
-/* Tabs segment */
+/* Tabs segment - clean pill outline */
 .portal-tabs-container {
   display: flex;
   background: #ffffff;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 5px;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 9999px;
+  padding: 6px;
   margin-bottom: 28px;
   width: 100%;
   gap: 6px;
@@ -153,34 +147,33 @@ body.portal-active {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
-  font-weight: 700;
-  font-size: 0.83rem;
-  border-radius: 8px;
+  padding: 12px 20px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  border-radius: 9999px;
   border: none;
   cursor: pointer;
   background: transparent;
-  color: var(--text-muted);
+  color: #000000;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
 
 .portal-tab-btn:hover {
-  background: #f1f5f9;
-  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .portal-tab-btn.active {
-  background: #0f172a;
+  background: #000000;
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
 }
 
-/* Metrics Grid */
+/* Metrics Bento Grid */
 .portal-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
   width: 100%;
   margin-bottom: 24px;
 }
@@ -189,75 +182,76 @@ body.portal-active {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 110px;
+  min-height: 120px;
   background: #ffffff;
-  border: 1px solid var(--border-color);
+  border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   padding: 20px;
-  transition: all 0.2s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .portal-metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-lg);
 }
 
 .portal-metric-value {
-  font-size: 2.2rem;
-  font-weight: 800;
-  margin: 6px 0 0 0;
-  line-height: 1.1;
+  font-size: 2.5rem;
+  font-weight: 900;
+  margin: 8px 0 0 0;
+  line-height: 1;
+  font-family: 'Outfit', sans-serif;
   letter-spacing: -0.02em;
 }
 
 .portal-metric-label {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-/* Refined Badges */
+/* Badges */
 .portal-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  font-size: 0.72rem;
-  font-weight: 700;
+  padding: 6px 12px;
+  font-size: 0.7rem;
+  font-weight: 800;
   border-radius: 9999px;
-  letter-spacing: 0.02em;
-  border: 1px solid transparent;
-  background: #f1f5f9;
-  color: #334155;
+  text-transform: uppercase;
+  border: 2px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  letter-spacing: 0.03em;
+  box-shadow: var(--shadow-sm);
 }
 
-.portal-badge-success { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-.portal-badge-warning { background: #fffbeb; color: #b45309; border-color: #fde68a; }
-.portal-badge-danger { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
-.portal-badge-info { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
-.portal-badge-muted { background: #f8fafc; color: #64748b; border-color: #e2e8f0; }
+.portal-badge-success { background: #d1fae5; color: #065f46; }
+.portal-badge-warning { background: #fef3c7; color: #92400e; }
+.portal-badge-danger { background: #fee2e2; color: #991b1b; }
+.portal-badge-info { background: #dbeafe; color: #1e40af; }
+.portal-badge-muted { background: #f4f4f5; color: #52525b; }
 
 /* Form Controls & Buttons */
 .portal-control {
   background: #ffffff;
-  border: 1px solid var(--border-color);
+  border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 12px 16px;
-  color: var(--text-primary);
+  padding: 14px 18px;
+  color: #000000;
   font-family: inherit;
-  font-weight: 600;
-  font-size: 0.88rem;
-  transition: all 0.15s ease;
+  font-weight: 700;
+  transition: box-shadow 0.15s ease;
   width: 100%;
 }
 
 .portal-control:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: var(--shadow-sm);
 }
 
 .portal-btn {
@@ -265,39 +259,57 @@ body.portal-active {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 20px;
-  font-weight: 700;
+  padding: 12px 24px;
+  font-weight: 800;
   font-size: 0.85rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
+  text-transform: uppercase;
+  border-radius: 9999px;
+  border: var(--border-width) solid var(--border-color);
   cursor: pointer;
   background: #ffffff;
-  color: var(--text-primary);
+  color: #000000;
   box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   text-decoration: none;
 }
 
 .portal-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+
+.portal-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: none;
+}
+
+.portal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .portal-btn-primary {
-  background: #0f172a;
+  background: #000000;
   color: #ffffff;
-  border-color: #0f172a;
 }
 
 .portal-btn-primary:hover {
-  background: #1e293b;
-  color: #ffffff;
+  background: #ffffff;
+  color: #000000;
 }
+
+.portal-btn-success { background: #ffffff; color: #000000; }
+.portal-btn-success:hover { background: #10b981; color: #ffffff; }
+
+.portal-btn-danger { background: #ffffff; color: #000000; }
+.portal-btn-danger:hover { background: #ef4444; color: #ffffff; }
 
 /* Grid Layouts */
 .portal-grid-half {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 20px;
 }
 
@@ -305,11 +317,11 @@ body.portal-active {
 .portal-table-container {
   overflow-x: auto;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
+  border: var(--border-width) solid var(--border-color);
   background: #ffffff;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .portal-table {
@@ -319,20 +331,20 @@ body.portal-active {
 }
 
 .portal-table th {
-  background: #f8fafc;
+  background: #f4f4f5;
   padding: 14px 18px;
-  font-weight: 700;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-color);
-  font-size: 0.75rem;
+  font-weight: 800;
+  color: #000000;
+  border-bottom: var(--border-width) solid var(--border-color);
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .portal-table td {
   padding: 14px 18px;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.85rem;
 }
@@ -342,8 +354,9 @@ body.portal-active {
 }
 
 .portal-table tr:hover td {
-  background: #f8fafc;
+  background: rgba(0, 0, 0, 0.02);
 }
+
 /* Modal styling */
 .portal-modal-overlay {
   position: fixed;
@@ -351,9 +364,9 @@ body.portal-active {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -376,41 +389,40 @@ body.portal-active {
 }
 
 .portal-month-tab {
-  padding: 8px 16px;
+  padding: 10px 20px;
   border-radius: 9999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: capitalize;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
   background: #ffffff;
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
+  border: var(--border-width) solid var(--border-color);
+  color: #000000;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
 
 .portal-month-tab:hover {
-  background: #f1f5f9;
-  color: var(--text-primary);
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-md);
 }
 
 .portal-month-tab.active {
-  background: #0f172a;
+  background: #000000;
   color: #ffffff;
-  border-color: #0f172a;
 }
 
 /* Script Box */
 .portal-script-box {
-  background: #f8fafc;
-  border: 1px solid var(--border-color);
+  background: #f4f4f5;
+  border: var(--border-width) solid var(--border-color);
   padding: 16px 20px;
   border-radius: var(--radius-sm);
-  font-family: inherit;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #000000;
   white-space: pre-wrap;
   position: relative;
   overflow: hidden;
@@ -424,41 +436,39 @@ body.portal-active {
 
 .portal-label {
   display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 800;
   margin-bottom: 8px;
-  color: var(--text-primary);
+  color: #000000;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 /* Select Dropdown & Input Reason */
 .portal-select {
   background: #ffffff;
-  border: 1px solid var(--border-color);
+  border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 8px 14px;
-  color: var(--text-primary);
+  padding: 6px 12px;
+  color: #000000;
   font-family: inherit;
-  font-weight: 600;
-  transition: all 0.15s ease;
+  font-weight: 700;
+  transition: box-shadow 0.15s ease;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
 }
-
 .portal-select:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: var(--shadow-sm);
 }
 
 .portal-code-block {
-  background: #0f172a;
-  color: #38bdf8;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1e1e24;
+  color: #a9b1d6;
+  border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: 16px;
-  font-family: monospace;
+  font-family: 'Courier New', Courier, monospace;
   font-size: 0.85rem;
   white-space: pre-wrap;
   box-shadow: var(--shadow-sm);
@@ -473,26 +483,31 @@ body.portal-active {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
     border-radius: var(--radius-sm) !important;
-    padding: 6px !important;
-    gap: 6px !important;
+    padding: 10px !important;
+    gap: 10px !important;
   }
   .portal-tab-btn {
-    border: 1px solid var(--border-color) !important;
+    border: var(--border-width) solid var(--border-color) !important;
     border-radius: var(--radius-sm) !important;
-    padding: 8px 10px !important;
-    font-size: 0.78rem !important;
+    padding: 10px 12px !important;
+    font-size: 0.8rem !important;
     background: #ffffff !important;
-    color: var(--text-muted) !important;
+    color: #000000 !important;
     box-shadow: var(--shadow-sm) !important;
     width: 100% !important;
     justify-content: center !important;
   }
   .portal-tab-btn.active {
-    background: #0f172a !important;
+    background: #000000 !important;
     color: #ffffff !important;
+    box-shadow: none !important;
+    transform: translate(1px, 1px) !important;
+  }
+  .portal-tabs-container button:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
   }
   .portal-header-banner {
-    padding: 20px;
+    padding: 16px;
   }
   .portal-header-title {
     font-size: 1.5rem;
@@ -504,68 +519,85 @@ body.portal-active {
     padding: 10px 12px;
     font-size: 0.75rem;
   }
+  .portal-code-block {
+    font-size: 0.75rem;
+    padding: 12px;
+  }
 }
 `;
 
-function PortalDonutChart({ title, data, totalLabel = 'Total' }) {
-  if (!data || data.length === 0) {
+function PlatformDistributionDonut({ breakdown }) {
+  if (!breakdown || breakdown.length === 0) {
     return (
-      <div className="portal-bento-card" style={{ padding: '24px' }}>
-        <h3 style={{ fontSize: '1.05rem', marginBottom: '12px', fontWeight: 800, color: 'var(--text-primary)' }}>{title}</h3>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No distribution data available yet.</div>
+      <div className="portal-bento-card" style={{ padding: '20px' }}>
+        <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Platform Share</h3>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>No distribution data available yet.</div>
       </div>
     );
   }
 
-  const total = data.reduce((sum, d) => sum + (d.value || 0), 0);
+  const total = breakdown.reduce((sum, item) => sum + item.count, 0);
   let accumulatedPercent = 0;
+  const platformColors = {
+    instagram: '#dc2626',
+    youtube: '#18181b',
+    facebook: '#2563eb',
+    linkedin: '#0284c7'
+  };
 
   return (
-    <div className="portal-bento-card" style={{ padding: '24px' }}>
-      <h3 style={{ fontSize: '1.05rem', marginBottom: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>{title}</h3>
+    <div className="portal-bento-card" style={{ padding: '20px' }}>
+      <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Platform Share</h3>
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <div style={{ position: 'relative', width: '130px', height: '130px' }}>
-          <svg width="130" height="130" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#f1f5f9" strokeWidth="4.5" />
-            {total > 0 && data.map((item) => {
-              const percent = (item.value / total) * 100;
+        <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+          <svg width="120" height="120" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)', borderRadius: '50%', border: '2px solid #18181b' }}>
+            <circle cx="21" cy="21" r="15.91549430918954" fill="#ffffff"></circle>
+            {breakdown.map((item) => {
+              const percent = (item.count / total) * 100;
               const strokeDashoffset = 100 - accumulatedPercent;
               accumulatedPercent += percent;
+              const color = platformColors[item.platform?.toLowerCase()] || '#64748b';
               return (
                 <circle
-                  key={item.label}
+                  key={item.platform}
                   cx="21"
                   cy="21"
                   r="15.91549430918954"
                   fill="transparent"
-                  stroke={item.color}
-                  strokeWidth="4.8"
+                  stroke={color}
+                  strokeWidth="5"
                   strokeDasharray={`${percent} ${100 - percent}`}
                   strokeDashoffset={strokeDashoffset}
-                  style={{ transition: 'all 0.4s ease' }}
+                  style={{ transition: 'stroke-dashoffset 0.3s ease' }}
                 />
               );
             })}
           </svg>
           <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justify: 'center',
+            pointerEvents: 'none'
           }}>
-            <span style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{total.toLocaleString()}</span>
-            <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>{totalLabel}</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total}</span>
+            <span style={{ fontSize: '0.65rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Posts</span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left', flexGrow: 1, minWidth: '140px' }}>
-          {data.map((item) => {
-            const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0;
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flexGrow: 1 }}>
+          {breakdown.map((item) => {
+            const percent = total > 0 ? ((item.count / total) * 100).toFixed(0) : 0;
+            const color = platformColors[item.platform?.toLowerCase()] || '#64748b';
             return (
-              <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', fontSize: '0.82rem', fontWeight: '700' }}>
+              <div key={item.platform} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: '800' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: item.color, display: 'inline-block' }} />
-                  <span style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>{item.label}</span>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block', border: '1px solid #18181b' }} />
+                  <span style={{ textTransform: 'capitalize' }}>{item.platform}:</span>
                 </div>
-                <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>{item.value.toLocaleString()} <span style={{ opacity: 0.7, fontSize: '0.75rem' }}>({percent}%)</span></span>
+                <span style={{ color: '#64748b' }}>{item.count} ({percent}%)</span>
               </div>
             );
           })}
@@ -575,57 +607,94 @@ function PortalDonutChart({ title, data, totalLabel = 'Total' }) {
   );
 }
 
-function TopContentBarChart({ contentList }) {
-  if (!contentList || contentList.length === 0) return null;
+function EngagementBreakdownDonut({ stats }) {
+  if (!stats) return null;
+  const likes = stats.total_likes || 0;
+  const comments = stats.total_comments || 0;
+  const shares = stats.total_shares || 0;
+  const saves = stats.total_saves || 0;
+  const total = likes + comments + shares + saves;
 
-  const topPosts = [...contentList]
-    .sort((a, b) => (b.views || 0) - (a.views || 0))
-    .slice(0, 5);
+  const items = [
+    { label: 'Likes', count: likes, color: '#dc2626' },
+    { label: 'Comments', count: comments, color: '#18181b' },
+    { label: 'Shares', count: shares, color: '#059669' },
+    { label: 'Saves', count: saves, color: '#d97706' }
+  ];
 
-  const maxViews = Math.max(...topPosts.map(p => p.views || 0), 1);
+  let accumulatedPercent = 0;
 
   return (
-    <div className="portal-bento-card" style={{ padding: '24px' }}>
-      <h3 style={{ fontSize: '1.05rem', marginBottom: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>Top Performing Content</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {topPosts.map((post, idx) => {
-          const widthPct = ((post.views || 0) / maxViews) * 100;
-          return (
-            <div key={post.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', fontWeight: '700' }}>
-                <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>
-                  {post.title || `${post.post_type} (${post.date || ''})`}
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: '800' }}>{(post.views || 0).toLocaleString()} views</span>
-                  {post.content_score > 0 && (
-                    <span className="portal-badge portal-badge-info" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Score {post.content_score}</span>
-                  )}
-                </div>
-              </div>
-              <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%',
-                  width: `${Math.max(widthPct, 3)}%`,
-                  background: 'linear-gradient(90deg, #6366f1 0%, #06b6d4 100%)',
-                  borderRadius: '9999px',
-                  transition: 'width 0.5s ease'
-                }} />
-              </div>
+    <div className="portal-bento-card" style={{ padding: '20px' }}>
+      <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Engagement Mix</h3>
+      {total === 0 ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>No engagement data available yet.</div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+            <svg width="120" height="120" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)', borderRadius: '50%', border: '2px solid #18181b' }}>
+              <circle cx="21" cy="21" r="15.91549430918954" fill="#ffffff"></circle>
+              {items.map((item) => {
+                if (item.count === 0) return null;
+                const percent = (item.count / total) * 100;
+                const strokeDashoffset = 100 - accumulatedPercent;
+                accumulatedPercent += percent;
+                return (
+                  <circle
+                    key={item.label}
+                    cx="21"
+                    cy="21"
+                    r="15.91549430918954"
+                    fill="transparent"
+                    stroke={item.color}
+                    strokeWidth="5"
+                    strokeDasharray={`${percent} ${100 - percent}`}
+                    strokeDashoffset={strokeDashoffset}
+                    style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                  />
+                );
+              })}
+            </svg>
+            <div style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justify: 'center',
+              pointerEvents: 'none'
+            }}>
+              <span style={{ fontSize: '1rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total.toLocaleString()}</span>
+              <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Interactions</span>
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flexGrow: 1 }}>
+            {items.map((item) => {
+              const percent = total > 0 ? ((item.count / total) * 100).toFixed(1) : 0;
+              return (
+                <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: '800' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, display: 'inline-block', border: '1px solid #18181b' }} />
+                    <span>{item.label}:</span>
+                  </div>
+                  <span style={{ color: '#64748b' }}>{item.count.toLocaleString()} ({percent}%)</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function PerformanceTrendChart({ data }) {
-  const [metric, setMetric] = useState('views');
+  const [metric, setMetric] = useState('views'); // 'views' or 'engagement'
   
   if (!data || data.length === 0) {
     return (
-      <div className="portal-bento-card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px', textAlign: 'center', fontWeight: '700' }}>
         No trend data available yet.
       </div>
     );
@@ -633,15 +702,17 @@ function PerformanceTrendChart({ data }) {
 
   const width = 500;
   const height = 220;
-  const paddingLeft = 50;
+  const paddingLeft = 55;
   const paddingRight = 20;
   const paddingTop = 20;
-  const paddingBottom = 35;
+  const paddingBottom = 40;
   
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
+
   const isViews = metric === 'views';
   
+  // Calculate max val
   const maxVal = Math.max(...data.map(d => isViews ? (d.views || 0) : (d.engagement_rate_pct || 0)), 1);
   const roundedMax = isViews ? Math.ceil(maxVal / 1000) * 1000 : Math.ceil(maxVal);
 
@@ -659,7 +730,7 @@ function PerformanceTrendChart({ data }) {
     areaD = `${pathD} L ${points[points.length - 1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`;
   }
 
-  const gridTicks = [0, 0.33, 0.66, 1];
+  const gridTicks = [0, 0.25, 0.5, 0.75, 1];
 
   const formatNumberAbbr = (num) => {
     if (num === null || num === undefined) return '0';
@@ -676,27 +747,27 @@ function PerformanceTrendChart({ data }) {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
+    const [year, month, day] = parts;
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${parseInt(parts[2], 10)} ${months[parseInt(parts[1], 10) - 1]}`;
+    return `${parseInt(day, 10)} ${months[parseInt(month, 10) - 1]}`;
   };
 
   return (
-    <div className="portal-bento-card" style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-        <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 800, color: 'var(--text-primary)' }}>Content Performance Trend</h3>
-        <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '3px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <h3 style={{ fontSize: '1rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Content Performance Trend</h3>
+        <div style={{ display: 'flex', border: '2px solid #18181b', borderRadius: '9999px', overflow: 'hidden', boxShadow: '2px 2px 0px #18181b' }}>
           <button 
             onClick={() => setMetric('views')}
             style={{
-              padding: '5px 12px',
+              padding: '6px 14px',
               border: 'none',
-              fontWeight: '700',
-              fontSize: '0.78rem',
-              borderRadius: '6px',
+              fontWeight: '800',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
               cursor: 'pointer',
-              background: isViews ? '#ffffff' : 'transparent',
-              color: isViews ? '#0f172a' : '#64748b',
-              boxShadow: isViews ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              background: isViews ? '#18181b' : '#ffffff',
+              color: isViews ? '#ffffff' : '#18181b',
               transition: 'all 0.15s ease'
             }}
           >
@@ -705,15 +776,14 @@ function PerformanceTrendChart({ data }) {
           <button 
             onClick={() => setMetric('engagement')}
             style={{
-              padding: '5px 12px',
+              padding: '6px 14px',
               border: 'none',
-              fontWeight: '700',
-              fontSize: '0.78rem',
-              borderRadius: '6px',
+              fontWeight: '800',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
               cursor: 'pointer',
-              background: !isViews ? '#ffffff' : 'transparent',
-              color: !isViews ? '#0f172a' : '#64748b',
-              boxShadow: !isViews ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              background: !isViews ? '#18181b' : '#ffffff',
+              color: !isViews ? '#ffffff' : '#18181b',
               transition: 'all 0.15s ease'
             }}
           >
@@ -722,15 +792,14 @@ function PerformanceTrendChart({ data }) {
         </div>
       </div>
 
-      <div style={{ width: '100%' }}>
+      <div style={{ width: '100%', background: '#ffffff', border: '2px solid #18181b', borderRadius: '12px', padding: '16px', boxShadow: '3px 3px 0px #18181b', boxSizing: 'border-box' }}>
         <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="auto" style={{ overflow: 'visible' }}>
           <defs>
-            <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={isViews ? "#7c3aed" : "#0284c7"} stopOpacity="0.25" />
-              <stop offset="100%" stopColor={isViews ? "#7c3aed" : "#0284c7"} stopOpacity="0.0" />
+            <linearGradient id="sakuraTrendGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#dc2626" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#dc2626" stopOpacity="0.0" />
             </linearGradient>
           </defs>
-
           {/* Grid lines */}
           {gridTicks.map((tick, idx) => {
             const y = paddingTop + chartHeight - tick * chartHeight;
@@ -742,16 +811,16 @@ function PerformanceTrendChart({ data }) {
                   y1={y} 
                   x2={width - paddingRight} 
                   y2={y} 
-                  stroke="#e2e8f0" 
-                  strokeWidth="1"
-                  strokeDasharray={idx === 0 ? "0" : "3 3"}
+                  stroke="#e4e4e7" 
+                  strokeWidth="1.5"
+                  strokeDasharray={idx === 0 ? "0" : "4 4"}
                 />
                 <text 
                   x={paddingLeft - 8} 
-                  y={y + 3} 
+                  y={y + 4} 
                   textAnchor="end" 
-                  fill="#64748b" 
-                  style={{ fontSize: '10px', fontWeight: '600' }}
+                  fill="#18181b" 
+                  style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: '800' }}
                 >
                   {formatNumberAbbr(gridVal)}
                 </text>
@@ -761,7 +830,10 @@ function PerformanceTrendChart({ data }) {
           
           {/* Fill Area */}
           {points.length > 0 && (
-            <path d={areaD} fill="url(#trendGradient)" />
+            <path 
+              d={areaD} 
+              fill="url(#sakuraTrendGrad)"
+            />
           )}
           
           {/* Stroke Line */}
@@ -769,7 +841,7 @@ function PerformanceTrendChart({ data }) {
             <path 
               d={pathD} 
               fill="none" 
-              stroke={isViews ? "#7c3aed" : "#0284c7"} 
+              stroke="#dc2626" 
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -782,20 +854,21 @@ function PerformanceTrendChart({ data }) {
               <circle 
                 cx={p.x} 
                 cy={p.y} 
-                r="4.5" 
-                fill="#ffffff" 
-                stroke={isViews ? "#7c3aed" : "#0284c7"} 
-                strokeWidth="2.5"
+                r="5" 
+                fill="#dc2626" 
+                stroke="#ffffff" 
+                strokeWidth="2"
                 style={{ cursor: 'pointer' }}
               >
                 <title>{`${p.title || 'Post'}\n${isViews ? 'Views' : 'Engagement'}: ${isViews ? p.val.toLocaleString() : p.val.toFixed(2) + '%'}\nDate: ${p.date}`}</title>
               </circle>
+              {/* Date labels */}
               <text 
                 x={p.x} 
-                y={paddingTop + chartHeight + 16} 
+                y={paddingTop + chartHeight + 18} 
                 textAnchor="middle" 
-                fill="#64748b" 
-                style={{ fontSize: '9px', fontWeight: '600' }}
+                fill="#18181b" 
+                style={{ fontSize: '9px', fontFamily: 'var(--font-sans)', fontWeight: '800' }}
               >
                 {shortDate(p.date)}
               </text>
@@ -1632,133 +1705,98 @@ export default function ClientPortal({ showToast }) {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (clientType === 'marketing' || clientType === 'both') && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Performance Summary</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Performance Summary</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Real-time marketing metrics and social performance overview</p>
+              </div>
+            </div>
             
-            <div className="portal-metrics-grid">
-              {/* Content Stats */}
+            {/* Top Bento Metric Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
               {overview.content && (
                 <>
-                  <div className="portal-metric-card">
-                    <span className="portal-metric-label">Total Video Views</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--accent-purple)' }}>{overview.content.total_views?.toLocaleString() || 0}</span>
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Total Video Views</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>
+                      {overview.content.total_views?.toLocaleString() || 0}
+                    </span>
                   </div>
-                  <div className="portal-metric-card">
-                    <span className="portal-metric-label">Avg Engagement Rate</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--accent-cyan)' }}>{overview.content.avg_engagement_rate || 0}%</span>
+
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Avg Engagement</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#dc2626', display: 'block', marginTop: '4px' }}>
+                      {overview.content.avg_engagement_rate || 0}%
+                    </span>
                   </div>
-                  <div className="portal-metric-card">
-                    <span className="portal-metric-label">Content Quality Score</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--accent-rose)' }}>{overview.content.avg_content_score || 0}</span>
+
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Avg Watch Time</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#059669', display: 'block', marginTop: '4px' }}>
+                      {overview.content.avg_watch_time ? `${overview.content.avg_watch_time}s` : '-'}
+                    </span>
+                  </div>
+
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Avg Skip Rate</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: overview.content.avg_skip_rate <= 30 ? '#059669' : '#dc2626', display: 'block', marginTop: '4px' }}>
+                      {overview.content.avg_skip_rate ? `${overview.content.avg_skip_rate}%` : '-'}
+                    </span>
+                  </div>
+
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Quality Score</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>
+                      {overview.content.avg_content_score || 0}
+                    </span>
                   </div>
                 </>
               )}
 
-              {/* Ads Stats */}
               {overview.ads && (
-                <>
-                  <div className="portal-metric-card">
-                    <span className="portal-metric-label">Total Leads Captured</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--accent-blue)' }}>{overview.ads.total_leads || 0}</span>
-                  </div>
-                  <div className="portal-metric-card">
-                    <span className="portal-metric-label">Qualified Leads</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--accent-cyan)' }}>{overview.ads.qualified_leads || 0}</span>
-                  </div>
-                  <div className="portal-metric-card">
-                    <span className="portal-metric-label">Appointments Booked</span>
-                    <span className="portal-metric-value" style={{ color: 'var(--accent-purple)' }}>{overview.ads.appointments_booked || 0}</span>
-                  </div>
-                </>
+                <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                  <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Leads Captured</span>
+                  <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#0284c7', display: 'block', marginTop: '4px' }}>
+                    {overview.ads.total_leads || 0}
+                  </span>
+                </div>
               )}
             </div>
 
             {/* Performance Trend Chart */}
             <PerformanceTrendChart data={overview.views_trend} />
 
-            {/* Executive Donut Charts */}
+            {/* 2-Column Bento Grid for Pie/Donut Charts & Ad Funnel */}
             <div className="portal-grid-half">
-              {/* Post Type Breakdown Donut Chart */}
-              {(() => {
-                const postTypeCounts = {};
-                (contentList || []).forEach(item => {
-                  const t = item.post_type || 'Other';
-                  postTypeCounts[t] = (postTypeCounts[t] || 0) + 1;
-                });
-                const postTypeData = Object.keys(postTypeCounts).map((type, idx) => {
-                  const colors = ['#7c3aed', '#0284c7', '#059669', '#f59e0b', '#e11d48'];
-                  return { label: type, value: postTypeCounts[type], color: colors[idx % colors.length] };
-                });
-                return <PortalDonutChart title="Post Format Distribution" data={postTypeData} totalLabel="Posts" />;
-              })()}
+              {/* Platform Share Donut Chart */}
+              <PlatformDistributionDonut breakdown={overview.platform_breakdown} />
 
-              {/* Engagement Breakdown Donut Chart */}
-              {(() => {
-                const totalLikes = (contentList || []).reduce((sum, item) => sum + (item.likes || 0), 0);
-                const totalComments = (contentList || []).reduce((sum, item) => sum + (item.comments || 0), 0);
-                const totalShares = (contentList || []).reduce((sum, item) => sum + (item.shares || 0), 0);
-                const totalSaves = (contentList || []).reduce((sum, item) => sum + (item.saves || 0), 0);
-
-                const engagementData = [
-                  { label: 'Likes', value: totalLikes, color: '#059669' },
-                  { label: 'Comments', value: totalComments, color: '#4f46e5' },
-                  { label: 'Shares', value: totalShares, color: '#0284c7' },
-                  { label: 'Saves', value: totalSaves, color: '#7c3aed' }
-                ].filter(d => d.value > 0);
-
-                return <PortalDonutChart title="Engagement Breakdown" data={engagementData} totalLabel="Actions" />;
-              })()}
+              {/* Engagement Mix Donut Chart */}
+              <EngagementBreakdownDonut stats={overview.content} />
             </div>
 
-            {/* Top Content Performance Bar Chart */}
-            <TopContentBarChart contentList={contentList} />
-
-            {/* Ad Campaign Performance Bar Charts */}
+            {/* Ad Campaigns & Conversion Performance */}
             {overview.ads_breakdown && overview.ads_breakdown.length > 0 && (
-              <div className="portal-bento-card" style={{ padding: '24px' }}>
-                <h3 style={{ fontSize: '1.05rem', marginBottom: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>Ad Campaigns Performance</h3>
+              <div className="portal-bento-card" style={{ padding: '20px' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Ad Campaign Breakdown</h3>
                 {(() => {
-                  const maxSpend = Math.max(...overview.ads_breakdown.map(item => item.spend || 0), 1);
                   const maxLeads = Math.max(...overview.ads_breakdown.map(item => item.leads || 0), 1);
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div>
-                        <h4 style={{ fontSize: '0.78rem', marginBottom: '6px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ad Spend (₹)</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {overview.ads_breakdown.map((item, idx) => {
-                            const widthPct = ((item.spend || 0) / maxSpend) * 100;
-                            const colors = ['#2563eb', '#059669', '#d97706'];
-                            const color = colors[idx % colors.length];
-                            return (
-                              <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: '700' }}>
-                                  <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
-                                  <span>₹{(item.spend || 0).toLocaleString()}</span>
-                                </div>
-                                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color, borderRadius: '9999px' }} />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 style={{ fontSize: '0.78rem', marginBottom: '6px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leads Generated</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {overview.ads_breakdown.map((item, idx) => {
+                        <h4 style={{ fontSize: '0.78rem', marginBottom: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leads Generated By Channel</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {overview.ads_breakdown.map((item) => {
                             const widthPct = ((item.leads || 0) / maxLeads) * 100;
-                            const colors = ['#7c3aed', '#0284c7', '#e11d48'];
-                            const color = colors[idx % colors.length];
                             return (
                               <div key={item.platform} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: '700' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: '800' }}>
                                   <span style={{ textTransform: 'capitalize' }}>{item.platform}</span>
                                   <span>{item.leads || 0} leads</span>
                                 </div>
-                                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${Math.max(widthPct, 2)}%`, background: color, borderRadius: '9999px' }} />
+                                <div style={{ height: '10px', background: '#f4f4f5', border: '1.5px solid #18181b', borderRadius: '9999px', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.max(widthPct, 3)}%`, background: '#dc2626', borderRadius: '9999px' }} />
                                 </div>
                               </div>
                             );
