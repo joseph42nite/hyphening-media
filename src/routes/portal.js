@@ -896,6 +896,7 @@ router.post('/:token/comments/sync', portalAuth, async (req, res) => {
         const comments = result?.comments || result?.data?.data || result?.data || [];
 
         for (const comm of comments) {
+          const commenterName = comm.username || comm.from?.username || comm.from?.name || comm.user?.username || comm.user?.name || comm.owner?.username || comm.authorDisplayName || comm.snippet?.topLevelComment?.snippet?.authorDisplayName || 'Instagram User';
           db.prepare(`
             INSERT OR IGNORE INTO social_comments (
               content_id, client_id, platform, comment_id, commenter_name, comment_text, created_at
@@ -905,7 +906,7 @@ router.post('/:token/comments/sync', portalAuth, async (req, res) => {
             req.portalClient.id,
             post.platform,
             comm.id || comm.comment_id,
-            comm.username || comm.authorDisplayName || 'User',
+            commenterName,
             comm.text || comm.textDisplay || '',
             comm.timestamp || new Date().toISOString()
           );

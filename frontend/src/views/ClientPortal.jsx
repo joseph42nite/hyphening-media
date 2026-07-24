@@ -2447,7 +2447,7 @@ export default function ClientPortal({ showToast }) {
 
                     {isConn && info.accountName && (
                       <div style={{ fontSize: '0.75rem', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e4e4e7', color: '#09090b', fontWeight: 700 }}>
-                        Account: <strong style={{ color: '#dc2626' }}>@{info.accountName}</strong>
+                        Account: <strong style={{ color: '#dc2626' }}>@{info.accountName.replace(/^@/, '')}</strong>
                       </div>
                     )}
 
@@ -2559,7 +2559,11 @@ export default function ClientPortal({ showToast }) {
                           >
                             {comm.platform || 'Instagram'}
                           </span>
-                          <strong style={{ color: '#09090b', fontSize: '0.9rem' }}>@{comm.commenter_name || 'Social User'}</strong>
+                          <strong style={{ color: '#09090b', fontSize: '0.9rem' }}>
+                            {(comm.commenter_name && comm.commenter_name !== 'User' && comm.commenter_name !== 'Social User')
+                              ? `@${comm.commenter_name.replace(/^@/, '')}`
+                              : `${comm.platform === 'youtube' ? 'YouTube User' : 'Instagram User'}`}
+                          </strong>
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
                           {comm.post_title ? `Post: ${comm.post_title}` : `Post ID: #${comm.content_id}`}
