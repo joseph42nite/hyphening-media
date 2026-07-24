@@ -1120,6 +1120,24 @@ tr:hover td {
     font-size: 0.7rem !important;
   }
 
+  .curation-section-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .curation-actions {
+    flex-direction: column !important;
+    width: 100% !important;
+    align-items: stretch !important;
+  }
+
+  .curation-actions .btn,
+  .curation-actions input {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   .calendar-events-desktop {
     display: none !important;
   }

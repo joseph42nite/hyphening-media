@@ -293,7 +293,7 @@ export default function ArtistCurationTab({
     <div style={{ textAlign: 'left' }}>
       
       {/* Gig Status Tracker */}
-      <div className="dashboard-toolbar">
+      <div className="dashboard-toolbar curation-section-header">
         <h3>Gig Status Tracker</h3>
         <button onClick={() => openGigModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={16} /> Add Gig
@@ -425,10 +425,10 @@ export default function ArtistCurationTab({
       )}
 
       {/* Roster & Encrypted Details */}
-      <div className="dashboard-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '280px' }}>
-          <h3 style={{ margin: 0, whiteSpace: 'nowrap' }}>Artist Roster (Client Specific)</h3>
-          <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
+      <div className="dashboard-toolbar curation-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+        <h3 style={{ margin: 0 }}>Artist Roster (Client Specific)</h3>
+        <div className="curation-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '180px', maxWidth: '320px' }}>
             <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
@@ -442,10 +442,10 @@ export default function ArtistCurationTab({
               style={{ paddingLeft: '34px', paddingRight: '12px', height: '36px', fontSize: '0.85rem' }}
             />
           </div>
+          <button onClick={() => openArtistModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={16} /> Add Artist
+          </button>
         </div>
-        <button onClick={() => openArtistModal()} className="btn btn-primary">
-          <Plus size={16} /> Add Artist
-        </button>
       </div>
       <div className="table-container table-scrollable-y" style={{ marginBottom: '20px' }}>
         <table>
@@ -596,7 +596,7 @@ export default function ArtistCurationTab({
       )}
 
       {/* Venues Table */}
-      <div className="dashboard-toolbar">
+      <div className="dashboard-toolbar curation-section-header">
         <h3>Venue List</h3>
         <button onClick={() => openVenueModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={16} /> Add Venue
