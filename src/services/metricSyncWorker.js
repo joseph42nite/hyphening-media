@@ -142,7 +142,11 @@ export async function runMetricSyncWorker() {
 
     console.log(`[METRIC-SYNC] Syncing live metrics for ${itemsToRefresh.length} posted item(s)...`);
     for (const row of itemsToRefresh) {
-      await syncSingleContentMetrics(row.id);
+      try {
+        await syncSingleContentMetrics(row.id);
+      } catch (err) {
+        console.warn(`[METRIC-SYNC] Skipped post #${row.id}:`, err.message);
+      }
     }
     console.log(`[METRIC-SYNC] ✓ Live metrics sync complete.`);
   } catch (err) {
