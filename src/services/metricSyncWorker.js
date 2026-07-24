@@ -153,7 +153,7 @@ export async function syncSingleContentMetrics(contentId) {
         try {
           const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
             ig_media_id: numericMediaId,
-            metric: ['views', 'reach', 'likes', 'comments', 'saved', 'shares']
+            metric: ['views', 'reach', 'likes', 'comments', 'saved', 'shares', 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time']
           });
 
           const insightArray = insightsRes?.data?.data || insightsRes?.data || [];
@@ -165,6 +165,10 @@ export async function syncSingleContentMetrics(contentId) {
               if (m.name === 'comments') metrics.comments = val;
               if (m.name === 'saved') metrics.saves = val;
               if (m.name === 'shares') metrics.shares = val;
+              if (m.name === 'ig_reels_avg_watch_time' && val > 0) {
+                // Convert ms to seconds (e.g. 10.67s)
+                metrics.avg_watch_time_pct = Math.round((val / 1000) * 100) / 100;
+              }
             });
           }
         } catch (e) {
@@ -185,9 +189,13 @@ export async function syncSingleContentMetrics(contentId) {
   const saveRatePct = Math.round((metrics.saves / viewsVal) * 10000) / 100;
   const contentScore = Math.round(metrics.views * 0.1 + metrics.likes * 0.5 + metrics.comments * 1.5 + metrics.shares * 2.0 + metrics.saves * 2.0);
 
+  const avgWatchTimePct = metrics.avg_watch_time_pct !== undefined ? metrics.avg_watch_time_pct : (item.avg_watch_time_pct || null);
+  const boostedVal = item.boosted ? item.boosted : 'No';
+
   db.prepare(`
     UPDATE marketing_content_tracker
     SET views = ?, likes = ?, comments = ?, shares = ?, saves = ?,
+        avg_watch_time_pct = ?, boosted = ?,
         engagement_rate_pct = ?, save_rate_pct = ?, content_score = ?
     WHERE id = ?
   `).run(
@@ -196,6 +204,8 @@ export async function syncSingleContentMetrics(contentId) {
     metrics.comments,
     metrics.shares,
     metrics.saves,
+    avgWatchTimePct,
+    boostedVal,
     engagementRatePct,
     saveRatePct,
     contentScore,
@@ -204,6 +214,8 @@ export async function syncSingleContentMetrics(contentId) {
 
   return {
     ...metrics,
+    avg_watch_time_pct: avgWatchTimePct,
+    boosted: boostedVal,
     engagement_rate_pct: engagementRatePct,
     save_rate_pct: saveRatePct,
     content_score: contentScore
