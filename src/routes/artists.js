@@ -92,11 +92,28 @@ router.get('/', authorize('admin', 'ops_social_media_manager'), (req, res) => {
     query += ' ORDER BY name ASC';
     const artists = db.prepare(query).all(...params);
 
-    // Strip encrypted bank details
-    const safe = artists.map(({ bank_details_enc, ...rest }) => ({
-      ...rest,
-      has_bank_details: !!bank_details_enc,
-    }));
+    // Decrypt bank details for each artist if available
+    const bankKey = process.env.ARTIST_BANK_KEY;
+    const safe = artists.map(({ bank_details_enc, ...rest }) => {
+      let bank_details = null;
+      if (bank_details_enc && bankKey) {
+        try {
+          const decrypted = decrypt(bank_details_enc, bankKey);
+          try {
+            bank_details = JSON.parse(decrypted);
+          } catch (e) {
+            bank_details = decrypted;
+          }
+        } catch (e) {
+          console.error('[ARTISTS] Decrypt error for artist', rest.id, e.message);
+        }
+      }
+      return {
+        ...rest,
+        bank_details,
+        has_bank_details: !!bank_details_enc,
+      };
+    });
 
     res.json({ artists: safe });
   } catch (err) {
@@ -142,7 +159,7 @@ router.post('/', authorize('admin', 'ops_social_media_manager'), (req, res) => {
 
     const newArtist = db.prepare('SELECT * FROM artists WHERE id = ?').get(result.lastInsertRowid);
     const { bank_details_enc, ...safe } = newArtist;
-    res.status(201).json({ ...safe, has_bank_details: !!bank_details_enc });
+    res.status(201).json({ ...safe, bank_details: bank_details || null, has_bank_details: !!bank_details_enc });
   } catch (err) {
     console.error('[ARTISTS] Create error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -191,7 +208,7 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager'), (req, res) 
 
     const updated = db.prepare('SELECT * FROM artists WHERE id = ?').get(req.params.id);
     const { bank_details_enc, ...safe } = updated;
-    res.json({ ...safe, has_bank_details: !!bank_details_enc });
+    res.json({ ...safe, bank_details: req.body.bank_details || null, has_bank_details: !!bank_details_enc });
   } catch (err) {
     console.error('[ARTISTS] Update error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -200,13 +217,9 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager'), (req, res) 
 
 /**
  * GET /api/artists/:id/bank
- * Retrieve decrypted bank details — super_admin only.
+ * Retrieve decrypted bank details.
  */
 router.get('/:id/bank', authorize(), (req, res) => {
-  if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Only admins can access bank details' });
-  }
-
   try {
     const artist = db.prepare('SELECT bank_details_enc, name FROM artists WHERE id = ?').get(req.params.id);
     if (!artist) return res.status(404).json({ error: 'Artist not found' });
@@ -216,6 +229,12 @@ router.get('/:id/bank', authorize(), (req, res) => {
     if (!bankKey) return res.status(500).json({ error: 'Bank encryption key not configured' });
 
     const decrypted = decrypt(artist.bank_details_enc, bankKey);
+    let bank_details;
+    try {
+      bank_details = JSON.parse(decrypted);
+    } catch (e) {
+      bank_details = decrypted;
+    }
 
     logAction({
       actorId: req.user.id,
@@ -227,7 +246,7 @@ router.get('/:id/bank', authorize(), (req, res) => {
       ip: req.ip,
     });
 
-    res.json({ bank_details: JSON.parse(decrypted) });
+    res.json({ bank_details });
   } catch (err) {
     console.error('[ARTISTS] Bank details error:', err);
     res.status(500).json({ error: 'Internal server error' });

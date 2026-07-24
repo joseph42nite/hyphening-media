@@ -74,7 +74,7 @@ export default function ArtistCurationTab({
       const res = await fetch(`${API_BASE}/api/artists/${artistId}/bank`, { credentials: 'include' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setDecryptedBank(prev => ({ ...prev, [artistId]: data.bank_details }));
+      setDecryptedBank(prev => ({ ...prev, [artistId]: data.bank_details || 'No bank details recorded' }));
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -135,7 +135,7 @@ export default function ArtistCurationTab({
   const openArtistModal = async (artist = null) => {
     if (artist) {
       setEditingArtist(artist);
-      const bankVal = decryptedBank[artist.id] || '';
+      const bankVal = artist.bank_details || decryptedBank[artist.id] || '';
       setArtistFormData({
         name: artist.name,
         category: artist.category || '',
@@ -510,8 +510,12 @@ export default function ArtistCurationTab({
                     {art.notes || '-'}
                   </td>
                   <td>
-                    {decryptedBank[art.id] ? (
-                      <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>{decryptedBank[art.id]}</span>
+                    {art.bank_details || decryptedBank[art.id] ? (
+                      <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' }}>
+                        {art.bank_details || decryptedBank[art.id]}
+                      </span>
+                    ) : decryptedBank[art.id] !== undefined ? (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No bank details</span>
                     ) : (
                       <button
                         onClick={() => decryptBankDetails(art.id)}
