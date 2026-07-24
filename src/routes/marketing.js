@@ -272,7 +272,7 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
 
     const allowedFields = [
       'platform', 'date', 'post_type', 'title', 'script', 'status',
-      'views', 'likes', 'comments', 'shares', 'saves', 'avg_watch_time_pct',
+      'views', 'likes', 'comments', 'shares', 'saves', 'avg_watch_time_pct', 'skip_rate_pct',
       'boosted', 'metric_override',
       'link', 'time', 'caption', 'follows',
       'youtube_views', 'youtube_watch_time', 'youtube_avg_view_duration', 'youtube_ctr',

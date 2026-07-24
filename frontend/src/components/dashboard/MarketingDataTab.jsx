@@ -265,7 +265,7 @@ export default function MarketingDataTab({
               <thead>
                 <tr>
                   <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5' }}>Metadata</th>
-                  <th colSpan="11" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#fee2e2' }}>Instagram Metrics</th>
+                  <th colSpan="12" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#fee2e2' }}>Instagram Metrics</th>
                   <th colSpan="4" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#dbeafe' }}>YouTube Metrics</th>
                   <th style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5' }}>Actions</th>
                 </tr>
@@ -285,6 +285,7 @@ export default function MarketingDataTab({
                   <th>Saves</th>
                   <th>Follows</th>
                   <th>Avg Watch Time %</th>
+                  <th>Skip Rate %</th>
                   <th>Boosted?</th>
                   <th>Engagement %</th>
                   <th>Save Rate %</th>
@@ -299,7 +300,7 @@ export default function MarketingDataTab({
               <tbody>
                 {marketingContent.length === 0 ? (
                   <tr>
-                    <td colSpan="24" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    <td colSpan="25" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                       No content items tracked yet.
                     </td>
                   </tr>
@@ -389,6 +390,13 @@ export default function MarketingDataTab({
                         {item.avg_watch_time_pct !== null && item.avg_watch_time_pct !== undefined ? (
                           <span style={{ color: item.avg_watch_time_pct >= 50 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
                             {item.avg_watch_time_pct}%
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td>
+                        {item.skip_rate_pct !== null && item.skip_rate_pct !== undefined ? (
+                          <span style={{ color: item.skip_rate_pct <= 30 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                            {item.skip_rate_pct}%
                           </span>
                         ) : '-'}
                       </td>

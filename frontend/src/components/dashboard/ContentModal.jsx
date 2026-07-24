@@ -450,7 +450,7 @@ export default function ContentModal({
                         />
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                       <div className="form-group">
                         <label className="form-label">Avg Watch Time %</label>
                         <input
@@ -459,6 +459,16 @@ export default function ContentModal({
                           className="form-control"
                           value={contentFormData.avg_watch_time_pct}
                           onChange={e => setContentFormData({ ...contentFormData, avg_watch_time_pct: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Skip Rate %</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-control"
+                          value={contentFormData.skip_rate_pct}
+                          onChange={e => setContentFormData({ ...contentFormData, skip_rate_pct: e.target.value })}
                         />
                       </div>
                       <div className="form-group">

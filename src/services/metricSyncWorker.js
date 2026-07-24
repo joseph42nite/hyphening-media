@@ -190,12 +190,13 @@ export async function syncSingleContentMetrics(contentId) {
   const contentScore = Math.round(metrics.views * 0.1 + metrics.likes * 0.5 + metrics.comments * 1.5 + metrics.shares * 2.0 + metrics.saves * 2.0);
 
   const avgWatchTimePct = metrics.avg_watch_time_pct !== undefined ? metrics.avg_watch_time_pct : (item.avg_watch_time_pct || null);
+  const skipRatePct = avgWatchTimePct !== null && avgWatchTimePct !== undefined ? Math.max(0, Math.round((100 - avgWatchTimePct) * 100) / 100) : (item.skip_rate_pct || null);
   const boostedVal = item.boosted ? item.boosted : 'No';
 
   db.prepare(`
     UPDATE marketing_content_tracker
     SET views = ?, likes = ?, comments = ?, shares = ?, saves = ?,
-        avg_watch_time_pct = ?, boosted = ?,
+        avg_watch_time_pct = ?, skip_rate_pct = ?, boosted = ?,
         engagement_rate_pct = ?, save_rate_pct = ?, content_score = ?
     WHERE id = ?
   `).run(
@@ -205,6 +206,7 @@ export async function syncSingleContentMetrics(contentId) {
     metrics.shares,
     metrics.saves,
     avgWatchTimePct,
+    skipRatePct,
     boostedVal,
     engagementRatePct,
     saveRatePct,
@@ -215,6 +217,7 @@ export async function syncSingleContentMetrics(contentId) {
   return {
     ...metrics,
     avg_watch_time_pct: avgWatchTimePct,
+    skip_rate_pct: skipRatePct,
     boosted: boostedVal,
     engagement_rate_pct: engagementRatePct,
     save_rate_pct: saveRatePct,
