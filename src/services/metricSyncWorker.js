@@ -1,11 +1,18 @@
 import db from '../../database.js';
 import { executeClientAction } from './composioService.js';
-import { broadcastEvent } from '../../server.js';
 
 /**
- * 2-Stage Metric Sync Worker & On-Demand Refresh Service
- * Stage 1: 7 days after post
- * Stage 2: 30 days after post
+ * Extract Instagram shortcode from post link URL
+ * e.g., https://www.instagram.com/reel/DYbX0txjRVx/ => 'DYbX0txjRVx'
+ */
+function extractInstagramShortcode(link) {
+  if (!link) return null;
+  const match = link.match(/instagram\.com\/(?:reel|p)\/([A-Za-z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Fetch and sync metrics (Views, Likes, Comments, Shares, Saves, Engagement Rate, Content Score) for a single post item
  */
 export async function syncSingleContentMetrics(contentId) {
   const item = db.prepare(`
@@ -19,87 +26,125 @@ export async function syncSingleContentMetrics(contentId) {
     throw new Error(`Content item #${contentId} not found`);
   }
 
-  const postId = item.platform_post_id || item.instagram_media_id || item.youtube_video_id;
-  if (!postId) {
-    throw new Error(`Content item #${contentId} does not have a live platform post ID`);
-  }
+  let numericMediaId = item.instagram_media_id || item.platform_post_id;
+  let shortcode = extractInstagramShortcode(item.link);
 
   const platform = (item.platform || 'instagram').toLowerCase();
-  let metrics = { views: 0, likes: 0, comments: 0, shares: 0, saves: 0 };
+  let metrics = {
+    views: item.views || 0,
+    likes: item.likes || 0,
+    comments: item.comments || 0,
+    shares: item.shares || 0,
+    saves: item.saves || 0
+  };
 
-  if (process.env.COMPOSIO_API_KEY) {
+  if (process.env.COMPOSIO_API_KEY && (platform.includes('instagram') || platform.includes('meta'))) {
     try {
-      if (platform.includes('youtube')) {
-        const res = await executeClientAction(item.client_id, 'YOUTUBE_GET_VIDEO_STATS', { video_id: postId });
-        metrics = {
-          views: parseInt(res?.viewCount || 0, 10),
-          likes: parseInt(res?.likeCount || 0, 10),
-          comments: parseInt(res?.commentCount || 0, 10),
-          shares: 0,
-          saves: 0
-        };
-      } else {
-        const res = await executeClientAction(item.client_id, 'INSTAGRAM_GET_MEDIA_INSIGHTS', { media_id: postId });
-        metrics = {
-          views: parseInt(res?.plays || res?.views || 0, 10),
-          likes: parseInt(res?.like_count || 0, 10),
-          comments: parseInt(res?.comments_count || 0, 10),
-          shares: parseInt(res?.shares || 0, 10),
-          saves: parseInt(res?.saved || 0, 10)
-        };
+      // 1. If we don't have numeric Graph API media ID, resolve it via INSTAGRAM_GET_IG_USER_MEDIA
+      if (!numericMediaId || !/^\d+$/.test(numericMediaId)) {
+        try {
+          const userMedia = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_USER_MEDIA', {
+            ig_user_id: 'me',
+            fields: 'id,caption,media_type,permalink,shortcode,like_count,comments_count,timestamp'
+          });
+
+          const mediaList = userMedia?.data?.data || userMedia?.items || userMedia?.data || [];
+          const matched = mediaList.find(m => 
+            (shortcode && (m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode))))
+            || (item.link && m.permalink && m.permalink.includes(m.shortcode))
+          );
+
+          if (matched) {
+            numericMediaId = matched.id;
+            metrics.likes = matched.like_count || metrics.likes;
+            metrics.comments = matched.comments_count || metrics.comments;
+
+            // Store resolved numeric ID in database for future syncs
+            db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = ? WHERE id = ?')
+              .run(numericMediaId, contentId);
+          }
+        } catch (e) {
+          console.warn(`[METRIC-SYNC] Could not resolve media ID for post #${contentId}:`, e.message);
+        }
+      }
+
+      // 2. Fetch live insights (Views, Reach, Likes, Comments, Saved, Shares) via INSTAGRAM_GET_IG_MEDIA_INSIGHTS
+      if (numericMediaId && /^\d+$/.test(numericMediaId)) {
+        try {
+          const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
+            ig_media_id: numericMediaId,
+            metric: ['views', 'reach', 'likes', 'comments', 'saved', 'shares']
+          });
+
+          const insightArray = insightsRes?.data?.data || insightsRes?.data || [];
+          if (Array.isArray(insightArray)) {
+            insightArray.forEach(m => {
+              const val = m.values?.[0]?.value || 0;
+              if (m.name === 'views') metrics.views = val;
+              if (m.name === 'likes') metrics.likes = val;
+              if (m.name === 'comments') metrics.comments = val;
+              if (m.name === 'saved') metrics.saves = val;
+              if (m.name === 'shares') metrics.shares = val;
+            });
+          }
+        } catch (e) {
+          console.warn(`[METRIC-SYNC] Insights fetch failed for post #${contentId}:`, e.message);
+        }
       }
     } catch (err) {
-      console.error(`[METRIC-SYNC] Failed to fetch live metrics for content #${contentId}:`, err.message);
+      console.error(`[METRIC-SYNC] Live metric fetch failed for content #${contentId}:`, err.message);
     }
-  } else {
-    // Dry-run simulation for dev
-    console.log(`[METRIC-SYNC] [MOCK] Refreshing metrics for item #${contentId}`);
-    metrics = {
-      views: (item.views || 100) + Math.floor(Math.random() * 50),
-      likes: (item.likes || 10) + Math.floor(Math.random() * 5),
-      comments: (item.comments || 2) + Math.floor(Math.random() * 2),
-      shares: item.shares || 0,
-      saves: item.saves || 0
-    };
   }
+
+  // Calculate engagement rate, save rate & content score
+  const viewsVal = Math.max(metrics.views, 1);
+  const totalEngagements = metrics.likes + metrics.comments + metrics.shares + metrics.saves;
+  const engagementRatePct = Math.round((totalEngagements / viewsVal) * 10000) / 100;
+  const saveRatePct = Math.round((metrics.saves / viewsVal) * 10000) / 100;
+  const contentScore = Math.round(metrics.views * 0.1 + metrics.likes * 0.5 + metrics.comments * 1.5 + metrics.shares * 2.0 + metrics.saves * 2.0);
 
   db.prepare(`
     UPDATE marketing_content_tracker
-    SET views = ?, likes = ?, comments = ?, shares = ?, saves = ?
+    SET views = ?, likes = ?, comments = ?, shares = ?, saves = ?,
+        engagement_rate_pct = ?, save_rate_pct = ?, content_score = ?
     WHERE id = ?
-  `).run(metrics.views, metrics.likes, metrics.comments, metrics.shares, metrics.saves, contentId);
+  `).run(
+    metrics.views,
+    metrics.likes,
+    metrics.comments,
+    metrics.shares,
+    metrics.saves,
+    engagementRatePct,
+    saveRatePct,
+    contentScore,
+    contentId
+  );
 
-  broadcastEvent('metrics_updated', {
-    content_id: contentId,
-    client_id: item.client_id,
-    metrics
-  });
-
-  return metrics;
+  return {
+    ...metrics,
+    engagement_rate_pct: engagementRatePct,
+    save_rate_pct: saveRatePct,
+    content_score: contentScore
+  };
 }
 
 /**
- * 2-Stage Background Cron Sync for Posted Items
+ * Refresh metrics for all posted items in the database
  */
 export async function runMetricSyncWorker() {
   try {
-    // Find items posted 7 days or 30 days ago that need metric refresh
     const itemsToRefresh = db.prepare(`
       SELECT id FROM marketing_content_tracker
-      WHERE status = 'Posted'
-        AND (platform_post_id IS NOT NULL OR instagram_media_id IS NOT NULL OR youtube_video_id IS NOT NULL)
-        AND (
-          julianday('now') - julianday(date) BETWEEN 7 AND 8
-          OR julianday('now') - julianday(date) BETWEEN 30 AND 31
-        )
+      WHERE status = 'Posted' AND (link IS NOT NULL OR instagram_media_id IS NOT NULL OR platform_post_id IS NOT NULL)
     `).all();
 
     if (itemsToRefresh.length === 0) return;
 
-    console.log(`[METRIC-SYNC] Refreshing 2-Stage metrics for ${itemsToRefresh.length} post(s)...`);
+    console.log(`[METRIC-SYNC] Syncing live metrics for ${itemsToRefresh.length} posted item(s)...`);
     for (const row of itemsToRefresh) {
       await syncSingleContentMetrics(row.id);
     }
+    console.log(`[METRIC-SYNC] ✓ Live metrics sync complete.`);
   } catch (err) {
     console.error('[METRIC-SYNC] Error running metric sync worker:', err.message);
   }

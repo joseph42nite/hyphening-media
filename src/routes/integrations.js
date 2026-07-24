@@ -1,7 +1,7 @@
 import express from 'express';
 import db from '../../database.js';
 import { getConnectUrl, getClientConnectedAccounts } from '../services/composioService.js';
-import { syncSingleContentMetrics } from '../services/metricSyncWorker.js';
+import { syncSingleContentMetrics, runMetricSyncWorker } from '../services/metricSyncWorker.js';
 
 const router = express.Router();
 
@@ -56,6 +56,20 @@ router.get('/clients/:id/integrations/status', async (req, res) => {
   } catch (err) {
     console.error('[INTEGRATIONS] Error getting status:', err.message);
     res.status(500).json({ error: 'Failed to retrieve integration status' });
+  }
+});
+
+/**
+ * POST /api/marketing/content/sync-all-metrics
+ * On-demand batch refresh for all posted content metrics
+ */
+router.post('/marketing/content/sync-all-metrics', async (req, res) => {
+  try {
+    await runMetricSyncWorker();
+    res.json({ success: true, message: 'All post metrics synced successfully' });
+  } catch (err) {
+    console.error('[INTEGRATIONS] Batch metric sync failed:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to sync metrics' });
   }
 });
 
