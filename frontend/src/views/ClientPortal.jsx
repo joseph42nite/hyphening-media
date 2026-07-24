@@ -2377,117 +2377,107 @@ export default function ClientPortal({ showToast }) {
             {/* Header / Subtitle */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>
-                  Social Integrations & Channel Connections
+                <h2 style={{ fontSize: '1.25rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
+                  Social Integrations & Connections
                 </h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>
-                  Connect your brand social accounts via Composio to enable 1080p uncompressed auto-publishing & live performance tracking.
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0', fontWeight: 600 }}>
+                  Connect brand social channels to enable automated 1080p publishing, live metric sync, and comment replies.
                 </p>
               </div>
               <button 
                 onClick={() => { fetchIntegrations(); fetchComments(); showToast('Refreshing integrations status...', 'info'); }}
                 className="portal-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 800 }}
                 disabled={integrationsLoading}
               >
-                <RefreshCw size={14} className={integrationsLoading ? 'spin' : ''} /> Refresh All Statuses
+                <RefreshCw size={14} className={integrationsLoading ? 'spin' : ''} /> Refresh Statuses
               </button>
             </div>
 
-            {/* Section A: Connected Accounts Bento Grid */}
-            <div className="portal-metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px' }}>
+            {/* Section A: Connected Accounts Bento Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px' }}>
               {[
-                { key: 'instagram', name: 'Instagram Business', desc: 'Reels, Posts & Video Stream', icon: '📸' },
-                { key: 'youtube', name: 'YouTube Channel', desc: 'Shorts & retention graphs', icon: '▶️' },
+                { key: 'instagram', name: 'Instagram Business', desc: 'Reels & Media Insights', icon: '📸' },
+                { key: 'youtube', name: 'YouTube Channel', desc: 'Shorts & Video Analytics', icon: '▶️' },
                 { key: 'linkedin', name: 'LinkedIn Company', desc: 'Professional Video Posts', icon: '💼' },
-                { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Engagement', icon: '📘' },
-                { key: 'x', name: 'X (Twitter)', desc: 'Direct Video Posts', icon: '𝕏' }
+                { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Insights', icon: '📘' },
+                { key: 'x', name: 'X (Twitter)', desc: 'Direct Social Video Posts', icon: '𝕏' }
               ].map(app => {
                 const info = integrations[app.key] || {};
                 const isConn = info.connected;
 
-                if (isConn) {
-                  return (
-                    <div key={app.key} className="portal-bento-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: '#f0fdf4', borderColor: '#bbf7d0', position: 'relative' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1.2rem' }}>{app.icon}</span>
+                return (
+                  <div 
+                    key={app.key} 
+                    style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justify: 'space-between', 
+                      gap: '12px', 
+                      padding: '16px', 
+                      background: '#ffffff', 
+                      border: '2px solid #18181b', 
+                      borderRadius: '12px',
+                      boxShadow: '3px 3px 0px #18181b',
+                      transition: 'transform 0.2s ease, boxShadow 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.4rem' }}>{app.icon}</span>
                         <div>
-                          <h3 style={{ fontSize: '0.8rem', margin: 0, fontWeight: 800, color: '#166534', lineHeight: 1.1 }}>
-                            {app.name.split(' ')[0]} ✓
-                          </h3>
-                          {info.accountName && (
-                            <span style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600, display: 'block', marginTop: '2px' }}>
-                              @{info.accountName}
-                            </span>
-                          )}
+                          <h3 style={{ fontSize: '0.88rem', margin: 0, fontWeight: 900, color: '#09090b', lineHeight: 1.2 }}>{app.name}</h3>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px', fontWeight: 600 }}>{app.desc}</span>
                         </div>
                       </div>
-                      
-                      <button
-                        onClick={() => handleConnectApp(app.key)}
-                        disabled={connectingApp === app.key}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#166534',
-                          fontSize: '0.65rem',
-                          fontWeight: '800',
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                          padding: 0
+                      <span 
+                        style={{ 
+                          fontSize: '0.65rem', 
+                          padding: '3px 8px', 
+                          borderRadius: '9999px', 
+                          fontWeight: 800,
+                          backgroundColor: isConn ? '#d1fae5' : '#f4f4f5',
+                          color: isConn ? '#065f46' : '#64748b',
+                          border: '1px solid #18181b'
                         }}
                       >
-                        {connectingApp === app.key ? '...' : 'Switch'}
-                      </button>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div key={app.key} className="portal-bento-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px', position: 'relative', overflow: 'hidden', padding: '12px 14px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1.2rem' }}>{app.icon}</span>
-                        <div>
-                          <h3 style={{ fontSize: '0.85rem', margin: 0, fontWeight: 800, color: '#000000', lineHeight: 1.2 }}>{app.name}</h3>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{app.desc}</span>
-                        </div>
-                      </div>
-                      <span className={`portal-badge ${isConn ? 'portal-badge-success' : 'portal-badge-warning'}`} style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
                         {isConn ? 'Connected' : 'Unlinked'}
                       </span>
                     </div>
 
                     {isConn && info.accountName && (
-                      <div style={{ fontSize: '0.75rem', background: '#f4f4f5', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e4e4e7', color: '#000000', fontWeight: 600 }}>
-                        Account: <strong>@{info.accountName}</strong>
+                      <div style={{ fontSize: '0.75rem', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e4e4e7', color: '#09090b', fontWeight: 700 }}>
+                        Account: <strong style={{ color: '#dc2626' }}>@{info.accountName}</strong>
                       </div>
                     )}
 
                     <button
                       onClick={() => handleConnectApp(app.key)}
-                      className={`portal-btn ${isConn ? 'portal-btn-success' : ''}`}
                       disabled={connectingApp === app.key}
                       style={{
                         width: '100%',
-                        justify: 'center',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '0.75rem',
-                        padding: '6px 12px',
-                        marginTop: 'auto',
-                        background: isConn ? '#dcfce7' : '#000000',
-                        color: isConn ? '#166534' : '#ffffff',
-                        border: '2px solid #000000'
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: isConn ? '#ffffff' : '#18181b',
+                        color: isConn ? '#18181b' : '#ffffff',
+                        border: '1.5px solid #18181b',
+                        boxShadow: '2px 2px 0px #18181b',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       {connectingApp === app.key ? (
                         <>Connecting...</>
                       ) : isConn ? (
-                        <><CheckCircle size={12} /> Reconnect / Switch</>
+                        <><CheckCircle size={13} color="#059669" /> Switch Account</>
                       ) : (
-                        <><Zap size={12} /> Connect {app.name.split(' ')[0]}</>
+                        <><Zap size={13} color="#dc2626" /> Connect {app.name.split(' ')[0]}</>
                       )}
                     </button>
                   </div>
@@ -2496,29 +2486,29 @@ export default function ClientPortal({ showToast }) {
             </div>
 
             {/* Section B: Community & Comment Reply Inbox */}
-            <div className="portal-bento-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', margin: '0 0 4px 0', textTransform: 'uppercase', fontWeight: 800 }}>
-                    💬 Community & Comment Reply Inbox
+                  <h3 style={{ fontSize: '1.05rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
+                    💬 Community & Live Comment Inbox
                   </h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0, fontWeight: 600 }}>
-                    Incoming comments across Instagram Reels & YouTube Shorts. Reply live directly from your client portal!
+                  <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0', fontWeight: 600 }}>
+                    View and reply to incoming comments across Instagram Reels & YouTube Shorts in real-time.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button 
                     onClick={handleSyncComments}
                     className="portal-btn portal-btn-primary"
-                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px', fontWeight: 800 }}
                     disabled={syncingComments}
                   >
-                    {syncingComments ? '⏳ Syncing...' : '🔄 Sync from Instagram'}
+                    {syncingComments ? '⏳ Syncing...' : '🔄 Sync Comments'}
                   </button>
                   <button 
                     onClick={fetchComments}
                     className="portal-btn"
-                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px', fontWeight: 800 }}
                   >
                     Refresh
                   </button>
@@ -2526,34 +2516,57 @@ export default function ClientPortal({ showToast }) {
               </div>
 
               {commentsLoading ? (
-                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>
+                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '0.85rem' }}>
                   Loading social comments...
                 </div>
               ) : comments.length === 0 ? (
-                <div style={{ padding: '30px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '2px dashed #cbd5e1', color: 'var(--text-muted)' }}>
-                  <MessageSquare size={32} style={{ opacity: 0.5, marginBottom: '8px' }} />
-                  <div style={{ fontWeight: 800, color: '#000000' }}>No Ingested Comments Yet</div>
-                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                <div style={{ padding: '36px', textAlign: 'center', background: '#fafafa', borderRadius: '12px', border: '2px dashed #e4e4e7', color: '#64748b' }}>
+                  <MessageSquare size={32} style={{ opacity: 0.4, marginBottom: '8px' }} />
+                  <div style={{ fontWeight: 800, color: '#09090b', fontSize: '0.95rem' }}>No Ingested Comments Yet</div>
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px', fontWeight: 600 }}>
                     Comments are automatically synced every night at 2:00 AM UTC once social accounts are connected.
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {comments.map(comm => (
-                    <div key={comm.id || comm.comment_id} style={{ background: '#f8fafc', border: '2px solid #000000', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div 
+                      key={comm.id || comm.comment_id} 
+                      style={{ 
+                        background: '#ffffff', 
+                        border: '1.5px solid #18181b', 
+                        borderRadius: '10px', 
+                        padding: '16px', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '12px',
+                        boxShadow: '2px 2px 0px #18181b'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className="portal-badge portal-badge-info" style={{ textTransform: 'capitalize' }}>
+                          <span 
+                            style={{ 
+                              fontSize: '0.68rem', 
+                              padding: '2px 8px', 
+                              borderRadius: '9999px', 
+                              fontWeight: 800,
+                              background: '#f4f4f5', 
+                              color: '#18181b', 
+                              border: '1px solid #18181b',
+                              textTransform: 'capitalize' 
+                            }}
+                          >
                             {comm.platform || 'Instagram'}
                           </span>
-                          <strong style={{ color: '#000000', fontSize: '0.9rem' }}>@{comm.commenter_name || 'Social User'}</strong>
+                          <strong style={{ color: '#09090b', fontSize: '0.9rem' }}>@{comm.commenter_name || 'Social User'}</strong>
                         </div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
                           {comm.post_title ? `Post: ${comm.post_title}` : `Post ID: #${comm.content_id}`}
                         </span>
                       </div>
 
-                      <div style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 500, paddingLeft: '4px' }}>
+                      <div style={{ fontSize: '0.88rem', color: '#18181b', fontWeight: 600, paddingLeft: '4px', borderLeft: '3px solid #dc2626' }}>
                         "{comm.comment_text}"
                       </div>
 
@@ -2563,12 +2576,13 @@ export default function ClientPortal({ showToast }) {
                           placeholder="Type live reply to post on social platform..."
                           value={replyTextMap[comm.comment_id] || ''}
                           onChange={(e) => setReplyTextMap({ ...replyTextMap, [comm.comment_id]: e.target.value })}
+                          className="portal-control"
                           style={{
                             flexGrow: 1,
                             padding: '8px 12px',
-                            borderRadius: '6px',
-                            border: '2px solid #000000',
-                            fontSize: '0.85rem',
+                            borderRadius: '8px',
+                            border: '1.5px solid #18181b',
+                            fontSize: '0.82rem',
                             outline: 'none'
                           }}
                           onKeyDown={(e) => {
@@ -2577,9 +2591,9 @@ export default function ClientPortal({ showToast }) {
                         />
                         <button
                           onClick={() => handleSendCommentReply(comm.comment_id, comm.platform)}
-                          className="portal-btn"
+                          className="portal-btn portal-btn-primary"
                           disabled={replyingId === comm.comment_id}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap', padding: '8px 16px', fontWeight: 800 }}
                         >
                           <Send size={14} /> {replyingId === comm.comment_id ? 'Posting...' : 'Reply'}
                         </button>
@@ -2591,19 +2605,32 @@ export default function ClientPortal({ showToast }) {
             </div>
 
             {/* Section C: Live Metrics Direct Refresh */}
-            <div className="portal-bento-card" style={{ background: '#f0fdf4', border: '3px solid #000000', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <div 
+              style={{ 
+                background: '#ffffff', 
+                border: '2px solid #18181b', 
+                borderRadius: '12px',
+                padding: '20px 24px',
+                boxShadow: '3px 3px 0px #18181b',
+                display: 'flex', 
+                justify: 'space-between', 
+                alignItems: 'center', 
+                flexWrap: 'wrap', 
+                gap: '16px' 
+              }}
+            >
               <div>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#166534', fontWeight: 800 }}>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#09090b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   ⚡ High-Velocity Metric Sync
                 </h4>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
-                  All portal numbers update automatically 7-days and 30-days post-publishing. Trigger a manual sync anytime.
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                  Portal analytics automatically sync post insights continuously. Trigger a manual live refresh anytime.
                 </p>
               </div>
               <button
                 onClick={() => { fetchData(); showToast('✓ Live metrics synced from cache', 'success'); }}
-                className="portal-btn"
-                style={{ background: '#166534', color: '#ffffff', border: '2px solid #000000', fontSize: '0.85rem' }}
+                className="portal-btn portal-btn-primary"
+                style={{ fontSize: '0.82rem', padding: '8px 18px', fontWeight: 800 }}
               >
                 Sync Live Metrics Now
               </button>
