@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function ArtistCurationTab({
@@ -21,6 +21,23 @@ export default function ArtistCurationTab({
   const [gigsLimit, setGigsLimit] = useState(10);
   const [artistsPage, setArtistsPage] = useState(1);
   const [artistsLimit, setArtistsLimit] = useState(10);
+
+  // Search state for Artist Roster
+  const [artistRosterSearch, setArtistRosterSearch] = useState('');
+
+  // Filtered Artists calculation
+  const filteredArtists = artists.filter(art => {
+    if (!artistRosterSearch.trim()) return true;
+    const q = artistRosterSearch.toLowerCase();
+    return (
+      (art.name && art.name.toLowerCase().includes(q)) ||
+      (art.category && art.category.toLowerCase().includes(q)) ||
+      (art.city && art.city.toLowerCase().includes(q)) ||
+      (art.phone && art.phone.toLowerCase().includes(q)) ||
+      (art.email && art.email.toLowerCase().includes(q)) ||
+      (art.instruments && art.instruments.toLowerCase().includes(q))
+    );
+  });
 
   // Bank decryption state
   const [decryptedBank, setDecryptedBank] = useState({});
@@ -115,9 +132,10 @@ export default function ArtistCurationTab({
   };
 
   // Artist CRUD handlers
-  const openArtistModal = (artist = null) => {
+  const openArtistModal = async (artist = null) => {
     if (artist) {
       setEditingArtist(artist);
+      const bankVal = decryptedBank[artist.id] || '';
       setArtistFormData({
         name: artist.name,
         category: artist.category || '',
@@ -125,21 +143,34 @@ export default function ArtistCurationTab({
         phone: artist.phone || '',
         email: artist.email || '',
         telegram_chat_id: artist.telegram_chat_id || '',
-        bank_details: '', // Leave blank unless updating
+        bank_details: bankVal,
         instruments: artist.instruments || '',
         insta_link: artist.insta_link || '',
         description: artist.description || '',
         rating: artist.rating !== null && artist.rating !== undefined ? String(artist.rating) : '',
         notes: artist.notes || ''
       });
+      setShowArtistModal(true);
+      if (!bankVal && (artist.has_bank_details || artist.bank_details_enc)) {
+        try {
+          const res = await fetch(`${API_BASE}/api/artists/${artist.id}/bank`, { credentials: 'include' });
+          const data = await res.json();
+          if (res.ok && data.bank_details) {
+            setDecryptedBank(prev => ({ ...prev, [artist.id]: data.bank_details }));
+            setArtistFormData(prev => ({ ...prev, bank_details: data.bank_details }));
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
     } else {
       setEditingArtist(null);
       setArtistFormData({
         name: '', category: '', city: '', phone: '', email: '', telegram_chat_id: '', bank_details: '',
         instruments: '', insta_link: '', description: '', rating: '', notes: ''
       });
+      setShowArtistModal(true);
     }
-    setShowArtistModal(true);
   };
 
   const handleArtistSubmit = async (e) => {
@@ -394,8 +425,24 @@ export default function ArtistCurationTab({
       )}
 
       {/* Roster & Encrypted Details */}
-      <div className="dashboard-toolbar">
-        <h3>Artist Roster (Client Specific)</h3>
+      <div className="dashboard-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '280px' }}>
+          <h3 style={{ margin: 0, whiteSpace: 'nowrap' }}>Artist Roster (Client Specific)</h3>
+          <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search artist roster..."
+              value={artistRosterSearch}
+              onChange={(e) => {
+                setArtistRosterSearch(e.target.value);
+                setArtistsPage(1);
+              }}
+              style={{ paddingLeft: '34px', paddingRight: '12px', height: '36px', fontSize: '0.85rem' }}
+            />
+          </div>
+        </div>
         <button onClick={() => openArtistModal()} className="btn btn-primary">
           <Plus size={16} /> Add Artist
         </button>
@@ -427,69 +474,75 @@ export default function ArtistCurationTab({
             </tr>
           </thead>
           <tbody>
-            {artists.slice((artistsPage - 1) * artistsLimit, artistsPage * artistsLimit).map(art => (
-              <tr key={art.id}>
-                <td style={{ fontWeight: 'bold' }}>{art.name}</td>
-                <td>{art.category || '-'}</td>
-                <td>{art.phone || '-'}</td>
-                <td>{art.instruments || '-'}</td>
-                <td>
-                  {art.insta_link ? (
-                    <a href={art.insta_link.startsWith('http') ? art.insta_link : `https://${art.insta_link}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>
-                      {art.insta_link}
-                    </a>
-                  ) : '-'}
-                </td>
-                <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={art.description}>
-                  {art.description || '-'}
-                </td>
-                <td>{art.email || '-'}</td>
-                <td>{art.city || '-'}</td>
-                <td>{art.total_performances}</td>
-                <td>{art.perf_with_m}</td>
-                <td>{art.last_perf_date}</td>
-                <td>₹{art.average_fee_inr ? art.average_fee_inr.toLocaleString('en-IN') : '0'}</td>
-                <td>{art.payment_status}</td>
-                <td>{art.rating || '-'}</td>
-                <td>{art.reliability_score !== null && art.reliability_score !== undefined ? `${art.reliability_score}%` : 'N/A'}</td>
-                <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={art.notes}>
-                  {art.notes || '-'}
-                </td>
-                <td>
-                  {decryptedBank[art.id] ? (
-                    <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>{decryptedBank[art.id]}</span>
-                  ) : (
-                    <button
-                      onClick={() => decryptBankDetails(art.id)}
-                      className="btn btn-secondary"
-                      style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                      disabled={!isSuperAdmin}
-                      title={!isSuperAdmin ? 'Only Super Admin can decrypt bank credentials' : ''}
-                    >
-                      Reveal Bank Info
-                    </button>
-                  )}
-                </td>
-                <td>₹{art.total_amount_paid_inr ? art.total_amount_paid_inr.toLocaleString('en-IN') : '0'}</td>
-                <td>₹{art.total_amount_pending_inr ? art.total_amount_pending_inr.toLocaleString('en-IN') : '0'}</td>
-                <td>
-                  <button onClick={() => openArtistModal(art)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                    Edit
-                  </button>
+            {filteredArtists.length === 0 ? (
+              <tr>
+                <td colSpan="20" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  No artists found matching your search.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredArtists.slice((artistsPage - 1) * artistsLimit, artistsPage * artistsLimit).map(art => (
+                <tr key={art.id}>
+                  <td style={{ fontWeight: 'bold' }}>{art.name}</td>
+                  <td>{art.category || '-'}</td>
+                  <td>{art.phone || '-'}</td>
+                  <td>{art.instruments || '-'}</td>
+                  <td>
+                    {art.insta_link ? (
+                      <a href={art.insta_link.startsWith('http') ? art.insta_link : `https://${art.insta_link}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>
+                        {art.insta_link}
+                      </a>
+                    ) : '-'}
+                  </td>
+                  <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={art.description}>
+                    {art.description || '-'}
+                  </td>
+                  <td>{art.email || '-'}</td>
+                  <td>{art.city || '-'}</td>
+                  <td>{art.total_performances}</td>
+                  <td>{art.perf_with_m}</td>
+                  <td>{art.last_perf_date}</td>
+                  <td>₹{art.average_fee_inr ? art.average_fee_inr.toLocaleString('en-IN') : '0'}</td>
+                  <td>{art.payment_status}</td>
+                  <td>{art.rating || '-'}</td>
+                  <td>{art.reliability_score !== null && art.reliability_score !== undefined ? `${art.reliability_score}%` : 'N/A'}</td>
+                  <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={art.notes}>
+                    {art.notes || '-'}
+                  </td>
+                  <td>
+                    {decryptedBank[art.id] ? (
+                      <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>{decryptedBank[art.id]}</span>
+                    ) : (
+                      <button
+                        onClick={() => decryptBankDetails(art.id)}
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                      >
+                        Reveal Bank Info
+                      </button>
+                    )}
+                  </td>
+                  <td>₹{art.total_amount_paid_inr ? art.total_amount_paid_inr.toLocaleString('en-IN') : '0'}</td>
+                  <td>₹{art.total_amount_pending_inr ? art.total_amount_pending_inr.toLocaleString('en-IN') : '0'}</td>
+                  <td>
+                    <button onClick={() => openArtistModal(art)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
       {/* Pagination Controls for Artists */}
-      {artists.length > 0 && (
+      {filteredArtists.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
-            Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((artistsPage - 1) * artistsLimit + 1, artists.length)}</span> to{' '}
-            <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(artistsPage * artistsLimit, artists.length)}</span> of{' '}
-            <span style={{ fontFamily: 'var(--font-mono)' }}>{artists.length}</span> entries
+            Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((artistsPage - 1) * artistsLimit + 1, filteredArtists.length)}</span> to{' '}
+            <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(artistsPage * artistsLimit, filteredArtists.length)}</span> of{' '}
+            <span style={{ fontFamily: 'var(--font-mono)' }}>{filteredArtists.length}</span> entries
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -517,7 +570,7 @@ export default function ArtistCurationTab({
               <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage === 1} onClick={() => setArtistsPage(artistsPage - 1)}>Prev</button>
 
               {(() => {
-                const totalPages = Math.ceil(artists.length / artistsLimit);
+                const totalPages = Math.ceil(filteredArtists.length / artistsLimit);
                 const buttons = [];
                 const startPage = Math.max(1, artistsPage - 2);
                 const endPage = Math.min(totalPages, artistsPage + 2);
@@ -531,8 +584,8 @@ export default function ArtistCurationTab({
                 return buttons;
               })()}
 
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage >= Math.ceil(artists.length / artistsLimit)} onClick={() => setArtistsPage(artistsPage + 1)}>Next</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage >= Math.ceil(artists.length / artistsLimit)} onClick={() => setArtistsPage(Math.ceil(artists.length / artistsLimit))}>Last</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(artistsPage + 1)}>Next</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(Math.ceil(filteredArtists.length / artistsLimit))}>Last</button>
             </div>
           </div>
         </div>
@@ -713,7 +766,7 @@ export default function ArtistCurationTab({
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
-                  <label className="form-label">Bank Details (Super Admin only can decrypt)</label>
+                  <label className="form-label">Bank Details</label>
                   <textarea
                     className="form-control"
                     placeholder="Enter Bank Details..."
