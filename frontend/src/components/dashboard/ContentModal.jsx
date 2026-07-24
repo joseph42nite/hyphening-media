@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 export default function ContentModal({
   showContentModal,
@@ -14,7 +15,9 @@ export default function ContentModal({
 }) {
   if (!showContentModal) return null;
 
-  const [scriptFilterDate, setScriptFilterDate] = React.useState((contentFormData.date || '').slice(0, 7));
+  const [scriptFilterDate, setScriptFilterDate] = useState((contentFormData.date || '').slice(0, 7));
+  const [showAutoDetails, setShowAutoDetails] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(false);
 
   React.useEffect(() => {
     if (contentFormData.date) {
@@ -44,6 +47,7 @@ export default function ContentModal({
           </div>
         )}
         <form onSubmit={handleContentSubmit} style={{ marginTop: '20px' }}>
+          {/* Primary Row Info */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
               <label className="form-label">Platform</label>
@@ -120,52 +124,6 @@ export default function ContentModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
-              <label className="form-label">Instagram Link (Cross-Post)</label>
-              <input
-                type="url"
-                className="form-control"
-                value={contentFormData.instagram_link || ''}
-                onChange={e => setContentFormData({ ...contentFormData, instagram_link: e.target.value })}
-                placeholder="https://instagram.com/p/..."
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">YouTube Link (Cross-Post)</label>
-              <input
-                type="url"
-                className="form-control"
-                value={contentFormData.youtube_link || ''}
-                onChange={e => setContentFormData({ ...contentFormData, youtube_link: e.target.value })}
-                placeholder="https://youtube.com/watch?v=..."
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px', marginBottom: '12px' }}>
-            <div className="form-group">
-              <label className="form-label">Facebook Link (Cross-Post)</label>
-              <input
-                type="url"
-                className="form-control"
-                value={contentFormData.facebook_link || ''}
-                onChange={e => setContentFormData({ ...contentFormData, facebook_link: e.target.value })}
-                placeholder="https://facebook.com/..."
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">LinkedIn Link (Cross-Post)</label>
-              <input
-                type="url"
-                className="form-control"
-                value={contentFormData.linkedin_link || ''}
-                onChange={e => setContentFormData({ ...contentFormData, linkedin_link: e.target.value })}
-                placeholder="https://linkedin.com/..."
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div className="form-group">
               <label className="form-label">Script/Blog Month (Filter)</label>
               <input
                 type="month"
@@ -195,49 +153,10 @@ export default function ContentModal({
                   ));
                 })()}
               </select>
-              {(marketingScripts || []).length === 0 ? (
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  No scripts found. Create one in the Script Tracker tab.
-                </span>
-              ) : (
-                (() => {
-                  const selectedMonth = scriptFilterDate ? scriptFilterDate.slice(0, 7) : '';
-                  const filtered = selectedMonth ? (marketingScripts || []).filter(s => s.month === selectedMonth) : (marketingScripts || []);
-                  if (filtered.length === 0 && selectedMonth) {
-                    return (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-warning)' }}>
-                        No scripts found for {selectedMonth}. Create one in the Script Tracker tab.
-                      </span>
-                    );
-                  }
-                  return null;
-                })()
-              )}
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Caption</label>
-            <textarea
-              className="form-control"
-              rows={2}
-              value={contentFormData.caption}
-              onChange={e => setContentFormData({ ...contentFormData, caption: e.target.value })}
-            />
-          </div>
-
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            <div className="form-group">
-              <label className="form-label">Time</label>
-              <input
-                type="text"
-                className="form-control"
-                value={contentFormData.time}
-                onChange={e => setContentFormData({ ...contentFormData, time: e.target.value })}
-                placeholder="e.g. 18:00"
-              />
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             <div className="form-group">
               <label className="form-label">Assignee (Staff)</label>
               <select
@@ -270,181 +189,314 @@ export default function ContentModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            <div className="form-group">
-              <label className="form-label">Facebook Post ID</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="fb_..."
-                value={contentFormData.facebook_post_id}
-                onChange={e => setContentFormData({ ...contentFormData, facebook_post_id: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Instagram Media ID</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="ig_..."
-                value={contentFormData.instagram_media_id}
-                onChange={e => setContentFormData({ ...contentFormData, instagram_media_id: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">YouTube Video ID</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="yt_..."
-                value={contentFormData.youtube_video_id}
-                onChange={e => setContentFormData({ ...contentFormData, youtube_video_id: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">LinkedIn Post ID</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="urn:li:share:..."
-                value={contentFormData.linkedin_post_id || ''}
-                onChange={e => setContentFormData({ ...contentFormData, linkedin_post_id: e.target.value })}
-              />
-            </div>
+          {/* DROPDOWN 1: Auto-Extracted Content & Links */}
+          <div style={{
+            marginBottom: '16px',
+            border: '1px solid var(--border-color, #e4e4e7)',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowAutoDetails(!showAutoDetails)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: 'var(--bg-secondary, #f4f4f5)',
+                border: 'none',
+                display: 'flex',
+                justify: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.85rem',
+                color: 'var(--text-main, #18181b)'
+              }}
+            >
+              <span>🔗 Auto-Extracted Details (Links, Time, Caption & IDs)</span>
+              <ChevronDown size={16} style={{ transform: showAutoDetails ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+            </button>
+            {showAutoDetails && (
+              <div style={{ padding: '16px', background: 'var(--bg-primary, #ffffff)', borderTop: '1px solid var(--border-color, #e4e4e7)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Posting Time</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={contentFormData.time || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, time: e.target.value })}
+                      placeholder="Auto-extracted (e.g. 18:00)"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Post Caption</label>
+                    <textarea
+                      className="form-control"
+                      rows={2}
+                      value={contentFormData.caption || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, caption: e.target.value })}
+                      placeholder="Auto-extracted caption..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Instagram Link</label>
+                    <input
+                      type="url"
+                      className="form-control"
+                      value={contentFormData.instagram_link || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, instagram_link: e.target.value })}
+                      placeholder="https://instagram.com/p/..."
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">YouTube Link</label>
+                    <input
+                      type="url"
+                      className="form-control"
+                      value={contentFormData.youtube_link || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, youtube_link: e.target.value })}
+                      placeholder="https://youtube.com/watch?v=..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Facebook Link</label>
+                    <input
+                      type="url"
+                      className="form-control"
+                      value={contentFormData.facebook_link || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, facebook_link: e.target.value })}
+                      placeholder="https://facebook.com/..."
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">LinkedIn Link</label>
+                    <input
+                      type="url"
+                      className="form-control"
+                      value={contentFormData.linkedin_link || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, linkedin_link: e.target.value })}
+                      placeholder="https://linkedin.com/..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">IG Media ID</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="ig_..."
+                      value={contentFormData.instagram_media_id || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, instagram_media_id: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">YT Video ID</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="yt_..."
+                      value={contentFormData.youtube_video_id || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, youtube_video_id: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">FB Post ID</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="fb_..."
+                      value={contentFormData.facebook_post_id || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, facebook_post_id: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">LN Post ID</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="urn:li:..."
+                      value={contentFormData.linkedin_post_id || ''}
+                      onChange={e => setContentFormData({ ...contentFormData, linkedin_post_id: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {contentFormData.platform === 'instagram' ? (
-            <div>
-              <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Instagram Metrics</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
-                  <label className="form-label">Views</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={contentFormData.views}
-                    onChange={e => setContentFormData({ ...contentFormData, views: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Likes</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={contentFormData.likes}
-                    onChange={e => setContentFormData({ ...contentFormData, likes: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Comments</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={contentFormData.comments}
-                    onChange={e => setContentFormData({ ...contentFormData, comments: e.target.value })}
-                  />
-                </div>
+          {/* DROPDOWN 2: Auto-Synced Metrics & Manual Overrides */}
+          <div style={{
+            marginBottom: '16px',
+            border: '1px solid var(--border-color, #e4e4e7)',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowMetrics(!showMetrics)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: 'var(--bg-secondary, #f4f4f5)',
+                border: 'none',
+                display: 'flex',
+                justify: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.85rem',
+                color: 'var(--text-main, #18181b)'
+              }}
+            >
+              <span>📊 Auto-Synced Metrics & Manual Overrides</span>
+              <ChevronDown size={16} style={{ transform: showMetrics ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+            </button>
+            {showMetrics && (
+              <div style={{ padding: '16px', background: 'var(--bg-primary, #ffffff)', borderTop: '1px solid var(--border-color, #e4e4e7)' }}>
+                {contentFormData.platform === 'instagram' ? (
+                  <div>
+                    <h4 style={{ margin: '0 0 12px', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)' }}>Instagram Metrics</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">Views</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={contentFormData.views}
+                          onChange={e => setContentFormData({ ...contentFormData, views: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Likes</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={contentFormData.likes}
+                          onChange={e => setContentFormData({ ...contentFormData, likes: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Comments</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={contentFormData.comments}
+                          onChange={e => setContentFormData({ ...contentFormData, comments: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">Shares</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={contentFormData.shares}
+                          onChange={e => setContentFormData({ ...contentFormData, shares: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Saves</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={contentFormData.saves}
+                          onChange={e => setContentFormData({ ...contentFormData, saves: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Follows (from post)</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={contentFormData.follows}
+                          onChange={e => setContentFormData({ ...contentFormData, follows: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">Avg Watch Time %</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-control"
+                          value={contentFormData.avg_watch_time_pct}
+                          onChange={e => setContentFormData({ ...contentFormData, avg_watch_time_pct: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Boosted? (Yes/No + spend)</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. Yes - ₹500"
+                          value={contentFormData.boosted}
+                          onChange={e => setContentFormData({ ...contentFormData, boosted: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h4 style={{ margin: '0 0 12px', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)' }}>YouTube Metrics</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">YouTube Views</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={contentFormData.youtube_views}
+                          onChange={e => setContentFormData({ ...contentFormData, youtube_views: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Watch Time (hrs)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="form-control"
+                          value={contentFormData.youtube_watch_time}
+                          onChange={e => setContentFormData({ ...contentFormData, youtube_watch_time: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">Avg View Duration</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. 02:15"
+                          value={contentFormData.youtube_avg_view_duration}
+                          onChange={e => setContentFormData({ ...contentFormData, youtube_avg_view_duration: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">CTR%</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-control"
+                          value={contentFormData.youtube_ctr}
+                          onChange={e => setContentFormData({ ...contentFormData, youtube_ctr: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
-                  <label className="form-label">Shares</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={contentFormData.shares}
-                    onChange={e => setContentFormData({ ...contentFormData, shares: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Saves</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={contentFormData.saves}
-                    onChange={e => setContentFormData({ ...contentFormData, saves: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Follows (from post)</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={contentFormData.follows}
-                    onChange={e => setContentFormData({ ...contentFormData, follows: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
-                  <label className="form-label">Avg Watch Time %</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={contentFormData.avg_watch_time_pct}
-                    onChange={e => setContentFormData({ ...contentFormData, avg_watch_time_pct: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Boosted? (Yes/No + spend)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. Yes - ₹500"
-                    value={contentFormData.boosted}
-                    onChange={e => setContentFormData({ ...contentFormData, boosted: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>YouTube Metrics</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
-                  <label className="form-label">YouTube Views</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={contentFormData.youtube_views}
-                    onChange={e => setContentFormData({ ...contentFormData, youtube_views: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Watch Time (hrs)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="form-control"
-                    value={contentFormData.youtube_watch_time}
-                    onChange={e => setContentFormData({ ...contentFormData, youtube_watch_time: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
-                  <label className="form-label">Avg View Duration</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. 02:15"
-                    value={contentFormData.youtube_avg_view_duration}
-                    onChange={e => setContentFormData({ ...contentFormData, youtube_avg_view_duration: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">CTR%</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={contentFormData.youtube_ctr}
-                    onChange={e => setContentFormData({ ...contentFormData, youtube_ctr: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setShowContentModal(false)}>
