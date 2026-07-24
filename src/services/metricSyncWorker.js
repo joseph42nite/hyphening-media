@@ -95,6 +95,8 @@ export async function syncSingleContentMetrics(contentId) {
           }
         } catch (e) {
           console.warn(`[METRIC-SYNC] Insights fetch failed for post #${contentId}:`, e.message);
+          // If the stored media ID failed, clear it so it re-resolves from Instagram on next sync
+          db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = NULL WHERE id = ?').run(contentId);
         }
       }
     } catch (err) {
