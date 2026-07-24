@@ -28,9 +28,9 @@ export function initScheduler() {
     runDailyCommentSync();
   });
 
-  // 2-Stage metric refresh worker — 6 AM & 6 PM daily
-  cron.schedule('0 */12 * * *', () => {
-    console.log('[SCHEDULER] Running 2-Stage metric refresh worker...');
+  // Automated hourly metric refresh worker for all posted content
+  cron.schedule('0 * * * *', () => {
+    console.log('[SCHEDULER] Running hourly automated metric refresh worker...');
     runMetricSyncWorker();
   });
 

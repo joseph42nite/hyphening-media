@@ -21,7 +21,7 @@ export function extractPlatformId(link, platform) {
         return { facebook_post_id: match[1] };
       }
     } else if (plat.includes('instagram')) {
-      const igRegex = /instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9-_]+)/i;
+      const igRegex = /instagram\.com\/(?:p|reels?|tv)\/([A-Za-z0-9-_]+)/i;
       const match = link.match(igRegex);
       if (match && match[1]) {
         const shortcode = match[1];

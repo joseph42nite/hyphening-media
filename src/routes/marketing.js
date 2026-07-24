@@ -10,6 +10,7 @@ import { logAction } from '../services/auditLogger.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
+import { syncSingleContentMetrics } from '../services/metricSyncWorker.js';
 
 const router = Router();
 
@@ -339,6 +340,13 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
       db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
         .run(...Object.values(updates), req.params.contentId);
+
+      // Automatically trigger live metric sync if a link was added/updated or status was set to Posted
+      if (anyLinkChanged || updates.status === 'Posted' || updates.link) {
+        syncSingleContentMetrics(parseInt(req.params.contentId, 10)).catch(e => {
+          console.warn(`[MARKETING] Auto metric sync background error for post #${req.params.contentId}:`, e.message);
+        });
+      }
     }
 
     const { script_id } = req.body;
