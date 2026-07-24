@@ -2,35 +2,17 @@ import db from '../../database.js';
 import { executeClientAction } from './composioService.js';
 
 /**
- * Extract platform post IDs / URLs from multi-platform link string
+ * Extract Instagram shortcode from post link URL
+ * e.g., https://www.instagram.com/reel/DaiJZ_Qzb6N/ => 'DaiJZ_Qzb6N'
  */
-export function extractPlatformLinks(link) {
-  if (!link) return { instagramShortcode: null, youtubeVideoId: null, facebookLink: null };
-
-  const links = link.split(/\s*,\s*/);
-  let instagramShortcode = null;
-  let youtubeVideoId = null;
-  let facebookLink = null;
-
-  for (const l of links) {
-    if (!instagramShortcode) {
-      const igMatch = l.match(/instagram\.com\/(?:reel|p)\/([A-Za-z0-9_-]+)/);
-      if (igMatch) instagramShortcode = igMatch[1];
-    }
-    if (!youtubeVideoId) {
-      const ytMatch = l.match(/(?:youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]+)/);
-      if (ytMatch) youtubeVideoId = ytMatch[1];
-    }
-    if (!facebookLink && l.includes('facebook.com')) {
-      facebookLink = l;
-    }
-  }
-
-  return { instagramShortcode, youtubeVideoId, facebookLink };
+function extractInstagramShortcode(link) {
+  if (!link) return null;
+  const match = link.match(/instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i);
+  return match ? match[1] : null;
 }
 
 /**
- * Fetch and sync total multi-platform metrics (Instagram + Facebook Meta + YouTube) for a single post item
+ * Fetch and sync metrics (Views, Likes, Comments, Shares, Saves, Engagement Rate, Content Score) for a single post item
  */
 export async function syncSingleContentMetrics(contentId) {
   const item = db.prepare(`
@@ -44,9 +26,10 @@ export async function syncSingleContentMetrics(contentId) {
     throw new Error(`Content item #${contentId} not found`);
   }
 
-  const { instagramShortcode, youtubeVideoId } = extractPlatformLinks(item.link);
   let numericMediaId = item.instagram_media_id || item.platform_post_id;
+  let shortcode = extractInstagramShortcode(item.link);
 
+  const platform = (item.platform || 'instagram').toLowerCase();
   let metrics = {
     views: item.views || 0,
     likes: item.likes || 0,
@@ -55,12 +38,9 @@ export async function syncSingleContentMetrics(contentId) {
     saves: item.saves || 0
   };
 
-  let igMetrics = { views: 0, likes: 0, comments: 0, shares: 0, saves: 0 };
-
-  if (process.env.COMPOSIO_API_KEY) {
-    // A. Instagram Insights Sync
+  if (process.env.COMPOSIO_API_KEY && (platform.includes('instagram') || platform.includes('meta'))) {
     try {
-      // 1. Resolve numeric Instagram Graph ID if not present
+      // 1. If we don't have numeric Graph API media ID, resolve it via INSTAGRAM_GET_IG_USER_MEDIA
       if (!numericMediaId || !/^\d+$/.test(numericMediaId)) {
         try {
           const userMedia = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_USER_MEDIA', {
@@ -71,7 +51,7 @@ export async function syncSingleContentMetrics(contentId) {
           const mediaList = Array.isArray(userMedia?.data?.data) ? userMedia.data.data : [];
           const matched = mediaList.find(m => {
             if (!m) return false;
-            if (instagramShortcode && (m.shortcode === instagramShortcode || (m.permalink && m.permalink.includes(instagramShortcode)))) {
+            if (shortcode && (m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode)))) {
               return true;
             }
             if (item.link && m.permalink && item.link.includes(m.shortcode)) {
@@ -82,18 +62,19 @@ export async function syncSingleContentMetrics(contentId) {
 
           if (matched) {
             numericMediaId = matched.id;
-            igMetrics.likes = matched.like_count || igMetrics.likes;
-            igMetrics.comments = matched.comments_count || igMetrics.comments;
+            metrics.likes = matched.like_count || metrics.likes;
+            metrics.comments = matched.comments_count || metrics.comments;
 
+            // Store resolved numeric ID in database for future syncs
             db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = ? WHERE id = ?')
               .run(numericMediaId, contentId);
           }
         } catch (e) {
-          console.warn(`[METRIC-SYNC] Could not resolve Instagram media ID for post #${contentId}:`, e.message);
+          console.warn(`[METRIC-SYNC] Could not resolve media ID for post #${contentId}:`, e.message);
         }
       }
 
-      // 2. Fetch Instagram Insights
+      // 2. Fetch live insights (Views, Reach, Likes, Comments, Saved, Shares) via INSTAGRAM_GET_IG_MEDIA_INSIGHTS
       if (numericMediaId && /^\d+$/.test(numericMediaId)) {
         try {
           const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
@@ -105,30 +86,23 @@ export async function syncSingleContentMetrics(contentId) {
           if (Array.isArray(insightArray)) {
             insightArray.forEach(m => {
               const val = m.values?.[0]?.value || 0;
-              if (m.name === 'views') igMetrics.views = val;
-              if (m.name === 'likes') igMetrics.likes = val;
-              if (m.name === 'comments') igMetrics.comments = val;
-              if (m.name === 'saved') igMetrics.saves = val;
-              if (m.name === 'shares') igMetrics.shares = val;
+              if (m.name === 'views') metrics.views = val;
+              if (m.name === 'likes') metrics.likes = val;
+              if (m.name === 'comments') metrics.comments = val;
+              if (m.name === 'saved') metrics.saves = val;
+              if (m.name === 'shares') metrics.shares = val;
             });
           }
         } catch (e) {
-          console.warn(`[METRIC-SYNC] Instagram Insights fetch failed for post #${contentId}:`, e.message);
+          console.warn(`[METRIC-SYNC] Insights fetch failed for post #${contentId}:`, e.message);
         }
       }
     } catch (err) {
-      console.error(`[METRIC-SYNC] Instagram metric fetch failed for content #${contentId}:`, err.message);
+      console.error(`[METRIC-SYNC] Live metric fetch failed for content #${contentId}:`, err.message);
     }
-
-    // Assign combined totals (if IG metrics found, use max of stored vs IG live)
-    metrics.views = Math.max(metrics.views, igMetrics.views);
-    metrics.likes = Math.max(metrics.likes, igMetrics.likes);
-    metrics.comments = Math.max(metrics.comments, igMetrics.comments);
-    metrics.shares = Math.max(metrics.shares, igMetrics.shares);
-    metrics.saves = Math.max(metrics.saves, igMetrics.saves);
   }
 
-  // Calculate engagement rate, save rate & content performance score
+  // Calculate engagement rate, save rate & content score
   const viewsVal = Math.max(metrics.views, 1);
   const totalEngagements = metrics.likes + metrics.comments + metrics.shares + metrics.saves;
   const engagementRatePct = Math.round((totalEngagements / viewsVal) * 10000) / 100;
@@ -187,7 +161,6 @@ export async function runMetricSyncWorker() {
 }
 
 export default {
-  extractPlatformLinks,
   syncSingleContentMetrics,
   runMetricSyncWorker
 };
