@@ -790,14 +790,16 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
           {/* Real-time SSE Terminal Console Drawer */}
                     {true && ( // Always show the terminal drawer
                       <div 
+                        className="seo-terminal-drawer"
                         style={{
                           borderTop: '3px solid #000',
                           background: '#090d16',
                           color: '#22c55e',
-                          padding: isTerminalCollapsed ? '6px 20px 0' : '12px 20px',
+                          padding: isTerminalCollapsed ? '6px 14px 0' : '12px 14px',
                           display: 'flex',
                           flexDirection: 'column',
                           height: isTerminalCollapsed ? '36px' : `${terminalHeight}px`,
+                          maxHeight: '45vh',
                           position: 'fixed',
                           bottom: 0,
                           left: 0,
@@ -859,15 +861,17 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                               fontSize: '0.75rem',
                               lineHeight: '1.4',
                               whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              overflowWrap: 'anywhere',
                               textAlign: 'left',
                               marginTop: '4px'
                             }}
                           >
                             {consoleLogs.map((logEntry, idx) => (
-                              <div key={idx} style={{ marginBottom: '2px' }}>
+                              <div key={idx} style={{ marginBottom: '2px', wordBreak: 'break-word' }}>
                                 <span style={{ color: '#64748b' }}>{new Date(logEntry.timestamp).toLocaleTimeString()}</span>{' '}
                                 {logEntry.type === 'seo_agent_log' && (
-                                  <span className={getStatusColor(logEntry.data.log.includes('[ERROR]') ? 'error' : 'running')}>
+                                  <span className={getStatusColor(logEntry.data.log.includes('[ERROR]') ? 'error' : 'running')} style={{ wordBreak: 'break-word' }}>
                                     {logEntry.data.log}
                                   </span>
                                 )}
@@ -876,34 +880,35 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                                     [AGENT {logEntry.data.agentType.toUpperCase()}] Status: {logEntry.data.status}
                                   </span>
                                 )}
-                                                      {logEntry.type === 'agent_activity_log' && (
-                                                        <>
-                                                          <span className={getStatusColor(logEntry.data.status)}>[{logEntry.data.status.toUpperCase()}]</span>{' '}
-                                                          <span className="text-cyan-400">{logEntry.data.action}</span>{' '}
-                                                          <span>{logEntry.data.summary}</span>
-                                                          {logEntry.data.client && <span className="text-purple-400"> (Client: {logEntry.data.client})</span>}
-                                                          {logEntry.data.details && (() => {
-                                                            const parsedDetails = JSON.parse(logEntry.data.details);
-                                                            return (
-                                                              <>
-                                                                {parsedDetails.urls && parsedDetails.urls.length > 0 && (
-                                                                  <div className="mt-1 ml-4 text-gray-400">
-                                                                    {parsedDetails.urls.map((url, urlIdx) => (
-                                                                      <a key={urlIdx} href={url} target="_blank" rel="noopener noreferrer" className="block text-blue-400 hover:underline">{url}</a>
-                                                                    ))}
-                                                                  </div>
-                                                                )}
-                                                                {Object.keys(parsedDetails).filter(key => key !== 'urls').length > 0 && (
-                                                                  <pre className="text-xs text-gray-400 mt-1 ml-4 bg-gray-800 p-2 rounded">
-                                                                    {JSON.stringify(parsedDetails, null, 2)}
-                                                                  </pre>
-                                                                )}
-                                                              </>
-                                                            );
-                                                          })()}
-                                                        </>
-                                                      )}                                {logEntry.type === 'system_message' && (
-                                  <span className="text-gray-500">{logEntry.data.log}</span>
+                                {logEntry.type === 'agent_activity_log' && (
+                                  <>
+                                    <span className={getStatusColor(logEntry.data.status)}>[{logEntry.data.status.toUpperCase()}]</span>{' '}
+                                    <span className="text-cyan-400">{logEntry.data.action}</span>{' '}
+                                    <span>{logEntry.data.summary}</span>
+                                    {logEntry.data.client && <span className="text-purple-400"> (Client: {logEntry.data.client})</span>}
+                                    {logEntry.data.details && (() => {
+                                      const parsedDetails = JSON.parse(logEntry.data.details);
+                                      return (
+                                        <>
+                                          {parsedDetails.urls && parsedDetails.urls.length > 0 && (
+                                            <div className="mt-1 ml-4 text-gray-400" style={{ wordBreak: 'break-all' }}>
+                                              {parsedDetails.urls.map((url, urlIdx) => (
+                                                <a key={urlIdx} href={url} target="_blank" rel="noopener noreferrer" className="block text-blue-400 hover:underline" style={{ wordBreak: 'break-all' }}>{url}</a>
+                                              ))}
+                                            </div>
+                                          )}
+                                          {Object.keys(parsedDetails).filter(key => key !== 'urls').length > 0 && (
+                                            <pre className="text-xs text-gray-400 mt-1 ml-4 bg-gray-800 p-2 rounded" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowX: 'auto', maxWidth: '100%' }}>
+                                              {JSON.stringify(parsedDetails, null, 2)}
+                                            </pre>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </>
+                                )}
+                                {logEntry.type === 'system_message' && (
+                                  <span className="text-gray-500" style={{ wordBreak: 'break-word' }}>{logEntry.data.log}</span>
                                 )}
                               </div>
                             ))}
