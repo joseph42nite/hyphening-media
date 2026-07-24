@@ -294,6 +294,10 @@ a:hover {
 .badge-muted { background: #f4f4f5; color: #52525b; }
 
 /* Table styling */
+.audit-mobile-list {
+  display: none;
+}
+
 .table-container {
   overflow-x: auto;
   max-width: 100%;
@@ -1156,6 +1160,16 @@ tr:hover td {
   .seo-command-actions button {
     width: 100% !important;
     min-width: 0 !important;
+  }
+
+  .audit-desktop-table {
+    display: none !important;
+  }
+
+  .audit-mobile-list {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
   }
 
 .calendar-events-mobile {

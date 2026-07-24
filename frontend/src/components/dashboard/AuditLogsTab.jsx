@@ -17,7 +17,8 @@ export default function AuditLogsTab({
   return (
     <div style={{ textAlign: 'left' }}>
       <h3 style={{ marginBottom: '16px' }}>Operational Audit Trails</h3>
-      <div className="table-container">
+      {/* Desktop View: Table */}
+      <div className="table-container audit-desktop-table">
         <table>
           <thead>
             <tr>
@@ -50,16 +51,49 @@ export default function AuditLogsTab({
         </table>
       </div>
 
+      {/* Mobile View: Activity Cards */}
+      <div className="audit-mobile-list">
+        {auditLogs.length === 0 ? (
+          <div className="card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            No audit logs available.
+          </div>
+        ) : (
+          auditLogs.map(log => (
+            <div key={log.id} className="card" style={{ border: '2px solid #000', padding: '14px', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                  {log.created_at ? formatDateStr(log.created_at.split(' ')[0]) : '-'}
+                </span>
+                <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>{log.action}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                <div style={{ fontWeight: 'bold' }}>👤 {log.actor_email || 'System'}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {log.entity_type} #{log.entity_id}
+                </div>
+              </div>
+
+              {log.diff && (
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '8px 10px', fontSize: '0.75rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#1e293b' }}>
+                  {log.diff}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Pagination Controls */}
       {totalAuditLogs > 0 && (
         <div className="table-pagination-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontWeight: '800', fontSize: '0.85rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)', textAlign: 'center', width: '100%' }}>
             Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((auditPage - 1) * auditLimit + 1, totalAuditLogs)}</span> to{' '}
             <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(auditPage * auditLimit, totalAuditLogs)}</span> of{' '}
             <span style={{ fontFamily: 'var(--font-mono)' }}>{totalAuditLogs}</span> entries
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
               <select
@@ -69,7 +103,7 @@ export default function AuditLogsTab({
                   setAuditLimit(parseInt(e.target.value));
                   setAuditPage(1);
                 }}
-                style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '2px', cursor: 'pointer' }}
+                style={{ width: 'auto', padding: '6px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '2px', cursor: 'pointer' }}
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -79,9 +113,9 @@ export default function AuditLogsTab({
               <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage === 1} onClick={() => setAuditPage(1)}>First</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage === 1} onClick={() => setAuditPage(auditPage - 1)}>Prev</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button className="btn" style={{ padding: '6px 10px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage === 1} onClick={() => setAuditPage(1)}>First</button>
+              <button className="btn" style={{ padding: '6px 10px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage === 1} onClick={() => setAuditPage(auditPage - 1)}>Prev</button>
 
               {(() => {
                 const totalPages = Math.ceil(totalAuditLogs / auditLimit);
@@ -90,7 +124,7 @@ export default function AuditLogsTab({
                 const endPage = Math.min(totalPages, auditPage + 2);
                 for (let i = startPage; i <= endPage; i++) {
                   buttons.push(
-                    <button key={i} className={`btn ${auditPage === i ? 'btn-primary' : ''}`} style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: auditPage === i ? 'none' : '2px 2px 0px #000', minWidth: '32px' }} onClick={() => setAuditPage(i)}>
+                    <button key={i} className={`btn ${auditPage === i ? 'btn-primary' : ''}`} style={{ padding: '6px 10px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: auditPage === i ? 'none' : '2px 2px 0px #000', minWidth: '30px' }} onClick={() => setAuditPage(i)}>
                       {i}
                     </button>
                   );
@@ -98,8 +132,8 @@ export default function AuditLogsTab({
                 return buttons;
               })()}
 
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage >= Math.ceil(totalAuditLogs / auditLimit)} onClick={() => setAuditPage(auditPage + 1)}>Next</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage >= Math.ceil(totalAuditLogs / auditLimit)} onClick={() => setAuditPage(Math.ceil(totalAuditLogs / auditLimit))}>Last</button>
+              <button className="btn" style={{ padding: '6px 10px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage >= Math.ceil(totalAuditLogs / auditLimit)} onClick={() => setAuditPage(auditPage + 1)}>Next</button>
+              <button className="btn" style={{ padding: '6px 10px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={auditPage >= Math.ceil(totalAuditLogs / auditLimit)} onClick={() => setAuditPage(Math.ceil(totalAuditLogs / auditLimit))}>Last</button>
             </div>
           </div>
         </div>
