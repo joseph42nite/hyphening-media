@@ -139,6 +139,9 @@ export async function syncSingleContentMetrics(contentId) {
             const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
             updateFields.time = `${hours}:${minutes}`;
           }
+          if (!item.caption && matched.caption) {
+            updateFields.caption = matched.caption;
+          }
           const setClauses = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
           db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
             .run(...Object.values(updateFields), contentId);
