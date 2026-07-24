@@ -253,6 +253,7 @@ router.get('/:token/content', portalAuth, (req, res) => {
   try {
     const content = db.prepare(`
       SELECT id, date, platform, post_type, title, status, views, likes, comments, shares, saves,
+        avg_watch_time_pct, skip_rate_pct,
         engagement_rate_pct, content_score, boosted, link, time, caption, follows,
         youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr
       FROM marketing_content_tracker 

@@ -1797,8 +1797,14 @@ export default function ClientPortal({ showToast }) {
                           <th>Post Type</th>
                           <th>Title</th>
                           <th>Views</th>
+                          <th>Likes</th>
+                          <th>Comments</th>
+                          <th>Shares</th>
+                          <th>Saves</th>
+                          <th>Avg Watch Time %</th>
+                          <th>Skip Rate %</th>
                           <th>Engagement %</th>
-                          <th>Quality Score</th>
+                          <th>Score</th>
                           <th>Date</th>
                           <th>Link</th>
                         </tr>
@@ -1816,6 +1822,12 @@ export default function ClientPortal({ showToast }) {
                             <td>
                               {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
                             </td>
+                            <td>{item.likes?.toLocaleString() || 0}</td>
+                            <td>{item.comments?.toLocaleString() || 0}</td>
+                            <td>{item.shares?.toLocaleString() || 0}</td>
+                            <td>{item.saves?.toLocaleString() || 0}</td>
+                            <td>{item.avg_watch_time_pct ? `${item.avg_watch_time_pct}%` : '-'}</td>
+                            <td>{item.skip_rate_pct ? `${item.skip_rate_pct}%` : '-'}</td>
                             <td>
                               {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
                             </td>
