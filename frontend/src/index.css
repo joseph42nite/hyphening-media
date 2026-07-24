@@ -964,37 +964,43 @@ tr:hover td {
 
   .kanban-mobile-tab {
     flex: 0 0 auto;
-    padding: 6px 12px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    border-radius: 16px;
-    background: var(--bg-card);
-    border: 1.5px solid var(--border-color);
-    color: var(--text-muted);
+    padding: 7px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border-radius: 20px;
+    background: #ffffff;
+    border: 2px solid #000000;
+    color: #000000;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     transition: all 0.2s ease;
+    box-shadow: 2px 2px 0px #000000;
   }
 
   .kanban-mobile-tab.active {
-    background: var(--accent);
-    color: #000;
-    border-color: #000;
+    background: #000000;
+    color: #ffffff !important;
+    border-color: #000000;
     font-weight: 800;
+    box-shadow: 2px 2px 0px #000000;
   }
 
   .kanban-tab-badge {
-    background: rgba(0,0,0,0.12);
+    background: #f4f4f5;
+    color: #000000;
+    border: 1px solid #000000;
     padding: 1px 6px;
     border-radius: 10px;
     font-size: 0.68rem;
+    font-weight: 800;
   }
 
   .kanban-mobile-tab.active .kanban-tab-badge {
-    background: #000;
-    color: #fff;
+    background: #ffffff;
+    color: #000000;
+    border-color: #ffffff;
   }
 
   .kanban-column-hidden-mobile {
