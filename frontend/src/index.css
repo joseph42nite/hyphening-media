@@ -766,6 +766,21 @@ tr:hover td {
 }
 
 
+.dashboard-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.dashboard-mobile-menu-toggle {
+  display: none;
+}
+
+.dashboard-mobile-drawer {
+  display: none;
+}
+
 /* Layout overrides for clean bento sizing */
 @media (max-width: 768px) {
   body {
@@ -773,11 +788,8 @@ tr:hover td {
   }
   
   .dashboard-header {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     padding: 10px 14px;
-    gap: 8px;
     margin-bottom: 14px;
   }
   
@@ -789,25 +801,60 @@ tr:hover td {
     height: 32px !important;
   }
 
-  .dashboard-header-right {
-    border-top: none;
-    padding-top: 0;
-    justify-content: flex-end;
-    gap: 8px;
+  .dashboard-header-desktop-right {
+    display: none !important;
   }
 
-  .dashboard-user-info {
-    text-align: right;
-    max-width: 120px;
-    overflow: hidden;
+  .dashboard-mobile-menu-toggle {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 2px solid #000000;
+    background: #ffffff;
+    cursor: pointer;
+    box-shadow: 2px 2px 0px #000000;
+    flex-shrink: 0;
   }
 
-  .dashboard-user-name {
-    font-size: 0.8rem;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .dashboard-mobile-drawer {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    margin-top: 12px;
+    background: #ffffff;
+    border: 2px solid #000000;
+    border-radius: 12px;
+    box-shadow: 3px 3px 0px #000000;
+    width: 100%;
+  }
+
+  .dashboard-mobile-drawer-user {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    border-bottom: 1.5px solid var(--border-color);
+  }
+
+  .dashboard-mobile-drawer-name {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #000;
+  }
+
+  .dashboard-mobile-drawer-role {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #000;
+    background: #f4f4f5;
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1.5px solid #000;
   }
 
   .dashboard-user-role {

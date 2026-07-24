@@ -6,7 +6,7 @@ import {
   Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
   Search, Share2, FileDown, Eye, HelpCircle, Check, X, ShieldAlert,
-  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu
+  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu, Menu
 } from 'lucide-react';
 
 import TasksTab from '../components/dashboard/TasksTab.jsx';
@@ -124,6 +124,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [sseConnected, setSseConnected] = useState(false);
 
   // Search/Filters
+  const [mobileHeaderMenuOpen, setMobileHeaderMenuOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [taskSearch, setTaskSearch] = useState('');
   const [taskClientFilter, setTaskClientFilter] = useState('');
@@ -943,68 +944,136 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
       {/* Top Navbar */}
       <header className="dashboard-header">
-        <div className="dashboard-header-left">
-          <span
-            onClick={() => navigate('/dashboard')}
-            style={{ display: 'flex', alignItems: 'center', height: '40px', cursor: 'pointer' }}
-          >
-            <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: sseConnected ? 'var(--success)' : 'var(--danger)' }} />
-            {sseConnected ? 'SSE Connected' : 'SSE Disconnected'}
-          </div>
-        </div>
-
-        <div className="dashboard-header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* Notification Alarm Status/Toggle Button */}
-          <button 
-            onClick={notificationPermission === 'default' ? handleRequestPermission : toggleSound}
-            className={`btn ${soundEnabled && notificationPermission === 'granted' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ 
-              padding: '8px 12px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              cursor: 'pointer',
-              border: 'var(--border-width) solid var(--border-color)',
-              boxShadow: 'var(--shadow-sm)',
-              fontSize: '0.85rem'
-            }}
-            title={
-              notificationPermission === 'default' 
-                ? 'Enable Browser Notifications' 
-                : (soundEnabled ? 'Mute Chat Sound' : 'Unmute Chat Sound')
-            }
-          >
-            {notificationPermission === 'default' ? (
-              <>
-                <Bell size={16} />
-                <span>Enable Alerts</span>
-              </>
-            ) : soundEnabled ? (
-              <>
-                <Bell size={16} style={{ color: 'var(--success)' }} />
-                <span>Alerts On</span>
-              </>
-            ) : (
-              <>
-                <BellOff size={16} style={{ color: 'var(--text-muted)' }} />
-                <span>Alerts Muted</span>
-              </>
-            )}
-          </button>
-
-          <div className="dashboard-user-info">
-            <div className="dashboard-user-name">{auth?.name}</div>
-            <div className="dashboard-user-role">
-              {userRole.replace('ops_', '').replace('_', ' ')}
+        <div className="dashboard-header-main">
+          <div className="dashboard-header-left">
+            <span
+              onClick={() => navigate('/dashboard')}
+              style={{ display: 'flex', alignItems: 'center', height: '40px', cursor: 'pointer' }}
+            >
+              <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: sseConnected ? 'var(--success)' : 'var(--danger)' }} />
+              {sseConnected ? 'SSE Connected' : 'SSE Disconnected'}
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-secondary btn-logout">
-            <LogOut size={16} /> <span>Logout</span>
+
+          {/* Desktop Header Actions */}
+          <div className="dashboard-header-right dashboard-header-desktop-right">
+            <button 
+              onClick={notificationPermission === 'default' ? handleRequestPermission : toggleSound}
+              className={`btn ${soundEnabled && notificationPermission === 'granted' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ 
+                padding: '8px 12px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                cursor: 'pointer',
+                border: 'var(--border-width) solid var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
+                fontSize: '0.85rem'
+              }}
+              title={
+                notificationPermission === 'default' 
+                  ? 'Enable Browser Notifications' 
+                  : (soundEnabled ? 'Mute Chat Sound' : 'Unmute Chat Sound')
+              }
+            >
+              {notificationPermission === 'default' ? (
+                <>
+                  <Bell size={16} />
+                  <span>Enable Alerts</span>
+                </>
+              ) : soundEnabled ? (
+                <>
+                  <Bell size={16} style={{ color: 'var(--success)' }} />
+                  <span>Alerts On</span>
+                </>
+              ) : (
+                <>
+                  <BellOff size={16} style={{ color: 'var(--text-muted)' }} />
+                  <span>Alerts Muted</span>
+                </>
+              )}
+            </button>
+
+            <div className="dashboard-user-info">
+              <div className="dashboard-user-name">{auth?.name}</div>
+              <div className="dashboard-user-role">
+                {userRole.replace('ops_', '').replace('_', ' ')}
+              </div>
+            </div>
+            <button onClick={handleLogout} className="btn btn-secondary btn-logout">
+              <LogOut size={16} /> <span>Logout</span>
+            </button>
+          </div>
+
+          {/* Mobile Hamburger Toggle Button */}
+          <button 
+            className="dashboard-mobile-menu-toggle"
+            onClick={() => setMobileHeaderMenuOpen(!mobileHeaderMenuOpen)}
+            aria-label="Toggle user menu"
+          >
+            {mobileHeaderMenuOpen ? <X size={20} strokeWidth={3} /> : <Menu size={20} strokeWidth={3} />}
           </button>
         </div>
+
+        {/* Mobile Drawer Dropdown Menu */}
+        {mobileHeaderMenuOpen && (
+          <div className="dashboard-mobile-drawer">
+            <div className="dashboard-mobile-drawer-user">
+              <div>
+                <div className="dashboard-mobile-drawer-name">{auth?.name}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{auth?.email}</div>
+              </div>
+              <span className="dashboard-mobile-drawer-role">
+                {userRole.replace('ops_', '').replace('_', ' ')}
+              </span>
+            </div>
+
+            <button 
+              onClick={() => {
+                if (notificationPermission === 'default') handleRequestPermission();
+                else toggleSound();
+              }}
+              className={`btn ${soundEnabled && notificationPermission === 'granted' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ 
+                padding: '10px 14px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: '8px', 
+                width: '100%',
+                fontSize: '0.85rem'
+              }}
+            >
+              {notificationPermission === 'default' ? (
+                <>
+                  <Bell size={16} />
+                  <span>Enable Alerts</span>
+                </>
+              ) : soundEnabled ? (
+                <>
+                  <Bell size={16} style={{ color: 'var(--success)' }} />
+                  <span>Alerts On</span>
+                </>
+              ) : (
+                <>
+                  <BellOff size={16} style={{ color: 'var(--text-muted)' }} />
+                  <span>Alerts Muted</span>
+                </>
+              )}
+            </button>
+
+            <button 
+              onClick={handleLogout} 
+              className="btn btn-secondary" 
+              style={{ width: '100%', justifyContent: 'center', background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444', fontWeight: 'bold', height: '40px' }}
+            >
+              <LogOut size={16} /> Logout
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Tabs Menu */}
