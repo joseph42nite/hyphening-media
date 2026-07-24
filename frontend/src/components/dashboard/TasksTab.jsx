@@ -556,26 +556,26 @@ export default function TasksTab({
 
       {activeTab === 'calendar' && (
         <div style={{ textAlign: 'left' }}>
-          <div className="dashboard-toolbar" style={{ flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button className="btn btn-secondary" onClick={handlePrevMonth} style={{ padding: '8px 12px' }}>
+          <div className="calendar-toolbar" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+            <div className="calendar-month-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
+              <button className="btn btn-secondary" onClick={handlePrevMonth} style={{ padding: '8px 12px', fontWeight: 'bold' }}>
                 &larr; Prev
               </button>
-              <h3 style={{ margin: 0, minWidth: '160px', textAlign: 'center' }}>
+              <h3 style={{ margin: 0, textAlign: 'center', fontSize: '1.15rem', fontWeight: 800 }}>
                 {getMonthName(currentMonth)} {currentYear}
               </h3>
-              <button className="btn btn-secondary" onClick={handleNextMonth} style={{ padding: '8px 12px' }}>
+              <button className="btn btn-secondary" onClick={handleNextMonth} style={{ padding: '8px 12px', fontWeight: 'bold' }}>
                 Next &rarr;
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexGrow: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <label className="form-label" style={{ margin: 0 }}>Filter Client:</label>
+            <div className="calendar-client-filter" style={{ display: 'flex', gap: '10px', alignItems: 'center', width: '100%' }}>
+              <label className="form-label" style={{ margin: 0, flexShrink: 0, fontWeight: 'bold' }}>Filter Client:</label>
               <select
                 className="form-control"
                 value={calendarClientFilter}
                 onChange={(e) => setCalendarClientFilter(e.target.value)}
-                style={{ width: 'auto', minWidth: '180px' }}
+                style={{ width: '100%', flexGrow: 1, fontWeight: 'bold', border: '2px solid #000' }}
               >
                 <option value="">All Clients</option>
                 {clients.map(c => (
@@ -588,7 +588,7 @@ export default function TasksTab({
           </div>
 
           <div className="calendar-layout">
-            <div className="glass" style={{ padding: '16px' }}>
+            <div className="glass calendar-grid-card" style={{ padding: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '6px', textAlign: 'center', fontWeight: 'bold', marginBottom: '12px', borderBottom: '2px solid #000', paddingBottom: '8px' }}>
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                   <div key={day} style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{day}</div>
@@ -612,23 +612,52 @@ export default function TasksTab({
                       </div>
 
                       <div className="calendar-cell-events">
-                        {cell.events.slice(0, 2).map((ev, eIdx) => (
-                          <div
-                            key={eIdx}
-                            className={`calendar-event-tag ${
-                              ev.type === 'task' ? 'calendar-event-task' :
-                              ev.type === 'gig' ? 'calendar-event-gig' : 'calendar-event-content'
-                            }`}
-                            title={ev.title}
-                          >
-                            {ev.title}
-                          </div>
-                        ))}
-                        {cell.events.length > 2 && (
-                          <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: 'var(--text-muted)', textAlign: 'left' }}>
-                            +{cell.events.length - 2} more
-                          </div>
-                        )}
+                        {/* Desktop View: Text Tags */}
+                        <div className="calendar-events-desktop">
+                          {cell.events.slice(0, 2).map((ev, eIdx) => (
+                            <div
+                              key={eIdx}
+                              className={`calendar-event-tag ${
+                                ev.type === 'task' ? 'calendar-event-task' :
+                                ev.type === 'gig' ? 'calendar-event-gig' : 'calendar-event-content'
+                              }`}
+                              title={ev.title}
+                            >
+                              {ev.title}
+                            </div>
+                          ))}
+                          {cell.events.length > 2 && (
+                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: 'var(--text-muted)', textAlign: 'left' }}>
+                              +{cell.events.length - 2} more
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Mobile View: Compact Event Dots */}
+                        <div className="calendar-events-mobile">
+                          {cell.events.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', flexWrap: 'wrap' }}>
+                              {cell.events.slice(0, 3).map((ev, eIdx) => (
+                                <span
+                                  key={eIdx}
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    background: ev.type === 'task' ? '#2563eb' : ev.type === 'gig' ? '#d97706' : '#9333ea',
+                                    display: 'inline-block'
+                                  }}
+                                  title={ev.title}
+                                />
+                              ))}
+                              {cell.events.length > 3 && (
+                                <span style={{ fontSize: '0.55rem', fontWeight: '800', color: '#000' }}>
+                                  +{cell.events.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

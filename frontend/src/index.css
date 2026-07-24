@@ -1104,10 +1104,56 @@ tr:hover td {
     min-width: 0 !important;
   }
 
-  .seo-terminal-drawer {
+.calendar-events-mobile {
+  display: none;
+}
+
+.calendar-events-desktop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seo-terminal-drawer {
     padding: 8px 12px !important;
     max-height: 45vh !important;
     font-size: 0.7rem !important;
+  }
+
+  .calendar-events-desktop {
+    display: none !important;
+  }
+
+  .calendar-events-mobile {
+    display: flex !important;
+  }
+
+  .calendar-grid-card {
+    padding: 10px 8px !important;
+  }
+
+  .calendar-grid {
+    gap: 4px !important;
+  }
+
+  .calendar-cell {
+    min-height: 52px !important;
+    padding: 4px 2px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+  }
+
+  .calendar-day-num {
+    font-size: 0.82rem !important;
+    text-align: center !important;
+    margin-bottom: 2px !important;
+  }
+
+  .calendar-cell.selected {
+    background: #f3e8ff !important;
+    border: 2.5px solid #000000 !important;
+    box-shadow: 2px 2px 0px #000000 !important;
   }
 
   .grid-auto {
