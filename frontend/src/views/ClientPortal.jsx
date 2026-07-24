@@ -527,9 +527,12 @@ body.portal-active {
 `;
 
 function PlatformDistributionDonut({ breakdown }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [isChartHovered, setIsChartHovered] = useState(false);
+
   if (!breakdown || breakdown.length === 0) {
     return (
-      <div className="portal-bento-card" style={{ padding: '20px' }}>
+      <div className="portal-bento-card" style={{ padding: '24px' }}>
         <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Platform Share</h3>
         <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>No distribution data available yet.</div>
       </div>
@@ -545,54 +548,97 @@ function PlatformDistributionDonut({ breakdown }) {
     linkedin: '#0284c7'
   };
 
+  const C = 2 * Math.PI * 38; // 238.76
+
   return (
-    <div className="portal-bento-card" style={{ padding: '20px' }}>
-      <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Platform Share</h3>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <div style={{ position: 'relative', width: '120px', height: '120px' }}>
-          <svg width="120" height="120" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)', borderRadius: '50%', border: '2px solid #18181b' }}>
-            <circle cx="21" cy="21" r="15.91549430918954" fill="#ffffff"></circle>
-            {breakdown.map((item) => {
+    <div className="portal-bento-card" style={{ padding: '24px' }}>
+      <h3 style={{ fontSize: '1rem', marginBottom: '20px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Platform Share</h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div 
+          onMouseEnter={() => setIsChartHovered(true)}
+          onMouseLeave={() => { setIsChartHovered(false); setHoveredIndex(null); }}
+          style={{
+            position: 'relative',
+            width: '160px',
+            height: '160px',
+            transform: isChartHovered ? 'scale(1.06)' : 'scale(1)',
+            transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            cursor: 'pointer'
+          }}
+        >
+          <svg width="160" height="160" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+            <circle cx="50" cy="50" r="38" fill="#ffffff" stroke="#18181b" strokeWidth="2"></circle>
+            {breakdown.map((item, idx) => {
               const percent = (item.count / total) * 100;
-              const strokeDashoffset = 100 - accumulatedPercent;
+              const sliceLength = (percent / 100) * C;
+              const strokeDashoffset = C * (1 - accumulatedPercent / 100);
               accumulatedPercent += percent;
               const color = platformColors[item.platform?.toLowerCase()] || '#64748b';
+              const isHovered = hoveredIndex === idx;
+
               return (
                 <circle
                   key={item.platform}
-                  cx="21"
-                  cy="21"
-                  r="15.91549430918954"
+                  cx="50"
+                  cy="50"
+                  r="38"
                   fill="transparent"
                   stroke={color}
-                  strokeWidth="5"
-                  strokeDasharray={`${percent} ${100 - percent}`}
+                  strokeWidth={isHovered ? 11 : 8.5}
+                  strokeDasharray={`${sliceLength} ${C - sliceLength}`}
                   strokeDashoffset={strokeDashoffset}
-                  style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-                />
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  style={{ transition: 'all 0.25s ease', cursor: 'pointer' }}
+                >
+                  <title>{`${item.platform}: ${item.count} (${percent.toFixed(0)}%)`}</title>
+                </circle>
               );
             })}
           </svg>
+
+          {/* Center Text Container */}
           <div style={{
             position: 'absolute',
-            top: 0, left: 0, right: 0, bottom: 0,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justify: 'center',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            width: '100px',
+            textAlign: 'center'
           }}>
-            <span style={{ fontSize: '1.1rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total}</span>
-            <span style={{ fontSize: '0.65rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Posts</span>
+            <span style={{ fontSize: '1.6rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total}</span>
+            <span style={{ fontSize: '0.65rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px' }}>POSTS</span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flexGrow: 1 }}>
-          {breakdown.map((item) => {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left', flexGrow: 1, minWidth: '150px' }}>
+          {breakdown.map((item, idx) => {
             const percent = total > 0 ? ((item.count / total) * 100).toFixed(0) : 0;
             const color = platformColors[item.platform?.toLowerCase()] || '#64748b';
+            const isHighlighted = hoveredIndex === idx;
             return (
-              <div key={item.platform} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: '800' }}>
+              <div 
+                key={item.platform} 
+                onMouseEnter={() => setHoveredIndex(idx)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justify: 'space-between', 
+                  fontSize: '0.85rem', 
+                  fontWeight: '800',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  background: isHighlighted ? 'rgba(0,0,0,0.04)' : 'transparent',
+                  transition: 'background 0.2s ease',
+                  cursor: 'pointer'
+                }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block', border: '1px solid #18181b' }} />
                   <span style={{ textTransform: 'capitalize' }}>{item.platform}:</span>
@@ -608,6 +654,9 @@ function PlatformDistributionDonut({ breakdown }) {
 }
 
 function EngagementBreakdownDonut({ stats }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [isChartHovered, setIsChartHovered] = useState(false);
+
   if (!stats) return null;
   const likes = stats.total_likes || 0;
   const comments = stats.total_comments || 0;
@@ -623,57 +672,99 @@ function EngagementBreakdownDonut({ stats }) {
   ];
 
   let accumulatedPercent = 0;
+  const C = 2 * Math.PI * 38; // 238.76
 
   return (
-    <div className="portal-bento-card" style={{ padding: '20px' }}>
-      <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Engagement Mix</h3>
+    <div className="portal-bento-card" style={{ padding: '24px' }}>
+      <h3 style={{ fontSize: '1rem', marginBottom: '20px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Engagement Mix</h3>
       {total === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>No engagement data available yet.</div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <div style={{ position: 'relative', width: '120px', height: '120px' }}>
-            <svg width="120" height="120" viewBox="0 0 42 42" style={{ transform: 'rotate(-90deg)', borderRadius: '50%', border: '2px solid #18181b' }}>
-              <circle cx="21" cy="21" r="15.91549430918954" fill="#ffffff"></circle>
-              {items.map((item) => {
+        <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div 
+            onMouseEnter={() => setIsChartHovered(true)}
+            onMouseLeave={() => { setIsChartHovered(false); setHoveredIndex(null); }}
+            style={{
+              position: 'relative',
+              width: '160px',
+              height: '160px',
+              transform: isChartHovered ? 'scale(1.06)' : 'scale(1)',
+              transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              cursor: 'pointer'
+            }}
+          >
+            <svg width="160" height="160" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+              <circle cx="50" cy="50" r="38" fill="#ffffff" stroke="#18181b" strokeWidth="2"></circle>
+              {items.map((item, idx) => {
                 if (item.count === 0) return null;
                 const percent = (item.count / total) * 100;
-                const strokeDashoffset = 100 - accumulatedPercent;
+                const sliceLength = (percent / 100) * C;
+                const strokeDashoffset = C * (1 - accumulatedPercent / 100);
                 accumulatedPercent += percent;
+                const isHovered = hoveredIndex === idx;
+
                 return (
                   <circle
                     key={item.label}
-                    cx="21"
-                    cy="21"
-                    r="15.91549430918954"
+                    cx="50"
+                    cy="50"
+                    r="38"
                     fill="transparent"
                     stroke={item.color}
-                    strokeWidth="5"
-                    strokeDasharray={`${percent} ${100 - percent}`}
+                    strokeWidth={isHovered ? 11 : 8.5}
+                    strokeDasharray={`${sliceLength} ${C - sliceLength}`}
                     strokeDashoffset={strokeDashoffset}
-                    style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-                  />
+                    onMouseEnter={() => setHoveredIndex(idx)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    style={{ transition: 'all 0.25s ease', cursor: 'pointer' }}
+                  >
+                    <title>{`${item.label}: ${item.count} (${percent.toFixed(1)}%)`}</title>
+                  </circle>
                 );
               })}
             </svg>
+
+            {/* Center Text Container */}
             <div style={{
               position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justify: 'center',
-              pointerEvents: 'none'
+              pointerEvents: 'none',
+              width: '100px',
+              textAlign: 'center'
             }}>
-              <span style={{ fontSize: '1rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total.toLocaleString()}</span>
-              <span style={{ fontSize: '0.6rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Interactions</span>
+              <span style={{ fontSize: '1.4rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total.toLocaleString()}</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px' }}>INTERACTIONS</span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flexGrow: 1 }}>
-            {items.map((item) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left', flexGrow: 1, minWidth: '150px' }}>
+            {items.map((item, idx) => {
               const percent = total > 0 ? ((item.count / total) * 100).toFixed(1) : 0;
+              const isHighlighted = hoveredIndex === idx;
               return (
-                <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: '800' }}>
+                <div 
+                  key={item.label} 
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justify: 'space-between', 
+                    fontSize: '0.85rem', 
+                    fontWeight: '800',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    background: isHighlighted ? 'rgba(0,0,0,0.04)' : 'transparent',
+                    transition: 'background 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, display: 'inline-block', border: '1px solid #18181b' }} />
                     <span>{item.label}:</span>
