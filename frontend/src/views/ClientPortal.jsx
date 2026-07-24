@@ -2646,39 +2646,45 @@ export default function ClientPortal({ showToast }) {
             </div>
 
             {/* Top Bento KPI Stats Bar */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Leads</span>
-                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>{leads.length}</span>
-              </div>
-              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qualified Leads</span>
-                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#059669', display: 'block', marginTop: '4px' }}>
-                  {leads.filter(l => l.qualification_status === 'Qualified').length}
-                </span>
-              </div>
-              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Appointments Booked</span>
-                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#0284c7', display: 'block', marginTop: '4px' }}>
-                  {leads.filter(l => l.appointment_status === 'Booked').length}
-                </span>
-              </div>
-              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conversion Rate</span>
-                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#dc2626', display: 'block', marginTop: '4px' }}>
-                  {leads.length > 0 ? `${((leads.filter(l => l.appointment_status === 'Booked').length / leads.length) * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const safeLeads = Array.isArray(leads) ? leads : [];
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                  <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Leads</span>
+                    <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>{safeLeads.length}</span>
+                  </div>
+                  <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qualified Leads</span>
+                    <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#059669', display: 'block', marginTop: '4px' }}>
+                      {safeLeads.filter(l => l.qualification_status === 'Qualified').length}
+                    </span>
+                  </div>
+                  <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Appointments Booked</span>
+                    <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#0284c7', display: 'block', marginTop: '4px' }}>
+                      {safeLeads.filter(l => l.appointment_status === 'Booked').length}
+                    </span>
+                  </div>
+                  <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conversion Rate</span>
+                    <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#dc2626', display: 'block', marginTop: '4px' }}>
+                      {safeLeads.length > 0 ? `${((safeLeads.filter(l => l.appointment_status === 'Booked').length / safeLeads.length) * 100).toFixed(1)}%` : '0%'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Filter Toolbar */}
             {(() => {
+              const safeLeads = Array.isArray(leads) ? leads : [];
               const cleanStr = (val) => {
                 if (!val) return '';
                 return val.toString().replace(/^[=\s]+/, '').replace(/^🎯=/, '').replace(/^🎯/, '').trim();
               };
 
-              const filteredLeads = leads.filter(lead => {
+              const filteredLeads = safeLeads.filter(lead => {
                 const apptStatus = lead.appointment_status || 'Follow Up';
                 if (appointmentFilter !== 'all' && apptStatus !== appointmentFilter) return false;
 
@@ -2754,7 +2760,7 @@ export default function ClientPortal({ showToast }) {
                     </div>
                   </div>
 
-                  {leads.length === 0 ? (
+                  {safeLeads.length === 0 ? (
                     <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
                       No leads captured yet.
                     </div>
@@ -2793,6 +2799,12 @@ export default function ClientPortal({ showToast }) {
                               const cleanPhone = cleanStr(lead.phone);
                               const cleanCampaign = cleanStr(lead.campaign_name) || 'Direct / Organic';
 
+                              const formattedDate = lead.created_at ? (
+                                isNaN(new Date(lead.created_at.toString().replace(' ', 'T')).getTime())
+                                  ? lead.created_at
+                                  : new Date(lead.created_at.toString().replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+                              ) : '-';
+
                               return (
                                 <tr key={lead.id}>
                                   <td>
@@ -2820,7 +2832,7 @@ export default function ClientPortal({ showToast }) {
                                     </div>
                                   </td>
                                   <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', color: '#09090b', fontWeight: '600' }}>
-                                    {new Date(lead.created_at.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                    {formattedDate}
                                   </td>
                                   <td>
                                     <select 
