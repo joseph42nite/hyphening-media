@@ -2616,14 +2616,14 @@ export default function ClientPortal({ showToast }) {
         {activeTab === 'leads' && (clientType === 'marketing' || clientType === 'both') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
-            {/* Header / Subtitle */}
+            {/* Header / Actions */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>
+                <h2 style={{ fontSize: '1.25rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
                   Campaign Leads & Conversions
                 </h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>
-                  Review leads captured from forms and calls. Confirm booking appointments or record rejection details.
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0', fontWeight: 600 }}>
+                  Review leads captured from form submissions and phone calls. Manage qualifications and appointments.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2645,8 +2645,39 @@ export default function ClientPortal({ showToast }) {
               </div>
             </div>
 
-            {/* Leads Table Container */}
+            {/* Top Bento KPI Stats Bar */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Leads</span>
+                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>{leads.length}</span>
+              </div>
+              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qualified Leads</span>
+                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#059669', display: 'block', marginTop: '4px' }}>
+                  {leads.filter(l => l.qualification_status === 'Qualified').length}
+                </span>
+              </div>
+              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Appointments Booked</span>
+                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#0284c7', display: 'block', marginTop: '4px' }}>
+                  {leads.filter(l => l.appointment_status === 'Booked').length}
+                </span>
+              </div>
+              <div style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conversion Rate</span>
+                <span style={{ fontSize: '1.8rem', fontWeight: '900', color: '#dc2626', display: 'block', marginTop: '4px' }}>
+                  {leads.length > 0 ? `${((leads.filter(l => l.appointment_status === 'Booked').length / leads.length) * 100).toFixed(1)}%` : '0%'}
+                </span>
+              </div>
+            </div>
+
+            {/* Filter Toolbar */}
             {(() => {
+              const cleanStr = (val) => {
+                if (!val) return '';
+                return val.toString().replace(/^[=\s]+/, '').replace(/^🎯=/, '').replace(/^🎯/, '').trim();
+              };
+
               const filteredLeads = leads.filter(lead => {
                 const apptStatus = lead.appointment_status || 'Follow Up';
                 if (appointmentFilter !== 'all' && apptStatus !== appointmentFilter) return false;
@@ -2656,47 +2687,71 @@ export default function ClientPortal({ showToast }) {
 
                 if (leadSearchQuery.trim()) {
                   const q = leadSearchQuery.toLowerCase().trim();
-                  const nameMatch = lead.name && lead.name.toLowerCase().includes(q);
-                  const phoneMatch = lead.phone && lead.phone.toLowerCase().includes(q);
-                  const emailMatch = lead.email && lead.email.toLowerCase().includes(q);
-                  const campaignMatch = lead.campaign_name && lead.campaign_name.toLowerCase().includes(q);
+                  const nameMatch = lead.name && cleanStr(lead.name).toLowerCase().includes(q);
+                  const phoneMatch = lead.phone && cleanStr(lead.phone).toLowerCase().includes(q);
+                  const emailMatch = lead.email && cleanStr(lead.email).toLowerCase().includes(q);
+                  const campaignMatch = lead.campaign_name && cleanStr(lead.campaign_name).toLowerCase().includes(q);
                   if (!nameMatch && !phoneMatch && !emailMatch && !campaignMatch) return false;
                 }
                 return true;
               });
 
-              const apptCounts = {
-                all: leads.length,
-                Booked: leads.filter(l => l.appointment_status === 'Booked').length,
-                'Follow Up': leads.filter(l => (l.appointment_status || 'Follow Up') === 'Follow Up').length,
-                'Not Booked': leads.filter(l => l.appointment_status === 'Not Booked').length,
-              };
-
-              const qualCounts = {
-                all: leads.length,
-                Pending: leads.filter(l => (l.qualification_status || 'Pending') === 'Pending').length,
-                Qualified: leads.filter(l => l.qualification_status === 'Qualified').length,
-                Disqualified: leads.filter(l => l.qualification_status === 'Disqualified').length,
-              };
-
               return (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <h3 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'uppercase', fontWeight: 800 }}>Captured Leads Log</h3>
-                    {(appointmentFilter !== 'all' || qualificationFilter !== 'all' || leadSearchQuery !== '') && (
-                      <button
-                        onClick={() => {
-                          setAppointmentFilter('all');
-                          setQualificationFilter('all');
-                          setLeadSearchQuery('');
-                          setLeadsPage(1);
-                        }}
-                        className="portal-btn"
-                        style={{ padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800 }}
-                      >
-                        Reset Filters
-                      </button>
-                    )}
+                  {/* Clean Filter Bar */}
+                  <div className="portal-bento-card" style={{ padding: '14px 18px', marginBottom: '16px', display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                    <div style={{ position: 'relative', flexGrow: 1, maxWidth: '360px', minWidth: '220px' }}>
+                      <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                      <input
+                        type="text"
+                        className="portal-control"
+                        placeholder="Search lead name, phone, email..."
+                        value={leadSearchQuery}
+                        onChange={(e) => { setLeadSearchQuery(e.target.value); setLeadsPage(1); }}
+                        style={{ paddingLeft: '36px', height: '38px', fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Qualification:</span>
+                        <select
+                          value={qualificationFilter}
+                          onChange={(e) => { setQualificationFilter(e.target.value); setLeadsPage(1); }}
+                          className="portal-select"
+                          style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: '700' }}
+                        >
+                          <option value="all">All Qualifications</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Qualified">Qualified</option>
+                          <option value="Disqualified">Disqualified</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Appointment:</span>
+                        <select
+                          value={appointmentFilter}
+                          onChange={(e) => { setAppointmentFilter(e.target.value); setLeadsPage(1); }}
+                          className="portal-select"
+                          style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: '700' }}
+                        >
+                          <option value="all">All Appointments</option>
+                          <option value="Booked">Booked</option>
+                          <option value="Follow Up">Follow Up</option>
+                          <option value="Not Booked">Not Booked</option>
+                        </select>
+                      </div>
+
+                      {(appointmentFilter !== 'all' || qualificationFilter !== 'all' || leadSearchQuery !== '') && (
+                        <button
+                          onClick={() => { setAppointmentFilter('all'); setQualificationFilter('all'); setLeadSearchQuery(''); setLeadsPage(1); }}
+                          style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: '800', background: '#f4f4f5', border: '1px solid #18181b', borderRadius: '6px', cursor: 'pointer' }}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {leads.length === 0 ? (
@@ -2722,180 +2777,114 @@ export default function ClientPortal({ showToast }) {
                         <table className="portal-table">
                           <thead>
                             <tr>
-                              <th style={{ verticalAlign: 'top', minWidth: '150px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  <span>Lead Info</span>
-                                  <input
-                                    type="text"
-                                    className="portal-control"
-                                    placeholder="Filter info..."
-                                    value={leadSearchQuery}
-                                    onChange={(e) => { setLeadSearchQuery(e.target.value); setLeadsPage(1); }}
-                                    style={{
-                                      padding: '4px 8px',
-                                      fontSize: '0.75rem',
-                                      fontWeight: '700',
-                                      background: leadSearchQuery ? '#fffbe6' : '#ffffff',
-                                      border: '2px solid #000000',
-                                      borderRadius: '4px',
-                                      textTransform: 'none'
-                                    }}
-                                  />
-                                </div>
-                              </th>
-                              <th style={{ verticalAlign: 'top' }}>Source / Campaign</th>
-                              <th style={{ verticalAlign: 'top' }}>Captured Date</th>
-                              <th style={{ verticalAlign: 'top' }}>Called?</th>
-                              <th style={{ verticalAlign: 'top', minWidth: '150px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  <span>Qualification</span>
-                                  <select
-                                    value={qualificationFilter}
-                                    onChange={(e) => { setQualificationFilter(e.target.value); setLeadsPage(1); }}
-                                    className="portal-select"
-                                    style={{
-                                      padding: '4px 8px',
-                                      fontSize: '0.75rem',
-                                      fontWeight: '800',
-                                      background: qualificationFilter !== 'all' ? '#10b981' : '#ffffff',
-                                      color: qualificationFilter !== 'all' ? '#ffffff' : '#000000',
-                                      border: '2px solid #000000',
-                                      borderRadius: '4px',
-                                      textTransform: 'none',
-                                      boxShadow: 'none'
-                                    }}
-                                  >
-                                    <option value="all" style={{ background: '#ffffff', color: '#000000' }}>All Qualifications</option>
-                                    <option value="Pending" style={{ background: '#ffffff', color: '#000000' }}>⌛ Pending ({qualCounts.Pending})</option>
-                                    <option value="Qualified" style={{ background: '#ffffff', color: '#000000' }}>✅ Qualified ({qualCounts.Qualified})</option>
-                                    <option value="Disqualified" style={{ background: '#ffffff', color: '#000000' }}>❌ Disqualified ({qualCounts.Disqualified})</option>
-                                  </select>
-                                </div>
-                              </th>
-                              <th style={{ verticalAlign: 'top', minWidth: '160px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  <span>Appointment</span>
-                                  <select
-                                    value={appointmentFilter}
-                                    onChange={(e) => { setAppointmentFilter(e.target.value); setLeadsPage(1); }}
-                                    className="portal-select"
-                                    style={{
-                                      padding: '4px 8px',
-                                      fontSize: '0.75rem',
-                                      fontWeight: '800',
-                                      background: appointmentFilter !== 'all' ? '#3b82f6' : '#ffffff',
-                                      color: appointmentFilter !== 'all' ? '#ffffff' : '#000000',
-                                      border: '2px solid #000000',
-                                      borderRadius: '4px',
-                                      textTransform: 'none',
-                                      boxShadow: 'none'
-                                    }}
-                                  >
-                                    <option value="all" style={{ background: '#ffffff', color: '#000000' }}>All Appointments</option>
-                                    <option value="Booked" style={{ background: '#ffffff', color: '#000000' }}>📅 Booked ({apptCounts.Booked})</option>
-                                    <option value="Follow Up" style={{ background: '#ffffff', color: '#000000' }}>📞 Follow Up ({apptCounts['Follow Up']})</option>
-                                    <option value="Not Booked" style={{ background: '#ffffff', color: '#000000' }}>🚫 Not Booked ({apptCounts['Not Booked']})</option>
-                                  </select>
-                                </div>
-                              </th>
-                              <th style={{ verticalAlign: 'top' }}>Rejection Reason</th>
+                              <th>Lead Info</th>
+                              <th>Source / Campaign</th>
+                              <th>Captured Date</th>
+                              <th>Called?</th>
+                              <th>Qualification</th>
+                              <th>Appointment</th>
+                              <th>Rejection Reason</th>
                             </tr>
                           </thead>
                           <tbody>
                             {filteredLeads.slice((leadsPage - 1) * ITEMS_PER_PAGE_LEADS, leadsPage * ITEMS_PER_PAGE_LEADS).map(lead => {
-                              const qualBorderColor = 
-                                lead.qualification_status === 'Qualified' ? '#10b981' :
-                                lead.qualification_status === 'Disqualified' ? '#ef4444' : '#6b7280';
+                              const cleanName = cleanStr(lead.name) || 'Unnamed Lead';
+                              const cleanEmail = cleanStr(lead.email);
+                              const cleanPhone = cleanStr(lead.phone);
+                              const cleanCampaign = cleanStr(lead.campaign_name) || 'Direct / Organic';
 
-                              const callBorderColor = 
-                                lead.call_outcome === 'Picked Up' ? '#10b981' :
-                                lead.call_outcome === 'No Answer' ? '#f59e0b' :
-                                lead.call_outcome === 'Other' ? '#6b7280' : '#d1d5db';
-
-                              const apptBorderColor = 
-                                lead.appointment_status === 'Booked' ? '#3b82f6' :
-                                lead.appointment_status === 'Not Booked' ? '#ef4444' : '#6b7280';
-                                 
-                              const platformBadge = 
-                                lead.platform === 'Meta' ? 'portal-badge-info' :
-                                lead.platform === 'Google' ? 'portal-badge-success' :
-                                lead.platform === 'YouTube' ? 'portal-badge-danger' : 'portal-badge-muted';
-                                 
                               return (
                                 <tr key={lead.id}>
                                   <td>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <span style={{ fontWeight: '800', color: '#000000' }}>{lead.name}</span>
-                                      {lead.email && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{lead.email}</span>}
-                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '800' }}>{lead.phone}</span>
+                                      <span style={{ fontWeight: '800', color: '#09090b', fontSize: '0.88rem' }}>{cleanName}</span>
+                                      {cleanEmail && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{cleanEmail}</span>}
+                                      {cleanPhone && <span style={{ fontSize: '0.75rem', color: '#09090b', fontWeight: '700' }}>{cleanPhone}</span>}
                                     </div>
                                   </td>
                                   <td>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <div style={{ display: 'flex', gap: '6px' }}>
-                                        <span className={`portal-badge ${platformBadge}`}>{lead.platform}</span>
-                                        <span className="portal-badge" style={{ background: '#f3e8ff', color: '#6b21a8', border: '1px solid #c084fc' }}>
-                                          {lead.source === 'call' ? `📞 Call (${lead.call_duration_seconds || 0}s)` : '📝 Form'}
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                        <span className="portal-badge" style={{ background: '#f4f4f5', color: '#09090b', border: '1px solid #18181b', fontSize: '0.68rem' }}>
+                                          {lead.platform || 'Form'}
                                         </span>
+                                        {lead.source === 'call' && (
+                                          <span className="portal-badge" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #18181b', fontSize: '0.68rem' }}>
+                                            📞 Call ({lead.call_duration_seconds || 0}s)
+                                          </span>
+                                        )}
                                       </div>
-                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '800' }}>
-                                        🎯 {lead.campaign_name || 'Direct / Organic'}
+                                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>
+                                        {cleanCampaign}
                                       </span>
                                     </div>
                                   </td>
-                                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', color: '#09090b', fontWeight: '600' }}>
                                     {new Date(lead.created_at.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                                   </td>
                                   <td>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '130px' }}>
-                                      <select 
-                                        value={lead.call_outcome || 'Pending'}
-                                        onChange={(e) => handleUpdateLead(lead.id, { call_outcome: e.target.value })}
-                                        className="portal-select"
-                                        style={{ 
-                                          borderWidth: '2px', 
-                                          borderColor: callBorderColor,
-                                          padding: '4px 8px',
-                                          fontSize: '0.8rem'
-                                        }}
-                                      >
-                                        <option value="Pending">⌛ Pending</option>
-                                        <option value="Picked Up">📞 Picked Up</option>
-                                        <option value="No Answer">🔇 No Answer</option>
-                                        <option value="Other">❓ Other</option>
-                                      </select>
-                                    </div>
+                                    <select 
+                                      value={lead.call_outcome || 'Pending'}
+                                      onChange={(e) => handleUpdateLead(lead.id, { call_outcome: e.target.value })}
+                                      style={{ 
+                                        padding: '5px 10px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: '700',
+                                        borderRadius: '6px',
+                                        border: '1px solid #18181b',
+                                        background: '#ffffff',
+                                        color: '#09090b',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="Pending">⌛ Pending</option>
+                                      <option value="Picked Up">📞 Picked Up</option>
+                                      <option value="No Answer">🔇 No Answer</option>
+                                      <option value="Other">❓ Other</option>
+                                    </select>
                                   </td>
                                   <td>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '130px' }}>
-                                      <select 
-                                        value={lead.qualification_status || 'Pending'}
-                                        onChange={(e) => handleUpdateLead(lead.id, { qualification_status: e.target.value })}
-                                        className="portal-select"
-                                        style={{ 
-                                          borderWidth: '2px', 
-                                          borderColor: qualBorderColor,
-                                          padding: '4px 8px',
-                                          fontSize: '0.8rem'
-                                        }}
-                                      >
-                                        <option value="Pending">⌛ Pending</option>
-                                        <option value="Qualified">✅ Qualified</option>
-                                        <option value="Disqualified">❌ Disqualified</option>
-                                      </select>
-                                    </div>
+                                    <select 
+                                      value={lead.qualification_status || 'Pending'}
+                                      onChange={(e) => handleUpdateLead(lead.id, { qualification_status: e.target.value })}
+                                      style={{ 
+                                        padding: '5px 10px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: '800',
+                                        borderRadius: '6px',
+                                        border: '1px solid #18181b',
+                                        background: 
+                                          lead.qualification_status === 'Qualified' ? '#d1fae5' :
+                                          lead.qualification_status === 'Disqualified' ? '#fee2e2' : '#ffffff',
+                                        color: 
+                                          lead.qualification_status === 'Qualified' ? '#065f46' :
+                                          lead.qualification_status === 'Disqualified' ? '#991b1b' : '#09090b',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="Pending">⌛ Pending</option>
+                                      <option value="Qualified">✅ Qualified</option>
+                                      <option value="Disqualified">❌ Disqualified</option>
+                                    </select>
                                   </td>
                                   <td>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '150px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <select 
                                         value={lead.appointment_status || 'Follow Up'}
                                         onChange={(e) => handleUpdateLead(lead.id, { appointment_status: e.target.value })}
-                                        className="portal-select"
                                         style={{ 
-                                          borderWidth: '2px', 
-                                          borderColor: apptBorderColor,
-                                          padding: '4px 8px',
-                                          fontSize: '0.8rem'
+                                          padding: '5px 10px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: '800',
+                                          borderRadius: '6px',
+                                          border: '1px solid #18181b',
+                                          background: 
+                                            lead.appointment_status === 'Booked' ? '#dbeafe' :
+                                            lead.appointment_status === 'Not Booked' ? '#fee2e2' : '#ffffff',
+                                          color: 
+                                            lead.appointment_status === 'Booked' ? '#1e40af' :
+                                            lead.appointment_status === 'Not Booked' ? '#991b1b' : '#09090b',
+                                          cursor: 'pointer'
                                         }}
                                       >
                                         <option value="Follow Up">📞 Follow Up</option>
@@ -2907,12 +2896,11 @@ export default function ClientPortal({ showToast }) {
                                           type="datetime-local" 
                                           value={lead.appointment_date ? lead.appointment_date.slice(0, 16) : ''}
                                           onChange={(e) => handleUpdateLead(lead.id, { appointment_date: e.target.value })}
-                                          className="portal-select"
                                           style={{ 
                                             padding: '4px 6px',
-                                            fontSize: '0.75rem',
-                                            width: '100%',
-                                            marginTop: '2px'
+                                            fontSize: '0.72rem',
+                                            borderRadius: '4px',
+                                            border: '1px solid #18181b'
                                           }}
                                         />
                                       )}
@@ -2925,17 +2913,17 @@ export default function ClientPortal({ showToast }) {
                                         const selectVal = isPreset ? (lead.rejection_reason || 'Out of Budget') : 'Other';
                                         const showTextInput = !isPreset || lead.rejection_reason === 'Other';
                                         return (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '150px' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                             <select 
                                               value={selectVal}
                                               onChange={(e) => handleUpdateLead(lead.id, { rejection_reason: e.target.value })}
-                                              className="portal-select"
                                               style={{ 
-                                                borderWidth: '2px', 
-                                                borderColor: '#ef4444',
                                                 padding: '4px 8px',
-                                                fontSize: '0.8rem',
-                                                width: '100%'
+                                                fontSize: '0.78rem',
+                                                borderRadius: '6px',
+                                                border: '1px solid #18181b',
+                                                background: '#ffffff',
+                                                cursor: 'pointer'
                                               }}
                                             >
                                               <option value="Out of Budget">💰 Out of Budget</option>
@@ -2962,13 +2950,11 @@ export default function ClientPortal({ showToast }) {
                                                     e.target.blur();
                                                   }
                                                 }}
-                                                className="portal-select"
                                                 style={{ 
                                                   padding: '4px 6px',
                                                   fontSize: '0.75rem',
-                                                  width: '100%',
-                                                  borderColor: '#ef4444',
-                                                  marginTop: '2px'
+                                                  borderRadius: '4px',
+                                                  border: '1px solid #18181b'
                                                 }}
                                               />
                                             )}
@@ -2976,7 +2962,7 @@ export default function ClientPortal({ showToast }) {
                                         );
                                       })()
                                     ) : (
-                                      <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                      <span style={{ color: '#64748b' }}>-</span>
                                     )}
                                   </td>
                                 </tr>
@@ -2991,7 +2977,6 @@ export default function ClientPortal({ showToast }) {
                 </div>
               );
             })()}
-
           </div>
         )}
 
