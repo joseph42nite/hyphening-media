@@ -758,16 +758,6 @@ export default function ArtistCurationTab({
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Telegram Chat ID</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={artistFormData.telegram_chat_id}
-                  onChange={e => setArtistFormData({...artistFormData, telegram_chat_id: e.target.value})}
-                />
-              </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Bank Details</label>
