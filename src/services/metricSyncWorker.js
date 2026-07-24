@@ -3,7 +3,7 @@ import { executeClientAction } from './composioService.js';
 
 /**
  * Extract Instagram shortcode from post link URL
- * e.g., https://www.instagram.com/reel/DYbX0txjRVx/ => 'DYbX0txjRVx'
+ * e.g., https://www.instagram.com/reel/DaiJZ_Qzb6N/ => 'DaiJZ_Qzb6N'
  */
 function extractInstagramShortcode(link) {
   if (!link) return null;
@@ -48,11 +48,17 @@ export async function syncSingleContentMetrics(contentId) {
             fields: 'id,caption,media_type,permalink,shortcode,like_count,comments_count,timestamp'
           });
 
-          const mediaList = userMedia?.data?.data || userMedia?.items || userMedia?.data || [];
-          const matched = mediaList.find(m => 
-            (shortcode && (m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode))))
-            || (item.link && m.permalink && m.permalink.includes(m.shortcode))
-          );
+          const mediaList = Array.isArray(userMedia?.data?.data) ? userMedia.data.data : [];
+          const matched = mediaList.find(m => {
+            if (!m) return false;
+            if (shortcode && (m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode)))) {
+              return true;
+            }
+            if (item.link && m.permalink && item.link.includes(m.shortcode)) {
+              return true;
+            }
+            return false;
+          });
 
           if (matched) {
             numericMediaId = matched.id;
