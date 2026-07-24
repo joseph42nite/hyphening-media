@@ -15,15 +15,28 @@ export default function ContentModal({
 }) {
   if (!showContentModal) return null;
 
-  const [scriptFilterDate, setScriptFilterDate] = useState((contentFormData.date || '').slice(0, 7));
+  const [scriptFilterDate, setScriptFilterDate] = useState(() => {
+    if (contentFormData.script_id && marketingScripts?.length) {
+      const found = marketingScripts.find(s => String(s.id) === String(contentFormData.script_id));
+      if (found?.month) return found.month;
+    }
+    return (contentFormData.date || '').slice(0, 7);
+  });
   const [showAutoDetails, setShowAutoDetails] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
 
   React.useEffect(() => {
+    if (contentFormData.script_id && marketingScripts?.length) {
+      const found = marketingScripts.find(s => String(s.id) === String(contentFormData.script_id));
+      if (found?.month) {
+        setScriptFilterDate(found.month);
+        return;
+      }
+    }
     if (contentFormData.date) {
       setScriptFilterDate(contentFormData.date.slice(0, 7));
     }
-  }, [contentFormData.date]);
+  }, [showContentModal, contentFormData.script_id, contentFormData.date, marketingScripts]);
 
   return (
     <div className="modal-overlay" onClick={() => setShowContentModal(false)}>
@@ -137,14 +150,28 @@ export default function ContentModal({
               <select
                 className="form-control"
                 value={contentFormData.script_id || ''}
-                onChange={e => setContentFormData({ ...contentFormData, script_id: e.target.value })}
+                onChange={e => {
+                  const selectedId = e.target.value;
+                  const found = (marketingScripts || []).find(s => String(s.id) === String(selectedId));
+                  if (found?.month) {
+                    setScriptFilterDate(found.month);
+                  }
+                  setContentFormData({ ...contentFormData, script_id: selectedId });
+                }}
               >
                 <option value="">-- None --</option>
                 {(() => {
                   const selectedMonth = scriptFilterDate ? scriptFilterDate.slice(0, 7) : '';
-                  const filteredScripts = selectedMonth
+                  let filteredScripts = selectedMonth
                     ? (marketingScripts || []).filter(s => s.month === selectedMonth)
                     : (marketingScripts || []);
+
+                  if (contentFormData.script_id) {
+                    const linkedScript = (marketingScripts || []).find(s => String(s.id) === String(contentFormData.script_id));
+                    if (linkedScript && !filteredScripts.some(s => String(s.id) === String(linkedScript.id))) {
+                      filteredScripts = [linkedScript, ...filteredScripts];
+                    }
+                  }
 
                   return filteredScripts.map(s => (
                     <option key={s.id} value={s.id}>
