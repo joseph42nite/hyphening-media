@@ -34,7 +34,8 @@ export function syncContentToKanbanTask(contentId, database = db) {
     if (isPending) {
       const taskTitle = `Post: ${content.title || ('Content Plan - ' + formatDateStr(content.date))} (${content.platform || 'social'})`;
       const scriptInfo = content.script_title ? `\nScript: ${content.script_title}` : '';
-      const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}`;
+      const commentsInfo = content.client_comments ? `\n\n💬 CLIENT REVISION REQUESTED: "${content.client_comments}"` : '';
+      const taskDesc = `Auto-generated from Content Tracker.\nPlatform: ${content.platform || ''}\nPost Type: ${content.post_type || ''}\nCaption: ${content.caption || ''}${scriptInfo}${commentsInfo}`;
       
       const isVideo = ['reel', 'youtube', 'short'].includes((content.post_type || '').toLowerCase());
       const taskType = isVideo ? 'video' : 'social';

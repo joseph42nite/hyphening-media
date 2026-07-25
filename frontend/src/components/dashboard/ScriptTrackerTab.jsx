@@ -285,15 +285,16 @@ export default function ScriptTrackerTab({
 
               {item.client_comments && (
                 <div style={{ 
-                  background: 'rgba(239, 68, 68, 0.1)', 
-                  border: '1px solid rgba(239, 68, 68, 0.3)', 
-                  borderRadius: '4px', 
-                  padding: '8px 12px', 
-                  fontSize: '0.8rem', 
-                  color: '#f87171', 
-                  fontWeight: 600, 
+                  background: '#fee2e2', 
+                  border: '2px solid #ef4444', 
+                  borderRadius: '8px', 
+                  padding: '10px 14px', 
+                  fontSize: '0.85rem', 
+                  color: '#991b1b', 
+                  fontWeight: '800', 
                   textAlign: 'left',
-                  marginTop: '4px'
+                  marginTop: '8px',
+                  boxShadow: 'var(--shadow-sm)'
                 }}>
                   💬 <strong>Client Revision Note:</strong> "{item.client_comments}"
                 </div>

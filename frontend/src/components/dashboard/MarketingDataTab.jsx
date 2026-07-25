@@ -307,12 +307,12 @@ export default function MarketingDataTab({
                     <tr key={item.id}>
                       <td>{item.date ? formatDateStr(item.date) : '-'}</td>
                       <td><span className="badge badge-info">{item.post_type}</span></td>
-                      <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script_title || item.script}>
+                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script_title || item.script}>
                         {item.script_title || item.script || '-'}
                         {item.client_comments && (
-                          <span style={{ color: 'var(--danger)', cursor: 'help', marginLeft: '4px', display: 'inline-block' }} title={`Client Feedback: ${item.client_comments}`}>
-                            💬
-                          </span>
+                          <div style={{ fontSize: '0.72rem', color: '#991b1b', background: '#fee2e2', border: '1px solid #ef4444', padding: '2px 6px', borderRadius: '4px', marginTop: '2px', fontWeight: '800' }} title={`Client Feedback: ${item.client_comments}`}>
+                            💬 "{item.client_comments}"
+                          </div>
                         )}
                       </td>
                       <td>
