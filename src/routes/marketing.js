@@ -438,6 +438,47 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
 });
 
 /**
+ * DELETE /api/clients/:id/marketing/content/:contentId
+ * Delete a content tracker item.
+ */
+router.delete('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const { id, contentId } = req.params;
+    const content = db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ?').get(contentId, id);
+
+    if (!content) {
+      return res.status(404).json({ error: 'Content item not found' });
+    }
+
+    // 1. Remove script relation
+    db.prepare('DELETE FROM marketing_content_script_relation WHERE content_id = ?').run(contentId);
+
+    // 2. Delete linked Kanban task if exists
+    if (content.kanban_task_id) {
+      db.prepare('DELETE FROM kanban_tasks WHERE id = ?').run(content.kanban_task_id);
+    }
+
+    // 3. Delete content item
+    db.prepare('DELETE FROM marketing_content_tracker WHERE id = ?').run(contentId);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'delete',
+      entityType: 'content',
+      entityId: parseInt(contentId),
+      diff: { title: content.title, client_id: id },
+      ip: req.ip,
+    });
+
+    res.json({ message: 'Content item deleted successfully' });
+  } catch (err) {
+    console.error('[MARKETING] Content delete error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/clients/:id/marketing/content/:contentId/submit-approval
  * Submit content for client approval.
  */

@@ -8,6 +8,7 @@ export default function ContentModal({
   contentFormData,
   setContentFormData,
   handleContentSubmit,
+  handleDeleteContent,
   clients,
   staffUsers,
   marketingScripts,
@@ -536,6 +537,16 @@ export default function ContentModal({
           </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+            {editingContent && handleDeleteContent && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => handleDeleteContent(editingContent.id)}
+                style={{ marginRight: 'auto', backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#ef4444' }}
+              >
+                🗑️ Delete Row
+              </button>
+            )}
             <button type="button" className="btn btn-secondary" onClick={() => setShowContentModal(false)}>
               Cancel
             </button>

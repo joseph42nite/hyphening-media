@@ -110,8 +110,30 @@ export default function MarketingDataTab({
       showToast(`Content row ${editingContent ? 'updated' : 'added'} successfully`, 'success');
       setShowContentModal(false);
       fetchMarketingData(selectedClientForReports.id);
-      fetchCalendarMarketingContent();
-      fetchTasks();
+      if (fetchCalendarMarketingContent) fetchCalendarMarketingContent();
+      if (fetchTasks) fetchTasks();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteContent = async (contentId) => {
+    if (!selectedClientForReports) return;
+    if (!window.confirm('Are you sure you want to delete this content item? This action cannot be undone.')) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/content/${contentId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete content item');
+
+      showToast('Content item deleted successfully', 'success');
+      setShowContentModal(false);
+      fetchMarketingData(selectedClientForReports.id);
+      if (fetchCalendarMarketingContent) fetchCalendarMarketingContent();
+      if (fetchTasks) fetchTasks();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -428,13 +450,22 @@ export default function MarketingDataTab({
 
                       <td>
                         {(isAdmin || isSMM) && (
-                          <button
-                            onClick={() => openContentModal(item)}
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                          >
-                            Edit
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => openContentModal(item)}
+                              className="btn btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteContent(item.id)}
+                              className="btn btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#ef4444' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -602,6 +633,7 @@ export default function MarketingDataTab({
         contentFormData={contentFormData}
         setContentFormData={setContentFormData}
         handleContentSubmit={handleContentSubmit}
+        handleDeleteContent={handleDeleteContent}
         clients={clients}
         staffUsers={staffUsers}
         marketingScripts={marketingScripts}
