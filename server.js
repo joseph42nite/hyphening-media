@@ -44,6 +44,7 @@ import { publicGigConfirmRoute } from './src/routes/artists.js';
 import seoRoutes from './src/routes/seo.js';
 import approvalRoutes from './src/routes/approval.js';
 import usageRoutes from './src/routes/usage.js';
+import sitemapRoutes from './src/routes/sitemap.js';
 
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
@@ -206,6 +207,9 @@ app.use('/api/blog', blogRoutes);
 
 // Composio Social Integrations
 app.use('/api', integrationsRoutes);
+
+// Sitemap & Robots.txt routes
+app.use('/', sitemapRoutes);
 
 // Audit logs (admin only)
 app.get('/api/audit-logs', (req, res) => {
