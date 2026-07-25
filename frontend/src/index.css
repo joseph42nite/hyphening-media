@@ -869,7 +869,7 @@ tr:hover td {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
     display: block !important;
-    margin: 0 !important;
+    margin: 0 0 24px 0 !important;
     box-sizing: border-box !important;
   }
 

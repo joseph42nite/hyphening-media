@@ -444,7 +444,7 @@ export default function MarketingDataTab({
             </table>
           </div>
 
-          <h3 style={{ marginBottom: '12px' }}>Ad Campaigns Performance</h3>
+          <h3 style={{ marginTop: '32px', marginBottom: '14px' }}>Ad Campaigns Performance</h3>
           <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
             <table>
               <thead>
