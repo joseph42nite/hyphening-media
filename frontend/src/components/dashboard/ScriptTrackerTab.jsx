@@ -372,7 +372,6 @@ export default function ScriptTrackerTab({
                         className="form-control"
                         value={scriptFormData.client_comments || ''}
                         onChange={e => setScriptFormData({ ...scriptFormData, client_comments: e.target.value })}
-                        placeholder="e.g. Please make the intro hook punchier"
                       />
                     </>
                   ) : (

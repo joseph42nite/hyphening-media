@@ -2321,7 +2321,6 @@ export default function ClientPortal({ showToast }) {
                               <textarea
                                 className="portal-control"
                                 rows={3}
-                                placeholder="Type any comments or requested edits here. If you want changes, type them here and click 'Request Changes' below."
                                 value={contentCommentText}
                                 onChange={(e) => setContentCommentText(e.target.value)}
                                 style={{ resize: 'vertical', width: '100%', background: '#ffffff', border: '2px solid #000000', borderRadius: '6px', padding: '10px' }}
