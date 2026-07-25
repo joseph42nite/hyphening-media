@@ -542,6 +542,41 @@ body.portal-active {
     font-size: 0.75rem;
     padding: 12px;
   }
+  .portal-action-btns-row {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .portal-action-btns-row .portal-btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .portal-content-pagination-bar {
+    padding-bottom: 12px !important;
+    gap: 6px !important;
+  }
+  .portal-content-pagination-bar .portal-btn {
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
+  }
+  .portal-content-pagination-bar span {
+    font-size: 0.78rem !important;
+  }
+  .portal-content-item-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .portal-content-desktop-table {
+    display: none !important;
+  }
+  .portal-content-mobile-list {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+.portal-content-mobile-list {
+  display: none;
 }
 `;
 
@@ -2010,7 +2045,8 @@ export default function ClientPortal({ showToast }) {
                 </div>
               ) : (
                 <>
-                  <div className="portal-table-container">
+                  {/* Desktop Table View */}
+                  <div className="portal-table-container portal-content-desktop-table">
                     <table className="portal-table">
                       <thead>
                         <tr>
@@ -2066,6 +2102,59 @@ export default function ClientPortal({ showToast }) {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Mobile Card List View */}
+                  <div className="portal-content-mobile-list">
+                    {contentList.slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT).map(item => (
+                      <div key={item.id} className="portal-bento-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                          <div>
+                            <div style={{ display: 'inline-flex', gap: '6px', marginBottom: '6px' }}>
+                              <span className={`portal-badge ${item.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>
+                                {item.platform}
+                              </span>
+                              <span className="portal-badge portal-badge-muted" style={{ textTransform: 'capitalize' }}>
+                                {item.post_type}
+                              </span>
+                            </div>
+                            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: '#000000', wordBreak: 'break-word' }}>
+                              {item.title || 'Untitled Post'}
+                            </h4>
+                          </div>
+                          {item.link && (
+                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#000000', fontWeight: '800', flexShrink: 0 }}>
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: '#f4f4f5', padding: '10px', borderRadius: '8px', border: '1.5px solid #000000' }}>
+                          <div>
+                            <div style={{ fontSize: '0.65rem', color: '#52525b', textTransform: 'uppercase', fontWeight: '800' }}>Views</div>
+                            <div style={{ fontWeight: '800', fontSize: '0.88rem' }}>
+                              {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.65rem', color: '#52525b', textTransform: 'uppercase', fontWeight: '800' }}>Likes</div>
+                            <div style={{ fontWeight: '800', fontSize: '0.88rem' }}>{item.likes?.toLocaleString() || 0}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.65rem', color: '#52525b', textTransform: 'uppercase', fontWeight: '800' }}>Engagement</div>
+                            <div style={{ fontWeight: '800', fontSize: '0.88rem', color: item.engagement_rate_pct >= 5 ? '#065f46' : '#000000' }}>
+                              {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#52525b', fontWeight: '700' }}>
+                          <span>Score: <strong style={{ color: '#000000' }}>{item.content_score || 0}</strong></span>
+                          <span>Date: {formatDateStr(item.date)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   {renderPagination(contentPage, contentList.length, ITEMS_PER_PAGE_CONTENT, setContentPage)}
                 </>
               )}
@@ -2126,7 +2215,7 @@ export default function ClientPortal({ showToast }) {
                   return (
                     <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       {/* Pagination Controls */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000000', paddingBottom: '16px' }}>
+                      <div className="portal-content-pagination-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000000', paddingBottom: '16px' }}>
                         <button 
                           className="portal-btn"
                           disabled={index === 0}
@@ -2156,7 +2245,7 @@ export default function ClientPortal({ showToast }) {
 
                       {/* Content Item Details */}
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div className="portal-content-item-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                           <div>
                             <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>
                               {item.format === 'long_format' ? 'Long Format' : 'Reel'}
@@ -2239,7 +2328,7 @@ export default function ClientPortal({ showToast }) {
                               />
                             </div>
 
-                            <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                            <div className="portal-action-btns-row" style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
                               <button 
                                 onClick={() => handleReject(item.id, contentCommentText, item.content_id)}
                                 className="portal-btn portal-btn-danger" 
