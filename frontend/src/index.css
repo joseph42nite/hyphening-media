@@ -60,7 +60,7 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overflow-x: hidden;
-  padding: 24px;
+  padding: 16px;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -68,7 +68,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  max-width: 1440px;
+  max-width: 100%;
   margin: 0 auto;
   width: 100%;
 }
@@ -428,8 +428,10 @@ tr:hover td {
   min-width: 250px;
   background: #ffffff;
   padding: 12px;
-  max-height: calc(100vh - 240px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .kanban-column-header {
@@ -438,6 +440,7 @@ tr:hover td {
   align-items: center;
   border-bottom: var(--border-width) solid var(--border-color);
   padding-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .kanban-column-title {
@@ -466,6 +469,10 @@ tr:hover td {
   flex-direction: column;
   margin-top: 10px;
   gap: 8px;
+  max-height: calc(100vh - 290px);
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
 }
 
 .kanban-card {
