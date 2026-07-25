@@ -28,9 +28,10 @@ export function initScheduler() {
     runDailyCommentSync();
   });
 
-  // Automated hourly metric refresh worker for all posted content
-  cron.schedule('0 * * * *', () => {
-    console.log('[SCHEDULER] Running hourly automated metric refresh worker...');
+  // Daily metric refresh worker for content tracker (Composio / Meta Graph API) — 3:00 AM daily
+  // Configured to run ONCE a day to keep monthly API calls under Composio free tier limit (20,000 tool calls/mo)
+  cron.schedule('0 3 * * *', () => {
+    console.log('[SCHEDULER] Running daily automated metric refresh worker (Composio Free Tier Safe)...');
     runMetricSyncWorker();
   });
 
@@ -46,9 +47,9 @@ export function initScheduler() {
     runDailyBacklogReport();
   });
 
-  // API metric fetch — every 6 hours
-  cron.schedule('0 */6 * * *', () => {
-    console.log('[SCHEDULER] Running API metric fetch...');
+  // API metric fetch — once a day at 3:30 AM
+  cron.schedule('30 3 * * *', () => {
+    console.log('[SCHEDULER] Running daily API metric fetch...');
     runAPIMetricFetch();
   });
 

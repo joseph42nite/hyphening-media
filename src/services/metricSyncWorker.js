@@ -242,10 +242,12 @@ export async function runMetricSyncWorker() {
 
     if (itemsToRefresh.length === 0) return;
 
-    console.log(`[METRIC-SYNC] Syncing live metrics for ${itemsToRefresh.length} posted item(s)...`);
+    console.log(`[METRIC-SYNC] Syncing live metrics for ${itemsToRefresh.length} posted item(s) (Composio Free Tier Safe)...`);
     for (const row of itemsToRefresh) {
       try {
         await syncSingleContentMetrics(row.id);
+        // 300ms rate-limit delay between API calls
+        await new Promise(res => setTimeout(res, 300));
       } catch (err) {
         console.warn(`[METRIC-SYNC] Skipped post #${row.id}:`, err.message);
       }
