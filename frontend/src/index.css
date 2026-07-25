@@ -326,8 +326,6 @@ a:hover {
 }
 
 .table-scrollable-y {
-  max-height: 480px;
-  overflow-y: auto;
   overflow-x: auto;
 }
 
