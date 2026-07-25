@@ -321,12 +321,18 @@ body.portal-active {
   background: #ffffff;
   box-shadow: var(--shadow-md);
   width: 100%;
-  margin-bottom: 8px;
+  max-width: 100%;
+  padding: 0 !important;
+  box-sizing: border-box;
+  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .portal-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
 }
 
@@ -339,6 +345,18 @@ body.portal-active {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.portal-table th:first-child {
+  border-top-left-radius: calc(var(--radius-md) - 3px);
+}
+
+.portal-table th:last-child {
+  border-top-right-radius: calc(var(--radius-md) - 3px);
 }
 
 .portal-table td {
@@ -347,6 +365,7 @@ body.portal-active {
   color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .portal-table tr:last-child td {

@@ -262,10 +262,10 @@ export default function MarketingDataTab({
             <table>
               <thead>
                 <tr>
-                  <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5' }}>Metadata</th>
-                  <th colSpan="12" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#fee2e2' }}>Instagram Metrics</th>
-                  <th colSpan="4" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#dbeafe' }}>YouTube Metrics</th>
-                  <th style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5' }}>Actions</th>
+                  <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5', whiteSpace: 'nowrap', fontWeight: '900' }}>Metadata</th>
+                  <th colSpan="12" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#fee2e2', color: '#991b1b', whiteSpace: 'nowrap', fontWeight: '900' }}>Instagram Metrics</th>
+                  <th colSpan="4" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#dbeafe', color: '#1e40af', whiteSpace: 'nowrap', fontWeight: '900' }}>YouTube Metrics</th>
+                  <th style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5', whiteSpace: 'nowrap', fontWeight: '900' }}>Actions</th>
                 </tr>
                 <tr>
                   <th>Date</th>

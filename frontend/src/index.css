@@ -112,7 +112,7 @@ a:hover {
 }
 
 /* Bento Cards (Neo-brutalist boxes) */
-.card, .glass, .glass-premium, .kanban-column, .kanban-card, .table-container, .card-metric {
+.card, .glass, .glass-premium, .kanban-column, .kanban-card, .card-metric {
   background: var(--bg-card);
   border: var(--border-width) solid var(--border-color) !important;
   border-radius: var(--radius-md) !important;
@@ -124,6 +124,20 @@ a:hover {
   overflow: hidden;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.table-container {
+  background: var(--bg-card);
+  border: var(--border-width) solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+  padding: 0 !important;
+  position: relative;
+  overflow-x: auto;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
 }
 
 .glass-premium {
@@ -302,13 +316,19 @@ a:hover {
   overflow-x: auto;
   max-width: 100%;
   width: 100%;
+  padding: 0 !important;
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border-color);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
 }
 
 .table-scrollable-y {
-  max-height: 450px;
+  max-height: 480px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 
 .table-scrollable-y thead {
@@ -319,26 +339,44 @@ a:hover {
 
 table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
   font-size: 0.9rem;
 }
 
 th {
   background: #f4f4f5;
-  padding: 16px 20px;
+  padding: 14px 18px;
   font-family: var(--font-heading);
   font-weight: 800;
   text-transform: uppercase;
   color: var(--text-primary);
   border-bottom: var(--border-width) solid var(--border-color);
+  white-space: nowrap;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+th:first-child {
+  border-top-left-radius: calc(var(--radius-md) - 3px);
+}
+
+th:last-child {
+  border-top-right-radius: calc(var(--radius-md) - 3px);
 }
 
 td {
-  padding: 16px 20px;
+  padding: 14px 18px;
   border-bottom: 2px solid var(--border-color);
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 tr:last-child td {
@@ -836,7 +874,7 @@ tr:hover td {
   }
 
   .table-container table {
-    min-width: 480px !important;
+    min-width: max-content !important;
     width: 100% !important;
   }
 
