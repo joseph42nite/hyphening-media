@@ -17,8 +17,41 @@ const router = Router();
 router.use(authenticate);
 
 // =========================================
-// CONTENT TRACKER
+// CONTENT TRACKER & REVIEW QUEUE
 // =========================================
+
+/**
+ * GET /api/clients/marketing/review-queue
+ * Fetch all content items pending client approval or requested revisions across clients.
+ */
+router.get('/marketing/review-queue', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
+  try {
+    let query = `
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
+             c.name AS client_name, u.name AS assignee_name, f.name AS freelancer_name
+      FROM marketing_content_tracker t
+      JOIN crm_clients c ON t.client_id = c.id
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN freelancers f ON t.freelancer_id = f.id
+      WHERE t.status IN ('Pending Client Approval', 'Client Rejected')
+    `;
+    const params = [];
+
+    if (req.user.role === 'ops_video_editor') {
+      query += " AND t.post_type IN ('Reel', 'Youtube', 'Short') AND t.assigned_to = ?";
+      params.push(req.user.id);
+    }
+
+    query += ' ORDER BY t.updated_at DESC';
+    const content = db.prepare(query).all(...params);
+    res.json({ content });
+  } catch (err) {
+    console.error('[MARKETING] Review queue error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {

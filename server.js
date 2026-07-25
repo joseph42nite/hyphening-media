@@ -117,10 +117,21 @@ if (!IS_PROD) {
 
 const sseClients = new Set();
 
+// Send SSE keep-alive ping comment every 15 seconds to prevent HTTP/2 proxy (Caddy/Nginx) timeouts
+setInterval(() => {
+  for (const client of sseClients) {
+    try {
+      client.write(': keep-alive ping\n\n');
+    } catch (e) {
+      sseClients.delete(client);
+    }
+  }
+}, 15000);
+
 app.get('/api/events', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no',
   });

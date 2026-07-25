@@ -580,10 +580,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const fetchReviewQueue = async () => {
     try {
       const res = await authFetch('/api/clients/marketing/review-queue');
+      if (!res || !res.ok) return;
       const data = await res.json();
-      if (res.ok) setReviewQueue(data.content || []);
+      setReviewQueue(data.content || []);
     } catch (err) {
-      console.error(err);
+      console.error('[ReviewQueue] fetch error:', err);
     }
   };
 
