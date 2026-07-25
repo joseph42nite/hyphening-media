@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ContentModal from './ContentModal.jsx';
@@ -23,6 +23,14 @@ export default function MarketingDataTab({
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSMM = auth?.role === 'ops_social_media_manager';
+
+  // Content Tracker Pagination State
+  const [contentPage, setContentPage] = useState(1);
+  const ITEMS_PER_PAGE_CONTENT = 10;
+
+  useEffect(() => {
+    setContentPage(1);
+  }, [selectedClientForReports?.id, marketingContent.length]);
 
   // Modal local states (Content Row)
   const [showContentModal, setShowContentModal] = useState(false);
@@ -280,7 +288,7 @@ export default function MarketingDataTab({
               )}
             </div>
           </div>
-          <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
+          <div className="table-container table-scrollable-y" style={{ marginBottom: marketingContent.length > 0 ? '12px' : '32px' }}>
             <table>
               <thead>
                 <tr>
@@ -325,7 +333,9 @@ export default function MarketingDataTab({
                     </td>
                   </tr>
                 ) : (
-                  marketingContent.map(item => (
+                  marketingContent
+                    .slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT)
+                    .map(item => (
                     <tr key={item.id}>
                       <td>{item.date ? formatDateStr(item.date) : '-'}</td>
                       <td><span className="badge badge-info">{item.post_type}</span></td>
@@ -474,6 +484,42 @@ export default function MarketingDataTab({
               </tbody>
             </table>
           </div>
+
+          {marketingContent.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '32px', flexWrap: 'wrap', gap: '12px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                Showing {Math.min((contentPage - 1) * ITEMS_PER_PAGE_CONTENT + 1, marketingContent.length)} to {Math.min(contentPage * ITEMS_PER_PAGE_CONTENT, marketingContent.length)} of {marketingContent.length} entries
+              </span>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setContentPage(p => Math.max(1, p - 1))}
+                  disabled={contentPage === 1}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: contentPage === 1 ? 0.5 : 1, cursor: contentPage === 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  Previous
+                </button>
+                {Array.from({ length: Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT) }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setContentPage(page)}
+                    className={`btn ${contentPage === page ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '4px 10px', fontSize: '0.8rem', minWidth: '32px' }}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setContentPage(p => Math.min(Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT), p + 1))}
+                  disabled={contentPage >= Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT)}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: contentPage >= Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT) ? 0.5 : 1, cursor: contentPage >= Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT) ? 'not-allowed' : 'pointer' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
 
           <h3 style={{ marginTop: '32px', marginBottom: '14px' }}>Ad Campaigns Performance</h3>
           <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>

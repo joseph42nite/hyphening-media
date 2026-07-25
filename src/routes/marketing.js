@@ -567,14 +567,22 @@ const getAdWithLeads = (adId) => {
         SELECT COUNT(l.id) 
         FROM campaign_leads l 
         WHERE l.client_id = a.client_id 
-          AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
+          AND (
+            (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
+            OR
+            ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
+          )
       ) as actual_leads,
       (
         SELECT COUNT(l.id) 
         FROM campaign_leads l 
         WHERE l.client_id = a.client_id 
-          AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
-          AND l.qualification_status = 'Qualified'
+          AND (
+            (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
+            OR
+            ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
+          )
+          AND (l.qualification_status = 'Qualified' OR l.lead_status IN ('Qualified', 'Appointment Booked'))
       ) as actual_qualified_leads
     FROM marketing_ad_campaigns a
     WHERE a.id = ?
@@ -593,14 +601,22 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
           SELECT COUNT(l.id) 
           FROM campaign_leads l 
           WHERE l.client_id = a.client_id 
-            AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
+            AND (
+              (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
+              OR
+              ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
+            )
         ) as actual_leads,
         (
           SELECT COUNT(l.id) 
           FROM campaign_leads l 
           WHERE l.client_id = a.client_id 
-            AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
-            AND l.qualification_status = 'Qualified'
+            AND (
+              (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
+              OR
+              ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
+            )
+            AND (l.qualification_status = 'Qualified' OR l.lead_status IN ('Qualified', 'Appointment Booked'))
         ) as actual_qualified_leads
       FROM marketing_ad_campaigns a
       WHERE a.client_id = ?
