@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Copy, Edit3, Check, RotateCcw, MessageSquare } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function ArtistCurationTab({
@@ -15,6 +15,50 @@ export default function ArtistCurationTab({
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSuperAdmin = auth?.role === 'super_admin';
   const isSMM = auth?.role === 'ops_social_media_manager';
+
+  // Message Templates State (stored safely in localStorage)
+  const [onboardingMsg, setOnboardingMsg] = useState(() => {
+    return localStorage.getItem('artist_template_onboarding') || '';
+  });
+  const [confirmationMsg, setConfirmationMsg] = useState(() => {
+    return localStorage.getItem('artist_template_confirmation') || '';
+  });
+  const [editingMsgType, setEditingMsgType] = useState(null);
+  const [tempMsgText, setTempMsgText] = useState('');
+
+  const handleCopyTemplate = (text, label) => {
+    if (!text || !text.trim()) {
+      showToast(`Please click 'Edit' to enter your ${label} text first`, 'warning');
+      return;
+    }
+    navigator.clipboard.writeText(text);
+    showToast(`${label} copied to clipboard!`, 'success');
+  };
+
+  const handleSaveTemplate = (type) => {
+    if (type === 'onboarding') {
+      setOnboardingMsg(tempMsgText);
+      localStorage.setItem('artist_template_onboarding', tempMsgText);
+    } else {
+      setConfirmationMsg(tempMsgText);
+      localStorage.setItem('artist_template_confirmation', tempMsgText);
+    }
+    setEditingMsgType(null);
+    showToast('Template saved safely!', 'success');
+  };
+
+  const handleClearTemplate = (type) => {
+    if (type === 'onboarding') {
+      setOnboardingMsg('');
+      localStorage.removeItem('artist_template_onboarding');
+    } else {
+      setConfirmationMsg('');
+      localStorage.removeItem('artist_template_confirmation');
+    }
+    setTempMsgText('');
+    setEditingMsgType(null);
+    showToast('Template cleared', 'info');
+  };
 
   // Pagination states
   const [gigsPage, setGigsPage] = useState(1);
@@ -292,6 +336,115 @@ export default function ArtistCurationTab({
   return (
     <div style={{ textAlign: 'left' }}>
       
+      {/* Quick Artist Message Templates Strip */}
+      <div className="card glass-premium" style={{ marginBottom: '20px', padding: '14px 18px', border: '2px solid #000', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MessageSquare size={18} style={{ color: 'var(--primary-color)' }} /> Quick Artist Message Templates
+          </h4>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>1-CLICK COPY & EDIT</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+          {/* Onboarding Template */}
+          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '6px', padding: '10px 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span className="badge badge-info" style={{ fontSize: '0.65rem', textTransform: 'uppercase', padding: '2px 6px' }}>
+                1. Onboarding Message
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
+                  className="btn btn-primary"
+                  style={{ padding: '3px 10px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Copy size={12} /> Copy
+                </button>
+                <button
+                  onClick={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
+                  className="btn btn-secondary"
+                  style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Edit3 size={12} /> Edit
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#334155', whiteSpace: 'pre-wrap', maxHeight: '68px', overflowY: 'auto', background: '#ffffff', padding: '6px 10px', borderRadius: '4px', border: '1px solid #e2e8f0', fontFamily: 'sans-serif', lineHeight: '1.4' }}>
+              {onboardingMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
+            </div>
+          </div>
+
+          {/* Confirmation Template */}
+          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '6px', padding: '10px 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span className="badge badge-success" style={{ fontSize: '0.65rem', textTransform: 'uppercase', padding: '2px 6px' }}>
+                2. Confirmation Message
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
+                  className="btn btn-primary"
+                  style={{ padding: '3px 10px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Copy size={12} /> Copy
+                </button>
+                <button
+                  onClick={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
+                  className="btn btn-secondary"
+                  style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Edit3 size={12} /> Edit
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#334155', whiteSpace: 'pre-wrap', maxHeight: '68px', overflowY: 'auto', background: '#ffffff', padding: '6px 10px', borderRadius: '4px', border: '1px solid #e2e8f0', fontFamily: 'sans-serif', lineHeight: '1.4' }}>
+              {confirmationMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Template Modal */}
+      {editingMsgType && (
+        <div className="modal-overlay" onClick={() => setEditingMsgType(null)}>
+          <div className="modal-content glass" onClick={e => e.stopPropagation()} style={{ maxWidth: '540px', width: '90%', padding: '24px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '1.1rem', fontWeight: 800 }}>
+              Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : 'Confirmation Message'} Template
+            </h3>
+            <div style={{ marginBottom: '16px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>
+                Template Text
+              </label>
+              <textarea
+                className="form-control"
+                rows={8}
+                placeholder="Type or paste your custom message template here..."
+                value={tempMsgText}
+                onChange={(e) => setTempMsgText(e.target.value)}
+                style={{ width: '100%', padding: '10px', fontSize: '0.85rem', fontFamily: 'sans-serif', lineHeight: '1.4' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <button
+                onClick={() => handleClearTemplate(editingMsgType)}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#dc3545' }}
+              >
+                Clear Text
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setEditingMsgType(null)} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
+                  Cancel
+                </button>
+                <button onClick={() => handleSaveTemplate(editingMsgType)} className="btn btn-primary" style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Check size={14} /> Save Template
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Gig Status Tracker */}
       <div className="dashboard-toolbar curation-section-header">
         <h3>Gig Status Tracker</h3>
