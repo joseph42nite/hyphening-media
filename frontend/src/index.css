@@ -2602,12 +2602,50 @@ tr:hover td {
   margin: 0 auto;
 }
 
+/* Blog Dashboard Mobile List vs Desktop Table */
+.blog-mobile-list {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .blog-desktop-table {
+    display: none !important;
+  }
+  .blog-mobile-list {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .blog-form-header-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+}
+
 @media (max-width: 768px) {
   .blog-hero {
     padding: 130px 16px 40px;
   }
   .blog-hero h1 {
-    font-size: 2.2rem;
+    font-size: 2.0rem;
+  }
+  .blog-categories {
+    padding: 16px 12px 12px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .blog-categories::-webkit-scrollbar {
+    display: none;
+  }
+  .blog-cat-btn {
+    white-space: nowrap;
+    padding: 8px 16px;
+    font-size: 0.78rem;
+    flex-shrink: 0;
   }
 }
 

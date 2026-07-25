@@ -143,53 +143,94 @@ export default function BlogTab({ showToast }) {
           <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>Create your first post or let OpenClaw generate one automatically.</p>
         </div>
       ) : (
-        <div className="table-container table-scrollable-y">
-          <table>
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Published</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {posts.map(post => (
-                <tr key={post.id}>
-                  <td style={{ fontWeight: 700, maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {post.title}
-                    {post.slug && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>/blog/{post.slug}</div>
-                    )}
-                  </td>
-                  <td><span className="badge badge-info">{post.category}</span></td>
-                  <td>
-                    <span className={`badge ${post.status === 'published' ? 'badge-success' : 'badge-warning'}`}>
-                      {post.status === 'published' ? <><Eye size={10} /> Published</> : <><EyeOff size={10} /> Draft</>}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: '0.8rem' }}>{formatDate(post.published_at)}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      {post.status === 'published' && (
-                        <a href={`/blog/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live">
-                          <ExternalLink size={13} />
-                        </a>
-                      )}
-                      <button className="btn btn-sm" onClick={() => openEdit(post)} title="Edit">
-                        <Edit2 size={13} />
-                      </button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(post)} title="Delete">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
+        <>
+          {/* Desktop Table View */}
+          <div className="table-container table-scrollable-y blog-desktop-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th>Published</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {posts.map(post => (
+                  <tr key={post.id}>
+                    <td style={{ fontWeight: 700, maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {post.title}
+                      {post.slug && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>/blog/{post.slug}</div>
+                      )}
+                    </td>
+                    <td><span className="badge badge-info">{post.category}</span></td>
+                    <td>
+                      <span className={`badge ${post.status === 'published' ? 'badge-success' : 'badge-warning'}`}>
+                        {post.status === 'published' ? <><Eye size={10} /> Published</> : <><EyeOff size={10} /> Draft</>}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: '0.8rem' }}>{formatDate(post.published_at)}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {post.status === 'published' && (
+                          <a href={`/blog/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live">
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+                        <button className="btn btn-sm" onClick={() => openEdit(post)} title="Edit">
+                          <Edit2 size={13} />
+                        </button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(post)} title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="blog-mobile-list">
+            {posts.map(post => (
+              <div key={post.id} className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, wordBreak: 'break-word' }}>{post.title}</h4>
+                    {post.slug && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>/blog/{post.slug}</div>
+                    )}
+                  </div>
+                  <span className={`badge ${post.status === 'published' ? 'badge-success' : 'badge-warning'}`} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {post.status === 'published' ? 'Published' : 'Draft'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', gap: '8px', flexWrap: 'wrap' }}>
+                  <span className="badge badge-info">{post.category}</span>
+                  <span>{formatDate(post.published_at)}</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  {post.status === 'published' && (
+                    <a href={`/blog/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                      <ExternalLink size={12} style={{ marginRight: '4px' }} /> View
+                    </a>
+                  )}
+                  <button className="btn btn-sm" onClick={() => openEdit(post)} title="Edit" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                    <Edit2 size={12} style={{ marginRight: '4px' }} /> Edit
+                  </button>
+                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(post)} title="Delete" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                    <Trash2 size={12} style={{ marginRight: '4px' }} /> Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Create/Edit Modal */}
@@ -203,7 +244,7 @@ export default function BlogTab({ showToast }) {
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Row 1: Title + Status */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'end' }}>
+              <div className="form-grid-2 blog-form-header-grid">
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Title *</label>
                   <input className="form-control" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required placeholder="e.g. 10 Proven Instagram Reel Strategies" />
