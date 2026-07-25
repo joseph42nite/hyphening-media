@@ -428,10 +428,23 @@ tr:hover td {
   min-width: 250px;
   background: #ffffff;
   padding: 12px;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.kanban-column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kanban-column::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 12px 0;
+}
+
+.kanban-column::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
 }
 
 .kanban-column-header {
@@ -440,7 +453,6 @@ tr:hover td {
   align-items: center;
   border-bottom: var(--border-width) solid var(--border-color);
   padding-bottom: 8px;
-  flex-shrink: 0;
 }
 
 .kanban-column-title {
@@ -469,16 +481,13 @@ tr:hover td {
   flex-direction: column;
   margin-top: 10px;
   gap: 8px;
-  max-height: calc(100vh - 290px);
-  overflow-y: auto;
-  padding-right: 6px;
-  scrollbar-width: thin;
 }
 
 .kanban-card {
   border: 2px solid #000000 !important;
   box-shadow: 2.5px 2.5px 0px #000000 !important;
   padding: 8px 10px;
+  flex-shrink: 0 !important;
 }
 
 .kanban-card:hover {
