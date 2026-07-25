@@ -418,8 +418,9 @@ tr:hover td {
   overflow-x: auto;
   max-width: 100%;
   width: 100%;
-  padding: 12px 0;
+  padding: 12px 10px 16px 4px;
   min-height: calc(100vh - 250px);
+  box-sizing: border-box;
 }
 
 .kanban-column {
@@ -588,8 +589,9 @@ tr:hover td {
   gap: 12px;
   margin-bottom: 24px;
   overflow-x: auto;
-  padding-bottom: 8px;
+  padding: 4px 10px 8px 4px;
   scrollbar-width: thin;
+  box-sizing: border-box;
 }
 
 .dashboard-tabs::-webkit-scrollbar {
