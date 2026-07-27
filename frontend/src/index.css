@@ -256,6 +256,9 @@ a:hover {
 .form-group {
   margin-bottom: 20px;
   text-align: left;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-label {
@@ -270,7 +273,10 @@ a:hover {
 
 .form-control {
   width: 100%;
-  padding: 14px 18px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 14px;
   background-color: var(--bg-input);
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -278,6 +284,24 @@ a:hover {
   font-family: var(--font-sans);
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.form-control[type="date"],
+.form-control[type="month"],
+input[type="date"].form-control,
+input[type="month"].form-control {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+select.form-control {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .form-control:focus {
@@ -1222,9 +1246,50 @@ tr:hover td {
   .modal-content,
   .modal-content.glass-premium {
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     max-height: 92vh !important;
-    padding: 16px 14px !important;
+    padding: 16px 12px !important;
     box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .form-group {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .form-control,
+  input.form-control,
+  select.form-control,
+  textarea.form-control {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 10px 10px !important;
+    font-size: 14px !important;
+  }
+
+  input[type="date"].form-control,
+  input[type="month"].form-control {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    display: block !important;
+  }
+
+  input[type="date"].form-control::-webkit-calendar-picker-indicator,
+  input[type="month"].form-control::-webkit-calendar-picker-indicator {
+    margin-left: 2px !important;
+    padding: 0 !important;
+    cursor: pointer;
+    flex-shrink: 0;
   }
 
   .form-grid-2,

@@ -862,6 +862,28 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
+  const handleDeleteContent = async (contentId, skipConfirm = false) => {
+    if (!selectedClientForReports || !contentId) return;
+    if (!skipConfirm && !window.confirm('Are you sure you want to delete this content item? This action cannot be undone.')) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/content/${contentId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete content item');
+
+      showToast('Content item deleted successfully', 'success');
+      setShowContentModal(false);
+      fetchMarketingData(selectedClientForReports.id);
+      fetchCalendarMarketingContent();
+      fetchTasks();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   // Sort clients by recency of chat messages, then alphabetically
   const sortedClients = React.useMemo(() => {
     const list = [...clients];
@@ -1361,6 +1383,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           contentFormData={contentFormData}
           setContentFormData={setContentFormData}
           handleContentSubmit={handleContentSubmit}
+          handleDeleteContent={handleDeleteContent}
           clients={clients}
           staffUsers={staffUsers}
           marketingScripts={marketingScripts}

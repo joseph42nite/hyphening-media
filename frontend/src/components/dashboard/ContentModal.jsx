@@ -25,8 +25,10 @@ export default function ContentModal({
   });
   const [showAutoDetails, setShowAutoDetails] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   React.useEffect(() => {
+    setShowDeleteConfirm(false);
     if (contentFormData.script_id && marketingScripts?.length) {
       const found = marketingScripts.find(s => String(s.id) === String(contentFormData.script_id));
       if (found?.month) {
@@ -37,11 +39,11 @@ export default function ContentModal({
     if (contentFormData.date) {
       setScriptFilterDate(contentFormData.date.slice(0, 7));
     }
-  }, [showContentModal, contentFormData.script_id, contentFormData.date, marketingScripts]);
+  }, [showContentModal, contentFormData.script_id, contentFormData.date, marketingScripts, editingContent]);
 
   return (
     <div className="modal-overlay" onClick={() => setShowContentModal(false)}>
-      <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box' }}>
         <div className="content-modal-header">
           <h2 className="content-modal-title">{editingContent ? 'Edit Content Row' : 'Add Content Row'}</h2>
           <button
@@ -548,14 +550,41 @@ export default function ContentModal({
 
           <div className="content-modal-actions">
             {editingContent && handleDeleteContent && (
-              <button
-                type="button"
-                className="btn btn-secondary content-modal-delete-btn"
-                onClick={() => handleDeleteContent(editingContent.id)}
-                style={{ marginRight: 'auto', backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#ef4444' }}
-              >
-                🗑️ Delete Row
-              </button>
+              !showDeleteConfirm ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary content-modal-delete-btn"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  style={{ marginRight: 'auto', backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#ef4444' }}
+                >
+                  🗑️ Delete Row
+                </button>
+              ) : (
+                <div style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: '#fef2f2', padding: '6px 12px', borderRadius: '8px', border: '1px solid #fca5a5' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#991b1b' }}>
+                    ⚠️ Confirm delete?
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      handleDeleteContent(editingContent.id, true);
+                      setShowDeleteConfirm(false);
+                    }}
+                    style={{ backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#b91c1c', padding: '4px 10px', fontSize: '0.78rem' }}
+                  >
+                    Yes, Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )
             )}
             <button type="button" className="btn btn-secondary" onClick={() => setShowContentModal(false)}>
               Cancel

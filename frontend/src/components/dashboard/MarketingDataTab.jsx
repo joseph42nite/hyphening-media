@@ -125,9 +125,9 @@ export default function MarketingDataTab({
     }
   };
 
-  const handleDeleteContent = async (contentId) => {
+  const handleDeleteContent = async (contentId, skipConfirm = false) => {
     if (!selectedClientForReports) return;
-    if (!window.confirm('Are you sure you want to delete this content item? This action cannot be undone.')) return;
+    if (!skipConfirm && !window.confirm('Are you sure you want to delete this content item? This action cannot be undone.')) return;
 
     try {
       const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/content/${contentId}`, {
@@ -689,10 +689,10 @@ export default function MarketingDataTab({
       {/* Monthly Report Modal */}
       {showMonthlyModal && (
         <div className="modal-overlay" onClick={() => setShowMonthlyModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box' }}>
             <h2>{editingMonthly ? 'Edit Monthly Report' : 'Add Monthly Report'}</h2>
             <form onSubmit={handleMonthlyReportSubmit} style={{ marginTop: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Month (YYYY-MM)</label>
                   <input
