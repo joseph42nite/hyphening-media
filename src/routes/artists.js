@@ -498,6 +498,64 @@ router.delete('/gigs/:id', authorize('admin', 'ops_social_media_manager'), (req,
 });
 
 
+// =========================================
+// MESSAGE TEMPLATES
+// =========================================
+
+/**
+ * GET /api/artists/templates
+ */
+router.get('/templates', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const rows = db.prepare('SELECT template_key, template_text FROM artist_message_templates').all();
+    const templates = {};
+    rows.forEach(r => {
+      templates[r.template_key] = r.template_text;
+    });
+    res.json({ templates });
+  } catch (err) {
+    console.error('[TEMPLATES] Fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch artist message templates' });
+  }
+});
+
+/**
+ * PUT /api/artists/templates
+ */
+router.put('/templates', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const { type, text } = req.body;
+    if (!type || !['onboarding', 'confirmation'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid template type. Must be onboarding or confirmation.' });
+    }
+
+    const templateText = typeof text === 'string' ? text : '';
+
+    db.prepare(`
+      INSERT INTO artist_message_templates (template_key, template_text, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(template_key) DO UPDATE SET
+        template_text = excluded.template_text,
+        updated_at = datetime('now')
+    `).run(type, templateText);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'update_artist_template',
+      entityType: 'artist_template',
+      entityId: type,
+      diff: { type, text: templateText },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, message: 'Template saved successfully', type, text: templateText });
+  } catch (err) {
+    console.error('[TEMPLATES] Save error:', err);
+    res.status(500).json({ error: 'Failed to save artist message template' });
+  }
+});
+
 
 /**
  * GET /api/public/gigs/confirm/:token

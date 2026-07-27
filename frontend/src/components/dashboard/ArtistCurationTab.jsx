@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Copy, Edit3, Check, RotateCcw, MessageSquare } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
@@ -16,7 +16,7 @@ export default function ArtistCurationTab({
   const isSuperAdmin = auth?.role === 'super_admin';
   const isSMM = auth?.role === 'ops_social_media_manager';
 
-  // Message Templates State (stored safely in localStorage)
+  // Message Templates State (synced with backend + cached in localStorage)
   const [onboardingMsg, setOnboardingMsg] = useState(() => {
     return localStorage.getItem('artist_template_onboarding') || '';
   });
@@ -25,6 +25,30 @@ export default function ArtistCurationTab({
   });
   const [editingMsgType, setEditingMsgType] = useState(null);
   const [tempMsgText, setTempMsgText] = useState('');
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/artists/templates`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.templates) {
+            if (data.templates.onboarding !== undefined) {
+              setOnboardingMsg(data.templates.onboarding);
+              localStorage.setItem('artist_template_onboarding', data.templates.onboarding);
+            }
+            if (data.templates.confirmation !== undefined) {
+              setConfirmationMsg(data.templates.confirmation);
+              localStorage.setItem('artist_template_confirmation', data.templates.confirmation);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching message templates:', err);
+      }
+    };
+    fetchTemplates();
+  }, []);
 
   const handleCopyTemplate = (text, label) => {
     if (!text || !text.trim()) {
@@ -35,29 +59,55 @@ export default function ArtistCurationTab({
     showToast(`${label} copied to clipboard!`, 'success');
   };
 
-  const handleSaveTemplate = (type) => {
-    if (type === 'onboarding') {
-      setOnboardingMsg(tempMsgText);
-      localStorage.setItem('artist_template_onboarding', tempMsgText);
-    } else {
-      setConfirmationMsg(tempMsgText);
-      localStorage.setItem('artist_template_confirmation', tempMsgText);
+  const handleSaveTemplate = async (type) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/artists/templates`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, text: tempMsgText }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save template');
+
+      if (type === 'onboarding') {
+        setOnboardingMsg(tempMsgText);
+        localStorage.setItem('artist_template_onboarding', tempMsgText);
+      } else {
+        setConfirmationMsg(tempMsgText);
+        localStorage.setItem('artist_template_confirmation', tempMsgText);
+      }
+      setEditingMsgType(null);
+      showToast('Template saved safely!', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
     }
-    setEditingMsgType(null);
-    showToast('Template saved safely!', 'success');
   };
 
-  const handleClearTemplate = (type) => {
-    if (type === 'onboarding') {
-      setOnboardingMsg('');
-      localStorage.removeItem('artist_template_onboarding');
-    } else {
-      setConfirmationMsg('');
-      localStorage.removeItem('artist_template_confirmation');
+  const handleClearTemplate = async (type) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/artists/templates`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, text: '' }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to clear template');
+
+      if (type === 'onboarding') {
+        setOnboardingMsg('');
+        localStorage.removeItem('artist_template_onboarding');
+      } else {
+        setConfirmationMsg('');
+        localStorage.removeItem('artist_template_confirmation');
+      }
+      setTempMsgText('');
+      setEditingMsgType(null);
+      showToast('Template cleared', 'info');
+    } catch (err) {
+      showToast(err.message, 'error');
     }
-    setTempMsgText('');
-    setEditingMsgType(null);
-    showToast('Template cleared', 'info');
   };
 
   // Pagination states
