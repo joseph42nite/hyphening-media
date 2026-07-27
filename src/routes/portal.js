@@ -311,6 +311,7 @@ router.post('/:token/leads', portalAuth, (req, res) => {
       source, 
       campaign_name, 
       treatment_type,
+      created_at,
       qualification_status, 
       call_outcome, 
       appointment_status, 
@@ -339,6 +340,9 @@ router.post('/:token/leads', portalAuth, (req, res) => {
     }
 
     const now = new Date().toISOString();
+    const leadCreatedAt = created_at && created_at.trim() 
+      ? (created_at.trim().includes(':') ? created_at.trim() : `${created_at.trim()} 12:00:00`)
+      : now.replace('T', ' ').slice(0, 19);
 
     const result = db.prepare(`
       INSERT INTO campaign_leads (
@@ -361,12 +365,12 @@ router.post('/:token/leads', portalAuth, (req, res) => {
       cleanAppt === 'Booked' ? (appointment_date || null) : null,
       (cleanQual === 'Disqualified' || cleanAppt === 'Not Booked') ? (rejection_reason || null) : null,
       calculatedLeadStatus,
-      now,
+      leadCreatedAt,
       now
     );
 
     if (req.portalClient.lead_alerts_enabled) {
-      const alertMsg = `🔔 *New Lead Manually Added!*\n\n*Client:* ${req.portalClient.name}\n*Lead Name:* ${name.trim()}\n*Phone:* ${phone.trim()}\n*Platform:* ${cleanPlatform}\n*Source:* Manual Entry${cleanTreatment ? `\n*Treatment:* ${cleanTreatment}` : ''}`;
+      const alertMsg = `🔔 *New Lead Manually Added!*\n\n*Client:* ${req.portalClient.name}\n*Lead Name:* ${name.trim()}\n*Phone:* ${phone.trim()}\n*Platform:* ${cleanPlatform}\n*Source:* Manual Entry${cleanTreatment ? `\n*Treatment:* ${cleanTreatment}` : ''}\n*Date:* ${leadCreatedAt.slice(0, 10)}`;
       notifyAdmin(alertMsg);
     }
 
@@ -392,7 +396,8 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       appointment_status, 
       appointment_date, 
       rejection_reason,
-      treatment_type
+      treatment_type,
+      created_at
     } = req.body;
 
     const lead = db.prepare('SELECT * FROM campaign_leads WHERE id = ? AND client_id = ?').get(leadId, req.portalClient.id);
@@ -407,6 +412,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
     const newApptDate = appointment_date !== undefined ? appointment_date : lead.appointment_date;
     const newRejection = rejection_reason !== undefined ? rejection_reason : lead.rejection_reason;
     const newTreatment = treatment_type !== undefined ? (treatment_type && treatment_type.trim() ? treatment_type.trim() : null) : lead.treatment_type;
+    const newCreatedAt = created_at !== undefined ? (created_at && created_at.trim().includes(':') ? created_at.trim() : `${created_at.trim()} 12:00:00`) : lead.created_at;
 
     // Validate inputs
     if (newQual && !['Pending', 'Qualified', 'Disqualified'].includes(newQual)) {
@@ -438,6 +444,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
         appointment_date = ?, 
         rejection_reason = ?,
         treatment_type = ?,
+        created_at = ?,
         lead_status = ?,
         updated_at = datetime('now')
       WHERE id = ?
@@ -448,6 +455,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       newApptStatus === 'Booked' ? newApptDate : null, 
       (newQual === 'Disqualified' || newApptStatus === 'Not Booked') ? newRejection : null, 
       newTreatment,
+      newCreatedAt,
       calculatedLeadStatus,
       leadId
     );
@@ -460,6 +468,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       appointment_date: newApptStatus === 'Booked' ? newApptDate : null,
       rejection_reason: (newQual === 'Disqualified' || newApptStatus === 'Not Booked') ? newRejection : null,
       treatment_type: newTreatment,
+      created_at: newCreatedAt,
       lead_status: calculatedLeadStatus
     });
   } catch (err) {

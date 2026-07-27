@@ -1075,6 +1075,7 @@ export default function ClientPortal({ showToast }) {
     source: 'form',
     campaign_name: 'Manual Entry',
     treatment_type: '',
+    created_at: new Date().toISOString().split('T')[0],
     qualification_status: 'Pending',
     call_outcome: 'Pending',
     appointment_status: 'Follow Up',
@@ -1412,6 +1413,7 @@ export default function ClientPortal({ showToast }) {
           appointment_date: data.appointment_date,
           rejection_reason: data.rejection_reason,
           treatment_type: data.treatment_type !== undefined ? data.treatment_type : l.treatment_type,
+          created_at: data.created_at !== undefined ? data.created_at : l.created_at,
           lead_status: data.lead_status
         } : l));
         showToast('Lead updated successfully', 'success');
@@ -1454,6 +1456,7 @@ export default function ClientPortal({ showToast }) {
         source: 'form',
         campaign_name: 'Manual Entry',
         treatment_type: '',
+        created_at: new Date().toISOString().split('T')[0],
         qualification_status: 'Pending',
         call_outcome: 'Pending',
         appointment_status: 'Follow Up',
@@ -3022,7 +3025,19 @@ export default function ClientPortal({ showToast }) {
                                     </div>
                                   </td>
                                   <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', fontWeight: '700' }}>
-                                    {new Date(lead.created_at.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                    <div 
+                                      onClick={() => {
+                                        const currentDate = (lead.created_at || '').slice(0, 10);
+                                        const val = window.prompt('Update Lead Captured Date (YYYY-MM-DD):', currentDate);
+                                        if (val && val.trim() && val.trim() !== currentDate) {
+                                          handleUpdateLead(lead.id, { created_at: val.trim() });
+                                        }
+                                      }}
+                                      style={{ cursor: 'pointer' }}
+                                      title="Click to edit lead date"
+                                    >
+                                      {new Date(lead.created_at.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                    </div>
                                   </td>
                                   <td>
                                     <select 
@@ -3281,15 +3296,26 @@ export default function ClientPortal({ showToast }) {
                   </div>
                 </div>
 
-                <div className="portal-form-group" style={{ margin: 0 }}>
-                  <label className="portal-label">Type of Treatment / Service</label>
-                  <input 
-                    type="text" 
-                    className="portal-control"
-                    placeholder="e.g. Root Canal, Hair Transplant, Invisalign, Skin Rejuvenation"
-                    value={newLeadData.treatment_type || ''}
-                    onChange={(e) => setNewLeadData(prev => ({ ...prev, treatment_type: e.target.value }))}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Type of Treatment / Service</label>
+                    <input 
+                      type="text" 
+                      className="portal-control"
+                      placeholder="e.g. Root Canal, Hair Transplant, Invisalign"
+                      value={newLeadData.treatment_type || ''}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, treatment_type: e.target.value }))}
+                    />
+                  </div>
+                  <div className="portal-form-group" style={{ margin: 0 }}>
+                    <label className="portal-label">Lead Date (Defaults to Today)</label>
+                    <input 
+                      type="date" 
+                      className="portal-control"
+                      value={newLeadData.created_at || new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setNewLeadData(prev => ({ ...prev, created_at: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
                 {/* Platform & Source */}
