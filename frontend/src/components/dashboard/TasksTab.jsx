@@ -534,13 +534,14 @@ export default function TasksTab({
 
                         <div className="kanban-card-footer" style={{ marginTop: '6px' }} onClick={e => e.stopPropagation()}>
                           <select
-                            className="form-control"
+                            className="form-control task-card-status-select"
                             value={col}
                             onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                            style={{ padding: '2px 6px', fontSize: '0.68rem', width: 'auto', background: 'var(--bg-input)', borderWidth: '1.5px', height: '24px', borderRadius: '4px' }}
                           >
                             {columns.map(status => (
-                              <option key={status} value={status}>{status === 'todo' ? 'To - Do - Today' : status.replace('_', ' ')}</option>
+                              <option key={status} value={status}>
+                                {status === 'todo' ? 'To-Do Today' : status === 'in_progress' ? 'In Progress' : status === 'done' ? 'Done' : status === 'backlog' ? 'Backlog' : status.replace('_', ' ')}
+                              </option>
                             ))}
                           </select>
                         </div>

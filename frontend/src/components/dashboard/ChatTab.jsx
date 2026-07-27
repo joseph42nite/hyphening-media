@@ -503,13 +503,14 @@ export default function ChatTab({
                         )}
                         <td>
                           <select
-                            className="form-control"
+                            className="form-control task-card-status-select"
                             value={task.status}
                             onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                            style={{ padding: '6px', fontSize: '0.8rem' }}
                           >
                             {columns.map(status => (
-                              <option key={status} value={status}>{status === 'todo' ? 'To - Do - Today' : status.replace('_', ' ')}</option>
+                              <option key={status} value={status}>
+                                {status === 'todo' ? 'To-Do Today' : status === 'in_progress' ? 'In Progress' : status === 'done' ? 'Done' : status === 'backlog' ? 'Backlog' : status.replace('_', ' ')}
+                              </option>
                             ))}
                           </select>
                         </td>
