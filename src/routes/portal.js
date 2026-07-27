@@ -305,16 +305,19 @@ router.post('/:token/leads', portalAuth, (req, res) => {
   try {
     const {
       name,
-      email,
-      phone,
-      platform,
-      source,
-      campaign_name,
-      qualification_status,
-      call_outcome,
-      appointment_status,
-      appointment_date,
-      rejection_reason
+    const { 
+      name, 
+      email, 
+      phone, 
+      platform, 
+      source, 
+      campaign_name, 
+      treatment_type,
+      qualification_status, 
+      call_outcome, 
+      appointment_status, 
+      appointment_date, 
+      rejection_reason 
     } = req.body;
 
     if (!name || !name.trim() || !phone || !phone.trim()) {
@@ -326,6 +329,7 @@ router.post('/:token/leads', portalAuth, (req, res) => {
     const cleanQual = ['Pending', 'Qualified', 'Disqualified'].includes(qualification_status) ? qualification_status : 'Pending';
     const cleanCall = ['Pending', 'Picked Up', 'No Answer', 'Other'].includes(call_outcome) ? call_outcome : 'Pending';
     const cleanAppt = ['Follow Up', 'Booked', 'Not Booked'].includes(appointment_status) ? appointment_status : 'Follow Up';
+    const cleanTreatment = treatment_type && treatment_type.trim() ? treatment_type.trim() : null;
 
     let calculatedLeadStatus = 'Pending';
     if (cleanQual === 'Disqualified') {
@@ -340,10 +344,10 @@ router.post('/:token/leads', portalAuth, (req, res) => {
 
     const result = db.prepare(`
       INSERT INTO campaign_leads (
-        client_id, name, email, phone, platform, source, campaign_name,
+        client_id, name, email, phone, platform, source, campaign_name, treatment_type,
         qualification_status, call_outcome, appointment_status, appointment_date,
         rejection_reason, lead_status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       req.portalClient.id,
       name.trim(),
@@ -352,6 +356,7 @@ router.post('/:token/leads', portalAuth, (req, res) => {
       cleanPlatform,
       cleanSource,
       campaign_name && campaign_name.trim() ? campaign_name.trim() : 'Manual Entry',
+      cleanTreatment,
       cleanQual,
       cleanCall,
       cleanAppt,
@@ -363,7 +368,7 @@ router.post('/:token/leads', portalAuth, (req, res) => {
     );
 
     if (req.portalClient.lead_alerts_enabled) {
-      const alertMsg = `🔔 *New Lead Manually Added!*\n\n*Client:* ${req.portalClient.name}\n*Lead Name:* ${name.trim()}\n*Phone:* ${phone.trim()}\n*Platform:* ${cleanPlatform}\n*Source:* Manual Entry`;
+      const alertMsg = `🔔 *New Lead Manually Added!*\n\n*Client:* ${req.portalClient.name}\n*Lead Name:* ${name.trim()}\n*Phone:* ${phone.trim()}\n*Platform:* ${cleanPlatform}\n*Source:* Manual Entry${cleanTreatment ? `\n*Treatment:* ${cleanTreatment}` : ''}`;
       notifyAdmin(alertMsg);
     }
 
@@ -388,7 +393,8 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       call_outcome, 
       appointment_status, 
       appointment_date, 
-      rejection_reason 
+      rejection_reason,
+      treatment_type
     } = req.body;
 
     const lead = db.prepare('SELECT * FROM campaign_leads WHERE id = ? AND client_id = ?').get(leadId, req.portalClient.id);
@@ -402,6 +408,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
     const newApptStatus = appointment_status !== undefined ? appointment_status : lead.appointment_status;
     const newApptDate = appointment_date !== undefined ? appointment_date : lead.appointment_date;
     const newRejection = rejection_reason !== undefined ? rejection_reason : lead.rejection_reason;
+    const newTreatment = treatment_type !== undefined ? (treatment_type && treatment_type.trim() ? treatment_type.trim() : null) : lead.treatment_type;
 
     // Validate inputs
     if (newQual && !['Pending', 'Qualified', 'Disqualified'].includes(newQual)) {
@@ -432,6 +439,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
         appointment_status = ?, 
         appointment_date = ?, 
         rejection_reason = ?,
+        treatment_type = ?,
         lead_status = ?,
         updated_at = datetime('now')
       WHERE id = ?
@@ -441,6 +449,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       newApptStatus, 
       newApptStatus === 'Booked' ? newApptDate : null, 
       (newQual === 'Disqualified' || newApptStatus === 'Not Booked') ? newRejection : null, 
+      newTreatment,
       calculatedLeadStatus,
       leadId
     );
@@ -452,6 +461,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       appointment_status: newApptStatus,
       appointment_date: newApptStatus === 'Booked' ? newApptDate : null,
       rejection_reason: (newQual === 'Disqualified' || newApptStatus === 'Not Booked') ? newRejection : null,
+      treatment_type: newTreatment,
       lead_status: calculatedLeadStatus
     });
   } catch (err) {
@@ -486,7 +496,7 @@ router.post('/:token/lead-alerts', portalAuth, (req, res) => {
 router.post('/:token/leads/capture', async (req, res) => {
   try {
     const { token } = req.params;
-    const { name, email, phone, platform, source, campaign_name, call_duration_seconds, additional_data } = req.body;
+    const { name, email, phone, platform, source, campaign_name, treatment_type, service, treatment, call_duration_seconds, additional_data } = req.body;
 
     const client = db.prepare(
       'SELECT id, name, lead_alerts_enabled FROM crm_clients WHERE portal_token = ? AND portal_enabled = 1 AND is_active = 1'
@@ -502,12 +512,13 @@ router.post('/:token/leads/capture', async (req, res) => {
 
     const cleanPlatform = ['YouTube', 'Meta', 'Google', 'Other'].includes(platform) ? platform : 'Other';
     const cleanSource = ['form', 'call'].includes(source) ? source : 'form';
+    const cleanTreatment = treatment_type || service || treatment || (additional_data?.treatment) || (additional_data?.service) || null;
     const additionalDataStr = additional_data ? JSON.stringify(additional_data) : null;
 
     const result = db.prepare(`
       INSERT INTO campaign_leads (
-        client_id, name, email, phone, platform, source, campaign_name, call_duration_seconds, additional_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        client_id, name, email, phone, platform, source, campaign_name, treatment_type, call_duration_seconds, additional_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       client.id,
       name,
@@ -516,13 +527,14 @@ router.post('/:token/leads/capture', async (req, res) => {
       cleanPlatform,
       cleanSource,
       campaign_name || null,
+      cleanTreatment,
       call_duration_seconds || null,
       additionalDataStr
     );
 
     // Send telegram notification to admin/SMM if lead alerts are enabled for this client
     if (client.lead_alerts_enabled) {
-      const alertMsg = `🔔 *New Lead Captured!*\n\n*Client:* ${client.name}\n*Lead Name:* ${name}\n*Phone:* ${phone}\n*Platform:* ${cleanPlatform}\n*Source:* ${cleanSource === 'call' ? '📞 Call' : '📝 Form'}\n*Campaign:* ${campaign_name || 'N/A'}`;
+      const alertMsg = `🔔 *New Lead Captured!*\n\n*Client:* ${client.name}\n*Lead Name:* ${name}\n*Phone:* ${phone}\n*Platform:* ${cleanPlatform}\n*Source:* ${cleanSource === 'call' ? '📞 Call' : '📝 Form'}\n*Campaign:* ${campaign_name || 'N/A'}${cleanTreatment ? `\n*Treatment:* ${cleanTreatment}` : ''}`;
       notifyAdmin(alertMsg);
     }
 

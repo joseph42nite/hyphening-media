@@ -1074,6 +1074,7 @@ export default function ClientPortal({ showToast }) {
     platform: 'Meta',
     source: 'form',
     campaign_name: 'Manual Entry',
+    treatment_type: '',
     qualification_status: 'Pending',
     call_outcome: 'Pending',
     appointment_status: 'Follow Up',
@@ -1410,6 +1411,7 @@ export default function ClientPortal({ showToast }) {
           appointment_status: data.appointment_status,
           appointment_date: data.appointment_date,
           rejection_reason: data.rejection_reason,
+          treatment_type: data.treatment_type !== undefined ? data.treatment_type : l.treatment_type,
           lead_status: data.lead_status
         } : l));
         showToast('Lead updated successfully', 'success');
@@ -1451,6 +1453,7 @@ export default function ClientPortal({ showToast }) {
         platform: 'Meta',
         source: 'form',
         campaign_name: 'Manual Entry',
+        treatment_type: '',
         qualification_status: 'Pending',
         call_outcome: 'Pending',
         appointment_status: 'Follow Up',
@@ -2798,7 +2801,8 @@ export default function ClientPortal({ showToast }) {
                   const phoneMatch = lead.phone && lead.phone.toLowerCase().includes(q);
                   const emailMatch = lead.email && lead.email.toLowerCase().includes(q);
                   const campaignMatch = lead.campaign_name && lead.campaign_name.toLowerCase().includes(q);
-                  if (!nameMatch && !phoneMatch && !emailMatch && !campaignMatch) return false;
+                  const treatmentMatch = lead.treatment_type && lead.treatment_type.toLowerCase().includes(q);
+                  if (!nameMatch && !phoneMatch && !emailMatch && !campaignMatch && !treatmentMatch) return false;
                 }
                 return true;
               });
@@ -2938,7 +2942,7 @@ export default function ClientPortal({ showToast }) {
                           <thead>
                             <tr>
                               <th>Lead Details</th>
-                              <th>Source / Campaign</th>
+                              <th>Source / Campaign / Treatment</th>
                               <th>Captured Date</th>
                               <th>Call Status</th>
                               <th>Qualification</th>
@@ -2976,6 +2980,45 @@ export default function ClientPortal({ showToast }) {
                                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '800' }}>
                                         🎯 {(lead.campaign_name || 'Direct / Organic').replace(/^=/, '').trim()}
                                       </span>
+                                      {lead.treatment_type ? (
+                                        <span 
+                                          className="portal-badge" 
+                                          onClick={() => {
+                                            const val = window.prompt('Update Treatment / Service Type:', lead.treatment_type || '');
+                                            if (val !== null && val.trim() !== lead.treatment_type) {
+                                              handleUpdateLead(lead.id, { treatment_type: val.trim() });
+                                            }
+                                          }}
+                                          style={{ background: '#dcfce7', color: '#166534', border: '1.5px solid #18181b', fontWeight: '800', width: 'fit-content', cursor: 'pointer' }}
+                                          title="Click to edit treatment type"
+                                        >
+                                          🩺 {lead.treatment_type}
+                                        </span>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const val = window.prompt('Enter Treatment / Service Type for this lead:', '');
+                                            if (val && val.trim()) {
+                                              handleUpdateLead(lead.id, { treatment_type: val.trim() });
+                                            }
+                                          }}
+                                          style={{
+                                            background: '#f8fafc',
+                                            border: '1.5px dashed #94a3b8',
+                                            borderRadius: '9999px',
+                                            padding: '2px 8px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: '700',
+                                            color: '#64748b',
+                                            cursor: 'pointer',
+                                            width: 'fit-content'
+                                          }}
+                                          title="Click to specify treatment type"
+                                        >
+                                          + Set Treatment
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                   <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', fontWeight: '700' }}>
@@ -3214,7 +3257,7 @@ export default function ClientPortal({ showToast }) {
                   </div>
                 </div>
 
-                {/* Email & Campaign Name */}
+                {/* Email, Campaign & Treatment */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div className="portal-form-group" style={{ margin: 0 }}>
                     <label className="portal-label">Email Address</label>
@@ -3236,6 +3279,17 @@ export default function ClientPortal({ showToast }) {
                       onChange={(e) => setNewLeadData(prev => ({ ...prev, campaign_name: e.target.value }))}
                     />
                   </div>
+                </div>
+
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Type of Treatment / Service</label>
+                  <input 
+                    type="text" 
+                    className="portal-control"
+                    placeholder="e.g. Root Canal, Hair Transplant, Invisalign, Skin Rejuvenation"
+                    value={newLeadData.treatment_type || ''}
+                    onChange={(e) => setNewLeadData(prev => ({ ...prev, treatment_type: e.target.value }))}
+                  />
                 </div>
 
                 {/* Platform & Source */}
