@@ -303,8 +303,6 @@ router.get('/:token/leads', portalAuth, (req, res) => {
  */
 router.post('/:token/leads', portalAuth, (req, res) => {
   try {
-    const {
-      name,
     const { 
       name, 
       email, 
