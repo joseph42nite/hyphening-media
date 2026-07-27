@@ -282,7 +282,7 @@ router.get('/:token/leads', portalAuth, (req, res) => {
   try {
     const leads = db.prepare(`
       SELECT 
-        id, name, email, phone, platform, source, campaign_name, lead_status, rejection_reason, 
+        id, name, email, phone, platform, source, campaign_name, treatment_type, lead_status, rejection_reason, 
         call_duration_seconds, additional_data, created_at,
         qualification_status, call_outcome, appointment_status, appointment_date
       FROM campaign_leads
