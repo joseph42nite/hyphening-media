@@ -633,6 +633,53 @@ tr:hover td {
   gap: 12px;
 }
 
+.form-grid-time-caption {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+}
+
+.content-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.content-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main, #18181b);
+}
+
+.content-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #71717a);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.content-modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-main, #18181b);
+}
+
+.content-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 20px;
+}
+
 .tasks-toolbar {
   display: flex;
   justify-content: space-between;
@@ -1166,12 +1213,41 @@ tr:hover td {
     display: none !important;
   }
 
-  /* Responsive Form Grids inside Modals */
+  /* Responsive Modal & Form Overrides for Mobile */
+  .modal-overlay {
+    padding: 10px 8px !important;
+    align-items: center !important;
+  }
+
+  .modal-content,
+  .modal-content.glass-premium {
+    overflow-y: auto !important;
+    max-height: 92vh !important;
+    padding: 16px 14px !important;
+    box-sizing: border-box !important;
+  }
+
   .form-grid-2,
   .form-grid-3,
-  .form-grid-4 {
+  .form-grid-4,
+  .form-grid-time-caption {
     grid-template-columns: 1fr !important;
     gap: 10px !important;
+  }
+
+  .content-modal-actions {
+    flex-direction: column-reverse !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .content-modal-actions .btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .content-modal-actions .content-modal-delete-btn {
+    margin-right: 0 !important;
   }
 
   /* Marketing Data Mobile Adjustments */

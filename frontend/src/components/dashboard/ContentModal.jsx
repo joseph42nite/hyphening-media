@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 
 export default function ContentModal({
   showContentModal,
@@ -42,7 +42,17 @@ export default function ContentModal({
   return (
     <div className="modal-overlay" onClick={() => setShowContentModal(false)}>
       <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
-        <h2>{editingContent ? 'Edit Content Row' : 'Add Content Row'}</h2>
+        <div className="content-modal-header">
+          <h2 className="content-modal-title">{editingContent ? 'Edit Content Row' : 'Add Content Row'}</h2>
+          <button
+            type="button"
+            className="content-modal-close-btn"
+            onClick={() => setShowContentModal(false)}
+            aria-label="Close modal"
+          >
+            <X size={20} />
+          </button>
+        </div>
         {editingContent?.client_comments && (
           <div style={{
             background: '#fee2e2',
@@ -246,7 +256,7 @@ export default function ContentModal({
             </button>
             {showAutoDetails && (
               <div style={{ padding: '16px', background: 'var(--bg-primary, #ffffff)', borderTop: '1px solid var(--border-color, #e4e4e7)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '12px' }}>
+                <div className="form-grid-time-caption" style={{ marginBottom: '12px' }}>
                   <div className="form-group">
                     <label className="form-label">Posting Time</label>
                     <input
@@ -536,11 +546,11 @@ export default function ContentModal({
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+          <div className="content-modal-actions">
             {editingContent && handleDeleteContent && (
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-secondary content-modal-delete-btn"
                 onClick={() => handleDeleteContent(editingContent.id)}
                 style={{ marginRight: 'auto', backgroundColor: '#fee2e2', color: '#991b1b', borderColor: '#ef4444' }}
               >
