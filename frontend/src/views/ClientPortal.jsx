@@ -2511,9 +2511,11 @@ export default function ClientPortal({ showToast }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px' }}>
               {[
                 { key: 'instagram', name: 'Instagram Business', desc: 'Reels & Media Insights', icon: '📸' },
+                { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Insights', icon: '📘' },
+                { key: 'facebook_ads', name: 'Meta Ads Manager', desc: 'Ad Campaigns & Spend Analytics', icon: '🎯' },
+                { key: 'google_ads', name: 'Google Ads', desc: 'Search & Display Campaigns', icon: '📈' },
                 { key: 'youtube', name: 'YouTube Channel', desc: 'Shorts & Video Analytics', icon: '▶️' },
                 { key: 'linkedin', name: 'LinkedIn Company', desc: 'Professional Video Posts', icon: '💼' },
-                { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Insights', icon: '📘' },
                 { key: 'x', name: 'X (Twitter)', desc: 'Direct Social Video Posts', icon: '𝕏' }
               ].map(app => {
                 const info = integrations[app.key] || {};

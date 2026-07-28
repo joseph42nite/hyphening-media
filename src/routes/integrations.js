@@ -40,7 +40,7 @@ router.get('/clients/:id/integrations/status', async (req, res) => {
     const clientId = parseInt(req.params.id, 10);
     const accounts = await getClientConnectedAccounts(clientId);
 
-    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'x'];
+    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'facebook_ads', 'google_ads', 'x'];
     const statusMap = {};
 
     platforms.forEach(p => {

@@ -833,7 +833,7 @@ router.post('/:token/feedback', portalAuth, (req, res) => {
 router.get('/:token/integrations/status', portalAuth, async (req, res) => {
   try {
     const accounts = await getClientConnectedAccounts(req.portalClient.id);
-    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'x'];
+    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'facebook_ads', 'google_ads', 'x'];
     const statusMap = {};
 
     platforms.forEach(p => {
