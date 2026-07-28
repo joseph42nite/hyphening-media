@@ -1263,9 +1263,19 @@ function handleCreateSeoAudit(payload) {
   // loading state. finishRun only advances a run that is still in flight, so
   // a result arriving after a cancel cannot resurrect it.
   const finalStatus = auditFailed ? 'failed' : 'completed';
+
+  // Which model actually served the run. With fallback chains configured
+  // (Ultra:free -> Super:free -> a paid Kimi), a free-tier 429 silently
+  // escalates to a billable model, so this is recorded to make that visible
+  // rather than leaving it to show up on an invoice.
+  const reportedModel = payload.token_usage?.model
+    || results.find(r => r?.token_usage?.model)?.token_usage?.model
+    || null;
+
   const finishOpts = {
     auditId: firstAuditId,
-    error: auditFailed ? (payload.summary || 'OpenClaw reported a failed audit') : null
+    error: auditFailed ? (payload.summary || 'OpenClaw reported a failed audit') : null,
+    actualModel: reportedModel
   };
 
   // payload.run_id is the run id we send to OpenClaw as [run_id:N]. When it

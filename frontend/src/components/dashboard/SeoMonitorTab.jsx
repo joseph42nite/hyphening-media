@@ -867,15 +867,33 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 <details style={{ marginTop: '14px' }}>
                   <summary style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>Recent finished runs ({queue.recent.length})</summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                    {queue.recent.map(run => (
-                      <div key={run.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', padding: '4px 0', flexWrap: 'wrap' }}>
-                        <span className={getStatusColor(run.status)} style={{ fontWeight: 'bold', minWidth: '78px' }}>{run.status}</span>
-                        <span style={{ fontWeight: 'bold' }}>{run.agent_type}</span>
-                        <span style={{ color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
-                        <span style={{ color: '#94a3b8' }}>{run.finished_at || run.created_at}</span>
-                        {run.error && <span style={{ color: '#ef4444' }}>{run.error}</span>}
-                      </div>
-                    ))}
+                    {queue.recent.map(run => {
+                      // OpenClaw's reported model disagreeing with the one we
+                      // recorded means one of: a fallback fired, the agent
+                      // default changed, or OpenClaw is reporting a hardcoded
+                      // value rather than the model that served the request
+                      // (which was the case on 2026-07-28). Worth surfacing in
+                      // every one of those cases — but it is a mismatch, not
+                      // proof of a fallback, so the label says only that.
+                      const modelMismatch = run.actual_model && run.model && run.actual_model !== run.model;
+                      return (
+                        <div key={run.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', padding: '4px 0', flexWrap: 'wrap' }}>
+                          <span className={getStatusColor(run.status)} style={{ fontWeight: 'bold', minWidth: '78px' }}>{run.status}</span>
+                          <span style={{ fontWeight: 'bold' }}>{run.agent_type}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
+                          <span style={{ color: '#94a3b8' }}>{run.finished_at || run.created_at}</span>
+                          {modelMismatch && (
+                            <span
+                              style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #92400e', borderRadius: '3px', padding: '1px 6px', fontWeight: 'bold', fontSize: '0.7rem' }}
+                              title={`We recorded: ${run.model}\nOpenClaw reported: ${run.actual_model}\n\nThese disagree. Either a fallback fired, the agent default changed, or OpenClaw is reporting a hardcoded value instead of the model that served the request. Check OpenRouter's Activity page for the truth.`}
+                            >
+                              model mismatch: reported {run.actual_model}
+                            </span>
+                          )}
+                          {run.error && <span style={{ color: '#ef4444' }}>{run.error}</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </details>
               )}

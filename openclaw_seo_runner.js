@@ -28,6 +28,15 @@ const model = args.model || 'primary'; // Use 'primary' as per the new API spec
 const triggeredBy = args.triggeredBy || 'system';
 const runId = args.runId || null; // our seo_agent_runs.id, for webhook correlation
 
+// Which OpenClaw agent handles the run. This is the only lever we have over
+// the model: OpenClaw resolves the model from agent.defaults.model.primary on
+// the agent that serves the request, and SKILL.md cannot override it (confirmed
+// 2026-07-28). Pointing at an agent configured with a different primary model
+// is therefore how SEO runs change model, without touching what 'main' uses
+// for everything else OpenClaw does.
+// Precedence: per-skill config (--agentId) > global env > OpenClaw's default.
+const OPENCLAW_AGENT_ID = args.agentId || process.env.OPENCLAW_AGENT_ID || 'main';
+
 // --- Validation ---
 if (isNaN(clientId)) {
   console.error('[RUNNER] Error: --clientId is required.');
@@ -58,7 +67,11 @@ async function askOpenClaw(userMessage) {
   console.log(`[GATEWAY] Sending request to OpenClaw hook endpoint...`);
   console.log(`[GATEWAY]   - URL: ${OPENCLAW_GATEWAY_URL}`);
   console.log(`[GATEWAY]   - Message: "${userMessage}"`);
-  console.log(`[GATEWAY]   - Requested model: ${model} (not sent — OpenClaw confirmed model selection is fully determined by its own per-skill config)`);
+  // The model arg is recorded for our own reporting only. OpenClaw resolves
+  // the model from the serving agent's agent.defaults.model.primary, so the
+  // agentId below — not this value — is what determines what actually runs.
+  console.log(`[GATEWAY]   - Agent: ${OPENCLAW_AGENT_ID} (determines the model via agent.defaults.model.primary)`);
+  console.log(`[GATEWAY]   - Recorded model: ${model} (not sent — OpenClaw ignores a requested model)`);
 
   try {
     const response = await fetch(OPENCLAW_GATEWAY_URL, {
@@ -70,7 +83,7 @@ async function askOpenClaw(userMessage) {
       body: JSON.stringify({
         message: userMessage,
         name: `SEO ${agentType} — client #${clientId}`,
-        agentId: "main",
+        agentId: OPENCLAW_AGENT_ID,
         wakeMode: "now",
         deliver: false
       })

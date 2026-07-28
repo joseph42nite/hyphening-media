@@ -99,12 +99,12 @@ export function listQueue({ includeRecent = true, recentLimit = 20 } = {}) {
  * the partial unique index makes that decision atomically, so two racing
  * requests cannot both win.
  */
-export function createRun({ clientId, agentType, model, requestedBy, pendingActionId = null }) {
+export function createRun({ clientId, agentType, model, requestedBy, pendingActionId = null, agentId = null }) {
   try {
     const result = db.prepare(`
-      INSERT INTO seo_agent_runs (client_id, agent_type, status, model, requested_by, pending_action_id)
-      VALUES (?, ?, 'queued', ?, ?, ?)
-    `).run(clientId, agentType, model || null, requestedBy || null, pendingActionId);
+      INSERT INTO seo_agent_runs (client_id, agent_type, status, model, requested_by, pending_action_id, agent_id)
+      VALUES (?, ?, 'queued', ?, ?, ?, ?)
+    `).run(clientId, agentType, model || null, requestedBy || null, pendingActionId, agentId);
 
     const run = getRun(result.lastInsertRowid);
     broadcastRunStatus(run);
@@ -143,12 +143,14 @@ export function attachOpenClawRunId(runId, openClawRunId) {
  * Terminal state. Only advances a run that is still in flight, so a late
  * webhook can never resurrect a run the operator already cancelled.
  */
-export function finishRun(runId, status, { error = null, auditId = null } = {}) {
+export function finishRun(runId, status, { error = null, auditId = null, actualModel = null } = {}) {
   const result = db.prepare(`
     UPDATE seo_agent_runs
-    SET status = ?, finished_at = datetime('now'), error = ?, audit_id = COALESCE(?, audit_id)
+    SET status = ?, finished_at = datetime('now'), error = ?,
+        audit_id = COALESCE(?, audit_id),
+        actual_model = COALESCE(?, actual_model)
     WHERE id = ? AND status IN ('queued','running')
-  `).run(status, error, auditId, runId);
+  `).run(status, error, auditId, actualModel, runId);
 
   if (result.changes === 0) return null;
 

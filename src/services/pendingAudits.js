@@ -29,11 +29,13 @@ const TIMEOUT_MINUTES = new Map([
   ['content_brief', 25],
   ['sxo', 25],
 
-  // The five skills moved from deepseek-v4-flash to Nemotron 3 Ultra (free).
-  // Nemotron is a reasoning model: it spends longer thinking before emitting,
-  // so these windows are wider than the work itself would suggest. Numbers
-  // confirmed by OpenClaw (2026-07-28) and assume sequential execution — a
-  // Master Audit fires one skill at a time, so no queueing is added on top.
+  // Sized for the slowest model that could serve the skill, not the fastest.
+  //
+  // With the 'seo' agent available, a run may be served by Nemotron 3 Ultra (a
+  // reasoning model, markedly slower) or fall through its chain to DeepSeek V4
+  // Flash. A window that fits DeepSeek would mark a live Nemotron run as dead,
+  // so these use OpenClaw's Nemotron estimates. The cost of being generous is
+  // only that a genuinely stuck run holds its queue slot longer.
   ['technical', 35],
   ['schema', 25],
   ['images', 25],

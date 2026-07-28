@@ -42,6 +42,10 @@ export function spawnAgent(run, model) {
     '--runId', String(run.id)
   ];
 
+  // The agent decides the model, so this is the routing lever. Omitted when
+  // unset so the runner falls back to OPENCLAW_AGENT_ID or 'main'.
+  if (run.agent_id) args.push('--agentId', run.agent_id);
+
   console.log(`[AGENT RUNNER] Spawning: node ${args.join(' ')}`);
 
   const child = spawn(process.execPath || 'node', args, {
@@ -160,8 +164,8 @@ export async function abortOpenClawRun(run) {
   }
 }
 
-export function startAgentRun({ clientId, agentType, model, requestedBy, pendingActionId = null }) {
-  const { run, conflict } = createRun({ clientId, agentType, model, requestedBy, pendingActionId });
+export function startAgentRun({ clientId, agentType, model, requestedBy, pendingActionId = null, agentId = null }) {
+  const { run, conflict } = createRun({ clientId, agentType, model, requestedBy, pendingActionId, agentId });
   if (conflict) return { conflict };
 
   spawnAgent(run, model);

@@ -228,7 +228,11 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
         agentType,
         model: selectedModel,
         requestedBy: req.user.email,
-        pendingActionId: actionResult.lastInsertRowid
+        pendingActionId: actionResult.lastInsertRowid,
+        // Per-skill routing: conf.agent_id names the OpenClaw agent, and the
+        // agent determines the model. req.body.agentId allows a one-off
+        // override for comparing two agents on the same skill.
+        agentId: req.body.agentId || conf.agent_id || null
       });
 
       if (conflict) {
