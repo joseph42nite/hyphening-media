@@ -119,6 +119,17 @@ router.post('/webhook', (req, res) => {
       diff: { event_type, payload_keys: Object.keys(payload || {}), success: result.success },
     });
 
+    // Broadcast incoming OpenClaw webhook event to frontend in real-time
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('openclaw_webhook', {
+        event_type,
+        success: result.success,
+        summary: result.summary,
+        payload_keys: Object.keys(payload || {}),
+        timestamp: new Date().toISOString()
+      });
+    }).catch(err => console.error('[OPENCLAW] Broadcast openclaw_webhook failed:', err));
+
     if (!result.success) {
       return res.status(500).json({
         error: 'Execution failed',

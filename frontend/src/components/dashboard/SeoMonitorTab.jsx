@@ -103,12 +103,13 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
 
   // Real-time terminal log stream state
   const [activeConsoleAgent, setActiveConsoleAgent] = useState(null);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState([]);
   const [agentRunningStates, setAgentRunningStates] = useState({}); // e.g. { technical: 'running' }
   const terminalEndRef = useRef(null);
 
   // Terminal drag-to-resize and collapse/expand controls
-  const [terminalHeight, setTerminalHeight] = useState(240);
+  const [terminalHeight, setTerminalHeight] = useState(280);
   const [isTerminalCollapsed, setIsTerminalCollapsed] = useState(false);
   const [isDraggingTerminal, setIsDraggingTerminal] = useState(false);
 
@@ -246,15 +247,37 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     }
   }, [selectedAuditId, selectedClientId]);
 
+  // Fetch initial activity log history on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/api/openclaw/activity?limit=30`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.logs && Array.isArray(data.logs)) {
+          const historicalLogs = data.logs.reverse().map(l => ({
+            type: 'agent_activity_log',
+            data: { action: l.action, status: l.status, summary: l.summary, client: l.client, details: l.details },
+            timestamp: new Date(l.created_at)
+          }));
+          setConsoleLogs(prev => [...historicalLogs, ...prev]);
+        }
+      })
+      .catch(err => console.error('[SEO TAB] Activity log prefetch error:', err));
+  }, []);
+
   // Set up SSE EventSource for real-time console log streaming
   useEffect(() => {
     const eventSource = new EventSource(`${API_BASE}/api/events`, { withCredentials: true });
 
     eventSource.addEventListener('seo_agent_log', (e) => {
       const data = JSON.parse(e.data);
-      if (String(data.clientId) === String(selectedClientId) && data.agentType === activeConsoleAgent) {
+      if (!selectedClientId || String(data.clientId) === String(selectedClientId)) {
         setConsoleLogs(prev => [...prev, { type: 'seo_agent_log', data, timestamp: new Date() }]);
       }
+    });
+
+    eventSource.addEventListener('openclaw_webhook', (e) => {
+      const data = JSON.parse(e.data);
+      setConsoleLogs(prev => [...prev, { type: 'openclaw_webhook', data, timestamp: new Date() }]);
     });
 
     eventSource.addEventListener('seo_agent_status', (e) => {
@@ -283,7 +306,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
 
     eventSource.addEventListener('agent_activity_log', (e) => {
       const data = JSON.parse(e.data);
-      // Display all activity logs, not filtered by activeConsoleAgent
       setConsoleLogs(prev => [...prev, { type: 'agent_activity_log', data, timestamp: new Date() }]);
     });
 
@@ -298,7 +320,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     return () => {
       eventSource.close();
     };
-  }, [selectedClientId, activeConsoleAgent]);
+  }, [selectedClientId]);
 
   // Auto-scroll terminal drawer to bottom
   useEffect(() => {
@@ -477,13 +499,22 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               </select>
             </div>
             {selectedClientId && (
-              <button
-                onClick={triggerFullAuditMaster}
-                className="btn btn-primary"
-                style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold', width: '100%' }}
-              >
-                🚀 Run Full Audit (Master)
-              </button>
+              <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
+                <button
+                  onClick={triggerFullAuditMaster}
+                  className="btn btn-primary"
+                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold', flex: 1, minWidth: '200px' }}
+                >
+                  🚀 Run Full Audit (Master)
+                </button>
+                <button
+                  onClick={() => setIsTerminalOpen(prev => !prev)}
+                  className={`btn ${isTerminalOpen ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: 1, minWidth: '200px' }}
+                >
+                  <Terminal size={16} /> {isTerminalOpen ? 'Hide Console Stream' : 'Live OpenClaw Console & Webhooks'} ({consoleLogs.length})
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -788,93 +819,103 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
           </div>
 
           {/* Real-time SSE Terminal Console Drawer */}
-                    {true && ( // Always show the terminal drawer
-                      <div 
-                        className="seo-terminal-drawer"
-                        style={{
-                          borderTop: '3px solid #000',
-                          background: '#090d16',
-                          color: '#22c55e',
-                          padding: isTerminalCollapsed ? '6px 14px 0' : '12px 14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          height: isTerminalCollapsed ? '36px' : `${terminalHeight}px`,
-                          maxHeight: '45vh',
-                          position: 'fixed',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          zIndex: 1050,
-                          boxShadow: '0 -4px 10px rgba(0,0,0,0.15)',
-                          transition: isDraggingTerminal ? 'none' : 'height 0.2s ease, padding 0.2s ease',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {/* Resize Handle (only active when not collapsed) */}
-                        {!isTerminalCollapsed && (
-                          <div 
-                            onMouseDown={startResizeTerminal}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: '6px',
-                              cursor: 'row-resize',
-                              background: '#1e293b',
-                              zIndex: 1060
-                            }}
-                            title="Drag to resize terminal height"
-                          />
-                        )}
-          
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isTerminalCollapsed ? 'none' : '1px solid #1e293b', paddingBottom: isTerminalCollapsed ? '0' : '6px', marginBottom: isTerminalCollapsed ? '0' : '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Terminal size={14} style={{ color: '#22c55e' }} />
-                            <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.85rem' }}>Live Console Stream</span>
-                            {activeConsoleAgent && <span style={{ color: '#64748b', fontSize: '0.75rem' }}>({activeConsoleAgent})</span>}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <button 
-                              onClick={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
-                              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', marginRight: '14px', padding: 0 }}
-                              title={isTerminalCollapsed ? "Expand Console" : "Collapse Console"}
-                            >
-                              {isTerminalCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            </button>
-                            <button 
-                              onClick={() => setActiveConsoleAgent(null)} // This will clear the agent-specific filter
-                              style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.25rem', fontWeight: 'bold', padding: 0, display: 'flex', alignItems: 'center' }}
-                              title="Clear Agent Filter"
-                            >
-                              &times;
-                            </button>
-                          </div>
-                        </div>
-          
-                        {!isTerminalCollapsed && (
-                          <div 
-                            style={{ 
-                              flex: 1, 
-                              overflowY: 'auto', 
-                              fontFamily: 'monospace', 
-                              fontSize: '0.75rem',
-                              lineHeight: '1.4',
-                              whiteSpace: 'pre-wrap',
-                              wordBreak: 'break-word',
-                              overflowWrap: 'anywhere',
-                              textAlign: 'left',
-                              marginTop: '4px'
-                            }}
-                          >
-                            {consoleLogs.map((logEntry, idx) => (
-                              <div key={idx} style={{ marginBottom: '2px', wordBreak: 'break-word' }}>
-                                <span style={{ color: '#64748b' }}>{new Date(logEntry.timestamp).toLocaleTimeString()}</span>{' '}
-                                {logEntry.type === 'seo_agent_log' && (
-                                  <span className={getStatusColor(logEntry.data.log.includes('[ERROR]') ? 'error' : 'running')} style={{ wordBreak: 'break-word' }}>
-                                    {logEntry.data.log}
-                                  </span>
-                                )}
+          {(activeConsoleAgent || isTerminalOpen) && (
+            <div 
+              className="seo-terminal-drawer"
+              style={{
+                borderTop: '3px solid #000',
+                background: '#090d16',
+                color: '#22c55e',
+                padding: isTerminalCollapsed ? '6px 14px 0' : '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                height: isTerminalCollapsed ? '36px' : `${terminalHeight}px`,
+                maxHeight: '45vh',
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 1050,
+                boxShadow: '0 -4px 10px rgba(0,0,0,0.15)',
+                transition: isDraggingTerminal ? 'none' : 'height 0.2s ease, padding 0.2s ease',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Resize Handle (only active when not collapsed) */}
+              {!isTerminalCollapsed && (
+                <div 
+                  onMouseDown={startResizeTerminal}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '6px',
+                    cursor: 'row-resize',
+                    background: '#1e293b',
+                    zIndex: 1060
+                  }}
+                  title="Drag to resize terminal height"
+                />
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isTerminalCollapsed ? 'none' : '1px solid #1e293b', paddingBottom: isTerminalCollapsed ? '0' : '6px', marginBottom: isTerminalCollapsed ? '0' : '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Terminal size={14} style={{ color: '#22c55e' }} />
+                  <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.85rem' }}>Live OpenClaw Console & Webhook Stream</span>
+                  {activeConsoleAgent && <span style={{ color: '#64748b', fontSize: '0.75rem' }}>({activeConsoleAgent})</span>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
+                    style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', marginRight: '14px', padding: 0 }}
+                    title={isTerminalCollapsed ? "Expand Console" : "Collapse Console"}
+                  >
+                    {isTerminalCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                  <button 
+                    onClick={() => { setActiveConsoleAgent(null); setIsTerminalOpen(false); }}
+                    style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.25rem', fontWeight: 'bold', padding: 0, display: 'flex', alignItems: 'center' }}
+                    title="Close Console Drawer"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+
+              {!isTerminalCollapsed && (
+                <div 
+                  style={{ 
+                    flex: 1, 
+                    overflowY: 'auto', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.75rem',
+                    lineHeight: '1.4',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'anywhere',
+                    textAlign: 'left',
+                    marginTop: '4px'
+                  }}
+                >
+                  {consoleLogs.map((logEntry, idx) => (
+                    <div key={idx} style={{ marginBottom: '2px', wordBreak: 'break-word' }}>
+                      <span style={{ color: '#64748b' }}>{new Date(logEntry.timestamp).toLocaleTimeString()}</span>{' '}
+                      {logEntry.type === 'openclaw_webhook' && (
+                        <span>
+                          <span style={{ color: '#c084fc', fontWeight: 'bold' }}>[WEBHOOK INGESTED]</span>{' '}
+                          <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{logEntry.data.event_type}</span>{' '}
+                          <span style={{ color: logEntry.data.success ? '#4ade80' : '#f87171' }}>
+                            ({logEntry.data.success ? 'EXECUTED' : 'FAILED'})
+                          </span>{' '}
+                          <span style={{ color: '#e2e8f0' }}>{logEntry.data.summary}</span>
+                        </span>
+                      )}
+                      {logEntry.type === 'seo_agent_log' && (
+                        <span className={getStatusColor(logEntry.data.log.includes('[ERROR]') ? 'error' : 'running')} style={{ wordBreak: 'break-word' }}>
+                          {logEntry.data.log}
+                        </span>
+                      )}
                                 {logEntry.type === 'seo_agent_status' && (
                                   <span className={getStatusColor(logEntry.data.status)}>
                                     [AGENT {logEntry.data.agentType.toUpperCase()}] Status: {logEntry.data.status}
