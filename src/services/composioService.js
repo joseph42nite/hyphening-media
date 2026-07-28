@@ -42,18 +42,32 @@ export async function getConnectUrl(clientId, appName, redirectUrl = '') {
   const cleanApp = appName.toLowerCase();
 
   try {
-    // 1. Fetch auth configs for this toolkit
+    // 1. Fetch existing auth configs
     let authConfigId;
     try {
-      const configs = await composioClient.authConfigs.list({ toolkit: cleanApp });
-      if (configs?.items && configs.items.length > 0) {
-        authConfigId = configs.items[0].id;
+      const configs = await composioClient.authConfigs.list({});
+      const match = configs?.items?.find(c => 
+        c.toolkit?.slug?.toLowerCase() === cleanApp || 
+        c.name?.toLowerCase().includes(cleanApp)
+      );
+      if (match) {
+        authConfigId = match.id;
       }
     } catch (e) {
-      console.warn(`[COMPOSIO] Could not list authConfigs for ${cleanApp}:`, e.message);
+      console.warn(`[COMPOSIO] Could not list authConfigs:`, e.message);
     }
 
-    // 2. Direct user link generation (passing allowMultiple: true to prevent SDK errors)
+    // 2. If no authConfig exists, create one for this toolkit
+    if (!authConfigId) {
+      try {
+        const created = await composioClient.authConfigs.create({ toolkit: cleanApp });
+        authConfigId = created.id;
+      } catch (e) {
+        console.warn(`[COMPOSIO] Could not create authConfig for ${cleanApp}:`, e.message);
+      }
+    }
+
+    // 3. Generate OAuth connection link via connectedAccounts.link
     if (authConfigId) {
       const link = await composioClient.connectedAccounts.link(entityId, authConfigId, {
         allowMultiple: true,
@@ -62,12 +76,7 @@ export async function getConnectUrl(clientId, appName, redirectUrl = '') {
       logQuotaUsage('INITIATE_CONNECTION', clientId);
       return link.redirectUrl || link.url;
     } else {
-      const connection = await composioClient.toolkits.authorize(entityId, cleanApp, {
-        allowMultiple: true,
-        callbackUrl: redirectUrl || undefined
-      });
-      logQuotaUsage('INITIATE_CONNECTION', clientId);
-      return connection.redirectUrl || connection.url;
+      throw new Error(`No authConfig found or created for ${cleanApp}`);
     }
   } catch (err) {
     console.error(`[COMPOSIO] Connect error for ${appName}:`, err.message);
