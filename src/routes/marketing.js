@@ -594,7 +594,7 @@ const getAdWithLeads = (adId) => {
  */
 router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
-    const ads = db.prepare(`
+    let ads = db.prepare(`
       SELECT 
         a.*,
         (
@@ -622,6 +622,42 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
       WHERE a.client_id = ?
       ORDER BY a.created_at DESC
     `).all(req.params.id);
+
+    // If no explicit marketing_ad_campaigns entries exist, aggregate from campaign_leads so lead data from portal is reflected
+    if (ads.length === 0) {
+      const leadCampaigns = db.prepare(`
+        SELECT 
+          LOWER(COALESCE(NULLIF(TRIM(platform), ''), 'Other')) as platform_key,
+          COALESCE(NULLIF(TRIM(platform), ''), 'Other') as platform,
+          COALESCE(NULLIF(TRIM(campaign_name), ''), COALESCE(NULLIF(TRIM(platform), ''), 'Other') || ' Campaign') as ad_campaign_name,
+          COUNT(id) as leads,
+          COUNT(id) as actual_leads,
+          SUM(CASE WHEN qualification_status = 'Qualified' OR lead_status IN ('Qualified', 'Appointment Booked') THEN 1 ELSE 0 END) as actual_qualified_leads
+        FROM campaign_leads
+        WHERE client_id = ?
+        GROUP BY platform_key, ad_campaign_name
+        ORDER BY actual_leads DESC
+      `).all(req.params.id);
+
+      ads = leadCampaigns.map((lc, index) => ({
+        id: `synth-${index + 1}`,
+        client_id: parseInt(req.params.id),
+        platform: lc.platform,
+        ad_campaign_name: lc.ad_campaign_name,
+        leads: lc.leads,
+        actual_leads: lc.actual_leads,
+        actual_qualified_leads: lc.actual_qualified_leads || 0,
+        total_ad_spend_inr: 0,
+        impressions: 0,
+        clicks: 0,
+        ctr_pct: 0,
+        cpc_inr: 0,
+        cpl_inr: 0,
+        revenue_generated: 0,
+        roas: 0
+      }));
+    }
+
     res.json({ ads });
   } catch (err) {
     console.error('[MARKETING] Ads list error:', err);
