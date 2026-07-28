@@ -268,11 +268,37 @@ const frontendPath = path.join(__dirname, 'frontend', 'dist');
 if (IS_PROD || fs.existsSync(frontendPath)) {
   app.use(express.static(frontendPath));
   
-  // SPA fallback — serve index.html for all non-API routes
+  // SPA fallback — serve index.html for all non-API routes with dynamic canonical injection & 301 trailing slash normalization
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-      res.sendFile(path.join(frontendPath, 'index.html'));
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'Not found', path: req.path });
     }
+
+    // 301 Redirect trailing slashes on non-root paths (prevents "Page with redirect" & duplicate URL issues)
+    if (req.path.length > 1 && req.path.endsWith('/')) {
+      const query = req.url.slice(req.path.length);
+      const cleanPath = req.path.slice(0, -1) + query;
+      return res.redirect(301, cleanPath);
+    }
+
+    const indexPath = path.join(frontendPath, 'index.html');
+    if (!fs.existsSync(indexPath)) {
+      return res.status(404).send('Index file not found');
+    }
+
+    // Dynamically inject exact single canonical tag for requested path
+    const cleanPath = req.path === '/' ? '/' : req.path.replace(/\/$/, '');
+    const canonicalUrl = `https://hyphening.com${cleanPath}`;
+
+    fs.readFile(indexPath, 'utf8', (err, html) => {
+      if (err) {
+        return res.sendFile(indexPath);
+      }
+      const canonicalTag = `<link rel="canonical" href="${canonicalUrl}" />`;
+      const updatedHtml = html.replace('</head>', `  ${canonicalTag}\n</head>`);
+      res.header('Content-Type', 'text/html');
+      res.send(updatedHtml);
+    });
   });
 }
 

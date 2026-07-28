@@ -50,7 +50,6 @@ router.get('/sitemap.xml', (req, res) => {
     const staticRoutes = [
       { url: '/', changefreq: 'weekly', priority: '1.0', lastmod: today },
       { url: '/blog', changefreq: 'daily', priority: '0.8', lastmod: today },
-      { url: '/login', changefreq: 'monthly', priority: '0.3', lastmod: today },
     ];
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;

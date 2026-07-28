@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, ChevronRight, Menu, X } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
 import logoImg from '../assets/logo.png';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -120,12 +121,14 @@ function BlogListing() {
 
   return (
     <div className="landing-root">
+      <SEOHead 
+        title="Blog — Hyphening Media | Social Media Marketing Insights"
+        description="Expert insights on social media marketing, content strategy, brand growth, and creative operations from Hyphening Media."
+        canonicalUrl="https://hyphening.com/blog"
+      />
+
       {/* Navigation */}
       <Navbar />
-
-      {/* SEO Meta */}
-      <title>Blog — Hyphening Media | Social Media Marketing Insights</title>
-      <meta name="description" content="Read expert insights on social media marketing, content strategy, brand growth, and creative operations from Hyphening Media." />
 
       {/* Blog Hero */}
       <section className="blog-hero">
@@ -302,15 +305,14 @@ function BlogArticle() {
   return (
     <div className="landing-root">
       {/* SEO Meta */}
-      <title>{post.meta_title || post.title} — Hyphening Media</title>
-      <meta name="description" content={post.meta_description || post.excerpt || ''} />
-      {post.meta_keywords && <meta name="keywords" content={post.meta_keywords} />}
-      <link rel="canonical" href={`https://hyphening.com/blog/${post.slug}`} />
-      <meta property="og:title" content={post.meta_title || post.title} />
-      <meta property="og:description" content={post.meta_description || post.excerpt || ''} />
-      {post.cover_image_url && <meta property="og:image" content={post.cover_image_url} />}
-      <meta property="og:url" content={`https://hyphening.com/blog/${post.slug}`} />
-      <meta property="og:type" content="article" />
+      <SEOHead 
+        title={`${post.meta_title || post.title} — Hyphening Media`}
+        description={post.meta_description || post.excerpt || ''}
+        keywords={post.meta_keywords}
+        canonicalUrl={`https://hyphening.com/blog/${post.slug}`}
+        ogImage={post.cover_image_url}
+        ogType="article"
+      />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
 
       {/* Navigation */}

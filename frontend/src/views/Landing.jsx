@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import SEOHead from '../components/SEOHead';
 import { ArrowRight, Zap, Film, BarChart3, PenTool, Globe, Users, Play, Sparkles, TrendingUp, Menu, X, Code, Smartphone, Megaphone, Mouse, Sword, Bomb } from 'lucide-react';
 import { EncryptedText } from "@/components/ui/encrypted-text";
 import japaneseImg from '../assets/japenese-image.webp';
+import japaneseMobileImg from '../assets/japanese-image-mobile.webp';
 import sakuraLadyImg from '../assets/sakura-lady.webp';
 import logoImg from '../assets/logo.png';
 
@@ -929,6 +931,10 @@ function Landing() {
 
   return (
     <div className="landing-root">
+      <SEOHead 
+        title="Hyphening Media | Creative Operations & Marketing Performance Agency" 
+        canonicalUrl="https://hyphening.com/" 
+      />
       {/* ===== Fixed Navigation ===== */}
       <Navbar />
 
@@ -1133,13 +1139,18 @@ function Landing() {
           scrollMarginTop: '120px'
         }}
       >
-        <img src={japaneseImg} alt="Japanese Art" style={{ maxWidth: '100%', height: 'auto', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+        <picture style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+          <source media="(max-width: 768px)" srcSet={japaneseMobileImg} />
+          <img src={japaneseImg} alt="Japanese Art" style={{ maxWidth: '100%', height: 'auto', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+        </picture>
       </div>
 
       {/* ===== Capabilities ===== */}
       <section className="landing-section" id="capabilities">
-        <div className="section-label"><Zap size={12} /> What We Do</div>
-        <h2 className="section-heading">End-to-End Creative Operations</h2>
+        <div className="cap-head">
+          <div className="section-label"><Zap size={12} /> What We Do</div>
+          <h2 className="section-heading">End-to-End Creative Operations</h2>
+        </div>
         <div className="cap-grid">
           {CAPABILITIES.map((cap, i) => (
             <CapCard key={i} index={i} {...cap} delay={i * 80} />
