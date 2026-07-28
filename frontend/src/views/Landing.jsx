@@ -670,15 +670,15 @@ const useScrollReveal = (threshold = 0.15) => {
    DATA
    ========================================================================== */
 const CAPABILITIES = [
-  { icon: PenTool, title: 'Content Strategy', desc: 'We build monthly content calendars with scripts, hooks, and posting schedules engineered for maximum reach.', dark: false },
-  { icon: Film, title: 'Video Production', desc: 'End-to-end short-form and long-form video creation — from script to shoot to final edit, delivered on time.', dark: true },
-  { icon: Globe, title: 'Social Media Ops', desc: 'Multi-platform management across Instagram, YouTube, TikTok, and LinkedIn with daily engagement tracking.', dark: false },
-  { icon: Code, title: 'Web Development', desc: 'Custom, high-performance websites and web applications built with modern technologies to drive conversions.', dark: true },
-  { icon: Smartphone, title: 'App Development', desc: 'Native and cross-platform mobile applications designed for seamless user experiences and engagement.', dark: false },
-  { icon: BarChart3, title: 'Performance Analytics', desc: 'Data-driven growth reports with real CTR, impressions, and audience metrics — no vanity numbers.', dark: true },
-  { icon: Zap, title: 'Campaign Management', desc: 'Organic and paid campaign execution with A/B testing, audience targeting, and conversion-optimized funnels.', dark: false },
-  { icon: Users, title: 'Brand Development', desc: 'Visual identity systems, positioning strategy, and tone-of-voice guides that make your brand unmistakable.', dark: true },
-  { icon: Megaphone, title: 'News Media Coverage & PR', desc: 'Strategic public relations and news media placements to amplify your brand presence and establish industry authority.', dark: false },
+  { image: '/capabilities/content-strategy.webp', icon: PenTool, title: 'Content Strategy', desc: 'We build monthly content calendars with scripts, hooks, and posting schedules engineered for maximum reach.', dark: false },
+  { image: '/capabilities/video-production.webp', icon: Film, title: 'Video Production', desc: 'End-to-end short-form and long-form video creation — from script to shoot to final edit, delivered on time.', dark: true },
+  { image: '/capabilities/social-media-ops.webp', icon: Globe, title: 'Social Media Ops', desc: 'Multi-platform management across Instagram, YouTube, TikTok, and LinkedIn with daily engagement tracking.', dark: false },
+  { image: '/capabilities/web-development.webp', icon: Code, title: 'Web Development', desc: 'Custom, high-performance websites and web applications built with modern technologies to drive conversions.', dark: true },
+  { image: '/capabilities/app-development.webp', icon: Smartphone, title: 'App Development', desc: 'Native and cross-platform mobile applications designed for seamless user experiences and engagement.', dark: false },
+  { image: '/capabilities/performance-analytics.webp', icon: BarChart3, title: 'Performance Analytics', desc: 'Data-driven growth reports with real CTR, impressions, and audience metrics — no vanity numbers.', dark: true },
+  { image: '/capabilities/campaign-management.webp', icon: Zap, title: 'Campaign Management', desc: 'Organic and paid campaign execution with A/B testing, audience targeting, and conversion-optimized funnels.', dark: false },
+  { image: '/capabilities/brand-development.webp', icon: Users, title: 'Brand Development', desc: 'Visual identity systems, positioning strategy, and tone-of-voice guides that make your brand unmistakable.', dark: true },
+  { image: '/capabilities/news-media-pr.webp', icon: Megaphone, title: 'News Media Coverage & PR', desc: 'Strategic public relations and news media placements to amplify your brand presence and establish industry authority.', dark: false },
 ];
 
 const PORTFOLIO = [
@@ -730,13 +730,49 @@ const FNB_CLIENTS = [
 /* ==========================================================================
    CAPABILITY CARD
    ========================================================================== */
-const CapCard = ({ icon: Icon, title, desc, dark, delay }) => {
+const CapCard = ({ image, icon: Icon, title, desc, dark, delay, index }) => {
   const ref = useScrollReveal(0.12);
+  const [extIndex, setExtIndex] = useState(0);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const extensions = ['.webp', '.png', '.jpg', '.jpeg', '.svg'];
+  const basePath = image ? image.replace(/\.(webp|png|jpg|jpeg|svg)$/i, '') : '';
+  const currentSrc = basePath && !imgFailed ? `${basePath}${extensions[extIndex]}` : null;
+
+  const handleImgError = () => {
+    if (extIndex < extensions.length - 1) {
+      setExtIndex(prev => prev + 1);
+    } else {
+      setImgFailed(true);
+    }
+  };
+
+  const cardStyle = {
+    transitionDelay: `${delay}ms`,
+    '--card-idx': index + 1,
+    zIndex: index + 1,
+  };
+
   return (
-    <div ref={ref} className={`cap-card${dark ? ' cap-dark' : ''}`} style={{ transitionDelay: `${delay}ms` }}>
-      <div className="cap-card-icon"><Icon size={22} /></div>
-      <h3>{title}</h3>
-      <p>{desc}</p>
+    <div ref={ref} className={`cap-card${dark ? ' cap-dark' : ''}`} style={cardStyle}>
+      {currentSrc ? (
+        <div className="cap-card-banner">
+          <img
+            src={currentSrc}
+            alt={title}
+            className="cap-card-banner-img"
+            onError={handleImgError}
+          />
+        </div>
+      ) : (
+        <div className="cap-card-icon-wrap">
+          <Icon size={22} />
+        </div>
+      )}
+      <div className="cap-card-content">
+        <h3>{title}</h3>
+        <p>{desc}</p>
+      </div>
     </div>
   );
 };
@@ -1106,7 +1142,7 @@ function Landing() {
         <h2 className="section-heading">End-to-End Creative Operations</h2>
         <div className="cap-grid">
           {CAPABILITIES.map((cap, i) => (
-            <CapCard key={i} {...cap} delay={i * 80} />
+            <CapCard key={i} index={i} {...cap} delay={i * 80} />
           ))}
         </div>
       </section>

@@ -59,7 +59,7 @@ body {
   color: var(--text-primary);
   line-height: 1.5;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow: visible;
   padding: 16px;
   -webkit-font-smoothing: antialiased;
 }
@@ -1525,7 +1525,7 @@ tr:hover td {
   position: relative;
   width: 100vw;
   margin-left: calc(-50vw + 50%);
-  overflow-x: hidden;
+  overflow: visible;
 }
 
 /* --- Nav --- */
@@ -2103,45 +2103,116 @@ tr:hover td {
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
-  padding: 36px 28px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  overflow: hidden;
   perspective: 800px;
-  transition: transform 0.25s, box-shadow 0.25s;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease, border-color 0.4s ease;
   opacity: 0;
   transform: translateY(40px);
+  transform-origin: 50% 50%;
+  will-change: transform;
+  backface-visibility: hidden;
 }
+
+/* Silky Smooth Sinusoidal 1° Idle Giggle */
+@keyframes cap-idle-giggle {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-2.5px) rotate(-1.2deg);
+  }
+  50% {
+    transform: translateY(-0.5px) rotate(0.4deg);
+  }
+  75% {
+    transform: translateY(-2.5px) rotate(1.2deg);
+  }
+}
+
 .cap-card.visible {
   opacity: 1;
-  transform: translateY(0);
-  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  animation: cap-idle-giggle 4.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 }
+
+/* Smooth Staggered Wave Delays */
+.cap-grid .cap-card:nth-child(2n).visible {
+  animation-delay: 0.8s;
+}
+
+.cap-grid .cap-card:nth-child(3n).visible {
+  animation-delay: 1.6s;
+}
+
+.cap-grid .cap-card:nth-child(3n+1).visible {
+  animation-delay: 2.4s;
+}
+
 .cap-card:hover {
-  transform: translateY(-6px) rotateX(2deg) rotateY(-2deg);
+  animation-play-state: paused;
+  transform: translateY(-8px) scale(1.015) rotate(0deg);
   box-shadow: var(--shadow-lg);
 }
 
-.cap-card-icon {
-  width: 48px;
-  height: 48px;
+.cap-card-banner {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  position: relative;
+  background: #09090b;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.cap-card.cap-dark .cap-card-banner {
+  border-bottom-color: #27272a;
+}
+
+.cap-card-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.cap-card:hover .cap-card-banner-img {
+  transform: scale(1.06);
+}
+
+.cap-card-icon-wrap {
+  width: 52px;
+  height: 52px;
   border-radius: 14px;
   background: #000;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 28px 0 0 28px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.cap-card-content {
+  padding: 24px 28px 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .cap-card h3 {
-  font-size: 1.15rem;
+  font-size: 1.18rem;
   margin: 0;
+  font-weight: 800;
 }
 
 .cap-card p {
   font-size: 0.88rem;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.55;
+  margin: 0;
 }
 
 /* --- Dark-inverted capability card --- */
@@ -2155,9 +2226,10 @@ tr:hover td {
 .cap-card.cap-dark p {
   color: #a1a1aa;
 }
-.cap-card.cap-dark .cap-card-icon {
+.cap-card.cap-dark .cap-card-icon-wrap {
   background: #ffffff;
   color: #000000;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* --- Portfolio Section --- */
@@ -2568,7 +2640,40 @@ tr:hover td {
   .landing-nav-logo { font-size: 1.2rem; }
   .landing-hero { padding: 110px 16px 48px; }
   .landing-section { padding: 48px 16px; }
-  .cap-grid { grid-template-columns: 1fr; }
+  /* Mobile Sticky Card Deck Effect — Cards lock at top: 90px and cover each other */
+  .cap-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    padding-bottom: 80px;
+  }
+  
+  .cap-grid .cap-card,
+  .cap-grid .cap-card.visible,
+  .cap-grid .cap-card:hover {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 90px !important;
+    z-index: var(--card-idx, 1) !important;
+    margin-bottom: 40px !important;
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    will-change: auto !important;
+    perspective: none !important;
+    backface-visibility: visible !important;
+    box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.35), var(--shadow-lg) !important;
+    background-color: var(--bg-card);
+  }
+
+  .cap-grid .cap-card.cap-dark,
+  .cap-grid .cap-card.cap-dark.visible,
+  .cap-grid .cap-card.cap-dark:hover {
+    background-color: #000000 !important;
+  }
+
   .stats-bar { margin: 0 16px; }
   .stat-item { min-width: 100%; }
   .hero-actions { flex-direction: column; align-items: center; }
