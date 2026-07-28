@@ -2,114 +2,10 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { exec, spawn } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { startAgentRun } from '../services/agentRunner.js';
 
 const router = Router();
 router.use(authenticate);
-
-// Helper to spawn runner process
-function spawnAgent(clientId, agentType, model, requestedBy) {
-  const runnerPath = path.resolve(__dirname, '../../openclaw_seo_runner.js');
-  const args = [
-    runnerPath,
-    '--clientId', clientId,
-    '--skill', agentType,
-    '--model', model,
-    '--triggeredBy', requestedBy
-  ];
-
-  console.log(`[APPROVAL] Spawning queued runner: node ${args.join(' ')}`);
-
-  import('../../server.js').then(({ broadcastEvent }) => {
-    // Notify frontend agent is now running
-    broadcastEvent('seo_agent_status', {
-      clientId,
-      agentType,
-      status: 'running'
-    });
-
-    const child = spawn(process.execPath || 'node', args, {
-      cwd: path.resolve(__dirname, '../..')
-    });
-
-    let stdoutBuffer = '';
-    child.stdout.on('data', (chunk) => {
-      stdoutBuffer += chunk.toString();
-      const lines = stdoutBuffer.split('\n');
-      stdoutBuffer = lines.pop();
-      for (const line of lines) {
-        if (line.trim()) {
-          broadcastEvent('seo_agent_log', {
-            clientId,
-            agentType,
-            log: line
-          });
-        }
-      }
-    });
-
-    let stderrBuffer = '';
-    child.stderr.on('data', (chunk) => {
-      stderrBuffer += chunk.toString();
-      const lines = stderrBuffer.split('\n');
-      stderrBuffer = lines.pop();
-      for (const line of lines) {
-        if (line.trim()) {
-          broadcastEvent('seo_agent_log', {
-            clientId,
-            agentType,
-            log: `[ERROR] ${line}`
-          });
-        }
-      }
-    });
-
-    child.on('close', (code) => {
-      if (stdoutBuffer.trim()) {
-        broadcastEvent('seo_agent_log', {
-          clientId,
-          agentType,
-          log: stdoutBuffer
-        });
-      }
-      if (stderrBuffer.trim()) {
-        broadcastEvent('seo_agent_log', {
-          clientId,
-          agentType,
-          log: `[ERROR] ${stderrBuffer}`
-        });
-      }
-
-      const finalStatus = code === 0 ? 'completed' : 'failed';
-      broadcastEvent('seo_agent_status', {
-        clientId,
-        agentType,
-        status: finalStatus
-      });
-    });
-
-    child.on('error', (err) => {
-      console.error(`[APPROVAL] Spawning runner failed for ${agentType}:`, err);
-      broadcastEvent('seo_agent_log', {
-        clientId,
-        agentType,
-        log: `[SYSTEM ERROR] Failed to spawn agent: ${err.message}`
-      });
-      broadcastEvent('seo_agent_status', {
-        clientId,
-        agentType,
-        status: 'failed'
-      });
-    });
-  }).catch(err => {
-    console.error(`[APPROVAL] Failed to import broadcastEvent:`, err);
-  });
-}
 
 /**
  * GET /api/approval/pending
@@ -194,12 +90,28 @@ router.post('/:actionId/approve', authorize('admin'), (req, res) => {
       return res.status(400).json({ error: 'Malformed payload data' });
     }
 
+    // Claim the in-flight slot first — approving the same request twice, or
+    // approving one while an identical run is already going, must not spawn
+    // a second billable job.
+    const { run, conflict } = startAgentRun({
+      clientId: action.client_id,
+      agentType: payload.agentType,
+      model: payload.model,
+      requestedBy: payload.requested_by_email,
+      pendingActionId: Number(actionId)
+    });
+
+    if (conflict) {
+      return res.status(409).json({
+        error: 'already_running',
+        runId: conflict.id,
+        message: `'${payload.agentType}' is already ${conflict.status} for this client (run #${conflict.id}). Approve again once it finishes, or cancel it from the queue.`
+      });
+    }
+
     // Mark as accepted
     db.prepare('UPDATE openclaw_pending_actions SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?')
       .run('accepted', req.user.email, new Date().toISOString(), actionId);
-
-    // Spawn agent process
-    spawnAgent(action.client_id, payload.agentType, payload.model, payload.requested_by_email);
 
     logAction({
       actorId: req.user.id,
@@ -207,10 +119,10 @@ router.post('/:actionId/approve', authorize('admin'), (req, res) => {
       action: 'openclaw_action_approved',
       entityType: 'openclaw_action',
       entityId: actionId,
-      diff: { agentType: payload.agentType, model: payload.model, client_id: action.client_id }
+      diff: { agentType: payload.agentType, model: payload.model, client_id: action.client_id, runId: run.id }
     });
 
-    res.json({ success: true, message: 'Action successfully approved and executed.' });
+    res.json({ success: true, runId: run.id, message: 'Action successfully approved and executed.' });
   } catch (err) {
     console.error('[APPROVAL] Approve error:', err);
     res.status(500).json({ error: 'Internal server error' });

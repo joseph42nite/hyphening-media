@@ -7,23 +7,55 @@
  */
 
 const pending = new Map();
-const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
-const EXTENDED_TIMEOUT_MS = 45 * 60 * 1000; // 45 minutes
+const MINUTE = 60 * 1000;
+const DEFAULT_TIMEOUT_MIN = 15;
 
-// Skills OpenClaw confirmed routinely exceed 15 minutes due to heavy
-// external API calls (DataForSEO, backlink providers, image generation).
-const EXTENDED_TIMEOUT_SKILLS = new Set([
-  'backlinks', 'dataforseo', 'competitor_pages', 'image_gen', 'maps'
+// Per-skill ceilings confirmed by OpenClaw (2026-07-28). OpenClaw's own agent
+// runtime timeout is effectively unbounded (48h default), so these windows are
+// purely ours — marking a run timed out only stops us waiting and frees the
+// queue slot. Anything too tight would flag a live job as dead; the values
+// below are OpenClaw's stated realistic ceilings per skill.
+const TIMEOUT_MINUTES = new Map([
+  // Heavy external API calls (DataForSEO, backlink providers, image generation)
+  ['backlinks', 45],
+  ['dataforseo', 45],
+  ['competitor_pages', 45],
+  ['image_gen', 45],
+  ['maps', 45],
+  // Topic modeling
+  ['cluster', 30],
+  // Research- and generation-heavy, scale with word count
+  ['content', 25],
+  ['content_brief', 25],
+  ['sxo', 25],
+
+  // The five skills moved from deepseek-v4-flash to Nemotron 3 Ultra (free).
+  // Nemotron is a reasoning model: it spends longer thinking before emitting,
+  // so these windows are wider than the work itself would suggest. Numbers
+  // confirmed by OpenClaw (2026-07-28) and assume sequential execution — a
+  // Master Audit fires one skill at a time, so no queueing is added on top.
+  ['technical', 35],
+  ['schema', 25],
+  ['images', 25],
+  ['sitemap', 20],
+  ['hreflang', 20],
 ]);
 
 function key(clientId, agentType) {
   return `${clientId}:${agentType}`;
 }
 
-export function registerPendingAudit(clientId, agentType, onTimeout) {
+/** How long this skill is allowed to run before we give up on its webhook. */
+export function timeoutMsFor(agentType) {
+  return (TIMEOUT_MINUTES.get(agentType) ?? DEFAULT_TIMEOUT_MIN) * MINUTE;
+}
+
+// overrideMs is used when re-arming a timer after a server restart, where the
+// run has already burned part of its window and only the remainder is left.
+export function registerPendingAudit(clientId, agentType, onTimeout, overrideMs = null) {
   const k = key(clientId, agentType);
   clearPendingAudit(clientId, agentType);
-  const timeoutMs = EXTENDED_TIMEOUT_SKILLS.has(agentType) ? EXTENDED_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+  const timeoutMs = overrideMs ?? timeoutMsFor(agentType);
   const handle = setTimeout(() => {
     pending.delete(k);
     onTimeout();

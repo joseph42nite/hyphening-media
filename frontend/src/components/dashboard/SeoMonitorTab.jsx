@@ -1,6 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ArrowRight, ChevronUp, ChevronDown, ListOrdered, XCircle } from 'lucide-react';
 import { API_BASE } from '../../api.js';
+
+const IN_FLIGHT_STATUSES = ['queued', 'running'];
+
+// "4m 12s" — runs are minutes-long, so a live elapsed counter is the clearest
+// signal that a card is genuinely working rather than stuck.
+function formatElapsed(sinceIso, now) {
+  if (!sinceIso) return '';
+  // SQLite datetime('now') returns "YYYY-MM-DD HH:MM:SS" in UTC with no zone
+  // marker; without normalising, the browser reads it as local time and the
+  // counter starts hours off.
+  const iso = /Z|[+-]\d{2}:?\d{2}$/.test(sinceIso) ? sinceIso : `${sinceIso.replace(' ', 'T')}Z`;
+  const started = new Date(iso).getTime();
+  if (Number.isNaN(started)) return '';
+  const secs = Math.max(0, Math.floor((now - started) / 1000));
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ${secs % 60}s`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
 
 // Skills still blocked: maps/competitor_pages/dataforseo need DataForSEO
 // configured (confirmed by OpenClaw, 2026-07-20). drift is excluded per its
@@ -105,8 +124,34 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   const [activeConsoleAgent, setActiveConsoleAgent] = useState(null);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState([]);
-  const [agentRunningStates, setAgentRunningStates] = useState({}); // e.g. { technical: 'running' }
   const terminalEndRef = useRef(null);
+
+  // In-flight runs for the selected client, keyed by agent type. Seeded from
+  // the server on every load (agents[].activeRun) rather than from local
+  // clicks, so a refresh mid-run still shows "Running" instead of handing
+  // back a Run button that would queue — and bill — the same job twice.
+  const [activeRuns, setActiveRuns] = useState({});
+  const [pendingApprovals, setPendingApprovals] = useState({}); // agentType -> true, for non-admin staged runs
+
+  // Global queue across all clients
+  // abortSupported flips once OpenClaw exposes a real abort route — the cancel
+  // wording depends on it, since without one cancelling saves nothing.
+  const [queue, setQueue] = useState({ active: [], recent: [], abortSupported: false });
+  const [showQueue, setShowQueue] = useState(false);
+  const [cancellingRunIds, setCancellingRunIds] = useState([]);
+
+  // Terminal is one drawer with a tab per run ('all' = merged stream)
+  const [terminalTab, setTerminalTab] = useState('all');
+  const [runMeta, setRunMeta] = useState({}); // runId -> { agentType, clientId, status, startedAt }
+
+  // Ticks only while something is in flight, to drive the elapsed counters.
+  const [now, setNow] = useState(() => Date.now());
+  const hasInFlight = Object.keys(activeRuns).length > 0 || queue.active.length > 0;
+  useEffect(() => {
+    if (!hasInFlight) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [hasInFlight]);
 
   // Terminal drag-to-resize and collapse/expand controls
   const [terminalHeight, setTerminalHeight] = useState(280);
@@ -186,7 +231,10 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       case 'error':
       case 'failed':
       case 'rejected':
+      case 'timed_out':
         return 'text-red-400';
+      case 'cancelled':
+        return 'text-orange-400';
       case 'pending':
       case 'pending_approval':
         return 'text-yellow-400';
@@ -210,7 +258,33 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       // 1. Fetch agent freshness states
       const agentRes = await fetch(`${API_BASE}/api/clients/${clientId}/seo/agents/status`, { credentials: 'include' });
       const agentData = await agentRes.json();
-      if (agentRes.ok) setAgents(agentData.agents || []);
+      if (agentRes.ok) {
+        const list = agentData.agents || [];
+        setAgents(list);
+
+        // The server is the authority on what is in flight — this is what
+        // survives a refresh, a re-login, or a different browser.
+        const running = {};
+        for (const agent of list) {
+          if (agent.activeRun) running[agent.agentType] = agent.activeRun;
+        }
+        setActiveRuns(running);
+        setRunMeta(prev => {
+          const next = { ...prev };
+          for (const agent of list) {
+            if (agent.activeRun) {
+              next[agent.activeRun.id] = {
+                id: agent.activeRun.id,
+                clientId: Number(clientId),
+                agentType: agent.agentType,
+                status: agent.activeRun.status,
+                startedAt: agent.activeRun.startedAt || agent.activeRun.createdAt
+              };
+            }
+          }
+          return next;
+        });
+      }
 
       // 2. Fetch past audits
       const auditRes = await fetch(`${API_BASE}/api/clients/${clientId}/seo/audits`, { credentials: 'include' });
@@ -229,11 +303,32 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     }
   };
 
+  // The queue is global (all clients), so it is fetched independently of the
+  // selected client — the whole point is to see work you'd otherwise forget
+  // about because you're looking at a different client's tab.
+  const fetchQueue = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/seo/queue`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) setQueue({ active: data.active || [], recent: data.recent || [], abortSupported: !!data.abortSupported });
+    } catch (err) {
+      console.error('[SEO TAB] Queue fetch failed:', err);
+    }
+  };
+
   useEffect(() => {
     if (selectedClientId) {
       fetchClientData(selectedClientId);
     }
   }, [selectedClientId]);
+
+  useEffect(() => {
+    fetchQueue();
+    // Safety net for a missed SSE frame — the queue must never quietly show a
+    // finished job as still running, or you'd wait forever instead of re-running.
+    const t = setInterval(fetchQueue, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   // Fetch recommendations when selected audit changes
   useEffect(() => {
@@ -271,7 +366,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     eventSource.addEventListener('seo_agent_log', (e) => {
       const data = JSON.parse(e.data);
       if (!selectedClientId || String(data.clientId) === String(selectedClientId)) {
-        setConsoleLogs(prev => [...prev, { type: 'seo_agent_log', data, timestamp: new Date() }]);
+        setConsoleLogs(prev => [...prev, { type: 'seo_agent_log', data, runId: data.runId, timestamp: new Date() }]);
       }
     });
 
@@ -282,16 +377,52 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
 
     eventSource.addEventListener('seo_agent_status', (e) => {
       const data = JSON.parse(e.data);
-      if (String(data.clientId) === String(selectedClientId)) {
-        setAgentRunningStates(prev => ({
-          ...prev,
-          [data.agentType]: data.status // 'queued' | 'running' | 'completed' | 'failed'
-        }));
-        
-        setConsoleLogs(prev => [...prev, { type: 'seo_agent_status', data, timestamp: new Date() }]);
+      const inFlight = IN_FLIGHT_STATUSES.includes(data.status);
 
-        if (data.status === 'completed' || data.status === 'failed') {
-          showToast(`Agent '${data.agentType}' audit ${data.status}!`, data.status === 'completed' ? 'success' : 'error');
+      // Run metadata is tracked for every client, not just the selected one,
+      // so the queue panel and terminal tabs stay honest when you switch tabs.
+      if (data.runId) {
+        setRunMeta(prev => ({
+          ...prev,
+          [data.runId]: {
+            ...prev[data.runId],
+            id: data.runId,
+            clientId: data.clientId,
+            agentType: data.agentType,
+            status: data.status,
+            startedAt: prev[data.runId]?.startedAt || new Date().toISOString()
+          }
+        }));
+      }
+      fetchQueue();
+
+      if (String(data.clientId) === String(selectedClientId)) {
+        setActiveRuns(prev => {
+          const next = { ...prev };
+          if (inFlight) {
+            next[data.agentType] = {
+              id: data.runId,
+              status: data.status,
+              startedAt: next[data.agentType]?.startedAt || new Date().toISOString()
+            };
+          } else {
+            delete next[data.agentType];
+          }
+          return next;
+        });
+
+        if (!inFlight) {
+          setPendingApprovals(prev => {
+            const next = { ...prev };
+            delete next[data.agentType];
+            return next;
+          });
+        }
+
+          setConsoleLogs(prev => [...prev, { type: 'seo_agent_status', data, runId: data.runId, timestamp: new Date() }]);
+
+        if (data.status === 'completed' || data.status === 'failed' || data.status === 'timed_out') {
+          showToast(`Agent '${data.agentType}' audit ${data.status.replace('_', ' ')}!`, data.status === 'completed' ? 'success' : 'error');
           // Refresh dashboard scores
           fetchClientData(selectedClientId);
         }
@@ -340,6 +471,18 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       });
       const data = await res.json();
 
+      // 409: the server refused to queue a duplicate. Nothing was spent —
+      // re-sync so the card stops offering a Run button it shouldn't.
+      if (res.status === 409 && data.error === 'already_running') {
+        showToast(data.message, 'info');
+        setActiveRuns(prev => ({
+          ...prev,
+          [agentType]: { id: data.runId, status: data.status, startedAt: data.startedAt }
+        }));
+        fetchQueue();
+        return;
+      }
+
       if (!res.ok) throw new Error(data.message || data.error);
 
       if (data.requiresConfirmation) {
@@ -349,20 +492,63 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       }
 
       showToast(data.message, 'success');
-      
-      // Update local running state indicator
-      setAgentRunningStates(prev => ({
-        ...prev,
-        [agentType]: data.status === 'auto_approved' ? 'queued' : 'pending_approval'
-      }));
 
-      // Open log drawer for queued runs immediately
-      if (data.status === 'auto_approved' && autoOpenConsole) {
-        setActiveConsoleAgent(agentType);
-        setConsoleLogs(prev => [...prev, { type: 'system_message', data: { log: `[SYSTEM] Trigger approved. Placing '${agentType}' in queue...` }, timestamp: new Date() }]);
+      if (data.status === 'auto_approved') {
+        setActiveRuns(prev => ({
+          ...prev,
+          [agentType]: { id: data.runId, status: 'queued', startedAt: new Date().toISOString() }
+        }));
+        if (data.runId) {
+          setRunMeta(prev => ({
+            ...prev,
+            [data.runId]: { id: data.runId, clientId: Number(selectedClientId), agentType, status: 'queued', startedAt: new Date().toISOString() }
+          }));
+        }
+        // Open log drawer for queued runs immediately
+        if (autoOpenConsole) {
+          setActiveConsoleAgent(agentType);
+          if (data.runId) setTerminalTab(String(data.runId));
+          setConsoleLogs(prev => [...prev, {
+            type: 'system_message',
+            data: { log: `[SYSTEM] Trigger approved. Placing '${agentType}' in queue (run #${data.runId})...` },
+            runId: data.runId,
+            timestamp: new Date()
+          }]);
+        }
+      } else {
+        setPendingApprovals(prev => ({ ...prev, [agentType]: true }));
       }
+      fetchQueue();
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  };
+
+  // Releases our queue slot only. OpenClaw confirmed it exposes no abort, so
+  // the job keeps running and keeps spending — the UI says so rather than
+  // implying a cancel saves anything.
+  const cancelRun = async (runId, agentType) => {
+    setCancellingRunIds(prev => [...prev, runId]);
+    try {
+      const res = await fetch(`${API_BASE}/api/seo/runs/${runId}/cancel`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error);
+
+      showToast(data.message || `Run #${runId} cancelled.`, data.aborted ? 'success' : 'info');
+      setActiveRuns(prev => {
+        const next = { ...prev };
+        if (agentType) delete next[agentType];
+        return next;
+      });
+      fetchQueue();
+      if (selectedClientId) fetchClientData(selectedClientId);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setCancellingRunIds(prev => prev.filter(id => id !== runId));
     }
   };
 
@@ -397,11 +583,20 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     // Skip 'full' itself, skills that are blocked/excluded, and anything
     // already fresh — forcing a re-run of a skill that doesn't need one
     // wastes tokens on every single click of this button.
+    // Anything already queued or running is skipped too — the server would
+    // reject it with a 409 anyway, and this keeps the toast count honest.
     const activeAgents = getFilteredAgents().filter(agent =>
       agent.agentType !== 'full' &&
       !UNAVAILABLE_SKILLS.has(agent.agentType) &&
-      agent.freshness !== 'fresh'
+      agent.freshness !== 'fresh' &&
+      !activeRuns[agent.agentType]
     );
+
+    if (activeAgents.length === 0) {
+      showToast('Nothing to run — every available agent is either fresh or already in the queue.', 'info');
+      return;
+    }
+
     showToast(`Starting Master Audit: Queuing ${activeAgents.length} agents...`, 'info');
 
     for (const agent of activeAgents) {
@@ -463,9 +658,53 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     });
   };
 
-  const calculatedPadding = activeConsoleAgent 
-    ? (isTerminalCollapsed ? '56px' : `${terminalHeight + 20}px`) 
+  const calculatedPadding = activeConsoleAgent
+    ? (isTerminalCollapsed ? '56px' : `${terminalHeight + 20}px`)
     : '0px';
+
+  // One tab per run rather than one drawer per run: the drawer is a fixed
+  // bottom strip, so stacking several would just fight over the same space.
+  // Tab order follows first appearance in the log so it stays stable.
+  const runTabIds = (() => {
+    const seen = new Set();
+    const ids = [];
+    for (const entry of consoleLogs) {
+      if (entry.runId != null && !seen.has(entry.runId)) {
+        seen.add(entry.runId);
+        ids.push(entry.runId);
+      }
+    }
+    for (const run of Object.values(activeRuns)) {
+      if (run?.id != null && !seen.has(run.id)) {
+        seen.add(run.id);
+        ids.push(run.id);
+      }
+    }
+    return ids;
+  })();
+
+  // A tab whose logs were dismissed shouldn't leave the drawer showing nothing.
+  const effectiveTerminalTab = terminalTab !== 'all' && !runTabIds.some(id => String(id) === terminalTab)
+    ? 'all'
+    : terminalTab;
+
+  const visibleLogs = effectiveTerminalTab === 'all'
+    ? consoleLogs
+    : consoleLogs.filter(entry => String(entry.runId) === effectiveTerminalTab);
+
+  const runTabLabel = (id) => {
+    const meta = runMeta[id];
+    return meta?.agentType ? `${meta.agentType} #${id}` : `run #${id}`;
+  };
+
+  const runTabColor = (id) => {
+    const status = runMeta[id]?.status;
+    if (IN_FLIGHT_STATUSES.includes(status)) return '#fbbf24';
+    if (status === 'completed') return '#4ade80';
+    if (status === 'cancelled') return '#fb923c';
+    if (status === 'failed' || status === 'timed_out') return '#f87171';
+    return '#64748b';
+  };
 
   return (
     <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
@@ -491,6 +730,12 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   setConsoleLogs([]);
                   setFocusedAgentType(null);
                   setShowReportModal(false);
+                  setTerminalTab('all');
+                  // Card state belongs to the client it was fetched for —
+                  // carrying it over would show the new client's agents as
+                  // running when it's the previous client's job that is live.
+                  setActiveRuns({});
+                  setPendingApprovals({});
                 }}
               >
                 {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
@@ -514,6 +759,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 >
                   <Terminal size={16} /> {isTerminalOpen ? 'Hide Console Stream' : 'Live OpenClaw Console & Webhooks'} ({consoleLogs.length})
                 </button>
+                <button
+                  onClick={() => setShowQueue(prev => !prev)}
+                  className={`btn ${showQueue ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: 1, minWidth: '200px' }}
+                  title="Every SEO job currently queued or running on OpenClaw, across all clients"
+                >
+                  <ListOrdered size={16} /> OpenClaw Queue ({queue.active.length})
+                </button>
               </div>
             )}
           </div>
@@ -527,14 +780,117 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       ) : (
         <div>
           
+          {/* Global OpenClaw job queue — spans every client, because the job
+              you're about to re-trigger may have been started from another
+              client's tab (or by another admin) and you'd never see it here. */}
+          {showQueue && (
+            <div className="card" style={{ border: '2px solid #000', padding: '16px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, fontWeight: 'bold' }}>OpenClaw Job Queue</h3>
+                <button
+                  onClick={fetchQueue}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', border: '1px solid #000' }}
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {queue.active.length === 0 ? (
+                <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nothing queued or running. Every agent is idle.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {queue.active.map(run => (
+                    <div
+                      key={run.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        border: '2px solid #000',
+                        borderLeft: `6px solid ${run.status === 'running' ? '#3b82f6' : '#eab308'}`,
+                        borderRadius: '4px',
+                        padding: '10px 12px',
+                        background: '#fff',
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <Loader2 size={14} className="animate-spin" style={{ color: run.status === 'running' ? '#3b82f6' : '#eab308' }} />
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{run.agent_type}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
+                        <span className="badge" style={{ background: run.status === 'running' ? '#dbeafe' : '#fef3c7', border: '1px solid #000', fontSize: '0.68rem', fontWeight: 'bold' }}>
+                          {run.status} · {formatElapsed(run.started_at || run.created_at, now)}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                          run #{run.id}{run.openclaw_run_id ? ` · openclaw ${run.openclaw_run_id.slice(0, 8)}` : ''}
+                          {run.requested_by ? ` · ${run.requested_by}` : ''}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => {
+                            setIsTerminalOpen(true);
+                            setTerminalTab(String(run.id));
+                          }}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 10px', fontSize: '0.72rem', border: '1px solid #000', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Terminal size={12} /> Logs
+                        </button>
+                        <button
+                          onClick={() => cancelRun(run.id, String(run.client_id) === String(selectedClientId) ? run.agent_type : null)}
+                          disabled={cancellingRunIds.includes(run.id)}
+                          style={{ padding: '4px 10px', fontSize: '0.72rem', border: '2px solid #000', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          title="Frees the slot so this agent can be run again. Does NOT stop the job inside OpenClaw or save tokens — it keeps running until it finishes on its own."
+                        >
+                          <XCircle size={12} /> {cancellingRunIds.includes(run.id) ? 'Cancelling…' : 'Cancel'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '10px 0 0' }}>
+                {queue.abortSupported ? (
+                  <>Cancel aborts the run inside OpenClaw and stops token spend. Any partial results are discarded.</>
+                ) : (
+                  <><strong>Cancel does not save tokens.</strong> OpenClaw exposes no abort endpoint, so a cancelled job keeps running and keeps spending until it finishes on its own. Cancel only frees the slot here so the agent can be triggered again — use it when a run looks stuck, not to stop a run you regret starting.</>
+                )}
+              </p>
+
+              {queue.recent.length > 0 && (
+                <details style={{ marginTop: '14px' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>Recent finished runs ({queue.recent.length})</summary>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+                    {queue.recent.map(run => (
+                      <div key={run.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', padding: '4px 0', flexWrap: 'wrap' }}>
+                        <span className={getStatusColor(run.status)} style={{ fontWeight: 'bold', minWidth: '78px' }}>{run.status}</span>
+                        <span style={{ fontWeight: 'bold' }}>{run.agent_type}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
+                        <span style={{ color: '#94a3b8' }}>{run.finished_at || run.created_at}</span>
+                        {run.error && <span style={{ color: '#ef4444' }}>{run.error}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+
           {/* Main Workspace Area */}
           <div>
             {/* 25-Agent Bento Grid */}
             <h3 style={{ marginBottom: '12px', fontWeight: 'bold' }}>Agent Fleet Matrix ({getFilteredAgents().length} active)</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginBottom: '24px' }}>
               {getFilteredAgents().map(agent => {
-                const isRunning = agentRunningStates[agent.agentType] === 'running' || agentRunningStates[agent.agentType] === 'queued';
-                const isPending = agentRunningStates[agent.agentType] === 'pending_approval';
+                const run = activeRuns[agent.agentType];
+                const isRunning = !!run;
+                const isPending = !run && !!pendingApprovals[agent.agentType];
                 const unavailableReason = UNAVAILABLE_SKILLS.get(agent.agentType);
                 const isUnavailable = !!unavailableReason;
 
@@ -590,7 +946,18 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveConsoleAgent(agent.agentType);
-                            setConsoleLogs([`[SYSTEM] Subscribed to logs for '${agent.agentType}' agent.`]);
+                            setIsTerminalOpen(true);
+                            // Focus this agent's live run if it has one, else
+                            // the merged stream. (This used to push a bare
+                            // string into consoleLogs and wipe the history —
+                            // every entry is a {type,data,timestamp} object.)
+                            setTerminalTab(run ? String(run.id) : 'all');
+                            setConsoleLogs(prev => [...prev, {
+                              type: 'system_message',
+                              data: { log: `[SYSTEM] Subscribed to logs for '${agent.agentType}' agent.` },
+                              runId: run?.id,
+                              timestamp: new Date()
+                            }]);
                           }}
                           className="btn btn-secondary"
                           style={{ padding: '4px 6px', border: '1px solid #000' }}
@@ -600,12 +967,29 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         </button>
 
                         {isRunning ? (
-                          <button
-                            disabled
-                            style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '2px solid #000', background: '#fbbf24', color: '#000', fontWeight: 'bold', borderRadius: '4px', cursor: 'default' }}
-                          >
-                            <Loader2 size={12} className="animate-spin" /> Running...
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveConsoleAgent(agent.agentType);
+                                setTerminalTab(String(run.id));
+                                setIsTerminalOpen(true);
+                              }}
+                              title={`Run #${run.id} — ${run.status}. Click to open this job's log tab.`}
+                              style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '2px solid #000', background: '#fbbf24', color: '#000', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                              <Loader2 size={12} className="animate-spin" />
+                              {run.status === 'queued' ? 'Queued' : 'Running'} {formatElapsed(run.startedAt || run.createdAt, now)}
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); cancelRun(run.id, agent.agentType); }}
+                              disabled={cancellingRunIds.includes(run.id)}
+                              title="Free the slot so this agent can be triggered again. Does NOT stop the job inside OpenClaw or save any tokens — it keeps running until it finishes on its own."
+                              style={{ padding: '4px 6px', border: '2px solid #000', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            >
+                              <XCircle size={13} />
+                            </button>
+                          </>
                         ) : isPending ? (
                           <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title="Waiting for admin approval">
                             Pending
@@ -883,11 +1267,85 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 </div>
               </div>
 
+              {/* Per-job tabs. Two runs of the same skill used to interleave
+                  into one unreadable stream; each tab is now exactly one job. */}
+              {!isTerminalCollapsed && runTabIds.length > 0 && (
+                <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '4px', borderBottom: '1px solid #1e293b', flexShrink: 0 }}>
+                  <button
+                    onClick={() => setTerminalTab('all')}
+                    style={{
+                      background: effectiveTerminalTab === 'all' ? '#1e293b' : 'transparent',
+                      color: effectiveTerminalTab === 'all' ? '#fff' : '#64748b',
+                      border: '1px solid #1e293b',
+                      borderRadius: '3px',
+                      padding: '3px 10px',
+                      fontSize: '0.7rem',
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}
+                  >
+                    All ({consoleLogs.length})
+                  </button>
+                  {runTabIds.map(id => {
+                    const isActive = effectiveTerminalTab === String(id);
+                    const count = consoleLogs.filter(entry => String(entry.runId) === String(id)).length;
+                    return (
+                      <span
+                        key={id}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: isActive ? '#1e293b' : 'transparent',
+                          border: '1px solid #1e293b',
+                          borderRadius: '3px',
+                          padding: '3px 6px 3px 10px',
+                          flexShrink: 0
+                        }}
+                      >
+                        <button
+                          onClick={() => setTerminalTab(String(id))}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: isActive ? '#fff' : '#64748b',
+                            fontSize: '0.7rem',
+                            fontFamily: 'monospace',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          title={runMeta[id]?.status ? `Status: ${runMeta[id].status}` : 'Run log'}
+                        >
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: runTabColor(id), flexShrink: 0 }} />
+                          {runTabLabel(id)} ({count})
+                        </button>
+                        <button
+                          onClick={() => {
+                            setConsoleLogs(prev => prev.filter(entry => String(entry.runId) !== String(id)));
+                            if (isActive) setTerminalTab('all');
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1, padding: 0 }}
+                          title="Dismiss this job's log tab"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
               {!isTerminalCollapsed && (
-                <div 
-                  style={{ 
-                    flex: 1, 
-                    overflowY: 'auto', 
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY: 'auto',
                     fontFamily: 'monospace', 
                     fontSize: '0.75rem',
                     lineHeight: '1.4',
@@ -898,7 +1356,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                     marginTop: '4px'
                   }}
                 >
-                  {consoleLogs.map((logEntry, idx) => (
+                  {visibleLogs.map((logEntry, idx) => (
                     <div key={idx} style={{ marginBottom: '2px', wordBreak: 'break-word' }}>
                       <span style={{ color: '#64748b' }}>{new Date(logEntry.timestamp).toLocaleTimeString()}</span>{' '}
                       {logEntry.type === 'openclaw_webhook' && (
@@ -918,7 +1376,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       )}
                                 {logEntry.type === 'seo_agent_status' && (
                                   <span className={getStatusColor(logEntry.data.status)}>
-                                    [AGENT {logEntry.data.agentType.toUpperCase()}] Status: {logEntry.data.status}
+                                    [AGENT {logEntry.data.agentType.toUpperCase()}{logEntry.data.runId ? ` #${logEntry.data.runId}` : ''}] Status: {logEntry.data.status}
                                   </span>
                                 )}
                                 {logEntry.type === 'agent_activity_log' && (

@@ -41,7 +41,7 @@ import openclawRoutes from './src/routes/openclaw.js';
 import blogRoutes from './src/routes/blog.js';
 import integrationsRoutes from './src/routes/integrations.js';
 import { publicGigConfirmRoute } from './src/routes/artists.js';
-import seoRoutes from './src/routes/seo.js';
+import seoRoutes, { queueRouter as seoQueueRoutes } from './src/routes/seo.js';
 import approvalRoutes from './src/routes/approval.js';
 import usageRoutes from './src/routes/usage.js';
 import sitemapRoutes from './src/routes/sitemap.js';
@@ -199,6 +199,7 @@ app.use('/api/openclaw', openclawRoutes);
 
 // SEO & Audit integration routes
 app.use('/api/clients', seoRoutes);
+app.use('/api/seo', seoQueueRoutes);
 app.use('/api/approval', approvalRoutes);
 app.use('/api/usage', usageRoutes);
 
@@ -336,6 +337,13 @@ app.listen(PORT, () => {
 
   // Initialize cron scheduler
   initScheduler();
+
+  // Audit-timeout timers live in memory, so a restart would strand every
+  // in-flight SEO run as permanently "running" — and a stranded run holds the
+  // dedupe slot, blocking that agent from ever being triggered again.
+  import('./src/services/agentRuns.js')
+    .then(({ recoverInFlightRuns }) => recoverInFlightRuns())
+    .catch(err => console.error('[SERVER] SEO run recovery failed:', err));
 });
 
 export default app;

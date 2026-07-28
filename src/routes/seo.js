@@ -2,138 +2,13 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { registerPendingAudit } from '../services/pendingAudits.js';
-import { exec, spawn } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { cancelRun, getActiveRunsForClient, getRun, listQueue, broadcastRunLog } from '../services/agentRuns.js';
+import { startAgentRun, abortOpenClawRun, isAbortSupported } from '../services/agentRunner.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const IN_FLIGHT_FOR_ABORT = ['queued', 'running'];
 
 const router = Router({ mergeParams: true });
 router.use(authenticate);
-
-// Helper to spawn agent runner asynchronously
-function spawnAgent(clientId, agentType, model, requestedBy) {
-  const runnerPath = path.resolve(__dirname, '../../openclaw_seo_runner.js');
-  const args = [
-    runnerPath,
-    '--clientId', clientId,
-    '--skill', agentType,
-    '--model', model,
-    '--triggeredBy', requestedBy
-  ];
-
-  console.log(`[SEO ROUTE] Spawning: node ${args.join(' ')}`);
-
-  import('../../server.js').then(({ broadcastEvent }) => {
-    // Notify frontend agent is now running
-    broadcastEvent('seo_agent_status', {
-      clientId,
-      agentType,
-      status: 'running'
-    });
-
-    const child = spawn(process.execPath || 'node', args, {
-      cwd: path.resolve(__dirname, '../..')
-    });
-
-    let stdoutBuffer = '';
-    child.stdout.on('data', (chunk) => {
-      stdoutBuffer += chunk.toString();
-      const lines = stdoutBuffer.split('\n');
-      stdoutBuffer = lines.pop();
-      for (const line of lines) {
-        if (line.trim()) {
-          broadcastEvent('seo_agent_log', {
-            clientId,
-            agentType,
-            log: line
-          });
-        }
-      }
-    });
-
-    let stderrBuffer = '';
-    child.stderr.on('data', (chunk) => {
-      stderrBuffer += chunk.toString();
-      const lines = stderrBuffer.split('\n');
-      stderrBuffer = lines.pop();
-      for (const line of lines) {
-        if (line.trim()) {
-          broadcastEvent('seo_agent_log', {
-            clientId,
-            agentType,
-            log: `[ERROR] ${line}`
-          });
-        }
-      }
-    });
-
-    child.on('close', (code) => {
-      if (stdoutBuffer.trim()) {
-        broadcastEvent('seo_agent_log', {
-          clientId,
-          agentType,
-          log: stdoutBuffer
-        });
-      }
-      if (stderrBuffer.trim()) {
-        broadcastEvent('seo_agent_log', {
-          clientId,
-          agentType,
-          log: `[ERROR] ${stderrBuffer}`
-        });
-      }
-
-      if (code === 0) {
-        // Trigger hand-off succeeded — the actual audit is still running on
-        // OpenClaw's side. Stay in 'running' and wait for the
-        // create_seo_audit webhook to mark completion; fall back to
-        // 'failed' if OpenClaw never reports back.
-        broadcastEvent('seo_agent_log', {
-          clientId,
-          agentType,
-          log: '[SYSTEM] Trigger accepted by OpenClaw. Awaiting audit results...'
-        });
-        registerPendingAudit(clientId, agentType, () => {
-          broadcastEvent('seo_agent_log', {
-            clientId,
-            agentType,
-            log: '[TIMEOUT] No audit result received from OpenClaw within the expected time window for this audit type.'
-          });
-          broadcastEvent('seo_agent_status', {
-            clientId,
-            agentType,
-            status: 'failed'
-          });
-        });
-      } else {
-        broadcastEvent('seo_agent_status', {
-          clientId,
-          agentType,
-          status: 'failed'
-        });
-      }
-    });
-
-    child.on('error', (err) => {
-      console.error(`[SEO ROUTE] Spawning runner failed for ${agentType}:`, err);
-      broadcastEvent('seo_agent_log', {
-        clientId,
-        agentType,
-        log: `[SYSTEM ERROR] Failed to spawn agent: ${err.message}`
-      });
-      broadcastEvent('seo_agent_status', {
-        clientId,
-        agentType,
-        status: 'failed'
-      });
-    });
-  }).catch(err => {
-    console.error(`[SEO ROUTE] Failed to import broadcastEvent:`, err);
-  });
-}
 
 /**
  * GET /api/clients/:id/seo/audits
@@ -186,6 +61,10 @@ router.get('/:id/seo/agents/status', (req, res) => {
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
     const configs = db.prepare('SELECT * FROM agent_run_config').all();
+    // In-flight runs come from the DB rather than the client's own memory, so
+    // a card still reads "Running" after a refresh instead of offering a
+    // second, duplicate Run button.
+    const activeRuns = getActiveRunsForClient(client.id);
     const statusMap = [];
 
     for (const conf of configs) {
@@ -218,6 +97,8 @@ router.get('/:id/seo/agents/status', (req, res) => {
         score = lastAudit.health_score ?? lastAudit.technical_score ?? lastAudit.backlinks_score ?? lastAudit.local_score ?? lastAudit.on_page_score ?? lastAudit.schema_score ?? null;
       }
 
+      const activeRun = activeRuns.get(conf.audit_type) || null;
+
       statusMap.push({
         agentType: conf.audit_type,
         staleAfterDays: conf.stale_after_days,
@@ -225,7 +106,15 @@ router.get('/:id/seo/agents/status', (req, res) => {
         freshness,
         ageDays,
         lastRunAt,
-        score
+        score,
+        activeRun: activeRun && {
+          id: activeRun.id,
+          status: activeRun.status,
+          createdAt: activeRun.created_at,
+          startedAt: activeRun.started_at,
+          requestedBy: activeRun.requested_by,
+          openclawRunId: activeRun.openclaw_run_id
+        }
       });
     }
 
@@ -255,6 +144,21 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     if (!conf) return res.status(400).json({ error: `Unknown agent type: ${agentType}` });
 
     const selectedModel = model || conf.default_model;
+
+    // 0. Already in flight? Bail before spending anything. This is checked
+    // ahead of the freshness gate because freshness is derived from completed
+    // audits — a run queued 2 minutes ago has produced none yet, so freshness
+    // would wave a duplicate straight through.
+    const inFlight = getActiveRunsForClient(clientId).get(agentType);
+    if (inFlight) {
+      return res.status(409).json({
+        error: 'already_running',
+        status: inFlight.status,
+        runId: inFlight.id,
+        startedAt: inFlight.started_at || inFlight.created_at,
+        message: `'${agentType}' is already ${inFlight.status} for this client (run #${inFlight.id}). Cancel it from the queue if you want to re-run it.`
+      });
+    }
 
     // 1. Check budget cap
     const budget = db.prepare('SELECT * FROM token_budgets WHERE client_id = ?').get(clientId);
@@ -317,8 +221,25 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
         VALUES (?, 'run_seo_agent', ?, ?, ?, 'auto_approved')
       `).run(clientId, payload, req.user.id, userRole);
 
-      // Trigger runner asynchronously
-      spawnAgent(client.id, agentType, selectedModel, req.user.email);
+      // Claim the in-flight slot, then spawn. If two clicks race past the
+      // check above, the partial unique index lets exactly one through.
+      const { run, conflict } = startAgentRun({
+        clientId: client.id,
+        agentType,
+        model: selectedModel,
+        requestedBy: req.user.email,
+        pendingActionId: actionResult.lastInsertRowid
+      });
+
+      if (conflict) {
+        return res.status(409).json({
+          error: 'already_running',
+          status: conflict.status,
+          runId: conflict.id,
+          startedAt: conflict.started_at || conflict.created_at,
+          message: `'${agentType}' is already ${conflict.status} for this client (run #${conflict.id}).`
+        });
+      }
 
       logAction({
         actorId: req.user.id,
@@ -332,7 +253,8 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
       return res.json({
         status: 'auto_approved',
         message: `Trigger request for ${agentType} auto-approved and queued.`,
-        actionId: actionResult.lastInsertRowid
+        actionId: actionResult.lastInsertRowid,
+        runId: run.id
       });
     } else {
       // Put in pending action queue
@@ -465,6 +387,82 @@ router.patch('/:id/seo/recommendations/:recId', (req, res) => {
     res.json({ success: true, status });
   } catch (err) {
     console.error('[SEO ROUTE] Update recommendation error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Client-agnostic queue routes, mounted at /api/seo.
+ * The dashboard reads these to answer "what is OpenClaw actually working on
+ * right now?" — the question that used to be unanswerable, which is how
+ * duplicate jobs got queued in the first place.
+ */
+export const queueRouter = Router();
+queueRouter.use(authenticate);
+
+/**
+ * GET /api/seo/queue
+ * Everything in flight across all clients, plus recent finished runs.
+ */
+queueRouter.get('/queue', (req, res) => {
+  try {
+    const recentLimit = Math.min(parseInt(req.query.recentLimit, 10) || 20, 100);
+    const { active, recent } = listQueue({ recentLimit });
+    // Drives the dashboard wording: without a real abort, cancelling frees the
+    // slot but saves nothing, and saying otherwise would be a lie.
+    res.json({ active, recent, abortSupported: isAbortSupported() });
+  } catch (err) {
+    console.error('[SEO ROUTE] Queue fetch error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/seo/runs/:runId/cancel
+ * Releases our queue slot and stops waiting for the result. This does not
+ * interrupt work already running inside OpenClaw — see the OpenClaw asks in
+ * the README for the gateway capability that would make it a true cancel.
+ */
+queueRouter.post('/runs/:runId/cancel', async (req, res) => {
+  try {
+    // Ask OpenClaw to stop the work first, while the run is still in flight.
+    // If that isn't configured or fails, the cancel still proceeds — freeing
+    // the slot must never depend on the gateway being reachable.
+    const target = getRun(req.params.runId);
+    let abort = { ok: false, reason: 'not_configured' };
+    if (target && IN_FLIGHT_FOR_ABORT.includes(target.status)) {
+      abort = await abortOpenClawRun(target);
+      if (abort.ok) {
+        broadcastRunLog(target, '[SYSTEM] OpenClaw confirmed the run was aborted. Token spend stopped.');
+      } else if (abort.reason !== 'not_configured') {
+        broadcastRunLog(target, `[SYSTEM] Abort request to OpenClaw failed (${abort.reason}). Freeing the slot anyway; the job may still be running.`);
+      }
+    }
+
+    const { run, error } = cancelRun(req.params.runId, req.user.email);
+
+    if (error === 'not_found') return res.status(404).json({ error: 'Run not found' });
+    if (error === 'not_in_flight') return res.status(409).json({ error: 'Run has already finished', status: run.status });
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'seo_run_cancelled',
+      entityType: 'seo_agent_run',
+      entityId: run.id,
+      diff: { agentType: run.agent_type, clientId: run.client_id, openclawRunId: run.openclaw_run_id, aborted: abort.ok }
+    });
+
+    res.json({
+      success: true,
+      run,
+      aborted: abort.ok,
+      message: abort.ok
+        ? 'Run aborted inside OpenClaw and cancelled here. Token spend stopped.'
+        : 'Run cancelled and the queue slot freed. OpenClaw was not interrupted, so this job keeps running until it finishes on its own.'
+    });
+  } catch (err) {
+    console.error('[SEO ROUTE] Cancel run error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

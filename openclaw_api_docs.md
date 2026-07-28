@@ -898,11 +898,19 @@ Submits audit results and recommendations back from an agent run.
 
 ## 3.5. OpenClaw Action Queue Polling
 
-To check for triggered audits, OpenClaw can poll the action queue:
+> **⚠️ Do not poll this endpoint to pick up SEO audit runs. It is not a work queue.**
+>
+> SEO agent runs are triggered by the dashboard calling `POST /hooks/agent` **directly**, in the same request that writes the `openclaw_pending_actions` row. A poller acting on those rows therefore runs every audit a second time and bills it twice.
+>
+> The `seo-audit-queue-poller` cron was disabled on OpenClaw's side on 2026-07-28 for exactly this reason. As a safeguard, this endpoint no longer returns `run_seo_agent` rows with status `auto_approved` at all — re-enabling a poller against it will simply return nothing to run.
+>
+> The authoritative record of what is queued or running is `seo_agent_runs`, exposed at `GET /api/seo/queue`. That is a read-only view for humans, not a work queue either.
+
+Remaining use: inspecting staff-submitted requests that are awaiting admin approval (`status = 'pending'`).
 
 * **Endpoint**: `GET /api/openclaw/pending`
 * **Query Parameters**:
-  * `status`: Optional filter (e.g. `pending`, `accepted`, `auto_approved`, etc.). If omitted, returns all recent actions (up to 50).
+  * `status`: Optional filter (e.g. `pending`, `accepted`). If omitted, returns all recent actions (up to 50), excluding auto-approved `run_seo_agent` rows.
 * **Response Format**:
   ```json
   {

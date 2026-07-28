@@ -8,7 +8,11 @@ import db from './database.js';
 
 // --- Configuration ---
 const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789/hooks/agent';
-const OPENCLAW_HOOK_TOKEN = process.env.OPENCLAW_HOOK_TOKEN || '';
+// OpenClaw documents hooks.token and gateway.auth.token as separate values,
+// hence the separate names. Confirmed 2026-07-28 that this deployment uses the
+// same value for both, so OPENCLAW_GATEWAY_TOKEN is accepted as a fallback —
+// without it the runner exits before ever reaching the gateway.
+const OPENCLAW_HOOK_TOKEN = process.env.OPENCLAW_HOOK_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN || '';
 
 // --- Argument Parsing ---
 const args = {};
@@ -22,6 +26,7 @@ const clientId = parseInt(args.clientId);
 const agentType = args.skill || 'technical';
 const model = args.model || 'primary'; // Use 'primary' as per the new API spec
 const triggeredBy = args.triggeredBy || 'system';
+const runId = args.runId || null; // our seo_agent_runs.id, for webhook correlation
 
 // --- Validation ---
 if (isNaN(clientId)) {
@@ -82,6 +87,10 @@ async function askOpenClaw(userMessage) {
       const parsed = JSON.parse(rawBody);
       if (parsed?.runId) {
         console.log(`[GATEWAY] OpenClaw accepted the request. Run ID: ${parsed.runId}`);
+        // Machine-readable line: the spawning parent scrapes this to store the
+        // gateway's runId against our seo_agent_runs record, which is what
+        // ties our job to OpenClaw's.
+        console.log(`[RUNID] ${parsed.runId}`);
       }
     } catch {
       // Non-JSON response body — fall back to logging the raw text below.
@@ -100,7 +109,10 @@ async function askOpenClaw(userMessage) {
 async function run() {
   console.log(`[INIT] Initializing '${agentType}' agent request for target: ${targetUrl}`);
 
-  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]`;
+  // run_id lets OpenClaw echo the exact job back in create_seo_audit. Without
+  // it we can only correlate on client_id + audit_type, which is ambiguous the
+  // moment a scheduled run overlaps a manual one for the same skill.
+  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]${runId ? ` [run_id:${runId}]` : ''}`;
 
   const confirmation = await askOpenClaw(userMessage);
 

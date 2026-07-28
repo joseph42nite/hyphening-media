@@ -9,7 +9,10 @@ import crypto from 'crypto';
 import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
-import { clearPendingAudit } from '../services/pendingAudits.js';
+// Timeout timers are cleared by finishRun as part of closing a run, so the
+// webhook no longer clears them directly — doing so unconditionally used to
+// disarm the timer of a live run when a cancelled run's late result arrived.
+import { finishActiveRunFor, finishRun, claimOrphanedCancelledRun } from '../services/agentRuns.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
@@ -1070,6 +1073,16 @@ function handleCreateSeoAudit(payload) {
     : [{ page_url: payload.page_url || payload.url, health_score: payload.health_score, technical_score: payload.technical_score, content_score: payload.content_score, on_page_score: payload.on_page_score, schema_score: payload.schema_score, performance_score: payload.performance_score, geo_score: payload.geo_score, backlinks_score: payload.backlinks_score, local_score: payload.local_score, sxo_score: payload.sxo_score, summary: payload.summary, report_json: payload.report_json, recommendations: payload.recommendations, token_usage: payload.token_usage }];
 
   let totalAuditsCreated = 0;
+  let firstAuditId = null;
+
+  // A failed run (rate limit, provider error, upstream failure) reports through
+  // this same event, carrying health_score 0 and no recommendations. Those must
+  // NOT become audit rows: freshness is derived from the newest seo_audits row,
+  // so a 429 would mark the skill "fresh" and make the dashboard demand a Force
+  // Run for the retry — the opposite of what a rate-limited run needs. A zero
+  // score would also overwrite the client's monthly report. The failure is
+  // recorded on the run itself (status + error), which is where it belongs.
+  const auditFailed = payload.status === 'error' || payload.status === 'failed';
 
   // Insert one audit row per URL
   const insertAudit = db.prepare(`
@@ -1081,6 +1094,32 @@ function handleCreateSeoAudit(payload) {
   `);
 
   for (const result of results) {
+    if (auditFailed) {
+      // Tokens were still spent before the error, so the usage is worth
+      // keeping even though there is no audit to attach it to.
+      if (result.token_usage) {
+        const usage = result.token_usage;
+        db.prepare(`
+          INSERT INTO token_usage_log (
+            client_id, audit_id, agent_type, model, triggered_by,
+            input_tokens, output_tokens, estimated_cost_usd, external_api_cost_usd,
+            duration_seconds, status
+          ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'failed')
+        `).run(
+          payload.client_id,
+          payload.audit_type,
+          usage.model || null,
+          payload.triggered_by || 'system',
+          usage.input_tokens || 0,
+          usage.output_tokens || 0,
+          usage.estimated_cost_usd || 0,
+          usage.external_api_cost_usd || 0,
+          usage.duration_seconds || null
+        );
+      }
+      continue;
+    }
+
     const auditResult = insertAudit.run(
       payload.client_id,
       payload.audit_type,
@@ -1102,6 +1141,7 @@ function handleCreateSeoAudit(payload) {
 
     const auditId = auditResult.lastInsertRowid;
     totalAuditsCreated++;
+    if (firstAuditId === null) firstAuditId = auditId;
 
     // Insert recommendations for this specific audit/page
     if (Array.isArray(result.recommendations)) {
@@ -1176,38 +1216,40 @@ function handleCreateSeoAudit(payload) {
     }
   }
 
-  // Sync overall scores with marketing_monthly_report (use first result's scores)
-  const firstResult = results[0];
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const existingReport = db.prepare('SELECT id FROM marketing_monthly_report WHERE client_id = ? AND month = ?').get(payload.client_id, currentMonth);
+  // Sync overall scores with marketing_monthly_report (use first result's
+  // scores). Skipped for a failed run: its scores are zeros standing in for
+  // "no data", and writing them would silently overwrite a real score in the
+  // client's monthly report with a 0 caused by a rate limit.
+  if (!auditFailed) {
+    const firstResult = results[0];
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const existingReport = db.prepare('SELECT id FROM marketing_monthly_report WHERE client_id = ? AND month = ?').get(payload.client_id, currentMonth);
 
-  if (existingReport) {
-    db.prepare(`
-      UPDATE marketing_monthly_report SET
-        on_page_score = COALESCE(?, on_page_score),
-        da = COALESCE(?, da),
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      firstResult.on_page_score ?? firstResult.health_score ?? null,
-      firstResult.backlinks_score ?? null,
-      existingReport.id
-    );
-  } else {
-    db.prepare(`
-      INSERT INTO marketing_monthly_report (
-        client_id, month, on_page_score, da
-      ) VALUES (?, ?, ?, ?)
-    `).run(
-      payload.client_id,
-      currentMonth,
-      firstResult.on_page_score ?? firstResult.health_score ?? null,
-      firstResult.backlinks_score ?? null
-    );
+    if (existingReport) {
+      db.prepare(`
+        UPDATE marketing_monthly_report SET
+          on_page_score = COALESCE(?, on_page_score),
+          da = COALESCE(?, da),
+          updated_at = datetime('now')
+        WHERE id = ?
+      `).run(
+        firstResult.on_page_score ?? firstResult.health_score ?? null,
+        firstResult.backlinks_score ?? null,
+        existingReport.id
+      );
+    } else {
+      db.prepare(`
+        INSERT INTO marketing_monthly_report (
+          client_id, month, on_page_score, da
+        ) VALUES (?, ?, ?, ?)
+      `).run(
+        payload.client_id,
+        currentMonth,
+        firstResult.on_page_score ?? firstResult.health_score ?? null,
+        firstResult.backlinks_score ?? null
+      );
+    }
   }
-
-  // Check if any result failed
-  const auditFailed = payload.status === 'error' || payload.status === 'failed';
 
   logAction({
     action: 'create',
@@ -1216,16 +1258,56 @@ function handleCreateSeoAudit(payload) {
     diff: { audit_type: payload.audit_type, client_id: payload.client_id, results_count: totalAuditsCreated, status: auditFailed ? 'failed' : 'completed' }
   });
 
-  // The real audit results have arrived — stop waiting on the timeout and
-  // flip the dashboard cards out of their loading state.
-  clearPendingAudit(payload.client_id, payload.audit_type);
+  // The real audit results have arrived — close the run, which clears the
+  // timeout, releases the dedupe slot and flips the dashboard card out of its
+  // loading state. finishRun only advances a run that is still in flight, so
+  // a result arriving after a cancel cannot resurrect it.
+  const finalStatus = auditFailed ? 'failed' : 'completed';
+  const finishOpts = {
+    auditId: firstAuditId,
+    error: auditFailed ? (payload.summary || 'OpenClaw reported a failed audit') : null
+  };
+
+  // payload.run_id is the run id we send to OpenClaw as [run_id:N]. When it
+  // comes back the match is exact and none of the guesswork below applies.
+  let closedRun = null;
+  let orphanRun = null;
+
+  if (payload.run_id) {
+    closedRun = finishRun(payload.run_id, finalStatus, finishOpts);
+  } else {
+    // No run_id: this result identifies itself only by client + audit type.
+    // A cancelled run is still out there working (OpenClaw cannot abort), so
+    // give any outstanding cancelled run first claim before assuming this
+    // belongs to whatever is in flight now — otherwise a stale result closes
+    // a live run and the card reports done while the job is still going.
+    orphanRun = claimOrphanedCancelledRun(payload.client_id, payload.audit_type, firstAuditId);
+    if (!orphanRun) {
+      closedRun = finishActiveRunFor(payload.client_id, payload.audit_type, finalStatus, finishOpts);
+    }
+  }
+
+  if (orphanRun) {
+    console.log(`[OPENCLAW] create_seo_audit for client ${payload.client_id}/${payload.audit_type} attributed to cancelled run #${orphanRun.id}; audit stored, in-flight runs untouched.`);
+  } else if (!closedRun) {
+    // Nothing matched: OpenClaw pushed an audit we never triggered (a
+    // scheduled run). The audit rows are kept either way — the tokens were
+    // already spent, so discarding the data would waste them twice.
+    console.log(`[OPENCLAW] create_seo_audit for client ${payload.client_id}/${payload.audit_type} had no matching run (untracked).`);
+  }
 
   import('../../server.js').then(({ broadcastEvent }) => {
-    broadcastEvent('seo_agent_status', {
-      clientId: payload.client_id,
-      agentType: payload.audit_type,
-      status: auditFailed ? 'failed' : 'completed'
-    });
+    // finishRun already broadcast the status for tracked runs. An orphan
+    // result must NOT broadcast one at all: the card belongs to whatever is
+    // in flight now, and a 'completed' here would wrongly clear it.
+    if (!closedRun && !orphanRun) {
+      broadcastEvent('seo_agent_status', {
+        clientId: payload.client_id,
+        agentType: payload.audit_type,
+        status: finalStatus,
+        untracked: true
+      });
+    }
     broadcastEvent('seo_audit_created', { clientId: payload.client_id, agentType: payload.audit_type });
   }).catch(err => console.error('[OPENCLAW] Broadcast seo_audit_created failed:', err));
 
@@ -1248,15 +1330,34 @@ function handleCreateSeoAudit(payload) {
 router.get('/pending', (req, res) => {
   try {
     const status = req.query.status;
-    let query = 'SELECT * FROM openclaw_pending_actions';
+
+    // Auto-approved run_seo_agent rows are never served here.
+    //
+    // These are written by the admin trigger path, which ALSO calls the
+    // OpenClaw hook gateway directly in the same request. When OpenClaw's
+    // seo-audit-queue-poller was polling this endpoint for auto_approved
+    // items, every admin trigger therefore ran twice and billed twice — and
+    // the in-flight guard on seo_agent_runs cannot catch it, because the
+    // poller path never reaches our backend at all.
+    //
+    // The poller has been disabled on OpenClaw's side (2026-07-28), but that
+    // is a config flag someone could flip back. Withholding the rows makes
+    // the duplicate impossible rather than merely switched off. The rows are
+    // still written, and still readable through the approval history views —
+    // they are just no longer a work queue anyone can pick up.
+    //
+    // The staff approval flow is unaffected: those rows are 'pending' until
+    // an admin resolves them, and approval.js reads them directly.
+    const conditions = ["NOT (action_type = 'run_seo_agent' AND status = 'auto_approved')"];
     const params = [];
-    
+
     if (status) {
-      query += ' WHERE status = ?';
+      conditions.push('status = ?');
       params.push(status);
     }
-    query += ' ORDER BY created_at DESC LIMIT 50';
-    
+
+    const query = `SELECT * FROM openclaw_pending_actions WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC LIMIT 50`;
+
     const actions = db.prepare(query).all(...params);
     res.json({ pending_actions: actions });
   } catch (err) {
