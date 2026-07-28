@@ -65,59 +65,42 @@ const SlashCanvas = ({ score, onScore }) => {
     const TYPES = ['circle', 'square', 'hexagon', 'diamond'];
 
     const spawnWave = () => {
-      if (scoreRef.current === 0) {
-        if (fruits.current.some(f => f.alive)) return;
-        fruits.current.push({
-          x: W / 2,
-          y: H + 35,
-          size: 70,
-          type: "circle",
-          vx: 0,
-          vy: -13,
-          rot: 0,
-          rotV: 0.02,
-          alive: true,
-          filled: true,
-          tutorial: true
-        });
-      } else {
-        const count = 2 + Math.floor(Math.random() * 3); // 2-4 per wave
-        for (let i = 0; i < count; i++) {
-          // 18% chance to spawn a bomb (only if score > 2)
-          const isBomb = scoreRef.current > 2 && Math.random() < 0.18;
-          
-          if (isBomb) {
-            const size = 38;
-            const x = 80 + Math.random() * (W - 160);
-            fruits.current.push({
-              x,
-              y: H + size,
-              size,
-              type: 'bomb',
-              vx: (Math.random() - 0.5) * 2.5,
-              vy: -(10 + Math.random() * 4),
-              rot: Math.random() * Math.PI * 2,
-              rotV: (Math.random() - 0.5) * 0.04,
-              alive: true,
-              filled: true
-            });
-          } else {
-            const type = TYPES[Math.floor(Math.random() * TYPES.length)];
-            const size = 32 + Math.random() * 38;
-            const x = 80 + Math.random() * (W - 160);
-            fruits.current.push({
-              x,
-              y: H + size,
-              size,
-              type,
-              vx: (Math.random() - 0.5) * 3,
-              vy: -(11 + Math.random() * 5),   // strong upward launch
-              rot: Math.random() * Math.PI * 2,
-              rotV: (Math.random() - 0.5) * 0.06,
-              alive: true,
-              filled: Math.random() > 0.35,     // 65% filled, 35% outline-only
-            });
-          }
+      const count = 2 + Math.floor(Math.random() * 3); // 2-4 per wave
+      for (let i = 0; i < count; i++) {
+        // ~18% chance to spawn a bomb
+        const isBomb = Math.random() < 0.18;
+        
+        if (isBomb) {
+          const size = 38;
+          const x = 80 + Math.random() * (W - 160);
+          fruits.current.push({
+            x,
+            y: H + size,
+            size,
+            type: 'bomb',
+            vx: (Math.random() - 0.5) * 2.5,
+            vy: -(10 + Math.random() * 4),
+            rot: Math.random() * Math.PI * 2,
+            rotV: (Math.random() - 0.5) * 0.04,
+            alive: true,
+            filled: true
+          });
+        } else {
+          const type = TYPES[Math.floor(Math.random() * TYPES.length)];
+          const size = 32 + Math.random() * 38;
+          const x = 80 + Math.random() * (W - 160);
+          fruits.current.push({
+            x,
+            y: H + size,
+            size,
+            type,
+            vx: (Math.random() - 0.5) * 3,
+            vy: -(11 + Math.random() * 5),   // strong upward launch
+            rot: Math.random() * Math.PI * 2,
+            rotV: (Math.random() - 0.5) * 0.06,
+            alive: true,
+            filled: Math.random() > 0.35,     // 65% filled, 35% outline-only
+          });
         }
       }
     };
