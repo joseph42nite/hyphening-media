@@ -8,7 +8,13 @@
 
 const pending = new Map();
 const MINUTE = 60 * 1000;
-const DEFAULT_TIMEOUT_MIN = 15;
+
+// 20 rather than 15: any skill can be routed to the 'seo' agent, where a run
+// may be served by Nemotron — a reasoning model that is markedly slower than
+// deepseek-v4-flash. A window sized for the fast model would mark a live
+// Nemotron run as dead. Being generous only costs a stuck run holding its
+// queue slot a little longer.
+const DEFAULT_TIMEOUT_MIN = 20;
 
 // Per-skill ceilings confirmed by OpenClaw (2026-07-28). OpenClaw's own agent
 // runtime timeout is effectively unbounded (48h default), so these windows are

@@ -108,11 +108,6 @@ export function spawnAgent(run, model) {
 }
 
 /**
- * Claims the in-flight slot and, if it was free, spawns the runner.
- * Returns { run } on success or { conflict } when that client+agent already
- * has a run in flight — the caller should surface a 409 rather than spend.
- */
-/**
  * True once OpenClaw exposes an abort route and it is configured here.
  * Until then cancelling only frees our slot — the job runs to completion and
  * keeps spending — so the dashboard wording depends on this.
@@ -164,6 +159,11 @@ export async function abortOpenClawRun(run) {
   }
 }
 
+/**
+ * Claims the in-flight slot and, if it was free, spawns the runner.
+ * Returns { run } on success or { conflict } when that client+agent already
+ * has a run in flight — the caller should surface a 409 rather than spend.
+ */
 export function startAgentRun({ clientId, agentType, model, requestedBy, pendingActionId = null, agentId = null }) {
   const { run, conflict } = createRun({ clientId, agentType, model, requestedBy, pendingActionId, agentId });
   if (conflict) return { conflict };

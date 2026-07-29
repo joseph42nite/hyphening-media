@@ -8,6 +8,16 @@
  *   seo   -> nemotron-3-ultra:free
  *              -> nemotron-3-super:free -> deepseek-v4-flash
  *
+ * Routing to 'seo' is safe: worst case it degrades to what you already have.
+ * The free Nemotron tiers are rate-limited in practice, so many runs fall
+ * through the chain to deepseek-v4-flash — the same model 'main' uses. So the
+ * downside is a slower run, never a worse model. seo_agent_runs.actual_model
+ * records which one actually served, so the real split is measurable.
+ *
+ * ('seo' is reachable via POST /hooks/agent, which is the path this system
+ * uses. It is NOT reachable via sessions_send/sessions_spawn — those have
+ * tool-level restrictions to 'main'. Confirmed with OpenClaw 2026-07-28.)
+ *
  * NULL routes to OPENCLAW_AGENT_ID, or 'main' when that is unset.
  *
  * Usage:

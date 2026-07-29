@@ -25,10 +25,19 @@ function formatElapsed(sinceIso, now) {
 // configured (confirmed by OpenClaw, 2026-07-20). drift is excluded per its
 // own agent_run_config note — "Automatic weekly, not manually triggered" —
 // a design choice independent of whether it's installed.
+// Verified against OpenClaw's actual skill directory on 2026-07-28. Several of
+// these have no SKILL.md on disk at all — triggering them burns a queue slot
+// and a timeout window to produce nothing.
 const UNAVAILABLE_SKILLS = new Map([
-  ['maps', 'Requires DataForSEO configuration'],
-  ['competitor_pages', 'Requires DataForSEO configuration'],
-  ['dataforseo', 'Requires DataForSEO configuration'],
+  // No skill directory exists on OpenClaw.
+  ['competitor_pages', 'No skill exists on OpenClaw'],
+  ['dataforseo', 'No skill exists on OpenClaw — DataForSEO MCP not installed'],
+  ['full', 'No skill exists on OpenClaw under this name (it is "seo-audit" there)'],
+  // Present but missing the credentials or tools it depends on.
+  // 'google' was here until its Google API credentials went live (2026-07-28).
+  ['maps', 'Requires DataForSEO, which is not installed'],
+  ['image_gen', 'Requires the nanobanana MCP image tool, which is not installed'],
+  // Works, but by design is not triggered by hand.
   ['drift', 'Automatic weekly check — not manually triggered'],
 ]);
 
@@ -829,6 +838,17 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           run #{run.id}{run.openclaw_run_id ? ` · openclaw ${run.openclaw_run_id.slice(0, 8)}` : ''}
                           {run.requested_by ? ` · ${run.requested_by}` : ''}
                         </span>
+                        {/* The agent we dispatched to is the one fact we know
+                            first-hand — OpenClaw's reported model is currently
+                            a hardcoded string and cannot be trusted. */}
+                        <span
+                          style={{ fontSize: '0.68rem', fontWeight: 'bold', border: '1px solid #94a3b8', borderRadius: '3px', padding: '1px 5px', color: '#475569' }}
+                          title={run.agent_id === 'seo'
+                            ? 'Dispatched to the "seo" agent — Nemotron first, falling back to deepseek when rate-limited.'
+                            : 'Dispatched to the default "main" agent — deepseek-v4-flash.'}
+                        >
+                          agent: {run.agent_id || 'main'}
+                        </span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
@@ -882,6 +902,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           <span style={{ fontWeight: 'bold' }}>{run.agent_type}</span>
                           <span style={{ color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
                           <span style={{ color: '#94a3b8' }}>{run.finished_at || run.created_at}</span>
+                          <span style={{ color: '#64748b' }}>agent: {run.agent_id || 'main'}</span>
                           {modelMismatch && (
                             <span
                               style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #92400e', borderRadius: '3px', padding: '1px 6px', fontWeight: 'bold', fontSize: '0.7rem' }}
