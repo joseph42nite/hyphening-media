@@ -838,16 +838,17 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           run #{run.id}{run.openclaw_run_id ? ` · openclaw ${run.openclaw_run_id.slice(0, 8)}` : ''}
                           {run.requested_by ? ` · ${run.requested_by}` : ''}
                         </span>
-                        {/* What we ASKED for, via the chat-model-switch phrase embedded
-                            in the trigger message — not a claim about what actually ran.
-                            Compare against the "model mismatch" badge in Recent Runs,
-                            which shows what OpenClaw reported back. */}
-                        <span
-                          style={{ fontSize: '0.68rem', fontWeight: 'bold', border: '1px solid #94a3b8', borderRadius: '3px', padding: '1px 5px', color: '#475569' }}
-                          title="Model requested via the chat-model-switch plugin phrase embedded in the trigger message. Not yet confirmed to control hook-triggered runs — check the model-mismatch badge in Recent Runs for what OpenClaw actually reports."
-                        >
-                          requested: {run.agent_id === 'kimi' ? 'kimi' : 'nemotron ultra'}
-                        </span>
+                        {/* Only shown when a skill is deliberately pinned to a
+                            non-default model. By default we name no model and the
+                            agent's own primary decides, so there is nothing to claim. */}
+                        {run.agent_id && (
+                          <span
+                            style={{ fontSize: '0.68rem', fontWeight: 'bold', border: '1px solid #94a3b8', borderRadius: '3px', padding: '1px 5px', color: '#475569' }}
+                            title="This skill is pinned to a specific model, requested via the chat-model-switch plugin. Check actual_model in Recent Runs for what OpenClaw reports actually ran."
+                          >
+                            requested: {run.agent_id}
+                          </span>
+                        )}
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
@@ -901,9 +902,11 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           <span style={{ fontWeight: 'bold' }}>{run.agent_type}</span>
                           <span style={{ color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
                           <span style={{ color: '#94a3b8' }}>{run.finished_at || run.created_at}</span>
-                          <span style={{ color: '#64748b' }} title="Model requested via the chat-model-switch phrase in the trigger message.">
-                            requested: {run.agent_id === 'kimi' ? 'kimi' : 'nemotron ultra'}
-                          </span>
+                          {run.agent_id && (
+                            <span style={{ color: '#64748b' }} title="This skill is pinned to a specific model via the chat-model-switch phrase in the trigger message.">
+                              requested: {run.agent_id}
+                            </span>
+                          )}
                           {modelMismatch && (
                             <span
                               style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #92400e', borderRadius: '3px', padding: '1px 6px', fontWeight: 'bold', fontSize: '0.7rem' }}

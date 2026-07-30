@@ -26,17 +26,18 @@ const __dirname = path.dirname(__filename);
 // against the run record without the runner needing any schema knowledge.
 const RUNID_LINE = /^\[RUNID\]\s+(\S+)/;
 
-// Which model-name phrase to embed in the trigger message, driven by
-// agent_run_config.agent_id — the same per-skill column originally built for
-// agent-level HTTP dispatch (confirmed inert 2026-07-30; OpenClaw never
-// routed on it). Repurposed as the input to the chat-model-switch plugin,
-// which reads a model's name out of the prompt text instead. 'main' is now
-// configured as Nemotron, so that is the default; 'kimi' is for skills marked
-// as creative work, where Kimi's strengths are a better fit than a reasoning
-// model tuned for analysis.
+// Optional per-skill model override, from agent_run_config.agent_id. Returns
+// null for the default, meaning no model is named and the run uses the agent's
+// own primary — which is what we want almost always.
+//
+// This briefly returned 'nemotron ultra' for everything, while 'main' was
+// configured as Nemotron. Reverted 2026-07-30: Nemotron's free tier hit
+// ResourceExhausted (32/32) under real load and killed runs outright instead
+// of degrading, so forcing it from here made audits fail outright.
 function modelPhraseFor(agentId) {
   if (agentId === 'kimi') return 'kimi';
-  return 'nemotron ultra';
+  if (agentId === 'nemotron') return 'nemotron ultra';
+  return null;
 }
 
 /**
@@ -52,12 +53,13 @@ export function spawnAgent(run, model) {
     '--skill', run.agent_type,
     '--model', model || 'primary',
     '--triggeredBy', run.requested_by || 'system',
-    '--runId', String(run.id),
-    // Always explicit — never omit this and rely on default resolution,
-    // since the plugin remembers the last model named per session and we
-    // don't know whether separate hook calls share one.
-    '--modelPhrase', modelPhraseFor(run.agent_id)
+    '--runId', String(run.id)
   ];
+
+  // Only passed when a skill is deliberately pinned to a non-default model.
+  // Omitted otherwise so the trigger message names no model at all.
+  const modelPhrase = modelPhraseFor(run.agent_id);
+  if (modelPhrase) args.push('--modelPhrase', modelPhrase);
 
   // Kept for the (currently theoretical) case OpenClaw wires real agent-level
   // dispatch later — inert today, does not affect which model runs.

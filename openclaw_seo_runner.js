@@ -35,19 +35,19 @@ const runId = args.runId || null; // our seo_agent_runs.id, for webhook correlat
 // changes later; nothing currently depends on it.
 const OPENCLAW_AGENT_ID = args.agentId || process.env.OPENCLAW_AGENT_ID || 'main';
 
-// The actual lever: OpenClaw's chat-model-switch plugin reads the model's own
-// name out of the prompt text and overrides the session's model for that call.
-// Always set explicitly — never omit it and rely on "no phrase = default" —
-// because the plugin remembers the last model mentioned per session, and we
-// don't yet know whether separate hook calls share a session. Naming the
-// model every time removes that ambiguity regardless of how sessions work
-// underneath. Unverified for hook-triggered runs as of 2026-07-30; confirm
-// with a real run and actual_model before trusting it broadly.
+// Optional model override, read by OpenClaw's chat-model-switch plugin out of
+// the prompt text. Null by default: we do NOT name a model, and the run uses
+// whatever the agent's own primary is.
 //
-// Default is 'nemotron ultra' because 'main' was switched to Nemotron
-// (2026-07-30) — this restates the default rather than assuming it, in case
-// this call's session inherited a different model from an earlier mention.
-const MODEL_PHRASE = args.modelPhrase || 'nemotron ultra';
+// This briefly defaulted to 'nemotron ultra' while 'main' was configured as
+// Nemotron. That was reverted 2026-07-30 — Nemotron's free tier returned
+// ResourceExhausted (32/32) under real load and killed runs outright rather
+// than degrading, so forcing it from here made audits fail. Naming no model
+// keeps this out of the way of whatever the agent is configured with.
+//
+// Still wired for a deliberate per-skill override: set agent_run_config
+// .agent_id (see scripts/set_agent_routing.js) and the phrase is appended.
+const MODEL_PHRASE = args.modelPhrase || null;
 
 // Unique per run so each audit starts from a clean context. Prefixed 'hook:'
 // to satisfy hooks.allowedSessionKeyPrefixes. runId is our seo_agent_runs.id
@@ -87,7 +87,7 @@ async function askOpenClaw(userMessage) {
   console.log(`[GATEWAY] Sending request to OpenClaw hook endpoint...`);
   console.log(`[GATEWAY]   - URL: ${OPENCLAW_GATEWAY_URL}`);
   console.log(`[GATEWAY]   - Message: "${userMessage}"`);
-  console.log(`[GATEWAY]   - Model hint in message: "${MODEL_PHRASE}" (via chat-model-switch plugin — unverified for hook-triggered runs)`);
+  console.log(`[GATEWAY]   - Model: ${MODEL_PHRASE ? `"${MODEL_PHRASE}" requested in message via chat-model-switch plugin` : 'not specified — the agent\'s own primary decides'}`);
   console.log(`[GATEWAY]   - Session key: ${SESSION_KEY} (isolates this run; ignored unless OpenClaw sets hooks.allowRequestSessionKey)`);
   console.log(`[GATEWAY]   - agentId field sent: ${OPENCLAW_AGENT_ID} (confirmed inert for routing as of 2026-07-30 — kept in case that changes)`);
 
@@ -156,10 +156,11 @@ async function run() {
   // it we can only correlate on client_id + audit_type, which is ambiguous the
   // moment a scheduled run overlaps a manual one for the same skill.
   //
-  // The trailing clause is the chat-model-switch plugin's trigger — it scans
-  // this text for a model name and overrides the session's model to match.
-  // Phrased in the plugin's own documented style ("use X for this one").
-  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]${runId ? ` [run_id:${runId}]` : ''} — use ${MODEL_PHRASE} for this one.`;
+  // No model is named unless one was explicitly requested. The trailing clause,
+  // when present, is the chat-model-switch plugin's trigger — it scans this
+  // text for a model name and overrides the session's model to match.
+  const modelClause = MODEL_PHRASE ? ` — use ${MODEL_PHRASE} for this one.` : '';
+  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]${runId ? ` [run_id:${runId}]` : ''}${modelClause}`;
 
   const confirmation = await askOpenClaw(userMessage);
 

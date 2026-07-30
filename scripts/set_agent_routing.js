@@ -31,8 +31,11 @@
 
 import db from '../database.js';
 
+// Mirrors modelPhraseFor in src/services/agentRunner.js — keep in sync.
 function phraseFor(agentId) {
-  return agentId === 'kimi' ? 'kimi' : 'nemotron ultra';
+  if (agentId === 'kimi') return 'kimi';
+  if (agentId === 'nemotron') return 'nemotron ultra';
+  return null; // no model named; the agent's own primary decides
 }
 
 function show() {
@@ -44,7 +47,8 @@ function show() {
   }
   console.log('Current model requests:\n');
   for (const [phrase, skills] of Object.entries(byPhrase)) {
-    console.log(`  "${phrase}"  (${skills.length})`);
+    const label = phrase === 'null' ? 'no model named (agent default)' : `"${phrase}"`;
+    console.log(`  ${label}  (${skills.length})`);
     console.log(`    ${skills.join(', ')}\n`);
   }
 }
