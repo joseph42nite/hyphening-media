@@ -8,6 +8,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
 // webhook no longer clears them directly — doing so unconditionally used to
@@ -1336,8 +1337,17 @@ function handleCreateSeoAudit(payload) {
 /**
  * GET /api/openclaw/pending
  * List all pending actions waiting for Telegram confirmation.
+ *
+ * Was unauthenticated — anyone, logged in or not, could read every pending
+ * action's payload (client id, requested_by email, agent type). Confirmed
+ * 2026-07-30 that an OpenClaw cron was polling this route on a schedule to
+ * execute run_seo_agent items directly, bypassing the admin-approval flow
+ * entirely (POST /api/approval/:id/approve was never called). The withheld
+ * auto_approved rows only blocked one query shape; a caller asking for
+ * ?status=pending was never filtered. Authentication closes the endpoint to
+ * every caller, not just that one query pattern.
  */
-router.get('/pending', (req, res) => {
+router.get('/pending', authenticate, authorize('admin'), (req, res) => {
   try {
     const status = req.query.status;
 
@@ -1379,8 +1389,12 @@ router.get('/pending', (req, res) => {
 /**
  * GET /api/openclaw/activity
  * List all activity logs.
+ *
+ * Was unauthenticated. The SEO Monitor tab already sends credentials on this
+ * fetch, so any logged-in staff member works here — not admin-only like
+ * /pending, since this feed is a normal part of that tab for every role.
  */
-router.get('/activity', (req, res) => {
+router.get('/activity', authenticate, (req, res) => {
   try {
     const { limit = 50, offset = 0, action } = req.query;
 
