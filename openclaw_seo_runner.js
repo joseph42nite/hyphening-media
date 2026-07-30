@@ -49,6 +49,14 @@ const OPENCLAW_AGENT_ID = args.agentId || process.env.OPENCLAW_AGENT_ID || 'main
 // this call's session inherited a different model from an earlier mention.
 const MODEL_PHRASE = args.modelPhrase || 'nemotron ultra';
 
+// Unique per run so each audit starts from a clean context. Prefixed 'hook:'
+// to satisfy hooks.allowedSessionKeyPrefixes. runId is our seo_agent_runs.id
+// and already unique; the timestamp fallback only matters for manual CLI runs
+// invoked without --runId.
+const SESSION_KEY = runId
+  ? `hook:seo:run-${runId}`
+  : `hook:seo:${agentType}-${clientId}-${Date.now()}`;
+
 // --- Validation ---
 if (isNaN(clientId)) {
   console.error('[RUNNER] Error: --clientId is required.');
@@ -80,6 +88,7 @@ async function askOpenClaw(userMessage) {
   console.log(`[GATEWAY]   - URL: ${OPENCLAW_GATEWAY_URL}`);
   console.log(`[GATEWAY]   - Message: "${userMessage}"`);
   console.log(`[GATEWAY]   - Model hint in message: "${MODEL_PHRASE}" (via chat-model-switch plugin — unverified for hook-triggered runs)`);
+  console.log(`[GATEWAY]   - Session key: ${SESSION_KEY} (isolates this run; ignored unless OpenClaw sets hooks.allowRequestSessionKey)`);
   console.log(`[GATEWAY]   - agentId field sent: ${OPENCLAW_AGENT_ID} (confirmed inert for routing as of 2026-07-30 — kept in case that changes)`);
 
   try {
@@ -93,6 +102,18 @@ async function askOpenClaw(userMessage) {
         message: userMessage,
         name: `SEO ${agentType} — client #${clientId}`,
         agentId: OPENCLAW_AGENT_ID,
+        // One fresh session per run, rather than every SEO run sharing
+        // OpenClaw's hooks.defaultSessionKey ("hook:ingress"). Sharing one
+        // session means each run loads every previous run's transcript as
+        // context: growing token cost (observed inputs up to 35k), one
+        // client's audit visible while auditing another, and — most likely —
+        // the model seeing earlier successful webhook submissions in history
+        // and reporting one it never made.
+        //
+        // Requires hooks.allowRequestSessionKey=true and a matching entry in
+        // hooks.allowedSessionKeyPrefixes on OpenClaw's side; until those are
+        // set this field is silently ignored and behaviour is unchanged.
+        sessionKey: SESSION_KEY,
         wakeMode: "now",
         deliver: false
       })
