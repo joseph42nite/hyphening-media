@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { isNative } from './api.js';
+import { isNative, API_BASE } from './api.js';
 import Login from './views/Login.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import ClientPortal from './views/ClientPortal.jsx';
@@ -17,21 +17,68 @@ function App() {
   const [auth, setAuth] = useState(null);
   const [toast, setToast] = useState(null);
 
-  // Initialize auth from localStorage on boot
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
+
+  // Verify auth session against backend
+  const verifySession = async () => {
+    if (!localStorage.getItem('user')) return;
+    try {
+      let res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+      if (res.status === 401) {
+        // Attempt token refresh
+        const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
+        if (refreshRes.ok) {
+          res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+        }
+      }
+      if (res.ok) {
+        const userData = await res.json();
+        setAuth(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+      } else {
+        localStorage.removeItem('user');
+        setAuth(null);
+        showToast('Session expired. Please log in again.', 'error');
+      }
+    } catch (err) {
+      console.warn('Session verification failed:', err);
+    }
+  };
+
+  // Initialize auth on boot and re-verify whenever user returns to tab
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
         setAuth(JSON.parse(savedUser));
+        verifySession();
       } catch (err) {
         localStorage.removeItem('user');
       }
     }
-  }, []);
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-  };
+    let lastChecked = Date.now();
+    const handleFocusOrVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        // Check at most once every 10s on tab focus/refocus
+        if (now - lastChecked > 10000) {
+          lastChecked = now;
+          verifySession();
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisibility);
+    document.addEventListener('visibilitychange', handleFocusOrVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocusOrVisibility);
+      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
+    };
+  }, []);
 
   return (
     <Router>
