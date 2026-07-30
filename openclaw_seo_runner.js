@@ -71,7 +71,14 @@ async function askOpenClaw(userMessage) {
   // the model from the serving agent's agent.defaults.model.primary, so the
   // agentId below — not this value — is what determines what actually runs.
   console.log(`[GATEWAY]   - Agent: ${OPENCLAW_AGENT_ID} (determines the model via agent.defaults.model.primary)`);
-  console.log(`[GATEWAY]   - Recorded model: ${model} (not sent — OpenClaw ignores a requested model)`);
+  // Printing our stored config value here reads as a claim about what will run,
+  // which it is not — the agent decides, and for 'seo' that is Nemotron with a
+  // fallback chain. The model that actually served arrives with the webhook.
+  if (OPENCLAW_AGENT_ID === 'main') {
+    console.log(`[GATEWAY]   - Expected model: ${model} (not sent — the agent determines it)`);
+  } else {
+    console.log(`[GATEWAY]   - Model: decided by agent '${OPENCLAW_AGENT_ID}'; actual model reported back with the audit`);
+  }
 
   try {
     const response = await fetch(OPENCLAW_GATEWAY_URL, {
