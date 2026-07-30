@@ -26,6 +26,19 @@ const __dirname = path.dirname(__filename);
 // against the run record without the runner needing any schema knowledge.
 const RUNID_LINE = /^\[RUNID\]\s+(\S+)/;
 
+// Which model-name phrase to embed in the trigger message, driven by
+// agent_run_config.agent_id — the same per-skill column originally built for
+// agent-level HTTP dispatch (confirmed inert 2026-07-30; OpenClaw never
+// routed on it). Repurposed as the input to the chat-model-switch plugin,
+// which reads a model's name out of the prompt text instead. 'main' is now
+// configured as Nemotron, so that is the default; 'kimi' is for skills marked
+// as creative work, where Kimi's strengths are a better fit than a reasoning
+// model tuned for analysis.
+function modelPhraseFor(agentId) {
+  if (agentId === 'kimi') return 'kimi';
+  return 'nemotron ultra';
+}
+
 /**
  * Spawns the runner for an already-claimed run record. Every log line and
  * status change carries run.id, so the dashboard buckets output per job
@@ -39,11 +52,15 @@ export function spawnAgent(run, model) {
     '--skill', run.agent_type,
     '--model', model || 'primary',
     '--triggeredBy', run.requested_by || 'system',
-    '--runId', String(run.id)
+    '--runId', String(run.id),
+    // Always explicit — never omit this and rely on default resolution,
+    // since the plugin remembers the last model named per session and we
+    // don't know whether separate hook calls share one.
+    '--modelPhrase', modelPhraseFor(run.agent_id)
   ];
 
-  // The agent decides the model, so this is the routing lever. Omitted when
-  // unset so the runner falls back to OPENCLAW_AGENT_ID or 'main'.
+  // Kept for the (currently theoretical) case OpenClaw wires real agent-level
+  // dispatch later — inert today, does not affect which model runs.
   if (run.agent_id) args.push('--agentId', run.agent_id);
 
   console.log(`[AGENT RUNNER] Spawning: node ${args.join(' ')}`);

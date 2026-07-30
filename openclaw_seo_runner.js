@@ -28,14 +28,26 @@ const model = args.model || 'primary'; // Use 'primary' as per the new API spec
 const triggeredBy = args.triggeredBy || 'system';
 const runId = args.runId || null; // our seo_agent_runs.id, for webhook correlation
 
-// Which OpenClaw agent handles the run. This is the only lever we have over
-// the model: OpenClaw resolves the model from agent.defaults.model.primary on
-// the agent that serves the request, and SKILL.md cannot override it (confirmed
-// 2026-07-28). Pointing at an agent configured with a different primary model
-// is therefore how SEO runs change model, without touching what 'main' uses
-// for everything else OpenClaw does.
-// Precedence: per-skill config (--agentId) > global env > OpenClaw's default.
+// Historical note, not a working mechanism: sending a different `agentId` in
+// the hook payload does not change which model runs. OpenClaw confirmed
+// 2026-07-30 that /hooks/agent accepts the field but never routes on it —
+// every call executes on 'main' regardless. Still sent below in case that
+// changes later; nothing currently depends on it.
 const OPENCLAW_AGENT_ID = args.agentId || process.env.OPENCLAW_AGENT_ID || 'main';
+
+// The actual lever: OpenClaw's chat-model-switch plugin reads the model's own
+// name out of the prompt text and overrides the session's model for that call.
+// Always set explicitly — never omit it and rely on "no phrase = default" —
+// because the plugin remembers the last model mentioned per session, and we
+// don't yet know whether separate hook calls share a session. Naming the
+// model every time removes that ambiguity regardless of how sessions work
+// underneath. Unverified for hook-triggered runs as of 2026-07-30; confirm
+// with a real run and actual_model before trusting it broadly.
+//
+// Default is 'nemotron ultra' because 'main' was switched to Nemotron
+// (2026-07-30) — this restates the default rather than assuming it, in case
+// this call's session inherited a different model from an earlier mention.
+const MODEL_PHRASE = args.modelPhrase || 'nemotron ultra';
 
 // --- Validation ---
 if (isNaN(clientId)) {
@@ -67,18 +79,8 @@ async function askOpenClaw(userMessage) {
   console.log(`[GATEWAY] Sending request to OpenClaw hook endpoint...`);
   console.log(`[GATEWAY]   - URL: ${OPENCLAW_GATEWAY_URL}`);
   console.log(`[GATEWAY]   - Message: "${userMessage}"`);
-  // The model arg is recorded for our own reporting only. OpenClaw resolves
-  // the model from the serving agent's agent.defaults.model.primary, so the
-  // agentId below — not this value — is what determines what actually runs.
-  console.log(`[GATEWAY]   - Agent: ${OPENCLAW_AGENT_ID} (determines the model via agent.defaults.model.primary)`);
-  // Printing our stored config value here reads as a claim about what will run,
-  // which it is not — the agent decides, and for 'seo' that is Nemotron with a
-  // fallback chain. The model that actually served arrives with the webhook.
-  if (OPENCLAW_AGENT_ID === 'main') {
-    console.log(`[GATEWAY]   - Expected model: ${model} (not sent — the agent determines it)`);
-  } else {
-    console.log(`[GATEWAY]   - Model: decided by agent '${OPENCLAW_AGENT_ID}'; actual model reported back with the audit`);
-  }
+  console.log(`[GATEWAY]   - Model hint in message: "${MODEL_PHRASE}" (via chat-model-switch plugin — unverified for hook-triggered runs)`);
+  console.log(`[GATEWAY]   - agentId field sent: ${OPENCLAW_AGENT_ID} (confirmed inert for routing as of 2026-07-30 — kept in case that changes)`);
 
   try {
     const response = await fetch(OPENCLAW_GATEWAY_URL, {
@@ -132,7 +134,11 @@ async function run() {
   // run_id lets OpenClaw echo the exact job back in create_seo_audit. Without
   // it we can only correlate on client_id + audit_type, which is ambiguous the
   // moment a scheduled run overlaps a manual one for the same skill.
-  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]${runId ? ` [run_id:${runId}]` : ''}`;
+  //
+  // The trailing clause is the chat-model-switch plugin's trigger — it scans
+  // this text for a model name and overrides the session's model to match.
+  // Phrased in the plugin's own documented style ("use X for this one").
+  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]${runId ? ` [run_id:${runId}]` : ''} — use ${MODEL_PHRASE} for this one.`;
 
   const confirmation = await askOpenClaw(userMessage);
 

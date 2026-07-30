@@ -838,16 +838,15 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           run #{run.id}{run.openclaw_run_id ? ` · openclaw ${run.openclaw_run_id.slice(0, 8)}` : ''}
                           {run.requested_by ? ` · ${run.requested_by}` : ''}
                         </span>
-                        {/* The agent we dispatched to is the one fact we know
-                            first-hand — OpenClaw's reported model is currently
-                            a hardcoded string and cannot be trusted. */}
+                        {/* What we ASKED for, via the chat-model-switch phrase embedded
+                            in the trigger message — not a claim about what actually ran.
+                            Compare against the "model mismatch" badge in Recent Runs,
+                            which shows what OpenClaw reported back. */}
                         <span
                           style={{ fontSize: '0.68rem', fontWeight: 'bold', border: '1px solid #94a3b8', borderRadius: '3px', padding: '1px 5px', color: '#475569' }}
-                          title={run.agent_id === 'seo'
-                            ? 'Dispatched to the "seo" agent — Nemotron first, falling back to deepseek when rate-limited.'
-                            : 'Dispatched to the default "main" agent — deepseek-v4-flash.'}
+                          title="Model requested via the chat-model-switch plugin phrase embedded in the trigger message. Not yet confirmed to control hook-triggered runs — check the model-mismatch badge in Recent Runs for what OpenClaw actually reports."
                         >
-                          agent: {run.agent_id || 'main'}
+                          requested: {run.agent_id === 'kimi' ? 'kimi' : 'nemotron ultra'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -902,7 +901,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                           <span style={{ fontWeight: 'bold' }}>{run.agent_type}</span>
                           <span style={{ color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
                           <span style={{ color: '#94a3b8' }}>{run.finished_at || run.created_at}</span>
-                          <span style={{ color: '#64748b' }}>agent: {run.agent_id || 'main'}</span>
+                          <span style={{ color: '#64748b' }} title="Model requested via the chat-model-switch phrase in the trigger message.">
+                            requested: {run.agent_id === 'kimi' ? 'kimi' : 'nemotron ultra'}
+                          </span>
                           {modelMismatch && (
                             <span
                               style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #92400e', borderRadius: '3px', padding: '1px 6px', fontWeight: 'bold', fontSize: '0.7rem' }}

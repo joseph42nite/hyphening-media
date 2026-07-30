@@ -1,44 +1,50 @@
 /**
- * Chooses which OpenClaw agent — and therefore which model — serves each skill.
+ * Chooses which model each skill requests, via the chat-model-switch plugin.
  *
- * OpenClaw resolves the model from agent.defaults.model.primary on the agent
- * that handles the request, so naming a different agent is the whole mechanism:
+ * History: this used to set which OpenClaw *agent* a run dispatched to,
+ * because the plan was for the model to follow the agent
+ * (agent.defaults.model.primary). Confirmed 2026-07-30 that OpenClaw never
+ * actually routed on the agentId field — every call executed on 'main'
+ * regardless. The column is repurposed: it now selects a phrase embedded in
+ * the trigger message, which OpenClaw's chat-model-switch plugin reads out of
+ * the prompt text and uses to override the session's model for that call.
+ * Unverified for hook-triggered runs as of 2026-07-30 — check actual_model
+ * on a real run before trusting it.
  *
- *   main  -> openrouter/deepseek/deepseek-v4-flash   (fast, cheap, no daily cap)
- *   seo   -> nemotron-3-ultra:free
- *              -> nemotron-3-super:free -> deepseek-v4-flash
+ *   main (default) -> "nemotron ultra"   ('main' is configured as Nemotron
+ *                                         as of 2026-07-30; this states it
+ *                                         explicitly rather than relying on
+ *                                         silence, since the plugin remembers
+ *                                         the last model named per session)
+ *   kimi           -> "kimi"             (creative / writing-heavy skills)
  *
- * Routing to 'seo' is safe: worst case it degrades to what you already have.
- * The free Nemotron tiers are rate-limited in practice, so many runs fall
- * through the chain to deepseek-v4-flash — the same model 'main' uses. So the
- * downside is a slower run, never a worse model. seo_agent_runs.actual_model
- * records which one actually served, so the real split is measurable.
- *
- * ('seo' is reachable via POST /hooks/agent, which is the path this system
- * uses. It is NOT reachable via sessions_send/sessions_spawn — those have
- * tool-level restrictions to 'main'. Confirmed with OpenClaw 2026-07-28.)
- *
- * NULL routes to OPENCLAW_AGENT_ID, or 'main' when that is unset.
+ * NULL means "use the default" (nemotron ultra). Any value other than 'kimi'
+ * also resolves to the default — see modelPhraseFor in agentRunner.js, which
+ * this script's grouping mirrors.
  *
  * Usage:
- *   node scripts/set_agent_routing.js                      # show current routing
- *   node scripts/set_agent_routing.js seo technical schema # route those skills to 'seo'
- *   node scripts/set_agent_routing.js seo --all            # route every skill to 'seo'
- *   node scripts/set_agent_routing.js main --all           # revert everything
+ *   node scripts/set_agent_routing.js                       # show current mapping
+ *   node scripts/set_agent_routing.js kimi content flow     # route those skills to kimi
+ *   node scripts/set_agent_routing.js kimi --all            # route every skill to kimi
+ *   node scripts/set_agent_routing.js main --all            # revert everything to the default
  */
 
 import db from '../database.js';
 
+function phraseFor(agentId) {
+  return agentId === 'kimi' ? 'kimi' : 'nemotron ultra';
+}
+
 function show() {
   const rows = db.prepare('SELECT audit_type, agent_id FROM agent_run_config ORDER BY audit_type').all();
-  const byAgent = {};
+  const byPhrase = {};
   for (const r of rows) {
-    const key = r.agent_id || 'main (default)';
-    (byAgent[key] = byAgent[key] || []).push(r.audit_type);
+    const key = phraseFor(r.agent_id);
+    (byPhrase[key] = byPhrase[key] || []).push(r.audit_type);
   }
-  console.log('Current routing:\n');
-  for (const [agent, skills] of Object.entries(byAgent)) {
-    console.log(`  ${agent}  (${skills.length})`);
+  console.log('Current model requests:\n');
+  for (const [phrase, skills] of Object.entries(byPhrase)) {
+    console.log(`  "${phrase}"  (${skills.length})`);
     console.log(`    ${skills.join(', ')}\n`);
   }
 }
@@ -48,12 +54,11 @@ function main() {
 
   if (!agent) {
     show();
-    console.log('To change: node scripts/set_agent_routing.js <agentId> <skill...|--all>');
+    console.log('To change: node scripts/set_agent_routing.js <main|kimi> <skill...|--all>');
     return;
   }
 
-  // 'main' is the default agent, so it is stored as NULL rather than a literal
-  // — that keeps OPENCLAW_AGENT_ID working as a global override.
+  // 'main' is the default, stored as NULL.
   const value = agent === 'main' ? null : agent;
 
   let targets;
@@ -79,9 +84,9 @@ function main() {
     for (const t of targets) update.run(value, t);
   })();
 
-  console.log(`Routed ${targets.length} skill(s) to '${agent}'.\n`);
+  console.log(`Set ${targets.length} skill(s) to request "${phraseFor(value)}".\n`);
   show();
-  console.log('No restart needed — the agent is read per request.');
+  console.log('No restart needed — the phrase is embedded in each trigger message.');
 }
 
 main();
