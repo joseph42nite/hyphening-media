@@ -79,9 +79,9 @@ function ReportValue({ value, depth = 0 }) {
   if (Array.isArray(value)) {
     if (value.length === 0) return <span style={{ color: '#94a3b8' }}>none</span>;
     return (
-      <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+      <ul style={{ margin: '4px 0', paddingLeft: '20px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
         {value.map((item, i) => (
-          <li key={i} style={{ marginBottom: '4px' }}>
+          <li key={i} style={{ marginBottom: '4px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
             {typeof item === 'object' && item !== null ? <ReportValue value={item} depth={depth + 1} /> : String(item)}
           </li>
         ))}
@@ -90,9 +90,9 @@ function ReportValue({ value, depth = 0 }) {
   }
   if (typeof value === 'object') {
     return (
-      <div style={{ marginLeft: depth > 0 ? '14px' : 0 }}>
+      <div style={{ marginLeft: depth > 0 ? '14px' : 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
         {Object.entries(value).map(([k, v]) => (
-          <div key={k} style={{ marginBottom: '6px' }}>
+          <div key={k} style={{ marginBottom: '6px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
             <strong style={{ textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}:</strong>{' '}
             {typeof v === 'object' && v !== null ? <ReportValue value={v} depth={depth + 1} /> : String(v)}
           </div>
@@ -100,7 +100,7 @@ function ReportValue({ value, depth = 0 }) {
       </div>
     );
   }
-  return <span>{String(value)}</span>;
+  return <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{String(value)}</span>;
 }
 
 export default function SeoMonitorTab({ auth, clients, showToast }) {
@@ -958,8 +958,8 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                     title={unavailableReason || 'Click to view this agent\'s audit history'}
                   >
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{agent.agentType}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '0.85rem', wordBreak: 'break-word', minWidth: 0 }}>{agent.agentType}</span>
                         <span 
                           className="badge" 
                           style={{ 
@@ -967,7 +967,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                             color: '#fff', 
                             fontSize: '0.65rem',
                             fontWeight: 'bold',
-                            padding: '2px 6px'
+                            padding: '2px 6px',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           {agent.freshness.replace('_', ' ')}
@@ -1079,7 +1081,10 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       background: '#f8fafc',
                       borderLeft: '3px solid #7c3aed',
                       borderRadius: '2px',
-                      maxWidth: '640px'
+                      maxWidth: '100%',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere',
+                      boxSizing: 'border-box'
                     }}>
                       {getPreviewText(currentAudit)}
                       {currentAudit.report_json && (
@@ -1186,14 +1191,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         </span>
                       </div>
                       
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'left' }}>
-                        <strong>Target URL Path:</strong> <a href={rec.page_url || currentAudit?.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{rec.page_url || currentAudit?.url}</a>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'left', wordBreak: 'break-all' }}>
+                        <strong>Target URL Path:</strong> <a href={rec.page_url || currentAudit?.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)', wordBreak: 'break-all' }}>{rec.page_url || currentAudit?.url}</a>
                       </div>
                       
-                      <div style={{ fontSize: '0.85rem', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '0.85rem', marginBottom: '8px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         <strong>Issue:</strong> {rec.issue}
                       </div>
-                      <div style={{ fontSize: '0.85rem', marginBottom: '12px' }}>
+                      <div style={{ fontSize: '0.85rem', marginBottom: '12px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         <strong>Required Action:</strong> {rec.action_required}
                       </div>
 
@@ -1465,7 +1470,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       {/* Full Report Modal */}
       {showReportModal && currentAudit?.report_json && (
         <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '700px', width: '90%', maxHeight: '85vh', overflowY: 'auto', wordBreak: 'break-word', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
               <h3 style={{ margin: 0, fontWeight: 'bold' }}>Full Audit Report</h3>
               <button
@@ -1475,16 +1480,16 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 &times;
               </button>
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px', wordBreak: 'break-all' }}>
               {currentAudit.audit_type} — {currentAudit.page_url || currentAudit.url}
             </div>
-            <div style={{ fontSize: '0.85rem', lineHeight: '1.6' }}>
+            <div style={{ fontSize: '0.85rem', lineHeight: '1.6', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {(() => {
                 const parsed = parseReportJson(currentAudit.report_json);
                 // A plain-text report renders with line breaks preserved rather
                 // than collapsing onto one line via the object/array renderer.
                 return typeof parsed === 'string'
-                  ? <div style={{ whiteSpace: 'pre-wrap' }}>{parsed}</div>
+                  ? <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{parsed}</div>
                   : <ReportValue value={parsed} />;
               })()}
             </div>
