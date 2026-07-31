@@ -724,12 +724,12 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
             <h3 style={{ margin: 0, fontWeight: 'bold' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
             <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
           </div>
-          <div className="seo-command-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+          <div className="seo-command-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0 }}>Active Client:</span>
               <select
                 className="form-control"
-                style={{ minWidth: '220px', fontWeight: 'bold', border: '2px solid #000', flexGrow: 1 }}
+                style={{ minWidth: '200px', fontWeight: 'bold', border: '2px solid #000', flexGrow: 1 }}
                 value={selectedClientId}
                 onChange={e => {
                   const newId = e.target.value;
@@ -753,25 +753,25 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               </select>
             </div>
             {selectedClientId && (
-              <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
+              <div className="seo-command-buttons" style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
                 <button
                   onClick={triggerFullAuditMaster}
-                  className="btn btn-primary"
-                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold', flex: 1, minWidth: '200px' }}
+                  className="btn btn-primary seo-cmd-btn"
+                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
                 >
                   🚀 Run Full Audit (Master)
                 </button>
                 <button
                   onClick={() => setIsTerminalOpen(prev => !prev)}
-                  className={`btn ${isTerminalOpen ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: 1, minWidth: '200px' }}
+                  className={`btn ${isTerminalOpen ? 'btn-primary' : 'btn-secondary'} seo-cmd-btn`}
+                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
                 >
                   <Terminal size={16} /> {isTerminalOpen ? 'Hide Console Stream' : 'Live OpenClaw Console & Webhooks'} ({consoleLogs.length})
                 </button>
                 <button
                   onClick={() => setShowQueue(prev => !prev)}
-                  className={`btn ${showQueue ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: 1, minWidth: '200px' }}
+                  className={`btn ${showQueue ? 'btn-primary' : 'btn-secondary'} seo-cmd-btn`}
+                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
                   title="Every SEO job currently queued or running on OpenClaw, across all clients"
                 >
                   <ListOrdered size={16} /> OpenClaw Queue ({queue.active.length})

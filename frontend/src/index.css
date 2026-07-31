@@ -1386,12 +1386,27 @@ tr:hover td {
     flex-direction: column !important;
     width: 100% !important;
     align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .seo-command-buttons {
+    flex-direction: column !important;
+    width: 100% !important;
+    align-items: stretch !important;
+    gap: 8px !important;
   }
 
   .seo-command-actions select,
-  .seo-command-actions button {
+  .seo-command-actions button,
+  .seo-command-buttons button,
+  .seo-cmd-btn {
     width: 100% !important;
     min-width: 0 !important;
+    flex: none !important;
+    white-space: normal !important;
+    text-align: center !important;
+    word-break: break-word !important;
+    box-sizing: border-box !important;
   }
 
   .audit-desktop-table {
