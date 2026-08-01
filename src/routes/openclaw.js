@@ -94,7 +94,19 @@ router.post('/webhook', (req, res) => {
     const { event_type, payload } = req.body;
 
     if (!event_type || !payload) {
-      return res.status(400).json({ error: 'event_type and payload are required' });
+      // Says exactly what was missing and what arrived instead. The common
+      // cause is sending the fields flat — {event_type, client_id, url, ...}
+      // — rather than nested under "payload", which produces a 400 that is
+      // otherwise indistinguishable from a genuinely malformed body.
+      const received = Object.keys(req.body || {});
+      console.warn(`[OPENCLAW] Rejected webhook: missing ${!event_type ? 'event_type' : 'payload'}. Top-level keys received: ${received.join(', ') || '(none)'}`);
+      return res.status(400).json({
+        error: 'event_type and payload are required',
+        missing: !event_type ? 'event_type' : 'payload',
+        received_top_level_keys: received,
+        expected_shape: { event_type: 'create_seo_audit', payload: { client_id: 1, audit_type: 'technical', url: 'https://example.com' } },
+        hint: 'Audit fields go inside "payload", not at the top level.'
+      });
     }
 
     // Validate event type is known
@@ -111,7 +123,7 @@ router.post('/webhook', (req, res) => {
 
     if (!knownEvents.includes(event_type)) {
       console.warn(`[OPENCLAW] Unknown event type: ${event_type}`);
-      return res.status(400).json({ error: `Unknown event type: ${event_type}` });
+      return res.status(400).json({ error: `Unknown event type: ${event_type}`, known_events: knownEvents });
     }
 
     // Execute event immediately
