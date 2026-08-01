@@ -7,6 +7,39 @@ import { startAgentRun, abortOpenClawRun, isAbortSupported } from '../services/a
 
 const IN_FLIGHT_FOR_ABORT = ['queued', 'running'];
 
+// Each skill writes a different one of the ten score columns on seo_audits.
+// Prefer the column matching the audit type, then the generic health_score,
+// then whatever is populated — otherwise a real score reads as no score.
+// Mirrors getAuditScore in SeoMonitorTab.jsx; keep the two in sync.
+const SCORE_COLUMN_BY_TYPE = {
+  technical: 'technical_score',
+  content: 'content_score',
+  content_brief: 'content_score',
+  schema: 'schema_score',
+  geo: 'geo_score',
+  local: 'local_score',
+  backlinks: 'backlinks_score',
+  sxo: 'sxo_score',
+  full: 'health_score',
+};
+
+const ALL_SCORE_COLUMNS = [
+  'health_score', 'technical_score', 'content_score', 'on_page_score',
+  'schema_score', 'performance_score', 'geo_score', 'backlinks_score',
+  'local_score', 'sxo_score',
+];
+
+function resolveAuditScore(audit) {
+  if (!audit) return null;
+  const preferred = SCORE_COLUMN_BY_TYPE[audit.audit_type];
+  if (preferred && audit[preferred] != null) return audit[preferred];
+  if (audit.health_score != null) return audit.health_score;
+  for (const col of ALL_SCORE_COLUMNS) {
+    if (audit[col] != null) return audit[col];
+  }
+  return null;
+}
+
 const router = Router({ mergeParams: true });
 router.use(authenticate);
 
@@ -68,9 +101,13 @@ router.get('/:id/seo/agents/status', (req, res) => {
     const statusMap = [];
 
     for (const conf of configs) {
-      // Find last successful audit
+      // Selects every score column — content_score, sxo_score, geo_score and
+      // performance_score were previously omitted, so skills writing those
+      // showed no score on their card no matter what the audit contained.
       const lastAudit = db.prepare(`
-        SELECT id, created_at, health_score, technical_score, backlinks_score, local_score, on_page_score, schema_score
+        SELECT id, created_at, audit_type, health_score, technical_score, content_score,
+               on_page_score, schema_score, performance_score, geo_score,
+               backlinks_score, local_score, sxo_score
         FROM seo_audits
         WHERE client_id = ? AND audit_type = ?
         ORDER BY created_at DESC LIMIT 1
@@ -94,7 +131,7 @@ router.get('/:id/seo/agents/status', (req, res) => {
         }
 
         // Map score based on agent
-        score = lastAudit.health_score ?? lastAudit.technical_score ?? lastAudit.backlinks_score ?? lastAudit.local_score ?? lastAudit.on_page_score ?? lastAudit.schema_score ?? null;
+        score = resolveAuditScore(lastAudit);
       }
 
       const activeRun = activeRuns.get(conf.audit_type) || null;

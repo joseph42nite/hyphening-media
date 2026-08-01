@@ -41,6 +41,40 @@ const UNAVAILABLE_SKILLS = new Map([
   ['drift', 'Automatic weekly check — not manually triggered'],
 ]);
 
+// seo_audits carries ten score columns and each skill fills a different one.
+// Reading a hardcoded few means a real score renders as "--": a 'content'
+// audit writes content_score, which the old health/technical/local chain
+// never looked at. Prefer the column matching the audit type, then the
+// generic health_score, then whatever is actually populated.
+const SCORE_COLUMN_BY_TYPE = {
+  technical: 'technical_score',
+  content: 'content_score',
+  content_brief: 'content_score',
+  schema: 'schema_score',
+  geo: 'geo_score',
+  local: 'local_score',
+  backlinks: 'backlinks_score',
+  sxo: 'sxo_score',
+  full: 'health_score',
+};
+
+const ALL_SCORE_COLUMNS = [
+  'health_score', 'technical_score', 'content_score', 'on_page_score',
+  'schema_score', 'performance_score', 'geo_score', 'backlinks_score',
+  'local_score', 'sxo_score',
+];
+
+function getAuditScore(audit) {
+  if (!audit) return null;
+  const preferred = SCORE_COLUMN_BY_TYPE[audit.audit_type];
+  if (preferred && audit[preferred] != null) return audit[preferred];
+  if (audit.health_score != null) return audit.health_score;
+  for (const col of ALL_SCORE_COLUMNS) {
+    if (audit[col] != null) return audit[col];
+  }
+  return null;
+}
+
 // report_json is stored as a JSON-stringified column; it may itself be plain
 // text (not an object) if OpenClaw sent a long-form text report instead of
 // structured JSON — both are valid, so this never throws.
@@ -1116,7 +1150,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                     >
                       <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--text-muted)' }}>Score:</span>
                       <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#22c55e' }}>
-                        {currentAudit.health_score ?? currentAudit.technical_score ?? currentAudit.local_score ?? '--'}%
+                        {getAuditScore(currentAudit) ?? '--'}%
                       </span>
                     </div>
                   )}
