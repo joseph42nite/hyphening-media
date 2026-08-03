@@ -124,13 +124,16 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     }
     const availableMonths = Array.from(new Set(rawMonths)).sort().reverse();
 
-    const targetMonth = month !== undefined ? month : (availableMonths.length > 0 ? availableMonths[0] : currentMonth);
+    // No month param means "not chosen yet" -> default to the latest month with data.
+    // Only an explicit ?month=all aggregates across every month.
+    const targetMonth = month ? month : (availableMonths.length > 0 ? availableMonths[0] : currentMonth);
+    const monthFilter = targetMonth !== 'all' ? targetMonth : null;
 
     let leadWhere = 'WHERE client_id = ?';
     const leadParams = [clientId];
-    if (targetMonth && targetMonth !== 'all') {
+    if (monthFilter) {
       leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";
-      leadParams.push(targetMonth);
+      leadParams.push(monthFilter);
     }
 
     const contentStats = db.prepare(`
@@ -147,7 +150,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
         SUM(saves) as total_saves
       FROM marketing_content_tracker 
       WHERE client_id = ? AND is_tracked = 1
-      ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(created_at, 1, 7) = '" + targetMonth + "'" : ""}
+      ${monthFilter ? "AND SUBSTR(created_at, 1, 7) = '" + monthFilter + "'" : ""}
     `).get(clientId);
 
     const leadStats = db.prepare(`
@@ -176,7 +179,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       SELECT platform, COUNT(*) as count, SUM(views) as views
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1
-      ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(created_at, 1, 7) = '" + targetMonth + "'" : ""}
+      ${monthFilter ? "AND SUBSTR(created_at, 1, 7) = '" + monthFilter + "'" : ""}
       GROUP BY platform
     `).all(clientId);
 
@@ -204,7 +207,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       SELECT date, title, (COALESCE(views, 0) + COALESCE(youtube_views, 0)) AS views, COALESCE(engagement_rate_pct, 0.0) AS engagement_rate_pct
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1 AND status IN ('Posted', 'Client Approved')
-      ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(created_at, 1, 7) = '" + targetMonth + "'" : ""}
+      ${monthFilter ? "AND SUBSTR(created_at, 1, 7) = '" + monthFilter + "'" : ""}
       ORDER BY date DESC
       LIMIT 8
     `).all(clientId);
@@ -234,6 +237,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       platform_breakdown: platformBreakdown,
       ads_breakdown: adsBreakdown,
       available_months: availableMonths,
+      selected_month: targetMonth,
       sister_companies: sisterCompanies,
       views_trend: viewsTrend
     });

@@ -12,6 +12,7 @@ export default function MarketingDataTab({
   availableAdMonths = [],
   selectedAdMonth = '',
   setSelectedAdMonth,
+  adLeadTotals = null,
   monthlyReports,
   fetchMarketingData,
   fetchCalendarMarketingContent,
@@ -530,7 +531,7 @@ export default function MarketingDataTab({
               <h3 style={{ margin: 0 }}>Ad Campaigns Performance</h3>
               {selectedAdMonth && (
                 <span className="badge badge-info" style={{ fontSize: '0.8rem', padding: '4px 8px' }}>
-                  {formatMonthStr(selectedAdMonth)}
+                  {selectedAdMonth === 'all' ? 'All Months' : formatMonthStr(selectedAdMonth)}
                 </span>
               )}
             </div>
@@ -559,7 +560,9 @@ export default function MarketingDataTab({
                 style={{ width: 'auto', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 'bold' }}
                 value={selectedAdMonth || 'all'}
                 onChange={(e) => {
-                  const val = e.target.value === 'all' ? '' : e.target.value;
+                  // 'all' is sent through as-is: an empty month means "let the server pick
+                  // the latest month", which is not the same thing as an all-time total.
+                  const val = e.target.value;
                   if (setSelectedAdMonth) setSelectedAdMonth(val);
                   if (selectedClientForReports?.id) {
                     fetchMarketingData(selectedClientForReports.id, val);
@@ -602,15 +605,33 @@ export default function MarketingDataTab({
               <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Leads Captured</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)', marginTop: '2px' }}>
-                  {adCampaigns.reduce((acc, curr) => acc + (curr.actual_leads || curr.leads || 0), 0)}
+                  {adLeadTotals ? adLeadTotals.total_leads : adCampaigns.reduce((acc, curr) => acc + (curr.actual_leads || curr.leads || 0), 0)}
                 </div>
               </div>
+              {adLeadTotals && (
+                <>
+                  <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Qualified Leads</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)', marginTop: '2px' }}>
+                      {adLeadTotals.qualified_leads}
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Confirmed Bookings</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#2563eb', marginTop: '2px' }}>
+                      {adLeadTotals.confirmed_bookings}
+                    </div>
+                  </div>
+                </>
+              )}
               <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Avg Cost Per Lead (CPL)</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 800, marginTop: '2px' }}>
                   {(() => {
                     const totalSpend = adCampaigns.reduce((acc, curr) => acc + (curr.total_ad_spend_inr || 0), 0);
-                    const totalLeads = adCampaigns.reduce((acc, curr) => acc + (curr.actual_leads || curr.leads || 0), 0);
+                    const totalLeads = adLeadTotals
+                      ? adLeadTotals.total_leads
+                      : adCampaigns.reduce((acc, curr) => acc + (curr.actual_leads || curr.leads || 0), 0);
                     return totalLeads > 0 ? `₹${Math.round(totalSpend / totalLeads)}` : '-';
                   })()}
                 </div>

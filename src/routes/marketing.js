@@ -558,32 +558,56 @@ router.post('/:id/marketing/content/review/:contentId', authorize('admin', 'ops_
 // AD CAMPAIGNS
 // =========================================
 
-// Helper to fetch campaign with its captured and qualified lead counts from campaign_leads
+// Helper to fetch campaign with its captured, qualified and booked lead counts from campaign_leads.
+// Uses the exact same matching + status rules as GET /marketing/ads and the client portal, and
+// scopes the counts to the campaign's own month, so a created/updated row never disagrees
+// with the numbers the list endpoint returns for that month.
 const getAdWithLeads = (adId) => {
   return db.prepare(`
-    SELECT 
+    SELECT
       a.*,
       (
-        SELECT COUNT(l.id) 
-        FROM campaign_leads l 
-        WHERE l.client_id = a.client_id 
+        SELECT COUNT(l.id)
+        FROM campaign_leads l
+        WHERE l.client_id = a.client_id
           AND (
             (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
             OR
             ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
           )
+          AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
       ) as actual_leads,
       (
-        SELECT COUNT(l.id) 
-        FROM campaign_leads l 
-        WHERE l.client_id = a.client_id 
+        SELECT COUNT(l.id)
+        FROM campaign_leads l
+        WHERE l.client_id = a.client_id
           AND (
             (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
             OR
             ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
           )
-          AND (l.qualification_status = 'Qualified' OR l.lead_status IN ('Qualified', 'Appointment Booked'))
-      ) as actual_qualified_leads
+          AND (
+            LOWER(TRIM(COALESCE(l.qualification_status, ''))) = 'qualified'
+            OR LOWER(TRIM(COALESCE(l.lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted')
+            OR LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
+          )
+          AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
+      ) as actual_qualified_leads,
+      (
+        SELECT COUNT(l.id)
+        FROM campaign_leads l
+        WHERE l.client_id = a.client_id
+          AND (
+            (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
+            OR
+            ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
+          )
+          AND (
+            LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
+            OR LOWER(TRIM(COALESCE(l.lead_status, ''))) = 'appointment booked'
+          )
+          AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
+      ) as actual_confirmed_bookings
     FROM marketing_ad_campaigns a
     WHERE a.id = ?
   `).get(adId);
@@ -617,14 +641,17 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     }
     const campaignMonths = Array.from(new Set(rawMonths)).sort().reverse();
 
-    const targetMonth = month !== undefined ? month : (campaignMonths.length > 0 ? campaignMonths[0] : currentMonth);
+    // No month param means "not chosen yet" -> default to the latest month with data.
+    // Only an explicit ?month=all aggregates across every month.
+    const targetMonth = month ? month : (campaignMonths.length > 0 ? campaignMonths[0] : currentMonth);
+    const monthFilter = targetMonth !== 'all' ? targetMonth : null;
 
     let whereClause = 'WHERE a.client_id = ?';
     const queryParams = [clientId];
 
-    if (targetMonth && targetMonth !== 'all') {
+    if (monthFilter) {
       whereClause += " AND (a.month = ? OR (a.month IS NULL AND SUBSTR(a.created_at, 1, 7) = ?))";
-      queryParams.push(targetMonth, targetMonth);
+      queryParams.push(monthFilter, monthFilter);
     }
 
     const explicitAds = db.prepare(`
@@ -639,7 +666,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR
               ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
             )
-            ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + targetMonth + "'" : ""}
+            ${monthFilter ? "AND SUBSTR(l.created_at, 1, 7) = '" + monthFilter + "'" : ""}
         ) as actual_leads,
         (
           SELECT COUNT(l.id) 
@@ -655,7 +682,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR LOWER(TRIM(COALESCE(l.lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted') 
               OR LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
             )
-            ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + targetMonth + "'" : ""}
+            ${monthFilter ? "AND SUBSTR(l.created_at, 1, 7) = '" + monthFilter + "'" : ""}
         ) as actual_qualified_leads,
         (
           SELECT COUNT(l.id) 
@@ -670,7 +697,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed') 
               OR LOWER(TRIM(COALESCE(l.lead_status, ''))) = 'appointment booked'
             )
-            ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + targetMonth + "'" : ""}
+            ${monthFilter ? "AND SUBSTR(l.created_at, 1, 7) = '" + monthFilter + "'" : ""}
         ) as actual_confirmed_bookings
       FROM marketing_ad_campaigns a
       ${whereClause}
@@ -680,9 +707,9 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     // Fetch synthetic lead campaigns from campaign_leads to capture campaigns not explicitly listed in marketing_ad_campaigns
     let leadWhere = 'WHERE client_id = ?';
     const leadParams = [clientId];
-    if (targetMonth && targetMonth !== 'all') {
+    if (monthFilter) {
       leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";
-      leadParams.push(targetMonth);
+      leadParams.push(monthFilter);
     }
 
     const leadCampaigns = db.prepare(`
@@ -732,7 +759,34 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
 
     const finalAds = [...explicitAds, ...syntheticAds];
 
-    res.json({ ads: finalAds, available_months: campaignMonths });
+    // Client-portal parity: totals come straight from campaign_leads for the same month,
+    // so they can never drift from what the portal reports even if campaign matching changes.
+    const totals = db.prepare(`
+      SELECT
+        COUNT(*) as total_leads,
+        SUM(CASE WHEN
+          LOWER(TRIM(COALESCE(qualification_status, ''))) = 'qualified'
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted')
+          OR LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+        THEN 1 ELSE 0 END) as qualified_leads,
+        SUM(CASE WHEN
+          LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) = 'appointment booked'
+        THEN 1 ELSE 0 END) as confirmed_bookings
+      FROM campaign_leads
+      ${leadWhere}
+    `).get(...leadParams);
+
+    res.json({
+      ads: finalAds,
+      available_months: campaignMonths,
+      selected_month: targetMonth,
+      lead_totals: {
+        total_leads: totals.total_leads || 0,
+        qualified_leads: totals.qualified_leads || 0,
+        confirmed_bookings: totals.confirmed_bookings || 0
+      }
+    });
   } catch (err) {
     console.error('[MARKETING] Ads list error:', err);
     res.status(500).json({ error: 'Internal server error' });

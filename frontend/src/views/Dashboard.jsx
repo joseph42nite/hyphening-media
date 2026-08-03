@@ -110,6 +110,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [adCampaigns, setAdCampaigns] = useState([]);
   const [availableAdMonths, setAvailableAdMonths] = useState([]);
   const [selectedAdMonth, setSelectedAdMonth] = useState('');
+  const [adLeadTotals, setAdLeadTotals] = useState(null);
   const [monthlyReports, setMonthlyReports] = useState([]);
   const [marketingScripts, setMarketingScripts] = useState([]);
   const [staffUsers, setStaffUsers] = useState([]);
@@ -604,11 +605,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         if (adRes.ok) {
           const adData = await adRes.json();
           setAdCampaigns(adData.ads || []);
+          setAdLeadTotals(adData.lead_totals || null);
           if (adData.available_months && adData.available_months.length > 0) {
             setAvailableAdMonths(adData.available_months);
-            if (!selectedAdMonth) {
-              setSelectedAdMonth(adData.available_months[0]);
-            }
+          }
+          // Always mirror the month the server actually applied, so the selector label
+          // can never claim a month the numbers below it don't belong to.
+          if (adData.selected_month) {
+            setSelectedAdMonth(adData.selected_month);
           }
         }
         const rRes = await authFetch(`/api/clients/${clientId}/marketing/monthly`);
@@ -1314,6 +1318,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             availableAdMonths={availableAdMonths}
             selectedAdMonth={selectedAdMonth}
             setSelectedAdMonth={setSelectedAdMonth}
+            adLeadTotals={adLeadTotals}
             monthlyReports={monthlyReports}
             fetchMarketingData={fetchMarketingData}
             fetchCalendarMarketingContent={fetchCalendarMarketingContent}

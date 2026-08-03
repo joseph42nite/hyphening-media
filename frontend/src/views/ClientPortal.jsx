@@ -1247,9 +1247,11 @@ export default function ClientPortal({ showToast }) {
         
         if (data.available_months && data.available_months.length > 0) {
           setAvailablePortalMonths(data.available_months);
-          if (!selectedPortalMonth) {
-            setSelectedPortalMonth(data.available_months[0]);
-          }
+        }
+        // Always mirror the month the server actually applied, so the selector label
+        // can never claim a month the numbers below it don't belong to.
+        if (data.selected_month) {
+          setSelectedPortalMonth(data.selected_month);
         }
 
         if (data.client_type === 'artist_curation') {
@@ -1906,14 +1908,16 @@ export default function ClientPortal({ showToast }) {
                     style={{ width: 'auto', padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold', borderRadius: '8px', border: '2px solid #18181b' }}
                     value={selectedPortalMonth || 'all'}
                     onChange={(e) => {
-                      const val = e.target.value === 'all' ? '' : e.target.value;
+                      // 'all' is sent through as-is: an empty month means "let the server pick
+                      // the latest month", which is not the same thing as an all-time total.
+                      const val = e.target.value;
                       setSelectedPortalMonth(val);
                       checkPortalAuth(val);
                     }}
                   >
                     <option value="all">All Months (Total)</option>
                     {availablePortalMonths.map(m => (
-                      <option key={m} value={m}>{formatMonthStr(m)}</option>
+                      <option key={m} value={m}>{formatMonthName(m)}</option>
                     ))}
                   </select>
                 </div>
@@ -1962,12 +1966,28 @@ export default function ClientPortal({ showToast }) {
               )}
 
               {overview.ads && (
-                <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                  <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Leads Captured</span>
-                  <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#0284c7', display: 'block', marginTop: '4px' }}>
-                    {overview.ads.total_leads || 0}
-                  </span>
-                </div>
+                <>
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Leads Captured</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#0284c7', display: 'block', marginTop: '4px' }}>
+                      {overview.ads.total_leads || 0}
+                    </span>
+                  </div>
+
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Qualified Leads</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#16a34a', display: 'block', marginTop: '4px' }}>
+                      {overview.ads.qualified_leads || 0}
+                    </span>
+                  </div>
+
+                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Confirmed Bookings</span>
+                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#2563eb', display: 'block', marginTop: '4px' }}>
+                      {overview.ads.appointments_booked || 0}
+                    </span>
+                  </div>
+                </>
               )}
             </div>
 
