@@ -1,15 +1,23 @@
 /**
  * Chooses which model each skill requests, via the chat-model-switch plugin.
  *
- * History: this used to set which OpenClaw *agent* a run dispatched to,
- * because the plan was for the model to follow the agent
- * (agent.defaults.model.primary). Confirmed 2026-07-30 that OpenClaw never
- * actually routed on the agentId field — every call executed on 'main'
- * regardless. The column is repurposed: it now selects a phrase embedded in
- * the trigger message, which OpenClaw's chat-model-switch plugin reads out of
- * the prompt text and uses to override the session's model for that call.
- * Unverified for hook-triggered runs as of 2026-07-30 — check actual_model
- * on a real run before trusting it.
+ * WARNING: agent_id does two things, and only one of them is visible here.
+ *
+ * It picks the model phrase below, AND it is sent to OpenClaw as the agentId
+ * that serves the run. The note that OpenClaw "never routed on agentId" held
+ * only until it gained a second agent on 2026-07-30; setting this to 'seo'
+ * then sent every audit to a bare agent with no hyphening-ops-api skill, which
+ * ran them and never POSTed results back. Four runs timed out before anyone
+ * connected the two. Only set values naming an agent provisioned with the
+ * Hyphening API skills — 'main' is the one known to be.
+ *
+ * Note that show() below groups by model phrase, not by agent_id, and both
+ * 'main' and 'seo' resolve to the same "no model named" bucket — so this
+ * script's output cannot confirm which agent you are routing to. Query
+ * agent_run_config.agent_id directly for that.
+ *
+ * Model selection itself is unverified for hook-triggered runs as of
+ * 2026-07-30 — check actual_model on a real run before trusting it.
  *
  *   main (default) -> "nemotron ultra"   ('main' is configured as Nemotron
  *                                         as of 2026-07-30; this states it
@@ -49,6 +57,20 @@ function show() {
   for (const [phrase, skills] of Object.entries(byPhrase)) {
     const label = phrase === 'null' ? 'no model named (agent default)' : `"${phrase}"`;
     console.log(`  ${label}  (${skills.length})`);
+    console.log(`    ${skills.join(', ')}\n`);
+  }
+
+  // Shown separately because the grouping above collapses every agent that
+  // names no model into one bucket — which hid a run of audits routed to an
+  // unprovisioned 'seo' agent, since it looked identical to 'main'.
+  const byAgent = {};
+  for (const r of rows) {
+    const key = r.agent_id || '(null — falls back to OPENCLAW_AGENT_ID or main)';
+    (byAgent[key] = byAgent[key] || []).push(r.audit_type);
+  }
+  console.log('Serving agent (sent to OpenClaw as agentId):\n');
+  for (const [agentId, skills] of Object.entries(byAgent)) {
+    console.log(`  ${agentId}  (${skills.length})`);
     console.log(`    ${skills.join(', ')}\n`);
   }
 }

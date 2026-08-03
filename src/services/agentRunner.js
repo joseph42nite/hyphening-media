@@ -61,8 +61,11 @@ export function spawnAgent(run, model) {
   const modelPhrase = modelPhraseFor(run.agent_id);
   if (modelPhrase) args.push('--modelPhrase', modelPhrase);
 
-  // Kept for the (currently theoretical) case OpenClaw wires real agent-level
-  // dispatch later — inert today, does not affect which model runs.
+  // Selects which OpenClaw agent serves the run. Not theoretical and not
+  // inert — see the agentId note in openclaw_seo_runner.js. Routing to an
+  // agent that lacks the hyphening-ops-api skill produces runs that complete
+  // on OpenClaw's side and never call the webhook back, which surfaces here
+  // only as a timeout 20+ minutes later.
   if (run.agent_id) args.push('--agentId', run.agent_id);
 
   console.log(`[AGENT RUNNER] Spawning: node ${args.join(' ')}`);

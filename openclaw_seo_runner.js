@@ -28,11 +28,20 @@ const model = args.model || 'primary'; // Use 'primary' as per the new API spec
 const triggeredBy = args.triggeredBy || 'system';
 const runId = args.runId || null; // our seo_agent_runs.id, for webhook correlation
 
-// Historical note, not a working mechanism: sending a different `agentId` in
-// the hook payload does not change which model runs. OpenClaw confirmed
-// 2026-07-30 that /hooks/agent accepts the field but never routes on it —
-// every call executes on 'main' regardless. Still sent below in case that
-// changes later; nothing currently depends on it.
+// This field DOES route, and getting it wrong silently breaks every audit.
+//
+// It was documented here as inert — OpenClaw stated 2026-07-30 that
+// /hooks/agent accepts `agentId` but always executes on 'main'. That was true
+// only because no other agent existed yet. OpenClaw created a 'seo' agent later
+// that same day, and from then on every run we sent with agentId='seo' landed
+// in it. That agent is a bare workspace: no hyphening-ops-api skill, no webhook
+// config. It ran the audits, wrote local files, and never POSTed anything back,
+// so runs 4, 5, 8 and 9 all timed out waiting for create_seo_audit.
+//
+// Only name an agent that is provisioned with the Hyphening API skills. 'main'
+// is the one known to be. Before pointing this at anything else, confirm the
+// target agent can reach POST /api/openclaw/webhook — a run that never calls
+// back is indistinguishable from a hung one for 20 minutes.
 const OPENCLAW_AGENT_ID = args.agentId || process.env.OPENCLAW_AGENT_ID || 'main';
 
 // Optional model override, read by OpenClaw's chat-model-switch plugin out of

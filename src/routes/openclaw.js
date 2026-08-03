@@ -79,7 +79,19 @@ router.post('/webhook', (req, res) => {
     const nonce = req.headers['x-openclaw-nonce'];
 
     // Verify signature
+    //
+    // Logged, because a silent 401 here is indistinguishable from OpenClaw
+    // never calling at all. A secret mismatch used to leave no trace on either
+    // side: OpenClaw reports "posted the result", our logs show nothing, and
+    // the run sits until it times out. The event_type is safe to log; the
+    // signature itself is not, so only its length is recorded — enough to tell
+    // a truncated header from a wrong secret.
     if (!signature || !verifySignature(req.body, signature)) {
+      console.warn(
+        `[OPENCLAW] Rejected webhook (401): ${signature ? 'signature mismatch' : 'no x-openclaw-signature header'}. ` +
+        `event_type=${req.body?.event_type || '(none)'} signature_length=${signature?.length ?? 0} ` +
+        `hmac_secret_configured=${!!HMAC_SECRET}`
+      );
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
@@ -206,8 +218,31 @@ function executeEvent(eventType, payload) {
     }
   } catch (err) {
     console.error(`[OPENCLAW] Error executing ${eventType}:`, err);
+    // The error alone is not actionable. A CHECK constraint failure prints the
+    // whole allowed-values list but never the value that violated it, so two
+    // rejected create_seo_audit calls (2026-08-03) discarded finished audits
+    // without leaving any way to tell which audit_type OpenClaw had sent. The
+    // tokens were already spent, so the payload is worth a log line.
+    console.error(`[OPENCLAW] Failed payload for ${eventType}: ${safeSummarisePayload(payload)}`);
     return { success: false, summary: `Error: ${err.message}` };
   }
+}
+
+/**
+ * Compact, log-safe view of a rejected payload: the identifying fields that
+ * tell us which call failed, plus the key list. Deliberately excludes the bulk
+ * fields (report_json, recommendations, summary) — they are large and can carry
+ * scraped page content into the logs.
+ */
+function safeSummarisePayload(payload) {
+  if (!payload || typeof payload !== 'object') return String(payload);
+  const { client_id, audit_type, url, page_url, run_id, status } = payload;
+  const identifiers = { client_id, audit_type, url, page_url, run_id, status };
+  const named = Object.entries(identifiers)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+    .join(' ');
+  return `${named || '(no identifying fields)'} | keys: ${Object.keys(payload).join(', ')}`;
 }
 
 // ============================================================
