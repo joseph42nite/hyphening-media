@@ -2640,8 +2640,19 @@ export default function ClientPortal({ showToast }) {
                     </div>
 
                     {isConn && info.accountName && (
-                      <div style={{ fontSize: '0.75rem', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e4e4e7', color: '#09090b', fontWeight: 700 }}>
-                        Account: <strong style={{ color: '#dc2626' }}>@{info.accountName.replace(/^@/, '')}</strong>
+                      <div style={{
+                        fontSize: '0.72rem',
+                        background: '#f8fafc',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #e4e4e7',
+                        color: '#09090b',
+                        fontWeight: 700,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }} title={`@${info.accountName.replace(/^@/, '')}`}>
+                        Account: <strong style={{ color: '#059669' }}>@{info.accountName.replace(/^@/, '')}</strong>
                       </div>
                     )}
 
