@@ -1107,9 +1107,65 @@ function recalculateArtistRollups(artistId) {
   );
 }
 
+// Mirrors the CHECK constraint on seo_audits.audit_type (migration 043). Kept
+// here so a bad value is rejected with a readable message instead of surfacing
+// as a SqliteError, and so normaliseAuditType can tell "needs rewriting" from
+// "genuinely unknown". Keep in sync with the migration.
+const VALID_AUDIT_TYPES = new Set([
+  'full', 'page', 'technical', 'content', 'content_brief', 'schema', 'sitemap',
+  'images', 'geo', 'local', 'maps', 'hreflang', 'google', 'backlinks', 'cluster',
+  'sxo', 'drift', 'ecommerce', 'flow', 'competitor_pages', 'plan', 'programmatic',
+  'dataforseo', 'image_gen'
+]);
+
+/**
+ * Accepts OpenClaw's skill names as audit types.
+ *
+ * Each SEO sub-skill's webhook template substitutes its own SKILL.md `name`
+ * into audit_type, which yields 'seo-schema' or 'seo-image-gen' rather than
+ * 'schema' or 'image_gen'. Only 2 of OpenClaw's 21 sub-skills happen to produce
+ * a value our schema accepts (confirmed 2026-08-03). The orchestrator sends
+ * hardcoded correct values, so hook-triggered runs were unaffected — but any
+ * sub-skill invoked directly hit the CHECK constraint and the finished audit
+ * was discarded with a 500, after the tokens had already been spent.
+ *
+ * Rewriting on receipt fixes both failure modes at once: the insert, and the
+ * run correlation in finishActiveRunFor, which matches on seo_agent_runs
+ * .agent_type ('geo') and would never match 'seo-geo' either.
+ *
+ * Returns null for anything that is still unrecognised after rewriting, so a
+ * genuinely unknown type is reported rather than silently coerced.
+ */
+function normaliseAuditType(raw) {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim().toLowerCase();
+  if (VALID_AUDIT_TYPES.has(trimmed)) return trimmed;
+
+  const rewritten = trimmed.replace(/^seo[-_]/, '').replace(/-/g, '_');
+  return VALID_AUDIT_TYPES.has(rewritten) ? rewritten : null;
+}
+
 function handleCreateSeoAudit(payload) {
   if (!payload?.client_id || !payload?.audit_type || !payload?.url) {
     return { success: false, summary: 'client_id, audit_type, and url are required' };
+  }
+
+  // Normalised in place: audit_type is read in ~15 places below, including the
+  // insert and the run correlation, and all of them need the canonical value.
+  const receivedAuditType = payload.audit_type;
+  const auditType = normaliseAuditType(receivedAuditType);
+
+  if (!auditType) {
+    console.warn(`[OPENCLAW] Rejected create_seo_audit: unrecognised audit_type ${JSON.stringify(receivedAuditType)} (client ${payload.client_id}).`);
+    return {
+      success: false,
+      summary: `Unrecognised audit_type '${receivedAuditType}'. Accepted values: ${[...VALID_AUDIT_TYPES].join(', ')}`
+    };
+  }
+
+  if (auditType !== receivedAuditType) {
+    console.log(`[OPENCLAW] Normalised audit_type ${JSON.stringify(receivedAuditType)} -> '${auditType}' (client ${payload.client_id}). OpenClaw is sending skill names; the sending skill's template should be corrected.`);
+    payload.audit_type = auditType;
   }
 
   // Support two formats:

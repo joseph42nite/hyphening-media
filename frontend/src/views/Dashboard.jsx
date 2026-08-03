@@ -105,7 +105,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [reviewQueue, setReviewQueue] = useState([]);
   
   // Selected client for marketing reports
-  const [selectedClientForReports, setSelectedClientForReports] = useState(null);
+  const [selectedClientForReports, setSelectedClientForReports] = useState({ id: 'all', name: 'All Clients' });
+  const [allClientsOverview, setAllClientsOverview] = useState([]);
   const [marketingContent, setMarketingContent] = useState([]);
   const [adCampaigns, setAdCampaigns] = useState([]);
   const [availableAdMonths, setAvailableAdMonths] = useState([]);
@@ -492,9 +493,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           const marketingClients = allClients.filter(c => c.client_type !== 'artist_curation');
           // Video editors don't need marketing reports/scripts data
           if (!isVideoEditor && marketingClients.length > 0) {
-            if (!selectedClientForReports) {
-              setSelectedClientForReports(marketingClients[0]);
-              fetchMarketingData(marketingClients[0].id);
+            if (!selectedClientForReports || selectedClientForReports.id === 'all') {
+              const allClientsOption = { id: 'all', name: 'All Clients' };
+              setSelectedClientForReports(allClientsOption);
+              fetchMarketingData('all');
             }
             if (!selectedScriptClient) {
               setSelectedScriptClient(marketingClients[0]);
@@ -593,6 +595,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchMarketingData = async (clientId, monthFilter = selectedAdMonth) => {
     try {
+      if (clientId === 'all') {
+        const oRes = await authFetch('/api/clients/marketing/all-overview');
+        if (oRes.ok) {
+          const oData = await oRes.json();
+          setAllClientsOverview(oData.overview || []);
+        }
+        return;
+      }
       const cRes = await authFetch(`/api/clients/${clientId}/marketing/content`);
       if (cRes.ok) {
         const cData = await cRes.json();
@@ -1313,6 +1323,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           <MarketingDataTab
             auth={auth}
             clients={clients}
+            allClientsOverview={allClientsOverview}
             marketingContent={marketingContent}
             adCampaigns={adCampaigns}
             availableAdMonths={availableAdMonths}

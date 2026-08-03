@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ContentModal from './ContentModal.jsx';
+import AllClientsMarketingDashboard from './AllClientsMarketingDashboard.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from './contentFormHelper.js';
 
 export default function MarketingDataTab({
   auth,
   clients,
+  allClientsOverview = [],
   marketingContent,
   adCampaigns = [],
   availableAdMonths = [],
@@ -257,14 +259,21 @@ export default function MarketingDataTab({
           <label className="form-label" style={{ margin: 0 }}>Select Client:</label>
           <select
             className="form-control"
-            value={selectedClientForReports?.id || ''}
+            value={selectedClientForReports?.id || 'all'}
             onChange={(e) => {
-              const client = clients.find(c => c.id === parseInt(e.target.value));
-              setSelectedClientForReports(client);
-              if (client) fetchMarketingData(client.id);
+              const val = e.target.value;
+              if (val === 'all') {
+                setSelectedClientForReports({ id: 'all', name: 'All Clients' });
+                fetchMarketingData('all');
+              } else {
+                const client = clients.find(c => c.id === parseInt(val));
+                setSelectedClientForReports(client);
+                if (client) fetchMarketingData(client.id);
+              }
             }}
-            style={{ maxWidth: '250px' }}
+            style={{ maxWidth: '280px', fontWeight: 'bold' }}
           >
+            <option value="all">🌐 All Clients (Dashboard)</option>
             {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
               <option key={c.id} value={c.id}>
                 {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
@@ -274,7 +283,15 @@ export default function MarketingDataTab({
         </div>
       </div>
 
-      {selectedClientForReports && (
+      {(!selectedClientForReports || selectedClientForReports.id === 'all') ? (
+        <AllClientsMarketingDashboard
+          overviewData={allClientsOverview}
+          onSelectClient={(client) => {
+            setSelectedClientForReports(client);
+            fetchMarketingData(client.id);
+          }}
+        />
+      ) : (
         <div>
           <div className="marketing-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ margin: 0 }}>Content Performance Tracker</h3>

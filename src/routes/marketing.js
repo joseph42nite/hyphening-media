@@ -53,6 +53,103 @@ router.get('/marketing/review-queue', authorize('admin', 'ops_social_media_manag
   }
 });
 
+/**
+ * GET /api/clients/marketing/all-overview
+ * Fetch performance overview & metric summaries across all active marketing clients.
+ */
+router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
+  try {
+    const clients = db.prepare("SELECT id, name, parent_name, client_type FROM crm_clients WHERE client_type != 'artist_curation' ORDER BY name ASC").all();
+
+    const overview = clients.map(client => {
+      // 1. Ad Metrics
+      const adStats = db.prepare(`
+        SELECT 
+          COALESCE(SUM(total_ad_spend_inr), 0) as total_spend,
+          COALESCE(SUM(actual_leads), SUM(leads), 0) as total_leads,
+          COALESCE(SUM(actual_qualified_leads), 0) as qualified_leads,
+          COALESCE(SUM(actual_confirmed_bookings), 0) as confirmed_bookings,
+          COALESCE(SUM(impressions), 0) as total_impressions,
+          COALESCE(SUM(clicks), 0) as total_clicks,
+          COALESCE(SUM(revenue_generated), 0) as total_revenue,
+          COUNT(id) as ad_campaigns_count
+        FROM marketing_ad_campaigns
+        WHERE client_id = ?
+      `).get(client.id);
+
+      const totalSpend = adStats ? adStats.total_spend || 0 : 0;
+      const totalLeads = adStats ? adStats.total_leads || 0 : 0;
+      const totalRev = adStats ? adStats.total_revenue || 0 : 0;
+      const avgCpl = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
+      const overallRoas = totalSpend > 0 ? parseFloat((totalRev / totalSpend).toFixed(2)) : 0;
+
+      // 2. Content Metrics
+      const contentStats = db.prepare(`
+        SELECT 
+          COUNT(id) as total_posts,
+          COALESCE(SUM(views + COALESCE(youtube_views, 0)), 0) as total_views,
+          COALESCE(SUM(likes), 0) as total_likes,
+          COALESCE(SUM(comments), 0) as total_comments,
+          COALESCE(SUM(shares), 0) as total_shares,
+          COALESCE(SUM(saves), 0) as total_saves,
+          COALESCE(AVG(engagement_rate_pct), 0) as avg_engagement_pct
+        FROM marketing_content_tracker
+        WHERE client_id = ?
+      `).get(client.id);
+
+      // 3. SEO / GMB Monthly Metrics
+      const seoStats = db.prepare(`
+        SELECT 
+          COALESCE(SUM(website_traffic), 0) as total_website_traffic,
+          COALESCE(SUM(gmb_views), 0) as total_gmb_views,
+          COALESCE(SUM(gmb_clicks), 0) as total_gmb_clicks,
+          COALESCE(SUM(calls), 0) as total_calls,
+          COALESCE(SUM(directions), 0) as total_directions
+        FROM marketing_monthly_report
+        WHERE client_id = ?
+      `).get(client.id);
+
+      return {
+        id: client.id,
+        name: client.name,
+        parent_name: client.parent_name,
+        ad_metrics: {
+          total_spend: totalSpend,
+          total_leads: totalLeads,
+          qualified_leads: adStats ? adStats.qualified_leads : 0,
+          confirmed_bookings: adStats ? adStats.confirmed_bookings : 0,
+          impressions: adStats ? adStats.total_impressions : 0,
+          clicks: adStats ? adStats.total_clicks : 0,
+          avg_cpl: avgCpl,
+          roas: overallRoas,
+          campaigns_count: adStats ? adStats.ad_campaigns_count : 0
+        },
+        content_metrics: {
+          total_posts: contentStats ? contentStats.total_posts : 0,
+          total_views: contentStats ? contentStats.total_views : 0,
+          total_likes: contentStats ? contentStats.total_likes : 0,
+          total_comments: contentStats ? contentStats.total_comments : 0,
+          total_shares: contentStats ? contentStats.total_shares : 0,
+          total_saves: contentStats ? contentStats.total_saves : 0,
+          avg_engagement_pct: contentStats ? parseFloat(contentStats.avg_engagement_pct.toFixed(2)) : 0
+        },
+        seo_metrics: {
+          website_traffic: seoStats ? seoStats.total_website_traffic : 0,
+          gmb_views: seoStats ? seoStats.total_gmb_views : 0,
+          gmb_clicks: seoStats ? seoStats.total_gmb_clicks : 0,
+          calls: seoStats ? seoStats.total_calls : 0,
+          directions: seoStats ? seoStats.total_directions : 0
+        }
+      };
+    });
+
+    res.json({ overview });
+  } catch (err) {
+    console.error('[MARKETING] All overview error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     if (req.user.role === 'ops_video_editor') {
