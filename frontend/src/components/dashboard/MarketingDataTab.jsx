@@ -36,7 +36,12 @@ export default function MarketingDataTab({
 
   useEffect(() => {
     setContentPage(1);
-  }, [selectedClientForReports?.id, marketingContent.length]);
+    if (selectedClientForReports?.id === 'all' || !selectedClientForReports) {
+      fetchMarketingData('all');
+    } else if (selectedClientForReports?.id) {
+      fetchMarketingData(selectedClientForReports.id);
+    }
+  }, [selectedClientForReports?.id]);
 
   // Modal local states (Content Row)
   const [showContentModal, setShowContentModal] = useState(false);
