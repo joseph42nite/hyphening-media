@@ -120,7 +120,7 @@ export default function AllClientsMarketingDashboard({ overviewData = [], onSele
 
       {/* 2. Interactive Bar Chart Container */}
       <div style={{ background: '#ffffff', padding: '24px', borderRadius: '18px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)', marginBottom: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.02em' }}>
               <BarChart3 size={22} color="#000000" />
@@ -377,28 +377,77 @@ function ClientBarGraph({
   const maxPrimary = Math.max(...data.map(c => primaryKey(c)), 1);
   const maxSecondary = Math.max(...data.map(c => secondaryKey(c)), 1);
 
+  const hoveredClient = hoveredIdx !== null ? data[hoveredIdx] : null;
+
   return (
     <div style={{ marginTop: '8px' }}>
-      {/* Neo-Brutalist Legend */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', border: '2px solid #000000', borderRadius: '8px', background: '#ffffff', boxShadow: '2px 2px 0px #000000' }}>
-          <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: primaryColor, border: '1px solid #000000' }} />
-          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#000000' }}>{primaryLabel}</span>
+      {/* Top Control Bar: Legend + Active Hover Banner */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        
+        {/* Live Hover Detail Banner (100% in-flow, zero overflow/clipping guaranteed) */}
+        <div style={{ flex: 1, minWidth: '280px' }}>
+          {hoveredClient ? (
+            <div style={{
+              background: '#000000',
+              color: '#ffffff',
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: '2px solid #000000',
+              boxShadow: '3px 3px 0px #000000',
+              display: 'flex',
+              alignItems: 'center',
+              justify: 'space-between',
+              gap: '12px',
+              fontSize: '0.82rem',
+              fontWeight: 800
+            }}>
+              <span style={{ color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                📍 {hoveredClient.parent_name ? `${hoveredClient.parent_name} - ${hoveredClient.name}` : hoveredClient.name}
+              </span>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <span>🔹 {primaryLabel}: <strong style={{ color: '#4ade80' }}>{formatPrimary(primaryKey(hoveredClient))}</strong></span>
+                <span>🔸 {secondaryLabel}: <strong style={{ color: '#60a5fa' }}>{formatSecondary(secondaryKey(hoveredClient))}</strong></span>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: '#f4f4f5',
+              color: 'var(--text-muted)',
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: '2px dashed #000000',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              💡 Hover over any client bar below for metric breakdown
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', border: '2px solid #000000', borderRadius: '8px', background: '#ffffff', boxShadow: '2px 2px 0px #000000' }}>
-          <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: secondaryColor, border: '1px solid #000000' }} />
-          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#000000' }}>{secondaryLabel}</span>
+
+        {/* Neo-Brutalist Legend */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', border: '2px solid #000000', borderRadius: '8px', background: '#ffffff', boxShadow: '2px 2px 0px #000000' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: primaryColor, border: '1px solid #000000' }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#000000' }}>{primaryLabel}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', border: '2px solid #000000', borderRadius: '8px', background: '#ffffff', boxShadow: '2px 2px 0px #000000' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: secondaryColor, border: '1px solid #000000' }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#000000' }}>{secondaryLabel}</span>
+          </div>
         </div>
       </div>
 
-      {/* Bar Chart Container with generous top space to prevent tooltip clipping */}
+      {/* Bar Chart Container */}
       <div style={{
         display: 'flex',
         gap: '24px',
         overflowX: 'auto',
-        paddingTop: '50px',
+        paddingTop: '24px',
         paddingBottom: '16px',
-        minHeight: '300px',
+        minHeight: '260px',
         alignItems: 'flex-end',
         borderBottom: '3px solid #000000',
         position: 'relative'
@@ -420,48 +469,21 @@ function ClientBarGraph({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '12px',
-                position: 'relative'
+                gap: '10px',
+                position: 'relative',
+                padding: '4px',
+                borderRadius: '8px',
+                background: isHovered ? 'rgba(0,0,0,0.03)' : 'transparent',
+                transition: 'background 0.15s ease'
               }}
               onMouseEnter={() => setHoveredIdx(idx)}
               onMouseLeave={() => setHoveredIdx(null)}
             >
-              {/* Neo-Brutalist Tooltip on Hover */}
-              {isHovered && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: '100%',
-                    marginBottom: '12px',
-                    background: '#000000',
-                    color: '#ffffff',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '2px solid #000000',
-                    boxShadow: '4px 4px 0px rgba(0,0,0,0.3)',
-                    fontSize: '0.78rem',
-                    zIndex: 100,
-                    whiteSpace: 'nowrap',
-                    pointerEvents: 'none'
-                  }}
-                >
-                  <div style={{ fontWeight: 900, marginBottom: '6px', borderBottom: '1px solid #334155', paddingBottom: '4px', textTransform: 'uppercase', color: '#38bdf8' }}>
-                    {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
-                  </div>
-                  <div style={{ color: '#ffffff', fontWeight: 800, margin: '2px 0' }}>
-                    🔹 {primaryLabel}: <span style={{ color: '#4ade80' }}>{formatPrimary(valPrimary)}</span>
-                  </div>
-                  <div style={{ color: '#ffffff', fontWeight: 800, margin: '2px 0' }}>
-                    🔸 {secondaryLabel}: <span style={{ color: '#60a5fa' }}>{formatSecondary(valSecondary)}</span>
-                  </div>
-                </div>
-              )}
-
               {/* Bars Group */}
-              <div style={{ display: 'flex', gap: '8px', height: '220px', alignItems: 'flex-end', width: '100%', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '8px', height: '200px', alignItems: 'flex-end', width: '100%', justifyContent: 'center' }}>
                 
                 {/* Primary Bar */}
-                <div style={{ width: '28px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <div style={{ width: '32px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
                   {/* Clean Neo-Brutalist Value Pill above bar */}
                   <div
                     style={{
@@ -469,12 +491,14 @@ function ClientBarGraph({
                       fontWeight: 900,
                       marginBottom: '4px',
                       color: '#000000',
-                      background: '#ffffff',
+                      background: isHovered ? primaryColor : '#ffffff',
+                      color: isHovered ? '#ffffff' : '#000000',
                       border: '1px solid #000000',
                       borderRadius: '4px',
-                      padding: '1px 4px',
+                      padding: '1px 5px',
                       whiteSpace: 'nowrap',
-                      boxShadow: '1px 1px 0px #000000'
+                      boxShadow: '1px 1px 0px #000000',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     {valPrimary > 0 ? formatPrimary(valPrimary) : '0'}
@@ -494,7 +518,7 @@ function ClientBarGraph({
                 </div>
 
                 {/* Secondary Bar */}
-                <div style={{ width: '28px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <div style={{ width: '32px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
                   {/* Clean Neo-Brutalist Value Pill above bar */}
                   <div
                     style={{
@@ -502,12 +526,14 @@ function ClientBarGraph({
                       fontWeight: 900,
                       marginBottom: '4px',
                       color: '#000000',
-                      background: '#ffffff',
+                      background: isHovered ? secondaryColor : '#ffffff',
+                      color: isHovered ? '#ffffff' : '#000000',
                       border: '1px solid #000000',
                       borderRadius: '4px',
-                      padding: '1px 4px',
+                      padding: '1px 5px',
                       whiteSpace: 'nowrap',
-                      boxShadow: '1px 1px 0px #000000'
+                      boxShadow: '1px 1px 0px #000000',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     {valSecondary > 0 ? formatSecondary(valSecondary) : '0'}
@@ -532,16 +558,18 @@ function ClientBarGraph({
               <div
                 style={{
                   fontSize: '0.78rem',
-                  fontWeight: 800,
+                  fontWeight: 900,
                   color: isHovered ? '#000000' : 'var(--text-primary)',
                   textAlign: 'center',
                   textOverflow: 'ellipsis',
                   overflow: 'hidden',
                   whiteSpace: 'nowrap',
                   maxWidth: '110px',
-                  background: isHovered ? '#e4e4e7' : 'transparent',
+                  background: isHovered ? '#ffffff' : 'transparent',
+                  border: isHovered ? '1px solid #000000' : '1px solid transparent',
                   padding: '2px 6px',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  boxShadow: isHovered ? '1px 1px 0px #000000' : 'none'
                 }}
                 title={clientName}
               >
