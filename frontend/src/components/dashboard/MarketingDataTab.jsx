@@ -8,7 +8,10 @@ export default function MarketingDataTab({
   auth,
   clients,
   marketingContent,
-  adCampaigns,
+  adCampaigns = [],
+  availableAdMonths = [],
+  selectedAdMonth = '',
+  setSelectedAdMonth,
   monthlyReports,
   fetchMarketingData,
   fetchCalendarMarketingContent,
@@ -542,7 +545,7 @@ export default function MarketingDataTab({
                 onClick={() => {
                   const currIdx = availableAdMonths.indexOf(selectedAdMonth);
                   const nextMonth = currIdx < availableAdMonths.length - 1 ? availableAdMonths[currIdx + 1] : selectedAdMonth;
-                  if (nextMonth && setSelectedAdMonth) {
+                  if (nextMonth && setSelectedAdMonth && selectedClientForReports?.id) {
                     setSelectedAdMonth(nextMonth);
                     fetchMarketingData(selectedClientForReports.id, nextMonth);
                   }
@@ -558,7 +561,9 @@ export default function MarketingDataTab({
                 onChange={(e) => {
                   const val = e.target.value === 'all' ? '' : e.target.value;
                   if (setSelectedAdMonth) setSelectedAdMonth(val);
-                  fetchMarketingData(selectedClientForReports.id, val);
+                  if (selectedClientForReports?.id) {
+                    fetchMarketingData(selectedClientForReports.id, val);
+                  }
                 }}
               >
                 <option value="all">All Months (Total)</option>
@@ -574,7 +579,7 @@ export default function MarketingDataTab({
                 onClick={() => {
                   const currIdx = availableAdMonths.indexOf(selectedAdMonth);
                   const prevMonth = currIdx > 0 ? availableAdMonths[currIdx - 1] : selectedAdMonth;
-                  if (prevMonth && setSelectedAdMonth) {
+                  if (prevMonth && setSelectedAdMonth && selectedClientForReports?.id) {
                     setSelectedAdMonth(prevMonth);
                     fetchMarketingData(selectedClientForReports.id, prevMonth);
                   }
