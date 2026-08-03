@@ -1203,6 +1203,31 @@ export default function ClientPortal({ showToast }) {
     return () => clearInterval(intervalId);
   }, [isVerified, leads, leadAlertsEnabled, token, clientType]);
 
+  // Real-time SSE Connection Hook for Client Portal
+  useEffect(() => {
+    if (!isVerified) return;
+
+    const es = new EventSource(`${API_BASE}/api/events`, { withCredentials: true });
+    
+    es.addEventListener('task_updated', () => {
+      fetchData();
+    });
+
+    es.addEventListener('content_approved', () => {
+      checkPortalAuth();
+      fetchData();
+    });
+
+    es.addEventListener('client_feedback', () => {
+      checkPortalAuth();
+      fetchData();
+    });
+
+    return () => {
+      es.close();
+    };
+  }, [isVerified, token]);
+
   const checkPortalAuth = async () => {
     try {
       const response = await fetch(`${API_BASE}/api/portal/${token}/overview`, { credentials: 'include' });

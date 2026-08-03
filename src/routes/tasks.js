@@ -151,6 +151,11 @@ router.post('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manage
     }
 
     const newTask = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(result.lastInsertRowid);
+
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('task_updated', newTask);
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
+
     res.status(201).json(newTask);
   } catch (err) {
     console.error('[TASKS] Create error:', err);
@@ -212,7 +217,13 @@ router.patch('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_ma
       console.error('[TELEGRAM] Notification error during task update:', telegramErr.message);
     }
 
-    res.json(db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(req.params.id));
+    const updatedTask = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(req.params.id);
+
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('task_updated', updatedTask);
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
+
+    res.json(updatedTask);
   } catch (err) {
     console.error('[TASKS] Update error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -282,7 +293,13 @@ const statusHandler = (req, res) => {
       ip: req.ip,
     });
 
-    res.json(db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(req.params.id));
+    const updatedTask = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(req.params.id);
+
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('task_updated', updatedTask);
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
+
+    res.json(updatedTask);
   } catch (err) {
     console.error('[TASKS] Status change error:', err);
     res.status(500).json({ error: 'Internal server error' });

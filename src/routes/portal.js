@@ -662,6 +662,10 @@ router.post('/:token/content-plan/script/:scriptId/approve', portalAuth, (req, r
       diff: { client: req.portalClient.name, is_standalone_script: !relation },
     });
 
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('content_approved', { client_id: req.portalClient.id, script_id: req.params.scriptId });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
+
     res.json({ message: 'Script approved', status: 'Client Approved' });
   } catch (err) {
     console.error('[PORTAL] Approve script error:', err);
@@ -719,6 +723,11 @@ router.post('/:token/content-plan/script/:scriptId/reject', portalAuth, (req, re
 
     notifyAdmin(`⚠️ *Client Revision Request*\nClient *${req.portalClient.name}* requested changes on script *"${script.title}"*\n\n💬 *Feedback:* ${comment}`);
 
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('client_feedback', { client_id: req.portalClient.id, message: `Revision requested on script "${script.title}": ${comment}` });
+      broadcastEvent('task_updated', { title: script.title, status: 'todo' });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
+
     res.json({ message: 'Changes requested', status: 'Client Rejected' });
   } catch (err) {
     console.error('[PORTAL] Reject script error:', err);
@@ -754,6 +763,10 @@ router.post('/:token/content-plan/:contentId/approve', portalAuth, (req, res) =>
       entityId: parseInt(req.params.contentId),
       diff: { client: req.portalClient.name },
     });
+
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('content_approved', { client_id: req.portalClient.id, content_id: req.params.contentId });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
 
     res.json({ message: 'Content approved', status: 'Client Approved' });
   } catch (err) {
@@ -797,6 +810,11 @@ router.post('/:token/content-plan/:contentId/reject', portalAuth, (req, res) => 
     // Send Telegram alert to Ops Manager
     notifyAdmin(`⚠️ *Client Revision Request*\nClient *${req.portalClient.name}* requested changes on *"${content.title}"*\n\n💬 *Feedback:* ${comment}`);
 
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('client_feedback', { client_id: req.portalClient.id, message: `Revision requested on "${content.title}": ${comment}` });
+      broadcastEvent('task_updated', { title: content.title, status: 'todo' });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
+
     res.json({ message: 'Changes requested', status: 'Client Rejected' });
   } catch (err) {
     console.error('[PORTAL] Reject error:', err);
@@ -818,6 +836,10 @@ router.post('/:token/feedback', portalAuth, (req, res) => {
 
     // Send Telegram alert
     notifyAdmin(`💬 *New Client Feedback*\nClient: *${req.portalClient.name}*\n\n📝 *Message:* ${message}`);
+
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('client_feedback', { client_id: req.portalClient.id, message });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
 
     res.json({ message: 'Feedback submitted. Our team will review it shortly.' });
   } catch (err) {

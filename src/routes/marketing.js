@@ -591,9 +591,33 @@ const getAdWithLeads = (adId) => {
 
 /**
  * GET /api/clients/:id/marketing/ads
+ * Accepts optional ?month=YYYY-MM parameter
  */
 router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
+    const { month } = req.query;
+    const clientId = req.params.id;
+
+    // Fetch all available months for dropdown / pagination
+    const campaignMonths = db.prepare(`
+      SELECT DISTINCT COALESCE(NULLIF(month, ''), strftime('%Y-%m', created_at)) as month
+      FROM marketing_ad_campaigns
+      WHERE client_id = ?
+      UNION
+      SELECT DISTINCT strftime('%Y-%m', created_at) as month
+      FROM campaign_leads
+      WHERE client_id = ? AND created_at IS NOT NULL
+      ORDER BY month DESC
+    `).all(clientId, clientId).map(r => r.month).filter(Boolean);
+
+    let whereClause = 'WHERE a.client_id = ?';
+    const queryParams = [clientId];
+
+    if (month && month !== 'all') {
+      whereClause += " AND (a.month = ? OR (a.month IS NULL AND strftime('%Y-%m', a.created_at) = ?))";
+      queryParams.push(month, month);
+    }
+
     let ads = db.prepare(`
       SELECT 
         a.*,
@@ -606,6 +630,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR
               ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
             )
+            ${month && month !== 'all' ? "AND strftime('%Y-%m', l.created_at) = '" + month + "'" : ""}
         ) as actual_leads,
         (
           SELECT COUNT(l.id) 
@@ -617,14 +642,22 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
             )
             AND (l.qualification_status = 'Qualified' OR l.lead_status IN ('Qualified', 'Appointment Booked'))
+            ${month && month !== 'all' ? "AND strftime('%Y-%m', l.created_at) = '" + month + "'" : ""}
         ) as actual_qualified_leads
       FROM marketing_ad_campaigns a
-      WHERE a.client_id = ?
+      ${whereClause}
       ORDER BY a.created_at DESC
-    `).all(req.params.id);
+    `).all(...queryParams);
 
     // If no explicit marketing_ad_campaigns entries exist, aggregate from campaign_leads so lead data from portal is reflected
     if (ads.length === 0) {
+      let leadWhere = 'WHERE client_id = ?';
+      const leadParams = [clientId];
+      if (month && month !== 'all') {
+        leadWhere += " AND strftime('%Y-%m', created_at) = ?";
+        leadParams.push(month);
+      }
+
       const leadCampaigns = db.prepare(`
         SELECT 
           LOWER(COALESCE(NULLIF(TRIM(platform), ''), 'Other')) as platform_key,
@@ -634,14 +667,14 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
           COUNT(id) as actual_leads,
           SUM(CASE WHEN qualification_status = 'Qualified' OR lead_status IN ('Qualified', 'Appointment Booked') THEN 1 ELSE 0 END) as actual_qualified_leads
         FROM campaign_leads
-        WHERE client_id = ?
+        ${leadWhere}
         GROUP BY platform_key, ad_campaign_name
         ORDER BY actual_leads DESC
-      `).all(req.params.id);
+      `).all(...leadParams);
 
       ads = leadCampaigns.map((lc, index) => ({
         id: `synth-${index + 1}`,
-        client_id: parseInt(req.params.id),
+        client_id: parseInt(clientId),
         platform: lc.platform,
         ad_campaign_name: lc.ad_campaign_name,
         leads: lc.leads,
@@ -658,7 +691,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
       }));
     }
 
-    res.json({ ads });
+    res.json({ ads, available_months: campaignMonths });
   } catch (err) {
     console.error('[MARKETING] Ads list error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -670,7 +703,8 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
  */
 router.post('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'), (req, res) => {
   try {
-    const { platform, ad_campaign_name, leads, total_ad_spend_inr, impressions, clicks, revenue_generated } = req.body;
+    const { platform, ad_campaign_name, leads, total_ad_spend_inr, impressions, clicks, revenue_generated, month } = req.body;
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
 
     const computed = computeAdMetrics({
       impressions: impressions || 0,
@@ -681,11 +715,11 @@ router.post('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager')
     });
 
     const result = db.prepare(`
-      INSERT INTO marketing_ad_campaigns (client_id, platform, ad_campaign_name, leads, total_ad_spend_inr, 
+      INSERT INTO marketing_ad_campaigns (client_id, month, platform, ad_campaign_name, leads, total_ad_spend_inr, 
         impressions, clicks, ctr_pct, cpc_inr, cpl_inr, revenue_generated, roas)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      req.params.id, platform || null, ad_campaign_name || null,
+      req.params.id, targetMonth, platform || null, ad_campaign_name || null,
       leads || 0, total_ad_spend_inr || 0, impressions || 0, clicks || 0,
       computed.ctr_pct, computed.cpc_inr, computed.cpl_inr,
       revenue_generated || 0, computed.roas

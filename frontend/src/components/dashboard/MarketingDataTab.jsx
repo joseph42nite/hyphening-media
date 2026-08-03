@@ -521,7 +521,108 @@ export default function MarketingDataTab({
             </div>
           )}
 
-          <h3 style={{ marginTop: '32px', marginBottom: '14px' }}>Ad Campaigns Performance</h3>
+          {/* Ad Campaigns Performance Section with MoM Month Selection & Pagination */}
+          <div style={{ marginTop: '32px', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h3 style={{ margin: 0 }}>Ad Campaigns Performance</h3>
+              {selectedAdMonth && (
+                <span className="badge badge-info" style={{ fontSize: '0.8rem', padding: '4px 8px' }}>
+                  {formatMonthStr(selectedAdMonth)}
+                </span>
+              )}
+            </div>
+
+            {/* Month Pagination & Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Month:</span>
+              <button
+                className="btn btn-secondary"
+                style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                disabled={!availableAdMonths.length || availableAdMonths.indexOf(selectedAdMonth) >= availableAdMonths.length - 1}
+                onClick={() => {
+                  const currIdx = availableAdMonths.indexOf(selectedAdMonth);
+                  const nextMonth = currIdx < availableAdMonths.length - 1 ? availableAdMonths[currIdx + 1] : selectedAdMonth;
+                  if (nextMonth && setSelectedAdMonth) {
+                    setSelectedAdMonth(nextMonth);
+                    fetchMarketingData(selectedClientForReports.id, nextMonth);
+                  }
+                }}
+              >
+                &larr; Prev
+              </button>
+
+              <select
+                className="form-control"
+                style={{ width: 'auto', padding: '4px 8px', fontSize: '0.85rem', fontWeight: 'bold' }}
+                value={selectedAdMonth || 'all'}
+                onChange={(e) => {
+                  const val = e.target.value === 'all' ? '' : e.target.value;
+                  if (setSelectedAdMonth) setSelectedAdMonth(val);
+                  fetchMarketingData(selectedClientForReports.id, val);
+                }}
+              >
+                <option value="all">All Months (Total)</option>
+                {availableAdMonths.map(m => (
+                  <option key={m} value={m}>{formatMonthStr(m)}</option>
+                ))}
+              </select>
+
+              <button
+                className="btn btn-secondary"
+                style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                disabled={!availableAdMonths.length || availableAdMonths.indexOf(selectedAdMonth) <= 0}
+                onClick={() => {
+                  const currIdx = availableAdMonths.indexOf(selectedAdMonth);
+                  const prevMonth = currIdx > 0 ? availableAdMonths[currIdx - 1] : selectedAdMonth;
+                  if (prevMonth && setSelectedAdMonth) {
+                    setSelectedAdMonth(prevMonth);
+                    fetchMarketingData(selectedClientForReports.id, prevMonth);
+                  }
+                }}
+              >
+                Next &rarr;
+              </button>
+            </div>
+          </div>
+
+          {/* MoM Performance Summary Cards */}
+          {adCampaigns.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Ad Spend</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, marginTop: '2px' }}>
+                  ₹{adCampaigns.reduce((acc, curr) => acc + (curr.total_ad_spend_inr || 0), 0).toLocaleString()}
+                </div>
+              </div>
+              <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Leads Captured</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)', marginTop: '2px' }}>
+                  {adCampaigns.reduce((acc, curr) => acc + (curr.actual_leads || curr.leads || 0), 0)}
+                </div>
+              </div>
+              <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Avg Cost Per Lead (CPL)</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, marginTop: '2px' }}>
+                  {(() => {
+                    const totalSpend = adCampaigns.reduce((acc, curr) => acc + (curr.total_ad_spend_inr || 0), 0);
+                    const totalLeads = adCampaigns.reduce((acc, curr) => acc + (curr.actual_leads || curr.leads || 0), 0);
+                    return totalLeads > 0 ? `₹${Math.round(totalSpend / totalLeads)}` : '-';
+                  })()}
+                </div>
+              </div>
+              <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Overall ROAS</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent)', marginTop: '2px' }}>
+                  {(() => {
+                    const totalSpend = adCampaigns.reduce((acc, curr) => acc + (curr.total_ad_spend_inr || 0), 0);
+                    const totalRev = adCampaigns.reduce((acc, curr) => acc + (curr.revenue_generated || 0), 0);
+                    return totalSpend > 0 ? `${(totalRev / totalSpend).toFixed(2)}x` : '-';
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
             <table>
               <thead>
@@ -543,7 +644,7 @@ export default function MarketingDataTab({
                 {adCampaigns.length === 0 ? (
                   <tr>
                     <td colSpan="11" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                      No ad campaigns tracked.
+                      No ad campaigns tracked for this selection.
                     </td>
                   </tr>
                 ) : (

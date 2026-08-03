@@ -108,6 +108,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [selectedClientForReports, setSelectedClientForReports] = useState(null);
   const [marketingContent, setMarketingContent] = useState([]);
   const [adCampaigns, setAdCampaigns] = useState([]);
+  const [availableAdMonths, setAvailableAdMonths] = useState([]);
+  const [selectedAdMonth, setSelectedAdMonth] = useState('');
   const [monthlyReports, setMonthlyReports] = useState([]);
   const [marketingScripts, setMarketingScripts] = useState([]);
   const [staffUsers, setStaffUsers] = useState([]);
@@ -588,7 +590,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
-  const fetchMarketingData = async (clientId) => {
+  const fetchMarketingData = async (clientId, monthFilter = selectedAdMonth) => {
     try {
       const cRes = await authFetch(`/api/clients/${clientId}/marketing/content`);
       if (cRes.ok) {
@@ -597,10 +599,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       }
       // Video editors only have access to content — skip ads, monthly, scripts
       if (!isVideoEditor) {
-        const adRes = await authFetch(`/api/clients/${clientId}/marketing/ads`);
+        const adUrl = `/api/clients/${clientId}/marketing/ads${monthFilter ? `?month=${monthFilter}` : ''}`;
+        const adRes = await authFetch(adUrl);
         if (adRes.ok) {
           const adData = await adRes.json();
           setAdCampaigns(adData.ads || []);
+          if (adData.available_months) {
+            setAvailableAdMonths(adData.available_months);
+          }
         }
         const rRes = await authFetch(`/api/clients/${clientId}/marketing/monthly`);
         if (rRes.ok) {
@@ -1302,6 +1308,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             clients={clients}
             marketingContent={marketingContent}
             adCampaigns={adCampaigns}
+            availableAdMonths={availableAdMonths}
+            selectedAdMonth={selectedAdMonth}
+            setSelectedAdMonth={setSelectedAdMonth}
             monthlyReports={monthlyReports}
             fetchMarketingData={fetchMarketingData}
             fetchCalendarMarketingContent={fetchCalendarMarketingContent}
