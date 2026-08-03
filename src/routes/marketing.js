@@ -617,12 +617,14 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     }
     const campaignMonths = Array.from(new Set(rawMonths)).sort().reverse();
 
+    const targetMonth = month !== undefined ? month : (campaignMonths.length > 0 ? campaignMonths[0] : currentMonth);
+
     let whereClause = 'WHERE a.client_id = ?';
     const queryParams = [clientId];
 
-    if (month && month !== 'all') {
+    if (targetMonth && targetMonth !== 'all') {
       whereClause += " AND (a.month = ? OR (a.month IS NULL AND SUBSTR(a.created_at, 1, 7) = ?))";
-      queryParams.push(month, month);
+      queryParams.push(targetMonth, targetMonth);
     }
 
     const explicitAds = db.prepare(`
@@ -637,7 +639,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR
               ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
             )
-            ${month && month !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + month + "'" : ""}
+            ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + targetMonth + "'" : ""}
         ) as actual_leads,
         (
           SELECT COUNT(l.id) 
@@ -653,7 +655,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR LOWER(TRIM(COALESCE(l.lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted') 
               OR LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
             )
-            ${month && month !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + month + "'" : ""}
+            ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + targetMonth + "'" : ""}
         ) as actual_qualified_leads,
         (
           SELECT COUNT(l.id) 
@@ -668,7 +670,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed') 
               OR LOWER(TRIM(COALESCE(l.lead_status, ''))) = 'appointment booked'
             )
-            ${month && month !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + month + "'" : ""}
+            ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + targetMonth + "'" : ""}
         ) as actual_confirmed_bookings
       FROM marketing_ad_campaigns a
       ${whereClause}
@@ -678,9 +680,9 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     // Fetch synthetic lead campaigns from campaign_leads to capture campaigns not explicitly listed in marketing_ad_campaigns
     let leadWhere = 'WHERE client_id = ?';
     const leadParams = [clientId];
-    if (month && month !== 'all') {
+    if (targetMonth && targetMonth !== 'all') {
       leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";
-      leadParams.push(month);
+      leadParams.push(targetMonth);
     }
 
     const leadCampaigns = db.prepare(`

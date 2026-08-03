@@ -124,11 +124,13 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     }
     const availableMonths = Array.from(new Set(rawMonths)).sort().reverse();
 
+    const targetMonth = month !== undefined ? month : (availableMonths.length > 0 ? availableMonths[0] : currentMonth);
+
     let leadWhere = 'WHERE client_id = ?';
     const leadParams = [clientId];
-    if (month && month !== 'all') {
+    if (targetMonth && targetMonth !== 'all') {
       leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";
-      leadParams.push(month);
+      leadParams.push(targetMonth);
     }
 
     const contentStats = db.prepare(`
@@ -145,7 +147,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
         SUM(saves) as total_saves
       FROM marketing_content_tracker 
       WHERE client_id = ? AND is_tracked = 1
-      ${month && month !== 'all' ? "AND strftime('%Y-%m', created_at) = '" + month + "'" : ""}
+      ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(created_at, 1, 7) = '" + targetMonth + "'" : ""}
     `).get(clientId);
 
     const leadStats = db.prepare(`
@@ -174,7 +176,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       SELECT platform, COUNT(*) as count, SUM(views) as views
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1
-      ${month && month !== 'all' ? "AND strftime('%Y-%m', created_at) = '" + month + "'" : ""}
+      ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(created_at, 1, 7) = '" + targetMonth + "'" : ""}
       GROUP BY platform
     `).all(clientId);
 
@@ -202,7 +204,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       SELECT date, title, (COALESCE(views, 0) + COALESCE(youtube_views, 0)) AS views, COALESCE(engagement_rate_pct, 0.0) AS engagement_rate_pct
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1 AND status IN ('Posted', 'Client Approved')
-      ${month && month !== 'all' ? "AND strftime('%Y-%m', created_at) = '" + month + "'" : ""}
+      ${targetMonth && targetMonth !== 'all' ? "AND SUBSTR(created_at, 1, 7) = '" + targetMonth + "'" : ""}
       ORDER BY date DESC
       LIMIT 8
     `).all(clientId);
