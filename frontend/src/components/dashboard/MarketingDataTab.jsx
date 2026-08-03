@@ -637,6 +637,7 @@ export default function MarketingDataTab({
                   <th>Leads (Ad Platform)</th>
                   <th>Captured Leads</th>
                   <th>Qualified Leads</th>
+                  <th>Confirmed Bookings</th>
                   <th>Spend</th>
                   <th>Impressions</th>
                   <th>Clicks</th>
@@ -648,7 +649,7 @@ export default function MarketingDataTab({
               <tbody>
                 {adCampaigns.length === 0 ? (
                   <tr>
-                    <td colSpan="11" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    <td colSpan="12" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                       No ad campaigns tracked for this selection.
                     </td>
                   </tr>
@@ -660,6 +661,7 @@ export default function MarketingDataTab({
                       <td>{ad.leads}</td>
                       <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{ad.actual_leads ?? 0}</td>
                       <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>{ad.actual_qualified_leads ?? 0}</td>
+                      <td style={{ fontWeight: 'bold', color: '#2563eb' }}>{ad.actual_confirmed_bookings ?? 0}</td>
                       <td>₹{ad.total_ad_spend_inr?.toLocaleString()}</td>
                       <td>{ad.impressions?.toLocaleString()}</td>
                       <td>{ad.clicks?.toLocaleString()}</td>

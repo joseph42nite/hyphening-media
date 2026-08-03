@@ -98,11 +98,31 @@ router.post('/:token/verify-pin', (req, res) => {
 
 /**
  * GET /api/portal/:token/overview
- * High-level KPIs for the client.
+ * High-level KPIs for the client, with optional ?month=YYYY-MM filtering.
  */
 router.get('/:token/overview', portalAuth, (req, res) => {
   try {
     const clientId = req.portalClient.id;
+    const { month } = req.query;
+
+    // Fetch all available months for the client portal sorted latest month first
+    const availableMonths = db.prepare(`
+      SELECT DISTINCT strftime('%Y-%m', created_at) as month
+      FROM campaign_leads
+      WHERE client_id = ? AND created_at IS NOT NULL
+      UNION
+      SELECT DISTINCT COALESCE(NULLIF(month, ''), strftime('%Y-%m', created_at)) as month
+      FROM marketing_ad_campaigns
+      WHERE client_id = ? AND created_at IS NOT NULL
+      ORDER BY month DESC
+    `).all(clientId, clientId).map(r => r.month).filter(Boolean);
+
+    let leadWhere = 'WHERE client_id = ?';
+    const leadParams = [clientId];
+    if (month && month !== 'all') {
+      leadWhere += " AND strftime('%Y-%m', created_at) = ?";
+      leadParams.push(month);
+    }
 
     const contentStats = db.prepare(`
       SELECT 
@@ -118,16 +138,24 @@ router.get('/:token/overview', portalAuth, (req, res) => {
         SUM(saves) as total_saves
       FROM marketing_content_tracker 
       WHERE client_id = ? AND is_tracked = 1
+      ${month && month !== 'all' ? "AND strftime('%Y-%m', created_at) = '" + month + "'" : ""}
     `).get(clientId);
 
     const leadStats = db.prepare(`
       SELECT 
         COUNT(*) as total_leads,
-        SUM(CASE WHEN lead_status = 'Qualified' THEN 1 ELSE 0 END) as qualified_leads,
-        SUM(CASE WHEN lead_status = 'Appointment Booked' THEN 1 ELSE 0 END) as appointments_booked
+        SUM(CASE WHEN 
+          LOWER(TRIM(COALESCE(qualification_status, ''))) = 'qualified' 
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted') 
+          OR LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+        THEN 1 ELSE 0 END) as qualified_leads,
+        SUM(CASE WHEN 
+          LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed') 
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) = 'appointment booked'
+        THEN 1 ELSE 0 END) as appointments_booked
       FROM campaign_leads 
-      WHERE client_id = ?
-    `).get(clientId);
+      ${leadWhere}
+    `).get(...leadParams);
 
     const pendingApprovals = db.prepare(`
       SELECT COUNT(*) as count 
@@ -139,20 +167,35 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       SELECT platform, COUNT(*) as count, SUM(views) as views
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1
+      ${month && month !== 'all' ? "AND strftime('%Y-%m', created_at) = '" + month + "'" : ""}
       GROUP BY platform
     `).all(clientId);
 
     const adsBreakdown = db.prepare(`
-      SELECT platform, COUNT(*) as leads
+      SELECT 
+        COALESCE(NULLIF(TRIM(platform), ''), 'Other') as platform,
+        COALESCE(NULLIF(TRIM(campaign_name), ''), 'Manual Entry') as campaign_name,
+        COUNT(*) as leads,
+        SUM(CASE WHEN 
+          LOWER(TRIM(COALESCE(qualification_status, ''))) = 'qualified' 
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted') 
+          OR LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+        THEN 1 ELSE 0 END) as qualified_leads,
+        SUM(CASE WHEN 
+          LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed') 
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) = 'appointment booked'
+        THEN 1 ELSE 0 END) as confirmed_bookings
       FROM campaign_leads
-      WHERE client_id = ?
-      GROUP BY platform
-    `).all(clientId);
+      ${leadWhere}
+      GROUP BY platform, campaign_name
+      ORDER BY leads DESC
+    `).all(...leadParams);
 
     const viewsTrend = db.prepare(`
       SELECT date, title, (COALESCE(views, 0) + COALESCE(youtube_views, 0)) AS views, COALESCE(engagement_rate_pct, 0.0) AS engagement_rate_pct
       FROM marketing_content_tracker
       WHERE client_id = ? AND is_tracked = 1 AND status IN ('Posted', 'Client Approved')
+      ${month && month !== 'all' ? "AND strftime('%Y-%m', created_at) = '" + month + "'" : ""}
       ORDER BY date DESC
       LIMIT 8
     `).all(clientId);
@@ -181,6 +224,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       pending_approvals: pendingApprovals.count,
       platform_breakdown: platformBreakdown,
       ads_breakdown: adsBreakdown,
+      available_months: availableMonths,
       sister_companies: sisterCompanies,
       views_trend: viewsTrend
     });

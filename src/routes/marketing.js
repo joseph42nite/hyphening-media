@@ -598,7 +598,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     const { month } = req.query;
     const clientId = req.params.id;
 
-    // Fetch all available months for dropdown / pagination
+    // Fetch all available months for dropdown / pagination sorted latest first
     const campaignMonths = db.prepare(`
       SELECT DISTINCT COALESCE(NULLIF(month, ''), strftime('%Y-%m', created_at)) as month
       FROM marketing_ad_campaigns
@@ -618,7 +618,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
       queryParams.push(month, month);
     }
 
-    let ads = db.prepare(`
+    const explicitAds = db.prepare(`
       SELECT 
         a.*,
         (
@@ -641,57 +641,89 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR
               ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
             )
-            AND (l.qualification_status = 'Qualified' OR l.lead_status IN ('Qualified', 'Appointment Booked'))
+            AND (
+              LOWER(TRIM(COALESCE(l.qualification_status, ''))) = 'qualified' 
+              OR LOWER(TRIM(COALESCE(l.lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted') 
+              OR LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
+            )
             ${month && month !== 'all' ? "AND strftime('%Y-%m', l.created_at) = '" + month + "'" : ""}
-        ) as actual_qualified_leads
+        ) as actual_qualified_leads,
+        (
+          SELECT COUNT(l.id) 
+          FROM campaign_leads l 
+          WHERE l.client_id = a.client_id 
+            AND (
+              (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
+              OR
+              ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
+            )
+            AND (
+              LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed') 
+              OR LOWER(TRIM(COALESCE(l.lead_status, ''))) = 'appointment booked'
+            )
+            ${month && month !== 'all' ? "AND strftime('%Y-%m', l.created_at) = '" + month + "'" : ""}
+        ) as actual_confirmed_bookings
       FROM marketing_ad_campaigns a
       ${whereClause}
       ORDER BY a.created_at DESC
     `).all(...queryParams);
 
-    // If no explicit marketing_ad_campaigns entries exist, aggregate from campaign_leads so lead data from portal is reflected
-    if (ads.length === 0) {
-      let leadWhere = 'WHERE client_id = ?';
-      const leadParams = [clientId];
-      if (month && month !== 'all') {
-        leadWhere += " AND strftime('%Y-%m', created_at) = ?";
-        leadParams.push(month);
-      }
-
-      const leadCampaigns = db.prepare(`
-        SELECT 
-          LOWER(COALESCE(NULLIF(TRIM(platform), ''), 'Other')) as platform_key,
-          COALESCE(NULLIF(TRIM(platform), ''), 'Other') as platform,
-          COALESCE(NULLIF(TRIM(campaign_name), ''), COALESCE(NULLIF(TRIM(platform), ''), 'Other') || ' Campaign') as ad_campaign_name,
-          COUNT(id) as leads,
-          COUNT(id) as actual_leads,
-          SUM(CASE WHEN qualification_status = 'Qualified' OR lead_status IN ('Qualified', 'Appointment Booked') THEN 1 ELSE 0 END) as actual_qualified_leads
-        FROM campaign_leads
-        ${leadWhere}
-        GROUP BY platform_key, ad_campaign_name
-        ORDER BY actual_leads DESC
-      `).all(...leadParams);
-
-      ads = leadCampaigns.map((lc, index) => ({
-        id: `synth-${index + 1}`,
-        client_id: parseInt(clientId),
-        platform: lc.platform,
-        ad_campaign_name: lc.ad_campaign_name,
-        leads: lc.leads,
-        actual_leads: lc.actual_leads,
-        actual_qualified_leads: lc.actual_qualified_leads || 0,
-        total_ad_spend_inr: 0,
-        impressions: 0,
-        clicks: 0,
-        ctr_pct: 0,
-        cpc_inr: 0,
-        cpl_inr: 0,
-        revenue_generated: 0,
-        roas: 0
-      }));
+    // Fetch synthetic lead campaigns from campaign_leads to capture campaigns not explicitly listed in marketing_ad_campaigns
+    let leadWhere = 'WHERE client_id = ?';
+    const leadParams = [clientId];
+    if (month && month !== 'all') {
+      leadWhere += " AND strftime('%Y-%m', created_at) = ?";
+      leadParams.push(month);
     }
 
-    res.json({ ads, available_months: campaignMonths });
+    const leadCampaigns = db.prepare(`
+      SELECT 
+        LOWER(COALESCE(NULLIF(TRIM(platform), ''), 'Other')) as platform_key,
+        COALESCE(NULLIF(TRIM(platform), ''), 'Other') as platform,
+        COALESCE(NULLIF(TRIM(campaign_name), ''), 'Manual Entry') as ad_campaign_name,
+        COUNT(id) as leads,
+        COUNT(id) as actual_leads,
+        SUM(CASE WHEN 
+          LOWER(TRIM(COALESCE(qualification_status, ''))) = 'qualified' 
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted') 
+          OR LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+        THEN 1 ELSE 0 END) as actual_qualified_leads,
+        SUM(CASE WHEN 
+          LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed') 
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) = 'appointment booked'
+        THEN 1 ELSE 0 END) as actual_confirmed_bookings
+      FROM campaign_leads
+      ${leadWhere}
+      GROUP BY platform_key, ad_campaign_name
+      ORDER BY actual_leads DESC
+    `).all(...leadParams);
+
+    // Filter out synthetic lead campaigns that are already matched by explicit ad campaigns
+    const explicitNames = new Set(explicitAds.map(a => (a.ad_campaign_name || '').toLowerCase().trim()));
+    const unmatchedLeadCampaigns = leadCampaigns.filter(lc => !explicitNames.has((lc.ad_campaign_name || '').toLowerCase().trim()));
+
+    const syntheticAds = unmatchedLeadCampaigns.map((lc, index) => ({
+      id: `synth-${index + 1}`,
+      client_id: parseInt(clientId),
+      platform: lc.platform,
+      ad_campaign_name: lc.ad_campaign_name,
+      leads: lc.leads,
+      actual_leads: lc.actual_leads,
+      actual_qualified_leads: lc.actual_qualified_leads || 0,
+      actual_confirmed_bookings: lc.actual_confirmed_bookings || 0,
+      total_ad_spend_inr: 0,
+      impressions: 0,
+      clicks: 0,
+      ctr_pct: 0,
+      cpc_inr: 0,
+      cpl_inr: 0,
+      revenue_generated: 0,
+      roas: 0
+    }));
+
+    const finalAds = [...explicitAds, ...syntheticAds];
+
+    res.json({ ads: finalAds, available_months: campaignMonths });
   } catch (err) {
     console.error('[MARKETING] Ads list error:', err);
     res.status(500).json({ error: 'Internal server error' });
