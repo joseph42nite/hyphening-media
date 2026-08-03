@@ -598,23 +598,30 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     const { month } = req.query;
     const clientId = req.params.id;
 
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
     // Fetch all available months for dropdown / pagination sorted latest first
-    const campaignMonths = db.prepare(`
-      SELECT DISTINCT COALESCE(NULLIF(month, ''), strftime('%Y-%m', created_at)) as month
+    let rawMonths = db.prepare(`
+      SELECT DISTINCT COALESCE(NULLIF(month, ''), SUBSTR(created_at, 1, 7)) as month
       FROM marketing_ad_campaigns
-      WHERE client_id = ?
+      WHERE client_id = ? AND created_at IS NOT NULL
       UNION
-      SELECT DISTINCT strftime('%Y-%m', created_at) as month
+      SELECT DISTINCT SUBSTR(created_at, 1, 7) as month
       FROM campaign_leads
       WHERE client_id = ? AND created_at IS NOT NULL
       ORDER BY month DESC
-    `).all(clientId, clientId).map(r => r.month).filter(Boolean);
+    `).all(clientId, clientId).map(r => r.month).filter(m => m && m.length === 7);
+
+    if (!rawMonths.includes(currentMonth)) {
+      rawMonths.unshift(currentMonth);
+    }
+    const campaignMonths = Array.from(new Set(rawMonths)).sort().reverse();
 
     let whereClause = 'WHERE a.client_id = ?';
     const queryParams = [clientId];
 
     if (month && month !== 'all') {
-      whereClause += " AND (a.month = ? OR (a.month IS NULL AND strftime('%Y-%m', a.created_at) = ?))";
+      whereClause += " AND (a.month = ? OR (a.month IS NULL AND SUBSTR(a.created_at, 1, 7) = ?))";
       queryParams.push(month, month);
     }
 
@@ -630,7 +637,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR
               ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
             )
-            ${month && month !== 'all' ? "AND strftime('%Y-%m', l.created_at) = '" + month + "'" : ""}
+            ${month && month !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + month + "'" : ""}
         ) as actual_leads,
         (
           SELECT COUNT(l.id) 
@@ -646,7 +653,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               OR LOWER(TRIM(COALESCE(l.lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted') 
               OR LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
             )
-            ${month && month !== 'all' ? "AND strftime('%Y-%m', l.created_at) = '" + month + "'" : ""}
+            ${month && month !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + month + "'" : ""}
         ) as actual_qualified_leads,
         (
           SELECT COUNT(l.id) 
@@ -661,7 +668,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
               LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed') 
               OR LOWER(TRIM(COALESCE(l.lead_status, ''))) = 'appointment booked'
             )
-            ${month && month !== 'all' ? "AND strftime('%Y-%m', l.created_at) = '" + month + "'" : ""}
+            ${month && month !== 'all' ? "AND SUBSTR(l.created_at, 1, 7) = '" + month + "'" : ""}
         ) as actual_confirmed_bookings
       FROM marketing_ad_campaigns a
       ${whereClause}
@@ -672,7 +679,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     let leadWhere = 'WHERE client_id = ?';
     const leadParams = [clientId];
     if (month && month !== 'all') {
-      leadWhere += " AND strftime('%Y-%m', created_at) = ?";
+      leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";
       leadParams.push(month);
     }
 

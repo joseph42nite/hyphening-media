@@ -1245,8 +1245,11 @@ export default function ClientPortal({ showToast }) {
         setClientName(data.client_name);
         setClientType(data.client_type || 'marketing');
         
-        if (data.available_months) {
+        if (data.available_months && data.available_months.length > 0) {
           setAvailablePortalMonths(data.available_months);
+          if (!selectedPortalMonth) {
+            setSelectedPortalMonth(data.available_months[0]);
+          }
         }
 
         if (data.client_type === 'artist_curation') {

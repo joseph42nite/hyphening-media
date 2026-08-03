@@ -105,22 +105,29 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     const clientId = req.portalClient.id;
     const { month } = req.query;
 
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
     // Fetch all available months for the client portal sorted latest month first
-    const availableMonths = db.prepare(`
-      SELECT DISTINCT strftime('%Y-%m', created_at) as month
+    let rawMonths = db.prepare(`
+      SELECT DISTINCT SUBSTR(created_at, 1, 7) as month
       FROM campaign_leads
       WHERE client_id = ? AND created_at IS NOT NULL
       UNION
-      SELECT DISTINCT COALESCE(NULLIF(month, ''), strftime('%Y-%m', created_at)) as month
+      SELECT DISTINCT COALESCE(NULLIF(month, ''), SUBSTR(created_at, 1, 7)) as month
       FROM marketing_ad_campaigns
       WHERE client_id = ? AND created_at IS NOT NULL
       ORDER BY month DESC
-    `).all(clientId, clientId).map(r => r.month).filter(Boolean);
+    `).all(clientId, clientId).map(r => r.month).filter(m => m && m.length === 7);
+
+    if (!rawMonths.includes(currentMonth)) {
+      rawMonths.unshift(currentMonth);
+    }
+    const availableMonths = Array.from(new Set(rawMonths)).sort().reverse();
 
     let leadWhere = 'WHERE client_id = ?';
     const leadParams = [clientId];
     if (month && month !== 'all') {
-      leadWhere += " AND strftime('%Y-%m', created_at) = ?";
+      leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";
       leadParams.push(month);
     }
 

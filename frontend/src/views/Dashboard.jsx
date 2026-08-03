@@ -604,8 +604,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         if (adRes.ok) {
           const adData = await adRes.json();
           setAdCampaigns(adData.ads || []);
-          if (adData.available_months) {
+          if (adData.available_months && adData.available_months.length > 0) {
             setAvailableAdMonths(adData.available_months);
+            if (!selectedAdMonth) {
+              setSelectedAdMonth(adData.available_months[0]);
+            }
           }
         }
         const rRes = await authFetch(`/api/clients/${clientId}/marketing/monthly`);
