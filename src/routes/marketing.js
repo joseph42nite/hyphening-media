@@ -77,9 +77,16 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
 
       const leadTotals = db.prepare(`
         SELECT 
-          COUNT(id) as total_leads,
-          SUM(CASE WHEN qualification_status IN ('Qualified', 'Booked') OR lead_status IN ('Qualified', 'Booked') THEN 1 ELSE 0 END) as qualified_leads,
-          SUM(CASE WHEN appointment_status = 'Confirmed' OR qualification_status = 'Booked' THEN 1 ELSE 0 END) as confirmed_bookings
+          COUNT(*) as total_leads,
+          COALESCE(SUM(CASE WHEN
+            LOWER(TRIM(COALESCE(qualification_status, ''))) = 'qualified'
+            OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted')
+            OR LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+          THEN 1 ELSE 0 END), 0) as qualified_leads,
+          COALESCE(SUM(CASE WHEN
+            LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+            OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('appointment booked', 'booked', 'confirmed')
+          THEN 1 ELSE 0 END), 0) as confirmed_bookings
         FROM campaign_leads
         WHERE client_id = ?
       `).get(client.id);
