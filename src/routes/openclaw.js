@@ -334,7 +334,8 @@ function handleClaimSeoRuns(payload) {
 
   const claim = db.transaction(() => {
     const queued = db.prepare(`
-      SELECT r.id, r.client_id, r.agent_type, r.requested_by, c.website_url, c.name AS client_name
+      SELECT r.id, r.client_id, r.agent_type, r.requested_by, c.website_url, c.name AS client_name,
+             c.gsc_property, c.ga4_property_id
       FROM seo_agent_runs r
       JOIN crm_clients c ON c.id = r.client_id
       WHERE r.status = 'queued'
@@ -369,6 +370,11 @@ function handleClaimSeoRuns(payload) {
         audit_type: r.agent_type,
         url: r.website_url,
         requested_by: r.requested_by,
+        // Passed per run rather than defaulted in the plugin's own config, so a
+        // Search Console query can never return another client's data. Null
+        // means the skill reports that section as unavailable.
+        gsc_property: r.gsc_property || null,
+        ga4_property_id: r.ga4_property_id || null,
       })),
     },
   };
