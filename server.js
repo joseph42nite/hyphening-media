@@ -37,7 +37,7 @@ import csvExportRoutes from './src/routes/csvExport.js';
 import marketingRoutes from './src/routes/marketing.js';
 import portalRoutes from './src/routes/portal.js';
 import artistRoutes from './src/routes/artists.js';
-import openclawRoutes from './src/routes/openclaw.js';
+import webhookRoutes from './src/routes/webhooks.js';
 import blogRoutes from './src/routes/blog.js';
 import integrationsRoutes from './src/routes/integrations.js';
 import { publicGigConfirmRoute } from './src/routes/artists.js';
@@ -99,7 +99,7 @@ app.use(cookieParser());
 // hash exactly what was sent. Without it the OpenClaw webhook had to hash a
 // re-serialisation of the parsed body, which made the signature depend on
 // matching Node's JSON formatting — a sender emitting 0.0 rather than 0 failed
-// with an unexplained 401. See verifySignature in src/routes/openclaw.js.
+// with an unexplained 401. See verifySignature in src/routes/webhooks.js.
 app.use(express.json({
   limit: '5mb',
   verify: (req, res, buf) => { req.rawBody = buf; },
@@ -204,8 +204,14 @@ app.use('/api/artists', artistRoutes);
 // Public gig confirmation endpoint (no auth)
 app.get('/api/public/gigs/confirm/:token', publicGigConfirmRoute);
 
-// OpenClaw webhook
-app.use('/api/openclaw', openclawRoutes);
+// Signed webhook for automation clients: OpenClaw (blogs, ops writes) and the
+// local SEO worker.
+//
+// The path stays /api/openclaw even though the file no longer does. Both
+// callers POST to it with an HMAC signature, so changing it means coordinating
+// a cutover with OpenClaw and redeploying the worker — churn with no benefit,
+// since the path is a wire format rather than something anyone reads.
+app.use('/api/openclaw', webhookRoutes);
 
 // SEO & Audit integration routes
 app.use('/api/clients', seoRoutes);

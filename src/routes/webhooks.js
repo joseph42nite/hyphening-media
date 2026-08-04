@@ -1,7 +1,15 @@
 /**
- * Marketing Ops Center — OpenClaw Integration Routes
- * Webhook with HMAC-SHA256 verification, replay attack prevention,
- * and handlers for all dashboard entities.
+ * Marketing Ops Center — signed webhook for automation clients.
+ *
+ * HMAC-SHA256 verification over the raw request bytes, replay prevention via
+ * nonce and timestamp, and handlers for every entity an automation client can
+ * write.
+ *
+ * Two callers share it. OpenClaw posts blog content and ops writes; the local
+ * SEO worker claims queued runs, streams progress, and submits audits. It was
+ * named after OpenClaw when it had one caller — the mount path is still
+ * /api/openclaw because both sign against it and changing a wire format earns
+ * nothing.
  */
 
 import { Router } from 'express';
