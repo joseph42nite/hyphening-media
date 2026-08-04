@@ -1,26 +1,24 @@
 /**
- * Tracks SEO audits that have been handed off to OpenClaw but haven't
- * reported back yet. The trigger hand-off (openclaw_seo_runner.js) finishes
- * long before the actual audit does, so "completed" can't be based on that
- * process exiting — it has to wait for OpenClaw's create_seo_audit webhook.
- * This timeout is the fallback for when that webhook never arrives.
+ * Tracks SEO audits a worker has claimed but not yet reported on.
+ *
+ * A run is claimed and executed on another machine, so "completed" cannot be
+ * inferred from anything happening here — it waits for the worker's
+ * create_seo_audit webhook. This timeout is the fallback for when that never
+ * arrives, which is what happens if the worker is killed mid-run. Without it a
+ * run stays `running` for ever and holds the dedupe slot, blocking that client
+ * and skill from being triggered again.
  */
 
 const pending = new Map();
 const MINUTE = 60 * 1000;
 
-// 20 rather than 15: any skill can be routed to the 'seo' agent, where a run
-// may be served by Nemotron — a reasoning model that is markedly slower than
-// deepseek-v4-flash. A window sized for the fast model would mark a live
-// Nemotron run as dead. Being generous only costs a stuck run holding its
-// queue slot a little longer.
+// Generous on purpose. Marking a run timed out only stops us waiting and frees
+// the queue slot, so the cost of being too slow is small; the cost of being too
+// tight is flagging a live job as dead and letting a second one start.
 const DEFAULT_TIMEOUT_MIN = 20;
 
-// Per-skill ceilings confirmed by OpenClaw (2026-07-28). OpenClaw's own agent
-// runtime timeout is effectively unbounded (48h default), so these windows are
-// purely ours — marking a run timed out only stops us waiting and frees the
-// queue slot. Anything too tight would flag a live job as dead; the values
-// below are OpenClaw's stated realistic ceilings per skill.
+// Per-skill ceilings. A full-sitemap audit fetches every page before the model
+// starts, so the window covers measurement plus analysis, not analysis alone.
 const TIMEOUT_MINUTES = new Map([
   // Heavy external API calls (DataForSEO, backlink providers, image generation)
   ['backlinks', 45],

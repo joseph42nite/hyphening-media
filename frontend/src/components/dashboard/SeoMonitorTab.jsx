@@ -36,15 +36,14 @@ function formatElapsed(sinceIso, now) {
 //
 // Mirrors UNAVAILABLE_SKILLS in src/routes/seo.js; keep the two in sync.
 const UNAVAILABLE_SKILLS = new Map([
-  // No skill directory exists on OpenClaw — these fabricate results.
-  ['competitor_pages', 'No skill exists on OpenClaw'],
-  ['dataforseo', 'No skill exists on OpenClaw — DataForSEO MCP not installed'],
-  ['maps', 'No skill exists on OpenClaw — requires DataForSEO, which is not installed'],
-  // Present but missing the credentials or tools it depends on.
-  // 'google' was here until its Google API credentials went live (2026-07-28).
-  ['image_gen', 'Requires the nanobanana MCP image tool, which is not installed'],
-  // Works, but by design is not triggered by hand.
-  ['drift', 'Automatic weekly check — not manually triggered'],
+  // Installed, but the MCP server that supplies their data is not configured.
+  // A skill with no data source does not fail — it writes a plausible audit
+  // from training knowledge, which is how a fabricated finding reaches a client.
+  ['dataforseo', 'Requires the DataForSEO MCP server, which is not configured'],
+  ['maps', 'Requires the DataForSEO MCP server, which is not configured'],
+  ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
+  // Installed and working, but compares against a stored baseline.
+  ['drift', 'Needs a stored baseline first — capture one before comparing'],
 ]);
 
 // seo_audits carries ten score columns and each skill fills a different one.

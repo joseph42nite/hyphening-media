@@ -1,5 +1,5 @@
 /**
- * Lifecycle for SEO agent runs handed off to OpenClaw.
+ * Lifecycle for SEO agent runs executed by a worker.
  *
  * Every trigger claims a row in seo_agent_runs first. That row — not React
  * state, not an in-memory Map — is the single source of truth for "is this

@@ -7,25 +7,26 @@ import { startAgentRun, abortOpenClawRun, isAbortSupported } from '../services/a
 
 const IN_FLIGHT_FOR_ABORT = ['queued', 'running'];
 
-// Skills OpenClaw cannot serve, and why. Authoritative — the trigger route
-// rejects these, and /seo/agents/status reports the reason so the dashboard can
-// render it rather than keeping a second copy of this list.
+// Skills that cannot produce a real result, and why. Authoritative — the
+// trigger route rejects these, and /seo/agents/status reports the reason so the
+// dashboard can render it rather than keeping a second copy of this list.
 //
-// Confirmed against OpenClaw's installed skill directory 2026-08-03. The three
-// with no SKILL.md at all are the dangerous ones: OpenClaw stated that a run
-// with no matching skill answers from training knowledge and POSTs a
-// create_seo_audit regardless, producing a fabricated audit row.
+// Rewritten 2026-08-04 when audits moved from OpenClaw to the claude-seo plugin
+// running on the local worker. All 25 skills are now installed, so the previous
+// "no skill exists" entries are gone; what remains is skills whose external
+// dependency is genuinely absent. That distinction matters — a skill with no
+// data source does not fail, it writes a plausible-looking audit from training
+// knowledge, which is how a fabricated Critical recommendation reaches a client.
 //
 // Mirrors UNAVAILABLE_SKILLS in SeoMonitorTab.jsx; keep the two in sync.
 const UNAVAILABLE_SKILLS = new Map([
-  // No skill directory exists on OpenClaw — these fabricate results.
-  ['competitor_pages', 'No skill exists on OpenClaw'],
-  ['dataforseo', 'No skill exists on OpenClaw — DataForSEO MCP not installed'],
-  ['maps', 'No skill exists on OpenClaw — requires DataForSEO, which is not installed'],
-  // Present, but missing a tool it depends on.
-  ['image_gen', 'Requires the nanobanana MCP image tool, which is not installed'],
-  // Works, but by design is not triggered by hand.
-  ['drift', 'Automatic weekly check — not manually triggered'],
+  // Installed, but the MCP server that supplies their data is not configured.
+  ['dataforseo', 'Requires the DataForSEO MCP server, which is not configured'],
+  ['maps', 'Requires the DataForSEO MCP server, which is not configured'],
+  ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
+  // Installed and working, but compares against a stored baseline. Running it
+  // before one exists reports every element as new rather than as drift.
+  ['drift', 'Needs a stored baseline first — capture one before comparing'],
 ]);
 
 // Each skill writes a different one of the ten score columns on seo_audits.

@@ -209,12 +209,85 @@ async function runAPIMetricFetch() {
   }
 }
 
+// agent_run_config uses a very large stale_after_days to mean "on-demand only"
+// rather than carrying a separate flag. Anything at or above this is never
+// reported as due.
+const ON_DEMAND_THRESHOLD_DAYS = 365;
+
+// Skills the trigger route refuses, so there is nothing to act on if reported.
+// Mirrors UNAVAILABLE_SKILLS in routes/seo.js.
+const UNSCHEDULABLE_SKILLS = new Set(['dataforseo', 'maps', 'image_gen', 'drift']);
+
 /**
- * Daily SEO freshness check worker — runs at 3:05 AM daily
- * Scans active clients, checks stale audits against config stale limits,
- * and auto-triggers updates for stale indexes.
+ * Announces the day's due audits on Telegram and in the dashboard activity feed.
+ *
+ * Silent when nothing is due — a daily "all clear" trains people to ignore the
+ * channel, which defeats the point of alerting at all.
+ */
+async function reportDueAudits(due) {
+  if (!due.length) {
+    console.log('[SEO CRON] Nothing due today.');
+    return;
+  }
+
+  const byClient = new Map();
+  for (const item of due) {
+    if (!byClient.has(item.client)) byClient.set(item.client, []);
+    byClient.get(item.client).push(item);
+  }
+
+  // Long lists get truncated per client. A first run, or a client whose history
+  // was cleared, legitimately has every skill due at once — printing all of them
+  // produces a message nobody reads, which is the same outcome as not sending it.
+  const PER_CLIENT_LIMIT = 5;
+  const lines = [`🔍 *${due.length} SEO audit${due.length === 1 ? '' : 's'} due*`, ''];
+  for (const [client, items] of byClient) {
+    lines.push(`*${client}* (${items.length})`);
+    for (const i of items.slice(0, PER_CLIENT_LIMIT)) {
+      lines.push(`  • ${i.auditType} — last run ${i.lastRun}`);
+    }
+    if (items.length > PER_CLIENT_LIMIT) {
+      lines.push(`  • …and ${items.length - PER_CLIENT_LIMIT} more`);
+    }
+    lines.push('');
+  }
+  lines.push('_Nothing runs on its own. Trigger from SEO Monitor when you want it._');
+  const text = lines.join('\n');
+
+  try {
+    const { notifyAdmin } = await import('./telegram.js');
+    await notifyAdmin(text);
+  } catch (err) {
+    console.error('[SEO CRON] Telegram notification failed:', err.message);
+  }
+
+  // Also lands in the dashboard activity feed, so the alert survives a missed
+  // or muted Telegram message.
+  try {
+    db.prepare(`
+      INSERT INTO openclaw_activity_log (action, status, summary, client, details)
+      VALUES ('seo_audits_due', 'info', ?, ?, ?)
+    `).run(
+      `${due.length} SEO audit${due.length === 1 ? '' : 's'} due`,
+      byClient.size === 1 ? [...byClient.keys()][0] : null,
+      JSON.stringify(due)
+    );
+  } catch (err) {
+    console.error('[SEO CRON] Activity log insert failed:', err.message);
+  }
+}
+
+/**
+ * Reports which audits are due, once a day at 3:05 AM.
+ *
+ * Nothing is auto-triggered — an audit costs real tokens, so starting one stays
+ * a decision. What changed is that being due is now announced: it used to be
+ * written to the server log and highlighted in the UI, which only helps someone
+ * who has already opened the page. Clients went weeks past their refresh window
+ * without anyone noticing.
  */
 async function runDailySeoFreshnessCheck() {
+  const dueByClient = [];
   try {
     console.log('[SCHEDULER] Running daily SEO freshness checks...');
     const clients = db.prepare("SELECT * FROM crm_clients WHERE is_active = 1 AND client_type != 'artist_curation' AND website_url IS NOT NULL").all();
@@ -244,6 +317,16 @@ async function runDailySeoFreshnessCheck() {
       }
 
       for (const conf of configs) {
+        // stale_after_days is set to 9999 for skills that are deliberately
+        // on-demand — a content brief is written when a brief is wanted, not on
+        // a cadence. Without this they all read as due the moment they have
+        // never been run, which turned the first report into 69 items across
+        // three clients and made it worth ignoring.
+        if (conf.stale_after_days >= ON_DEMAND_THRESHOLD_DAYS) continue;
+
+        // No point announcing work that the trigger route would refuse.
+        if (UNSCHEDULABLE_SKILLS.has(conf.audit_type)) continue;
+
         // Find last successful audit of this type
         const lastAudit = db.prepare(`
           SELECT created_at FROM seo_audits
@@ -265,11 +348,20 @@ async function runDailySeoFreshnessCheck() {
 
         if (isStale) {
           console.log(`[SEO CRON] Agent '${conf.audit_type}' is stale for client '${client.name}'. Highlighted in UI, waiting for manual trigger.`);
-          // Auto-triggering is disabled to prevent accidental credit consumption. 
-          // Stale agents are highlighted in the UI and must be run manually.
+          // Auto-triggering stays disabled so nothing spends without a decision.
+          // Collected here so the day's due work can be reported once, rather
+          // than sitting in a server log nobody reads — the UI highlight is only
+          // seen by someone who already opened the page.
+          dueByClient.push({
+            client: client.name,
+            auditType: conf.audit_type,
+            lastRun: lastAudit ? lastAudit.created_at.slice(0, 10) : 'never',
+          });
         }
       }
     }
+
+    await reportDueAudits(dueByClient);
   } catch (err) {
     console.error('[SCHEDULER] Daily SEO freshness check error:', err);
   }
