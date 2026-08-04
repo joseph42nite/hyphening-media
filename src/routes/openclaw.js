@@ -1601,7 +1601,14 @@ function handleCreateSeoAudit(payload) {
 
   const finishOpts = {
     auditId: firstAuditId,
-    error: auditFailed ? (payload.summary || 'OpenClaw reported a failed audit') : null,
+    // `error` first, then `summary`. A failing worker puts the reason in
+    // `error` and leaves `summary` empty, so reading summary alone stored the
+    // generic fallback and threw away the detail — run 21 was rejected with ten
+    // specific contradictions and the dashboard showed "reported a failed
+    // audit", leaving no way to tell a real fabrication from a checker bug.
+    error: auditFailed
+      ? (payload.error || payload.summary || 'The worker reported a failed audit with no reason given')
+      : null,
     actualModel: reportedModel
   };
 
