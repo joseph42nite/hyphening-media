@@ -13,7 +13,7 @@ import { logAction } from '../services/auditLogger.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
 // webhook no longer clears them directly — doing so unconditionally used to
 // disarm the timer of a live run when a cancelled run's late result arrived.
-import { finishActiveRunFor, finishRun, claimOrphanedCancelledRun } from '../services/agentRuns.js';
+import { finishActiveRunFor, finishRun, claimOrphanedCancelledRun, getRun } from '../services/agentRuns.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
@@ -26,14 +26,37 @@ const HMAC_SECRET = process.env.OPENCLAW_HMAC_SECRET || '';
 const REPLAY_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Verify HMAC-SHA256 signature.
+ * Verify HMAC-SHA256 signature against the bytes that actually arrived.
+ *
+ * This used to hash JSON.stringify(req.body) — a re-serialisation of the parsed
+ * body — which meant any formatting the sender used that Node normalises away
+ * broke the signature even when the secret and the algorithm were both correct.
+ * A float of 0.0 arrives as "0.0", parses to 0, and re-serialises to "0"; the
+ * same applies to \uXXXX escapes, indentation and trailing whitespace. That cost
+ * a full day of debugging on 2026-08-03 for exactly the 0.0 case, and it failed
+ * as a bare 401 that looks identical to a wrong secret.
+ *
+ * Hashing req.rawBody (captured by the express.json verify hook in server.js)
+ * retires that whole class of mismatch. The sender no longer has to match Node's
+ * serialisation — only to sign the bytes it sends.
  */
-function verifySignature(body, signature) {
+function verifySignature(req, signature) {
   if (!HMAC_SECRET) return false;
-  const expected = crypto.createHmac('sha256', HMAC_SECRET)
-    .update(JSON.stringify(body))
-    .digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+
+  // Falls back for any path that reaches here without the verify hook having
+  // run — a non-JSON content type, or a router mounted without it in a test.
+  const body = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
+
+  const expected = Buffer.from(
+    crypto.createHmac('sha256', HMAC_SECRET).update(body).digest('hex'),
+    'utf8'
+  );
+  const received = Buffer.from(signature, 'utf8');
+
+  // timingSafeEqual throws on a length mismatch, which the route's catch turned
+  // into a 500 — reading as a server fault rather than a bad signature.
+  if (received.length !== expected.length) return false;
+  return crypto.timingSafeEqual(received, expected);
 }
 
 /**
@@ -86,7 +109,7 @@ router.post('/webhook', (req, res) => {
     // the run sits until it times out. The event_type is safe to log; the
     // signature itself is not, so only its length is recorded — enough to tell
     // a truncated header from a wrong secret.
-    if (!signature || !verifySignature(req.body, signature)) {
+    if (!signature || !verifySignature(req, signature)) {
       console.warn(
         `[OPENCLAW] Rejected webhook (401): ${signature ? 'signature mismatch' : 'no x-openclaw-signature header'}. ` +
         `event_type=${req.body?.event_type || '(none)'} signature_length=${signature?.length ?? 0} ` +
@@ -130,7 +153,7 @@ router.post('/webhook', (req, res) => {
       'create_gig', 'update_gig', 'create_freelancer', 'update_freelancer',
       'send_chat_message', 'update_knowledge', 'optimize_queue',
       'create_blog_post', 'update_blog_post', 'create_seo_audit',
-      'agent_activity_log'
+      'agent_activity_log', 'skill_inventory_report', 'claim_seo_runs'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -165,10 +188,15 @@ router.post('/webhook', (req, res) => {
       });
     }
 
-    return res.json({ 
-      status: 'executed', 
-      event_type, 
-      message: `Action executed immediately: ${result.summary}` 
+    return res.json({
+      status: 'executed',
+      event_type,
+      message: `Action executed immediately: ${result.summary}`,
+      // Handlers that answer a question rather than record one set `data`.
+      // The local SEO worker claims queued runs this way, which keeps it on the
+      // HMAC channel that already has replay protection and signature checks
+      // instead of needing a second authenticated surface.
+      ...(result.data !== undefined ? { data: result.data } : {}),
     });
   } catch (err) {
     console.error('[OPENCLAW] Webhook error:', err);
@@ -213,6 +241,8 @@ function executeEvent(eventType, payload) {
       case 'update_blog_post': return handleUpdateBlogPost(payload);
       case 'create_seo_audit': return handleCreateSeoAudit(payload);
       case 'agent_activity_log': return handleAgentActivityLog(payload);
+      case 'skill_inventory_report': return handleSkillInventoryReport(payload);
+      case 'claim_seo_runs': return handleClaimSeoRuns(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -248,6 +278,143 @@ function safeSummarisePayload(payload) {
 // ============================================================
 // HANDLER IMPLEMENTATIONS
 // ============================================================
+
+/**
+ * Hands queued SEO runs to the local worker.
+ *
+ * Inverts how audits have been dispatched. Until now the backend reached out to
+ * the runner, which needed a Tailscale tunnel into a machine we do not control;
+ * when that tunnel dropped on 2026-08-01 runs 6 and 7 died with nothing to show
+ * for it. Here the worker calls us, so the laptop needs no inbound connectivity
+ * and a machine that was asleep simply picks up its backlog on waking.
+ *
+ * Claiming marks runs `running` in the same transaction that returns them, so
+ * two workers cannot take the same job.
+ */
+function handleClaimSeoRuns(payload) {
+  const limit = Math.min(parseInt(payload?.limit, 10) || 1, 5);
+  const worker = payload?.worker_id || 'local';
+
+  const claim = db.transaction(() => {
+    const queued = db.prepare(`
+      SELECT r.id, r.client_id, r.agent_type, r.requested_by, c.website_url, c.name AS client_name
+      FROM seo_agent_runs r
+      JOIN crm_clients c ON c.id = r.client_id
+      WHERE r.status = 'queued'
+      ORDER BY r.id ASC
+      LIMIT ?
+    `).all(limit);
+
+    const mark = db.prepare(`
+      UPDATE seo_agent_runs
+      SET status = 'running', started_at = datetime('now'), actual_model = ?
+      WHERE id = ? AND status = 'queued'
+    `);
+    // actual_model records the claiming worker until the run reports the model
+    // that really served it, so a job in flight is attributable to a machine.
+    const taken = queued.filter(r => mark.run(`worker:${worker}`, r.id).changes === 1);
+    return taken;
+  });
+
+  const runs = claim();
+  if (runs.length) {
+    console.log(`[OPENCLAW] Worker '${worker}' claimed ${runs.length} SEO run(s): ${runs.map(r => `#${r.id} ${r.agent_type}`).join(', ')}`);
+  }
+
+  return {
+    success: true,
+    summary: `Claimed ${runs.length} run(s) for worker '${worker}'.`,
+    data: {
+      runs: runs.map(r => ({
+        run_id: r.id,
+        client_id: r.client_id,
+        client_name: r.client_name,
+        audit_type: r.agent_type,
+        url: r.website_url,
+        requested_by: r.requested_by,
+      })),
+    },
+  };
+}
+
+/**
+ * Stores OpenClaw's report of what it actually has installed.
+ *
+ * Each report is a full snapshot, so the skills table is replaced wholesale —
+ * a skill that vanishes from OpenClaw must vanish here rather than linger as a
+ * stale healthy row and keep its trigger enabled.
+ */
+function handleSkillInventoryReport(payload) {
+  if (!Array.isArray(payload?.skills)) {
+    return { success: false, summary: 'skills must be an array' };
+  }
+
+  const reportedAt = payload.reported_at || new Date().toISOString();
+  const bool = (v) => (v ? 1 : 0);
+
+  // A skill is usable only if its frontmatter parsed and no BOM precedes it —
+  // the two conditions that made seo-geo undiscoverable. The webhook pointer is
+  // recorded but deliberately excluded here; see migration 058.
+  const isHealthy = (s) => bool(s.frontmatter_parsed && !s.bom_present);
+  const unhealthy = payload.skills.filter(s => !isHealthy(s)).map(s => s.name || s.dirname);
+
+  const store = db.transaction(() => {
+    const reportId = db.prepare(`
+      INSERT INTO openclaw_skill_reports (
+        reported_at, trigger, runner_model, skill_count, unhealthy_count,
+        missing_skills, unexpected_skills
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      reportedAt,
+      payload.trigger || 'on_demand',
+      payload.runner_model || null,
+      payload.skills.length,
+      unhealthy.length,
+      JSON.stringify(payload.missing_skills || []),
+      JSON.stringify(payload.unexpected_skills || [])
+    ).lastInsertRowid;
+
+    db.prepare('DELETE FROM openclaw_skills').run();
+
+    const insert = db.prepare(`
+      INSERT INTO openclaw_skills (
+        report_id, name, version, dirname, byte_size, sha256, lines,
+        frontmatter_parsed, frontmatter_error, bom_present, has_references,
+        has_templates, has_assets, webhook_pointer_present, last_modified,
+        healthy, reported_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const s of payload.skills) {
+      const name = s.name || s.dirname;
+      if (!name) continue;
+      insert.run(
+        reportId, name, s.version || null, s.dirname || null,
+        s.byte_size ?? null, s.sha256 || null, s.lines ?? null,
+        bool(s.frontmatter_parsed), s.frontmatter_error || null,
+        bool(s.bom_present), bool(s.has_references), bool(s.has_templates),
+        bool(s.has_assets), bool(s.webhook_pointer_present),
+        s.last_modified || null, isHealthy(s), reportedAt
+      );
+    }
+
+    return reportId;
+  });
+
+  const reportId = store();
+
+  const missing = payload.missing_skills || [];
+  if (unhealthy.length || missing.length) {
+    console.warn(`[OPENCLAW] Skill inventory #${reportId}: ${unhealthy.length} unhealthy${unhealthy.length ? ` (${unhealthy.join(', ')})` : ''}, ${missing.length} missing${missing.length ? ` (${missing.join(', ')})` : ''}.`);
+  } else {
+    console.log(`[OPENCLAW] Skill inventory #${reportId}: ${payload.skills.length} skills, all healthy.`);
+  }
+
+  return {
+    success: true,
+    summary: `Skill inventory recorded: ${payload.skills.length} skills, ${unhealthy.length} unhealthy, ${missing.length} missing.`
+  };
+}
 
 function handleAgentActivityLog(payload) {
   const { action, status, summary, client, details } = payload;
@@ -1118,6 +1285,13 @@ const VALID_AUDIT_TYPES = new Set([
   'dataforseo', 'image_gen'
 ]);
 
+// Skill names that do not reduce to a valid audit type by prefix-stripping
+// alone. Only add entries here for a genuine naming difference between the two
+// systems, not to paper over a skill sending the wrong value.
+const AUDIT_TYPE_ALIASES = {
+  audit: 'full',
+};
+
 /**
  * Accepts OpenClaw's skill names as audit types.
  *
@@ -1142,7 +1316,14 @@ function normaliseAuditType(raw) {
   if (VALID_AUDIT_TYPES.has(trimmed)) return trimmed;
 
   const rewritten = trimmed.replace(/^seo[-_]/, '').replace(/-/g, '_');
-  return VALID_AUDIT_TYPES.has(rewritten) ? rewritten : null;
+  if (VALID_AUDIT_TYPES.has(rewritten)) return rewritten;
+
+  // 'full' is the one type whose name differs on both sides. We ask for it as
+  // "seo audit" (openclaw_seo_runner.js renames it when building the trigger),
+  // OpenClaw's skill is called seo-audit, so its payload reports 'seo-audit' or
+  // 'audit' — neither of which the prefix strip above can reach, since 'audit'
+  // is not a valid type on its own.
+  return AUDIT_TYPE_ALIASES[rewritten] || null;
 }
 
 function handleCreateSeoAudit(payload) {
@@ -1212,7 +1393,12 @@ function handleCreateSeoAudit(payload) {
         `).run(
           payload.client_id,
           payload.audit_type,
-          usage.model || null,
+          // token_usage_log.model is NOT NULL, so a failure reporting usage
+          // without naming a model used to throw and take the whole webhook
+          // down with a 500 — losing the usage record it was trying to save,
+          // on exactly the path we ask OpenClaw to use for failures. The
+          // success path below already defaults; this one did not.
+          usage.model || 'unknown',
           payload.triggered_by || 'system',
           usage.input_tokens || 0,
           usage.output_tokens || 0,
@@ -1388,7 +1574,27 @@ function handleCreateSeoAudit(payload) {
   let orphanRun = null;
 
   if (payload.run_id) {
-    closedRun = finishRun(payload.run_id, finalStatus, finishOpts);
+    // The run says which skill we asked for; the payload says which one ran.
+    // When they disagree, OpenClaw resolved our trigger message to a different
+    // skill — "seo geo" was read as geographic SEO and served by the local
+    // skill on 2026-08-04, closing run #11 as a completed geo audit when no geo
+    // audit existed. Skill selection there is the model reading a reference
+    // table, not a lookup, so this will recur with any confusable pair.
+    //
+    // The audit itself is kept — it is real work and the tokens are spent — but
+    // the run is failed rather than completed, so the card reports the truth and
+    // the skill stays due instead of looking freshly audited for 30 days.
+    const requestedRun = getRun(payload.run_id);
+    if (requestedRun && requestedRun.agent_type !== payload.audit_type) {
+      const mismatch =
+        `Skill mismatch: '${requestedRun.agent_type}' was requested but OpenClaw returned a ` +
+        `'${payload.audit_type}' audit (stored as #${firstAuditId}). The trigger message was ` +
+        `resolved to the wrong skill; '${requestedRun.agent_type}' has NOT been audited.`;
+      console.warn(`[OPENCLAW] ${mismatch}`);
+      closedRun = finishRun(payload.run_id, 'failed', { ...finishOpts, error: mismatch });
+    } else {
+      closedRun = finishRun(payload.run_id, finalStatus, finishOpts);
+    }
   } else {
     // No run_id: this result identifies itself only by client + audit type.
     // A cancelled run is still out there working (OpenClaw cannot abort), so

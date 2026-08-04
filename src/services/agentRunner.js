@@ -186,10 +186,28 @@ export async function abortOpenClawRun(run) {
  * Returns { run } on success or { conflict } when that client+agent already
  * has a run in flight — the caller should surface a 409 rather than spend.
  */
+/**
+ * Runners that execute SEO audits by pulling work from us rather than being
+ * pushed to.
+ *
+ * The local worker claims queued runs over the signed webhook (claim_seo_runs),
+ * so there is nothing to spawn here — the run simply stays `queued` until a
+ * worker picks it up. That inverts the dependency: no Tailscale tunnel into a
+ * machine we do not control, and a laptop that was asleep collects its backlog
+ * on waking instead of the work being lost.
+ *
+ * Set SEO_DISPATCH=push to go back to spawning openclaw_seo_runner.js.
+ */
+const DISPATCH_MODE = process.env.SEO_DISPATCH || 'pull';
+
 export function startAgentRun({ clientId, agentType, model, requestedBy, pendingActionId = null, agentId = null }) {
   const { run, conflict } = createRun({ clientId, agentType, model, requestedBy, pendingActionId, agentId });
   if (conflict) return { conflict };
 
-  spawnAgent(run, model);
+  if (DISPATCH_MODE === 'push') {
+    spawnAgent(run, model);
+  } else {
+    console.log(`[AGENT] Run #${run.id} (${agentType}) queued for a pull worker; not spawning a runner.`);
+  }
   return { run };
 }

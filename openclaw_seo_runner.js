@@ -169,7 +169,17 @@ async function run() {
   // when present, is the chat-model-switch plugin's trigger — it scans this
   // text for a model name and overrides the session's model to match.
   const modelClause = MODEL_PHRASE ? ` — use ${MODEL_PHRASE} for this one.` : '';
-  const userMessage = `seo ${agentType === 'full' ? 'audit' : agentType} ${targetUrl} [client_id:${clientId}]${runId ? ` [run_id:${runId}]` : ''}${modelClause}`;
+
+  // Hyphens, not underscores. OpenClaw has no skill-name field in its hook
+  // schema — the model picks the skill by reading this message against the
+  // orchestrator's Quick Reference table, which is written with hyphens
+  // ("/seo content-brief"). Our audit types are underscored, and OpenClaw
+  // described the underscore form as matching "because the model generalizes,
+  // not because of a parsing layer" (2026-08-03). Affects content_brief,
+  // competitor_pages and image_gen. 'full' is a separate rename: its skill is
+  // called seo-audit there, so the phrase has always been "seo audit".
+  const skillPhrase = agentType === 'full' ? 'audit' : agentType.replace(/_/g, '-');
+  const userMessage = `seo ${skillPhrase} ${targetUrl} [client_id:${clientId}]${runId ? ` [run_id:${runId}]` : ''}${modelClause}`;
 
   const confirmation = await askOpenClaw(userMessage);
 

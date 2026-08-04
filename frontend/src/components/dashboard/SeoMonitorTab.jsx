@@ -21,21 +21,27 @@ function formatElapsed(sinceIso, now) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
-// Skills still blocked: maps/competitor_pages/dataforseo need DataForSEO
-// configured (confirmed by OpenClaw, 2026-07-20). drift is excluded per its
-// own agent_run_config note — "Automatic weekly, not manually triggered" —
-// a design choice independent of whether it's installed.
-// Verified against OpenClaw's actual skill directory on 2026-07-28. Several of
-// these have no SKILL.md on disk at all — triggering them burns a queue slot
-// and a timeout window to produce nothing.
+// Display copy only. The trigger route enforces this list server-side as of
+// 2026-08-03 — this map exists so a blocked skill reads as blocked before the
+// click, not so the block itself depends on the browser.
+//
+// Verified against OpenClaw's installed skill directory 2026-08-03. The three
+// with no SKILL.md are not merely useless: OpenClaw confirmed that a run with
+// no matching skill answers from training knowledge and POSTs a
+// create_seo_audit anyway, producing a fabricated audit row.
+//
+// 'full' was listed here as having no skill. It does — OpenClaw calls it
+// seo-audit, which is exactly what our trigger message already asks for, and
+// it is unblocked as of 2026-08-03.
+//
+// Mirrors UNAVAILABLE_SKILLS in src/routes/seo.js; keep the two in sync.
 const UNAVAILABLE_SKILLS = new Map([
-  // No skill directory exists on OpenClaw.
+  // No skill directory exists on OpenClaw — these fabricate results.
   ['competitor_pages', 'No skill exists on OpenClaw'],
   ['dataforseo', 'No skill exists on OpenClaw — DataForSEO MCP not installed'],
-  ['full', 'No skill exists on OpenClaw under this name (it is "seo-audit" there)'],
+  ['maps', 'No skill exists on OpenClaw — requires DataForSEO, which is not installed'],
   // Present but missing the credentials or tools it depends on.
   // 'google' was here until its Google API credentials went live (2026-07-28).
-  ['maps', 'Requires DataForSEO, which is not installed'],
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not installed'],
   // Works, but by design is not triggered by hand.
   ['drift', 'Automatic weekly check — not manually triggered'],
@@ -1026,15 +1032,36 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                             e.stopPropagation();
                             setActiveConsoleAgent(agent.agentType);
                             setIsTerminalOpen(true);
-                            // Focus this agent's live run if it has one, else
-                            // the merged stream. (This used to push a bare
-                            // string into consoleLogs and wipe the history —
-                            // every entry is a {type,data,timestamp} object.)
-                            setTerminalTab(run ? String(run.id) : 'all');
+
+                            // Open the run this card is about, not the merged
+                            // stream. Previously this only considered a live
+                            // run, so the moment one finished the button fell
+                            // back to 'all' and showed every agent's output.
+                            // (It also used to push a bare string into
+                            // consoleLogs and wipe the history — every entry is
+                            // a {type,data,timestamp} object.)
+                            const latest = run || [...queue.active, ...queue.recent]
+                              .filter(r => r.agent_type === agent.agentType
+                                && String(r.client_id) === String(selectedClientId))
+                              .sort((a, b) => b.id - a.id)[0];
+
+                            // Runner output is streamed over SSE and never
+                            // stored, so a run from before this page loaded has
+                            // no logs to show. Say so rather than silently
+                            // swapping to the merged view.
+                            const hasLogs = latest && consoleLogs.some(l => String(l.runId) === String(latest.id));
+                            setTerminalTab(hasLogs ? String(latest.id) : 'all');
+
+                            const note = !latest
+                              ? `[SYSTEM] '${agent.agentType}' has no runs yet. Showing the merged stream.`
+                              : hasLogs
+                                ? `[SYSTEM] Subscribed to logs for '${agent.agentType}' agent (run #${latest.id}).`
+                                : `[SYSTEM] Run #${latest.id} ('${agent.agentType}', ${latest.status}) has no retained logs — runner output is streamed live and not stored, so it is gone after a refresh. Showing the merged stream.`;
+
                             setConsoleLogs(prev => [...prev, {
                               type: 'system_message',
-                              data: { log: `[SYSTEM] Subscribed to logs for '${agent.agentType}' agent.` },
-                              runId: run?.id,
+                              data: { log: note },
+                              runId: hasLogs ? latest.id : undefined,
                               timestamp: new Date()
                             }]);
                           }}
@@ -1196,7 +1223,19 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 </div>
               </div>
 
-              {recommendations.length === 0 ? (
+              {/* Focusing an agent with no audits used to blank this whole
+                  panel: dropdownAudits emptied, selectedAuditId stopped
+                  resolving, and every currentAudit-guarded section rendered
+                  nothing at all — reading as a broken page rather than an
+                  agent that has not run. */}
+              {focusedAgentType && dropdownAudits.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', border: '2px solid #000', borderRadius: '4px' }}>
+                  <p style={{ margin: 0, fontWeight: 'bold', fontSize: '0.9rem' }}>No '{focusedAgentType}' audits yet.</p>
+                  <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    Run this agent to generate one, or choose Show All to see audits from every agent.
+                  </p>
+                </div>
+              ) : recommendations.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: '4px' }}>
                   <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>No recommendations loaded. Run an agent audit above to populate recommendations.</p>
                 </div>

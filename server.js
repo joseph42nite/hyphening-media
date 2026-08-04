@@ -93,7 +93,16 @@ app.use(cors({
 app.use(cookieParser());
 
 // 4. JSON body parser
-app.use(express.json({ limit: '5mb' }));
+//
+// The verify hook keeps the raw bytes on the request so HMAC verification can
+// hash exactly what was sent. Without it the OpenClaw webhook had to hash a
+// re-serialisation of the parsed body, which made the signature depend on
+// matching Node's JSON formatting — a sender emitting 0.0 rather than 0 failed
+// with an unexplained 401. See verifySignature in src/routes/openclaw.js.
+app.use(express.json({
+  limit: '5mb',
+  verify: (req, res, buf) => { req.rawBody = buf; },
+}));
 
 // 5. Global rate limiter (only applied to API endpoints)
 app.use('/api', globalLimiter);

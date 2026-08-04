@@ -7,6 +7,27 @@ import { startAgentRun, abortOpenClawRun, isAbortSupported } from '../services/a
 
 const IN_FLIGHT_FOR_ABORT = ['queued', 'running'];
 
+// Skills OpenClaw cannot serve, and why. Authoritative — the trigger route
+// rejects these, and /seo/agents/status reports the reason so the dashboard can
+// render it rather than keeping a second copy of this list.
+//
+// Confirmed against OpenClaw's installed skill directory 2026-08-03. The three
+// with no SKILL.md at all are the dangerous ones: OpenClaw stated that a run
+// with no matching skill answers from training knowledge and POSTs a
+// create_seo_audit regardless, producing a fabricated audit row.
+//
+// Mirrors UNAVAILABLE_SKILLS in SeoMonitorTab.jsx; keep the two in sync.
+const UNAVAILABLE_SKILLS = new Map([
+  // No skill directory exists on OpenClaw — these fabricate results.
+  ['competitor_pages', 'No skill exists on OpenClaw'],
+  ['dataforseo', 'No skill exists on OpenClaw — DataForSEO MCP not installed'],
+  ['maps', 'No skill exists on OpenClaw — requires DataForSEO, which is not installed'],
+  // Present, but missing a tool it depends on.
+  ['image_gen', 'Requires the nanobanana MCP image tool, which is not installed'],
+  // Works, but by design is not triggered by hand.
+  ['drift', 'Automatic weekly check — not manually triggered'],
+]);
+
 // Each skill writes a different one of the ten score columns on seo_audits.
 // Prefer the column matching the audit type, then the generic health_score,
 // then whatever is populated — otherwise a real score reads as no score.
@@ -28,6 +49,43 @@ const ALL_SCORE_COLUMNS = [
   'schema_score', 'performance_score', 'geo_score', 'backlinks_score',
   'local_score', 'sxo_score',
 ];
+
+/**
+ * Our audit type -> OpenClaw's skill name. Mirrors the trigger phrase built in
+ * openclaw_seo_runner.js: underscores become hyphens, and 'full' is 'seo-audit'
+ * on their side.
+ */
+function skillNameForAuditType(agentType) {
+  return agentType === 'full' ? 'seo-audit' : `seo-${agentType.replace(/_/g, '-')}`;
+}
+
+/**
+ * What OpenClaw last reported about the skill backing this audit type.
+ *
+ * `enforced` is false until an inventory has been received at all, so a fresh
+ * install does not have every agent disabled by an empty table.
+ */
+function skillStateFor(agentType) {
+  const skillName = skillNameForAuditType(agentType);
+  const anyReport = db.prepare('SELECT COUNT(*) AS n FROM openclaw_skills').get().n > 0;
+  if (!anyReport) return { enforced: false, ok: true, skillName };
+
+  const row = db.prepare('SELECT * FROM openclaw_skills WHERE name = ?').get(skillName);
+  if (!row) {
+    return {
+      enforced: true, ok: false, skillName,
+      reason: `OpenClaw has no skill named '${skillName}' installed`,
+      reportedAt: null,
+    };
+  }
+  if (!row.healthy) {
+    const why = !row.frontmatter_parsed
+      ? `'${skillName}' has unreadable frontmatter, so OpenClaw cannot discover it${row.frontmatter_error ? ` (${row.frontmatter_error})` : ''}`
+      : `'${skillName}' has a byte-order mark before its frontmatter, which prevents discovery`;
+    return { enforced: true, ok: false, skillName, reason: why, reportedAt: row.reported_at };
+  }
+  return { enforced: true, ok: true, skillName, reportedAt: row.reported_at };
+}
 
 function resolveAuditScore(audit) {
   if (!audit) return null;
@@ -179,6 +237,40 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     // Look up config
     const conf = db.prepare('SELECT * FROM agent_run_config WHERE audit_type = ?').get(agentType);
     if (!conf) return res.status(400).json({ error: `Unknown agent type: ${agentType}` });
+
+    // Refuse skills OpenClaw cannot actually serve. This was previously
+    // enforced only in SeoMonitorTab, which meant it guarded the buttons and
+    // nothing else — a direct API call, a stale tab or a scheduled run went
+    // straight through.
+    //
+    // Not merely wasteful. OpenClaw confirmed 2026-08-03 that a run with no
+    // matching skill does not fail: the model answers from training knowledge,
+    // completes the workflow and POSTs a create_seo_audit anyway. The result is
+    // a fabricated audit row, indistinguishable from a real one, which then
+    // feeds the freshness gate and the client's report.
+    const unavailable = UNAVAILABLE_SKILLS.get(agentType);
+    if (unavailable) {
+      return res.status(400).json({
+        error: 'skill_unavailable',
+        agentType,
+        message: `'${agentType}' cannot be run: ${unavailable}`
+      });
+    }
+
+    // Refuse a skill OpenClaw has reported as broken or absent.
+    //
+    // Only enforced once an inventory has actually been received — before the
+    // first report we know nothing, and blocking on an empty table would
+    // disable every agent. Skipped entirely in that case.
+    const skillState = skillStateFor(agentType);
+    if (skillState.enforced && !skillState.ok) {
+      return res.status(400).json({
+        error: 'skill_unhealthy',
+        agentType,
+        skill: skillState.skillName,
+        message: `'${agentType}' cannot be run: ${skillState.reason} (as of OpenClaw's inventory at ${skillState.reportedAt}).`
+      });
+    }
 
     const selectedModel = model || conf.default_model;
 
@@ -440,6 +532,59 @@ router.patch('/:id/seo/recommendations/:recId', (req, res) => {
  */
 export const queueRouter = Router();
 queueRouter.use(authenticate);
+
+/**
+ * GET /api/seo/skills
+ * What OpenClaw last reported it has installed, plus the diff against what we
+ * expect. Drives the skill-health panel and explains a skill_unhealthy refusal.
+ */
+queueRouter.get('/skills', (req, res) => {
+  try {
+    const report = db.prepare(
+      'SELECT * FROM openclaw_skill_reports ORDER BY id DESC LIMIT 1'
+    ).get();
+
+    if (!report) {
+      return res.json({
+        reported: false,
+        message: 'OpenClaw has not reported a skill inventory yet. Skill health checks are not being enforced.',
+        skills: [],
+      });
+    }
+
+    const skills = db.prepare('SELECT * FROM openclaw_skills ORDER BY name ASC').all();
+
+    // Which audit types the dashboard can actually run, decided by the same
+    // rule the trigger route applies, so the UI cannot disagree with it.
+    const configured = db.prepare('SELECT audit_type FROM agent_run_config').all();
+    const byAuditType = {};
+    for (const { audit_type } of configured) {
+      const state = skillStateFor(audit_type);
+      byAuditType[audit_type] = {
+        skill: state.skillName,
+        ok: state.ok,
+        reason: state.reason || null,
+        blockedLocally: UNAVAILABLE_SKILLS.get(audit_type) || null,
+      };
+    }
+
+    res.json({
+      reported: true,
+      reportedAt: report.reported_at,
+      trigger: report.trigger,
+      runnerModel: report.runner_model,
+      skillCount: report.skill_count,
+      unhealthyCount: report.unhealthy_count,
+      missingSkills: JSON.parse(report.missing_skills || '[]'),
+      unexpectedSkills: JSON.parse(report.unexpected_skills || '[]'),
+      skills,
+      byAuditType,
+    });
+  } catch (err) {
+    console.error('[SEO ROUTE] Skill inventory error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 /**
  * GET /api/seo/queue
