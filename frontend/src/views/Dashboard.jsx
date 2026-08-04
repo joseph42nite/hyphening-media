@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../api.js';
 import logoImg from '../assets/logo.png';
 import { 
-  Users, Folder, Calendar, DollarSign, Clock, CheckSquare, 
+  Users, Folder, Calendar, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
-  Search, Share2, FileDown, Eye, HelpCircle, Check, X, ShieldAlert,
+  Search, Share2, FileDown, Eye, HelpCircle, Check, X,
   AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu, Menu
 } from 'lucide-react';
 
@@ -20,8 +20,6 @@ import ContentModal from '../components/dashboard/ContentModal.jsx';
 import BlogTab from '../components/dashboard/BlogTab.jsx';
 import ClientsTab from '../components/dashboard/ClientsTab.jsx';
 import SeoMonitorTab from '../components/dashboard/SeoMonitorTab.jsx';
-import ApprovalCenterTab from '../components/dashboard/ApprovalCenterTab.jsx';
-import TokenUsageTab from '../components/dashboard/TokenUsageTab.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from '../components/dashboard/contentFormHelper.js';
 
 let isRefreshing = false;
@@ -1210,13 +1208,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
-        {/* Approvals */}
-        {isAdmin && (
-          <button onClick={() => setActiveTab('approval')} className={`btn ${activeTab === 'approval' ? 'btn-primary' : 'btn-secondary'}`}>
-            <ShieldAlert size={16} /> Approvals
-          </button>
-        )}
-
         {/* 8. Clients */}
         {isAdmin && (
           <button onClick={() => setActiveTab('clients')} className={`btn ${activeTab === 'clients' ? 'btn-primary' : 'btn-secondary'}`}>
@@ -1231,12 +1222,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
-        {/* Token Usage */}
-        {isAdmin && (
-          <button onClick={() => setActiveTab('usage')} className={`btn ${activeTab === 'usage' ? 'btn-primary' : 'btn-secondary'}`}>
-            <DollarSign size={16} /> Token Usage
-          </button>
-        )}
 
         {/* 10. Audit Log */}
         {isAdmin && (
@@ -1380,21 +1365,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {activeTab === 'seo' && (isAdmin || isSMM) && (
           <SeoMonitorTab
             auth={auth}
-            clients={clients}
-            showToast={showToast}
-          />
-        )}
-
-        {/* APPROVAL CENTER TAB */}
-        {activeTab === 'approval' && isAdmin && (
-          <ApprovalCenterTab
-            showToast={showToast}
-          />
-        )}
-
-        {/* TOKEN USAGE TAB */}
-        {activeTab === 'usage' && isAdmin && (
-          <TokenUsageTab
             clients={clients}
             showToast={showToast}
           />

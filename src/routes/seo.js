@@ -24,10 +24,11 @@ const UNAVAILABLE_SKILLS = new Map([
   ['dataforseo', 'Requires the DataForSEO MCP server, which is not configured'],
   ['maps', 'Requires the DataForSEO MCP server, which is not configured'],
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
-  // 'google' ran unblocked from 2026-08-04: the worker reports tier 0, so
-  // PageSpeed, CrUX and CrUX History return real field data. Search Console,
-  // Indexing and GA4 still need a service account, and facts.mjs records that
-  // per run so the report states them as unavailable instead of estimating.
+  // 'google' was unblocked 2026-08-04: the worker reports tier 0, so PageSpeed,
+  // CrUX and CrUX History return real field data. Search Console, Indexing and
+  // GA4 still need a service account, and facts.mjs records that per run so the
+  // report states them as unavailable instead of estimating.
+  //
   // Installed and working, but compares against a stored baseline. Running it
   // before one exists reports every element as new rather than as drift.
   ['drift', 'Needs a stored baseline first — capture one before comparing'],
@@ -395,35 +396,18 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
         runId: run.id
       });
     } else {
-      // Put in pending action queue
-      const actionResult = db.prepare(`
-        INSERT INTO openclaw_pending_actions (client_id, action_type, action_payload, requested_by, requested_role, status)
-        VALUES (?, 'run_seo_agent', ?, ?, ?, 'pending')
-      `).run(clientId, payload, req.user.id, userRole);
-
-      logAction({
-        actorId: req.user.id,
-        actorEmail: req.user.email,
-        action: 'openclaw_staged',
-        entityType: 'openclaw_action',
-        entityId: actionResult.lastInsertRowid,
-        diff: { agentType, client: client.name, status: 'pending' }
-      });
-
-      // Notify SSE clients that a request needs review
-      if (req.app.get('broadcastEvent')) {
-        req.app.get('broadcastEvent')('pending_action_created', {
-          actionId: actionResult.lastInsertRowid,
-          clientName: client.name,
-          agentType,
-          requestedBy: req.user.email
-        });
-      }
-
-      return res.json({
-        status: 'pending_approval',
-        message: `Your run request for ${agentType} has been queued and is waiting for administrator approval.`,
-        actionId: actionResult.lastInsertRowid
+      // Non-admins cannot start a run.
+      //
+      // This used to stage a 'pending' row for an admin to approve in the
+      // Approval Center. That tab is gone — every SEO run in the system's
+      // history was requested by an admin and none ever needed approving — so
+      // staging one now would leave the request sitting unapprovable for ever
+      // while telling the requester it was queued. Refusing outright is the
+      // honest behaviour; flip this to auto-approve if SMMs should be able to
+      // spend tokens directly.
+      return res.status(403).json({
+        error: 'approval_required',
+        message: `Running '${agentType}' costs tokens, so it is limited to admins. Ask an admin to run it.`
       });
     }
 
