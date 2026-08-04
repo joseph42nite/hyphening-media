@@ -44,6 +44,7 @@ import { publicGigConfirmRoute } from './src/routes/artists.js';
 import seoRoutes, { queueRouter as seoQueueRoutes } from './src/routes/seo.js';
 import approvalRoutes from './src/routes/approval.js';
 import usageRoutes from './src/routes/usage.js';
+import notificationRoutes from './src/routes/notifications.js';
 import sitemapRoutes from './src/routes/sitemap.js';
 
 // Import services
@@ -211,6 +212,7 @@ app.use('/api/clients', seoRoutes);
 app.use('/api/seo', seoQueueRoutes);
 app.use('/api/approval', approvalRoutes);
 app.use('/api/usage', usageRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Blog (public + admin)
 app.use('/api/blog', blogRoutes);

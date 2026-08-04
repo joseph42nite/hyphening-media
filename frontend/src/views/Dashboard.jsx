@@ -25,6 +25,43 @@ import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } fro
 let isRefreshing = false;
 let refreshPromise = null;
 
+/**
+ * Count badge on a nav tab.
+ *
+ * One component for every tab so they cannot drift apart visually — the Client
+ * Workspace badge already looked like this, and each new one was going to be
+ * another copy of the same twenty lines of positioning.
+ *
+ * Renders nothing at zero: a badge showing 0 is a permanent decoration, and the
+ * point is that it appears only when there is something to do.
+ */
+function TabBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span style={{
+      position: 'absolute',
+      top: '-8px',
+      right: '-8px',
+      background: 'var(--warning)',
+      color: '#000',
+      border: '2px solid #000',
+      borderRadius: '50%',
+      minWidth: '20px',
+      height: '20px',
+      padding: '2px',
+      fontSize: '0.65rem',
+      fontWeight: 'bold',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '1px 1px 0px #000',
+      zIndex: 10
+    }}>
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 export default function Dashboard({ auth, setAuth, showToast }) {
   const navigate = useNavigate();
   
@@ -122,6 +159,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [unseenCounts, setUnseenCounts] = useState({});
   const [clientRecencyOrder, setClientRecencyOrder] = useState([]);
 
+  // Per-tab badge counts from /api/notifications/tabs. Replaces the daily
+  // Telegram digests: visible only while the work exists, and gone once it is
+  // done, rather than pushed every morning regardless.
+  const [tabCounts, setTabCounts] = useState({});
+
   // SSE State
   const [sseConnected, setSseConnected] = useState(false);
 
@@ -172,6 +214,26 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const chatContainerRef = useRef(null);
 
   // Auto-scroll only the chat messages container (not the page)
+  // Badge counts: on mount, whenever the tab changes (so acting on something
+  // clears its badge without a reload), and on a slow timer for anything that
+  // changes server-side.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/notifications/tabs`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setTabCounts(data.tabs || {});
+      } catch {
+        // Badges are an affordance; a failed fetch just leaves them as they were.
+      }
+    };
+    load();
+    const t = setInterval(load, 120000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [activeTab]);
+
   useEffect(() => {
     if (chatContainerRef.current) {
       const container = chatContainerRef.current;
@@ -1123,8 +1185,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       {/* Tabs Menu */}
       <div className="dashboard-tabs">
         {/* 1. Kanban Tasks */}
-        <button onClick={() => setActiveTab('tasks')} className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`}>
+        <button onClick={() => setActiveTab('tasks')} className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.tasks ? `${tabCounts.tasks} task(s) overdue` : undefined}>
           <Layers size={16} /> Kanban Tasks
+          <TabBadge count={tabCounts.tasks} />
         </button>
 
         {/* 2. Client Workspace */}
@@ -1134,35 +1197,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           style={{ position: 'relative' }}
         >
           <MessageSquare size={16} /> Client Workspace
-          {(() => {
-            const totalUnseen = Object.values(unseenCounts).reduce((acc, curr) => acc + (curr || 0), 0);
-            if (totalUnseen > 0) {
-              return (
-                <span style={{
-                  position: 'absolute',
-                  top: '-8px',
-                  right: '-8px',
-                  background: 'var(--warning)',
-                  color: '#000',
-                  border: '2px solid #000',
-                  borderRadius: '50%',
-                  minWidth: '20px',
-                  height: '20px',
-                  padding: '2px',
-                  fontSize: '0.65rem',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '1px 1px 0px #000',
-                  zIndex: 10
-                }}>
-                  {totalUnseen}
-                </span>
-              );
-            }
-            return null;
-          })()}
+          <TabBadge count={Object.values(unseenCounts).reduce((a, c) => a + (c || 0), 0)} />
         </button>
 
         {/* 3. Marketing Data */}
@@ -1174,8 +1209,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
         {/* SEO Monitor */}
         {(isAdmin || isSMM) && (
-          <button onClick={() => setActiveTab('seo')} className={`btn ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}>
+          <button onClick={() => setActiveTab('seo')} className={`btn ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.seo ? `${tabCounts.seo} audit(s) due` : undefined}>
             <Cpu size={16} /> SEO Monitor
+            <TabBadge count={tabCounts.seo} />
           </button>
         )}
 
@@ -1184,8 +1220,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           <button onClick={() => {
             setActiveTab('scripts');
             if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
-          }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`}>
+          }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.scripts ? `${tabCounts.scripts} script(s) approved or commented by a client` : undefined}>
             <FileText size={16} /> Scripts
+            <TabBadge count={tabCounts.scripts} />
           </button>
         )}
 
@@ -1203,8 +1240,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
         {/* 7. Blogs */}
         {isAdmin && (
-          <button onClick={() => setActiveTab('blog')} className={`btn ${activeTab === 'blog' ? 'btn-primary' : 'btn-secondary'}`}>
+          <button onClick={() => setActiveTab('blog')} className={`btn ${activeTab === 'blog' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.blog ? `${tabCounts.blog} draft post(s)` : undefined}>
             <FileText size={16} /> Blogs
+            <TabBadge count={tabCounts.blog} />
           </button>
         )}
 
