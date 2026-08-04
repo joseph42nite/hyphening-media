@@ -22,7 +22,15 @@ const router = Router();
 
 router.use(webhookLimiter);
 
-const HMAC_SECRET = process.env.OPENCLAW_HMAC_SECRET || '';
+// HYPHENING_HMAC_SECRET is the current name — the shared secret now
+// authenticates our own local SEO worker as well as OpenClaw, so naming it
+// after one caller was misleading. OPENCLAW_HMAC_SECRET stays as a fallback so
+// an environment that has not been renamed yet keeps working: reading only the
+// new name on a server still using the old one leaves HMAC_SECRET empty, which
+// fails every signature check and takes the webhook down silently.
+const HMAC_SECRET = process.env.HYPHENING_HMAC_SECRET
+  || process.env.OPENCLAW_HMAC_SECRET
+  || '';
 const REPLAY_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
