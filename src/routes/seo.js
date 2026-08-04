@@ -24,6 +24,11 @@ const UNAVAILABLE_SKILLS = new Map([
   ['dataforseo', 'Requires the DataForSEO MCP server, which is not configured'],
   ['maps', 'Requires the DataForSEO MCP server, which is not configured'],
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
+  // Every one of its data sources needs a Google API key. The worker reports
+  // tier -1, meaning PageSpeed, CrUX, Search Console, Indexing and GA4 are all
+  // unreachable, so this skill has nothing to read. Add a key at
+  // ~/.config/claude-seo/google-api.json on the worker and remove this entry.
+  ['google', 'Needs a Google API key on the worker — PageSpeed, CrUX, Search Console and GA4 are all unreachable'],
   // Installed and working, but compares against a stored baseline. Running it
   // before one exists reports every element as new rather than as drift.
   ['drift', 'Needs a stored baseline first — capture one before comparing'],

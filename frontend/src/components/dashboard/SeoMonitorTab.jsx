@@ -42,6 +42,7 @@ const UNAVAILABLE_SKILLS = new Map([
   ['dataforseo', 'Requires the DataForSEO MCP server, which is not configured'],
   ['maps', 'Requires the DataForSEO MCP server, which is not configured'],
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
+  ['google', 'Needs a Google API key on the worker — PageSpeed, CrUX, Search Console and GA4 are all unreachable'],
   // Installed and working, but compares against a stored baseline.
   ['drift', 'Needs a stored baseline first — capture one before comparing'],
 ]);
