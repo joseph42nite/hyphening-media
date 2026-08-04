@@ -13,7 +13,7 @@ import { logAction } from '../services/auditLogger.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
 // webhook no longer clears them directly — doing so unconditionally used to
 // disarm the timer of a live run when a cancelled run's late result arrived.
-import { finishActiveRunFor, finishRun, claimOrphanedCancelledRun, getRun } from '../services/agentRuns.js';
+import { finishActiveRunFor, finishRun, claimOrphanedCancelledRun, getRun, broadcastRunLog } from '../services/agentRuns.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
@@ -161,7 +161,8 @@ router.post('/webhook', (req, res) => {
       'create_gig', 'update_gig', 'create_freelancer', 'update_freelancer',
       'send_chat_message', 'update_knowledge', 'optimize_queue',
       'create_blog_post', 'update_blog_post', 'create_seo_audit',
-      'agent_activity_log', 'skill_inventory_report', 'claim_seo_runs'
+      'agent_activity_log', 'skill_inventory_report', 'claim_seo_runs',
+      'seo_run_log'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -251,6 +252,7 @@ function executeEvent(eventType, payload) {
       case 'agent_activity_log': return handleAgentActivityLog(payload);
       case 'skill_inventory_report': return handleSkillInventoryReport(payload);
       case 'claim_seo_runs': return handleClaimSeoRuns(payload);
+      case 'seo_run_log': return handleSeoRunLog(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -286,6 +288,33 @@ function safeSummarisePayload(payload) {
 // ============================================================
 // HANDLER IMPLEMENTATIONS
 // ============================================================
+
+/**
+ * Relays a progress line from the local worker to the dashboard terminal.
+ *
+ * The terminal used to be fed by the runner's stdout, which the backend could
+ * read because it spawned the process itself. A pull worker runs on another
+ * machine, so it has to send its own progress — otherwise a run shows as
+ * `running` for several minutes with nothing to indicate whether it is working
+ * or hung, which is exactly the blindness that made the OpenClaw failures so
+ * slow to diagnose.
+ *
+ * Not persisted, matching the existing terminal behaviour: this is a live view,
+ * and the durable record is the audit plus the artifacts on the worker.
+ */
+function handleSeoRunLog(payload) {
+  const runId = parseInt(payload?.run_id, 10);
+  const line = typeof payload?.log === 'string' ? payload.log : null;
+  if (!runId || !line) {
+    return { success: false, summary: 'run_id and log are required' };
+  }
+
+  const run = getRun(runId);
+  if (!run) return { success: false, summary: `Run #${runId} not found` };
+
+  broadcastRunLog(run, line);
+  return { success: true, summary: `Relayed log for run #${runId}` };
+}
 
 /**
  * Hands queued SEO runs to the local worker.
