@@ -57,14 +57,15 @@ export async function getConnectUrl(clientId, appName, redirectUrl = '') {
       console.warn(`[COMPOSIO] Could not list authConfigs:`, e.message);
     }
 
-    // 2. If no authConfig exists, create one for this toolkit
+    // 2. If no authConfig exists, create one for this toolkit.
+    // Note: authConfigs.create takes the toolkit slug as a positional string,
+    // not as an options field.
     if (!authConfigId) {
-      try {
-        const created = await composioClient.authConfigs.create({ toolkit: cleanApp });
-        authConfigId = created.id;
-      } catch (e) {
-        console.warn(`[COMPOSIO] Could not create authConfig for ${cleanApp}:`, e.message);
-      }
+      const created = await composioClient.authConfigs.create(cleanApp, {
+        type: 'use_composio_managed_auth',
+        name: `${cleanApp} Auth Config`
+      });
+      authConfigId = created.id;
     }
 
     // 3. Generate OAuth connection link via connectedAccounts.link

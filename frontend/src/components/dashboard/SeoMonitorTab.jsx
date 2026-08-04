@@ -112,8 +112,176 @@ function getPreviewText(audit) {
   return audit.summary || null;
 }
 
+// Inline formatting: **bold**, `code`, [text](url). Applied to already-escaped
+// text nodes, so nothing here can inject markup.
+function renderInline(text, keyPrefix = 'i') {
+  const parts = [];
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  let last = 0;
+  let m;
+  let n = 0;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const tok = m[0];
+    const key = `${keyPrefix}-${n++}`;
+    if (tok.startsWith('**')) {
+      parts.push(<strong key={key}>{tok.slice(2, -2)}</strong>);
+    } else if (tok.startsWith('`')) {
+      parts.push(
+        <code key={key} style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', fontSize: '0.92em', wordBreak: 'break-all' }}>
+          {tok.slice(1, -1)}
+        </code>
+      );
+    } else {
+      const [, label, href] = tok.match(/\[([^\]]+)\]\(([^)]+)\)/) || [];
+      parts.push(
+        <a key={key} href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', wordBreak: 'break-all' }}>
+          {label}
+        </a>
+      );
+    }
+    last = m.index + tok.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+/**
+ * Renders the audit narrative as markdown.
+ *
+ * The generic key/value walker below turned the whole report into one unbroken
+ * string of '#', '**' and '|' characters — a 15KB audit with tables and a
+ * twelve-finding structure was unreadable in the dashboard.
+ *
+ * Deliberately hand-rolled rather than pulling in react-markdown: the server
+ * builds the frontend itself and `dist` is not tracked, so a new dependency
+ * fails the build if the deploy does not also run `npm install`. Breaking the
+ * whole dashboard is too high a price for a formatting improvement. This covers
+ * what the skills actually emit — headings, tables, lists, rules and inline
+ * formatting.
+ */
+function MarkdownBlock({ text }) {
+  const lines = String(text).split(/\r?\n/);
+  const blocks = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (!line.trim()) { i++; continue; }
+
+    // Horizontal rule, including the box-drawing separator the skills append.
+    if (/^\s*(---+|___+|\*\*\*+|━+)\s*$/.test(line)) {
+      blocks.push(<hr key={key++} style={{ border: 0, borderTop: '1px solid #e2e8f0', margin: '18px 0' }} />);
+      i++;
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      const level = heading[1].length;
+      const sizes = { 1: '1.35rem', 2: '1.15rem', 3: '1rem', 4: '0.95rem', 5: '0.9rem', 6: '0.85rem' };
+      blocks.push(
+        <div key={key++} style={{
+          fontSize: sizes[level], fontWeight: 700, marginTop: level <= 2 ? '20px' : '14px',
+          marginBottom: '8px', color: '#0f172a', lineHeight: 1.3,
+          borderBottom: level === 1 ? '2px solid #e2e8f0' : 'none',
+          paddingBottom: level === 1 ? '6px' : 0,
+        }}>
+          {renderInline(heading[2], `h${key}`)}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Table: a header row, a separator of dashes, then body rows.
+    if (line.trim().startsWith('|') && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] || '')) {
+      const cells = (row) => row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const header = cells(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        rows.push(cells(lines[i]));
+        i++;
+      }
+      blocks.push(
+        <div key={key++} style={{ overflowX: 'auto', margin: '12px 0' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '100%' }}>
+            <thead>
+              <tr>
+                {header.map((h, hi) => (
+                  <th key={hi} style={{ border: '1px solid #e2e8f0', padding: '6px 10px', background: '#f8fafc', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {renderInline(h, `th${key}-${hi}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri}>
+                  {r.map((c, ci) => (
+                    <td key={ci} style={{ border: '1px solid #e2e8f0', padding: '6px 10px', verticalAlign: 'top', wordBreak: 'break-word' }}>
+                      {renderInline(c, `td${key}-${ri}-${ci}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    // Bullet or numbered list.
+    const isBullet = (l) => /^\s*[-*+]\s+/.test(l);
+    const isNumber = (l) => /^\s*\d+\.\s+/.test(l);
+    if (isBullet(line) || isNumber(line)) {
+      const ordered = isNumber(line);
+      const items = [];
+      while (i < lines.length && (isBullet(lines[i]) || isNumber(lines[i]))) {
+        items.push(lines[i].replace(/^\s*(?:[-*+]|\d+\.)\s+/, ''));
+        i++;
+      }
+      const List = ordered ? 'ol' : 'ul';
+      blocks.push(
+        <List key={key++} style={{ margin: '8px 0', paddingLeft: '22px', lineHeight: 1.6 }}>
+          {items.map((it, ii) => (
+            <li key={ii} style={{ marginBottom: '4px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+              {renderInline(it, `li${key}-${ii}`)}
+            </li>
+          ))}
+        </List>
+      );
+      continue;
+    }
+
+    // Paragraph: consecutive non-blank lines that start no other block.
+    const para = [];
+    while (
+      i < lines.length && lines[i].trim()
+      && !/^(#{1,6})\s/.test(lines[i])
+      && !lines[i].trim().startsWith('|')
+      && !isBullet(lines[i]) && !isNumber(lines[i])
+      && !/^\s*(---+|___+|\*\*\*+|━+)\s*$/.test(lines[i])
+    ) {
+      para.push(lines[i]);
+      i++;
+    }
+    blocks.push(
+      <p key={key++} style={{ margin: '8px 0', lineHeight: 1.65, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+        {renderInline(para.join(' '), `p${key}`)}
+      </p>
+    );
+  }
+
+  return <div style={{ fontSize: '0.88rem', color: '#1e293b' }}>{blocks}</div>;
+}
+
 // Renders an arbitrary report_json object as readable nested key/value
-// text instead of a raw JSON dump — OpenClaw's report shape varies by skill.
+// text instead of a raw JSON dump — the report shape varies by skill.
 function ReportValue({ value, depth = 0 }) {
   if (value === null || value === undefined) {
     return <span style={{ color: '#94a3b8' }}>—</span>;
@@ -133,12 +301,20 @@ function ReportValue({ value, depth = 0 }) {
   if (typeof value === 'object') {
     return (
       <div style={{ marginLeft: depth > 0 ? '14px' : 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-        {Object.entries(value).map(([k, v]) => (
-          <div key={k} style={{ marginBottom: '6px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-            <strong style={{ textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}:</strong>{' '}
-            {typeof v === 'object' && v !== null ? <ReportValue value={v} depth={depth + 1} /> : String(v)}
-          </div>
-        ))}
+        {Object.entries(value).map(([k, v]) => {
+          // The narrative is markdown and reads as noise through the key/value
+          // walker, so it gets the renderer and drops the "Report markdown:"
+          // label — it is the report, not a field of one.
+          if (k === 'report_markdown' && typeof v === 'string') {
+            return <MarkdownBlock key={k} text={v} />;
+          }
+          return (
+            <div key={k} style={{ marginBottom: '6px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+              <strong style={{ textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}:</strong>{' '}
+              {typeof v === 'object' && v !== null ? <ReportValue value={v} depth={depth + 1} /> : String(v)}
+            </div>
+          );
+        })}
       </div>
     );
   }
