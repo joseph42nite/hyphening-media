@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ArrowRight, ChevronUp, ChevronDown, ListOrdered, XCircle } from 'lucide-react';
+import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ChevronUp, ChevronDown, XCircle } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 const IN_FLIGHT_STATUSES = ['queued', 'running'];
@@ -364,7 +364,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   // abortSupported flips once OpenClaw exposes a real abort route — the cancel
   // wording depends on it, since without one cancelling saves nothing.
   const [queue, setQueue] = useState({ active: [], recent: [], abortSupported: false });
-  const [showQueue, setShowQueue] = useState(false);
   const [cancellingRunIds, setCancellingRunIds] = useState([]);
 
   // Terminal is one drawer with a tab per run ('all' = merged stream)
@@ -422,8 +421,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   const [showReportModal, setShowReportModal] = useState(false);
 
   // Assign to SMM modal
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [assigningRec, setAssigningRec] = useState(null);
   const [freelancers, setFreelancers] = useState([]);
   const [assignForm, setAssignForm] = useState({
     assigned_to: '',
@@ -838,33 +835,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     showToast('All agents queued successfully!', 'success');
   };
 
-  // Convert Recommendation to Kanban Task
-  const handleAssignSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/recommendations/${assigningRec.id}/convert-task`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assignForm),
-        credentials: 'include'
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      showToast('Assigned to SMM & linked to Kanban board!', 'success');
-      setShowAssignModal(false);
-      
-      // Refresh recommendations list
-      if (selectedAuditId) {
-        const detailRes = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/audits/${selectedAuditId}`, { credentials: 'include' });
-        const detailData = await detailRes.json();
-        if (detailRes.ok) setRecommendations(detailData.recommendations || []);
-      }
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
   // Helper to resolve card border & freshness color indicators
   const getFreshnessColor = (freshness) => {
     switch (freshness) {
@@ -984,15 +954,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   className={`btn ${isTerminalOpen ? 'btn-primary' : 'btn-secondary'} seo-cmd-btn`}
                   style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
                 >
-                  <Terminal size={16} /> {isTerminalOpen ? 'Hide Console Stream' : 'Live OpenClaw Console & Webhooks'} ({consoleLogs.length})
-                </button>
-                <button
-                  onClick={() => setShowQueue(prev => !prev)}
-                  className={`btn ${showQueue ? 'btn-primary' : 'btn-secondary'} seo-cmd-btn`}
-                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
-                  title="Every SEO job currently queued or running on OpenClaw, across all clients"
-                >
-                  <ListOrdered size={16} /> OpenClaw Queue ({queue.active.length})
+                  <Terminal size={16} /> {isTerminalOpen ? 'Hide Console' : 'Live Console'} ({consoleLogs.length})
                 </button>
               </div>
             )}
@@ -1007,142 +969,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       ) : (
         <div>
           
-          {/* Global OpenClaw job queue — spans every client, because the job
-              you're about to re-trigger may have been started from another
-              client's tab (or by another admin) and you'd never see it here. */}
-          {showQueue && (
-            <div className="card" style={{ border: '2px solid #000', padding: '16px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ margin: 0, fontWeight: 'bold' }}>OpenClaw Job Queue</h3>
-                <button
-                  onClick={fetchQueue}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '0.75rem', border: '1px solid #000' }}
-                >
-                  Refresh
-                </button>
-              </div>
-
-              {queue.active.length === 0 ? (
-                <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
-                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nothing queued or running. Every agent is idle.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {queue.active.map(run => (
-                    <div
-                      key={run.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        border: '2px solid #000',
-                        borderLeft: `6px solid ${run.status === 'running' ? '#3b82f6' : '#eab308'}`,
-                        borderRadius: '4px',
-                        padding: '10px 12px',
-                        background: '#fff',
-                        flexWrap: 'wrap'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                        <Loader2 size={14} className="animate-spin" style={{ color: run.status === 'running' ? '#3b82f6' : '#eab308' }} />
-                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{run.agent_type}</span>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
-                        <span className="badge" style={{ background: run.status === 'running' ? '#dbeafe' : '#fef3c7', border: '1px solid #000', fontSize: '0.68rem', fontWeight: 'bold' }}>
-                          {run.status} · {formatElapsed(run.started_at || run.created_at, now)}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                          run #{run.id}{run.openclaw_run_id ? ` · openclaw ${run.openclaw_run_id.slice(0, 8)}` : ''}
-                          {run.requested_by ? ` · ${run.requested_by}` : ''}
-                        </span>
-                        {/* Only shown when a skill is deliberately pinned to a
-                            non-default model. By default we name no model and the
-                            agent's own primary decides, so there is nothing to claim. */}
-                        {run.agent_id && (
-                          <span
-                            style={{ fontSize: '0.68rem', fontWeight: 'bold', border: '1px solid #94a3b8', borderRadius: '3px', padding: '1px 5px', color: '#475569' }}
-                            title="This skill is pinned to a specific model, requested via the chat-model-switch plugin. Check actual_model in Recent Runs for what OpenClaw reports actually ran."
-                          >
-                            requested: {run.agent_id}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => {
-                            setIsTerminalOpen(true);
-                            setTerminalTab(String(run.id));
-                          }}
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 10px', fontSize: '0.72rem', border: '1px solid #000', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Terminal size={12} /> Logs
-                        </button>
-                        <button
-                          onClick={() => cancelRun(run.id, String(run.client_id) === String(selectedClientId) ? run.agent_type : null)}
-                          disabled={cancellingRunIds.includes(run.id)}
-                          style={{ padding: '4px 10px', fontSize: '0.72rem', border: '2px solid #000', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                          title="Frees the slot so this agent can be run again. Does NOT stop the job inside OpenClaw or save tokens — it keeps running until it finishes on its own."
-                        >
-                          <XCircle size={12} /> {cancellingRunIds.includes(run.id) ? 'Cancelling…' : 'Cancel'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '10px 0 0' }}>
-                {queue.abortSupported ? (
-                  <>Cancel aborts the run inside OpenClaw and stops token spend. Any partial results are discarded.</>
-                ) : (
-                  <><strong>Cancel does not save tokens.</strong> OpenClaw exposes no abort endpoint, so a cancelled job keeps running and keeps spending until it finishes on its own. Cancel only frees the slot here so the agent can be triggered again — use it when a run looks stuck, not to stop a run you regret starting.</>
-                )}
-              </p>
-
-              {queue.recent.length > 0 && (
-                <details style={{ marginTop: '14px' }}>
-                  <summary style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>Recent finished runs ({queue.recent.length})</summary>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                    {queue.recent.map(run => {
-                      // OpenClaw's reported model disagreeing with the one we
-                      // recorded means one of: a fallback fired, the agent
-                      // default changed, or OpenClaw is reporting a hardcoded
-                      // value rather than the model that served the request
-                      // (which was the case on 2026-07-28). Worth surfacing in
-                      // every one of those cases — but it is a mismatch, not
-                      // proof of a fallback, so the label says only that.
-                      const modelMismatch = run.actual_model && run.model && run.actual_model !== run.model;
-                      return (
-                        <div key={run.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', padding: '4px 0', flexWrap: 'wrap' }}>
-                          <span className={getStatusColor(run.status)} style={{ fontWeight: 'bold', minWidth: '78px' }}>{run.status}</span>
-                          <span style={{ fontWeight: 'bold' }}>{run.agent_type}</span>
-                          <span style={{ color: 'var(--text-muted)' }}>{run.client_name || `Client #${run.client_id}`}</span>
-                          <span style={{ color: '#94a3b8' }}>{run.finished_at || run.created_at}</span>
-                          {run.agent_id && (
-                            <span style={{ color: '#64748b' }} title="This skill is pinned to a specific model via the chat-model-switch phrase in the trigger message.">
-                              requested: {run.agent_id}
-                            </span>
-                          )}
-                          {modelMismatch && (
-                            <span
-                              style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #92400e', borderRadius: '3px', padding: '1px 6px', fontWeight: 'bold', fontSize: '0.7rem' }}
-                              title={`We recorded: ${run.model}\nOpenClaw reported: ${run.actual_model}\n\nThese disagree. Either a fallback fired, the agent default changed, or OpenClaw is reporting a hardcoded value instead of the model that served the request. Check OpenRouter's Activity page for the truth.`}
-                            >
-                              model mismatch: reported {run.actual_model}
-                            </span>
-                          )}
-                          {run.error && <span style={{ color: '#ef4444' }}>{run.error}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-
           {/* Main Workspace Area */}
           <div>
             {/* 25-Agent Bento Grid */}
@@ -1268,7 +1094,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                             <button
                               onClick={(e) => { e.stopPropagation(); cancelRun(run.id, agent.agentType); }}
                               disabled={cancellingRunIds.includes(run.id)}
-                              title="Free the slot so this agent can be triggered again. Does NOT stop the job inside OpenClaw or save any tokens — it keeps running until it finishes on its own."
+                              title="Free the slot so this agent can be triggered again. Does NOT stop the run on the worker or save any tokens — it keeps going until it finishes on its own."
                               style={{ padding: '4px 6px', border: '2px solid #000', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                             >
                               <XCircle size={13} />
@@ -1454,27 +1280,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       </div>
 
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                        {rec.status === 'open' && (
-                          <button
-                            onClick={() => {
-                              setAssigningRec(rec);
-                              setShowAssignModal(true);
-                            }}
-                            className="btn btn-primary"
-                            style={{
-                              padding: '4px 12px',
-                              fontSize: '0.75rem',
-                              border: '2px solid #000',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              width: 'fit-content'
-                            }}
-                          >
-                            Assign to SMM / Convert Task <ArrowRight size={12} />
-                          </button>
-                        )}
-                        
                         <button
                           onClick={() => toggleRecStatus(rec.id, rec.status)}
                           className="btn"
@@ -1545,7 +1350,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isTerminalCollapsed ? 'none' : '1px solid #1e293b', paddingBottom: isTerminalCollapsed ? '0' : '6px', marginBottom: isTerminalCollapsed ? '0' : '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Terminal size={14} style={{ color: '#22c55e' }} />
-                  <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.85rem' }}>Live OpenClaw Console & Webhook Stream</span>
+                  <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.85rem' }}>Live Console & Webhooks</span>
                   {activeConsoleAgent && <span style={{ color: '#64748b', fontSize: '0.75rem' }}>({activeConsoleAgent})</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -1783,60 +1588,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
         </div>
       )}
 
-      {/* Assign to SMM / Kanban conversion popover */}
-      {showAssignModal && (
-        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{ margin: '0 0 14px', fontWeight: 'bold' }}>Assign to SMM / Convert Task</h3>
-            <form onSubmit={handleAssignSubmit}>
-              <div className="form-group" style={{ marginBottom: '12px' }}>
-                <label className="form-label">Assignee</label>
-                <select 
-                  className="form-control" 
-                  value={assignForm.assigned_to} 
-                  onChange={e => setAssignForm({ ...assignForm, assigned_to: e.target.value })}
-                  required
-                >
-                  <option value="">-- Select SMM / Team Member --</option>
-                  {freelancers.map(f => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.role || 'Freelancer'})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Priority</label>
-                  <select 
-                    className="form-control" 
-                    value={assignForm.priority} 
-                    onChange={e => setAssignForm({ ...assignForm, priority: e.target.value })}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Due Date</label>
-                  <input 
-                    type="date" 
-                    className="form-control" 
-                    value={assignForm.due_date} 
-                    onChange={e => setAssignForm({ ...assignForm, due_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ border: '2px solid #000' }}>Confirm Assignment</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
