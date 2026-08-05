@@ -1220,7 +1220,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           <button onClick={() => {
             setActiveTab('scripts');
             if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
-          }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.scripts ? `${tabCounts.scripts} script(s) approved or commented by a client` : undefined}>
+          }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.scripts ? `${tabCounts.scripts} script change(s) pending review` : undefined}>
             <FileText size={16} /> Scripts
             <TabBadge count={tabCounts.scripts} />
           </button>

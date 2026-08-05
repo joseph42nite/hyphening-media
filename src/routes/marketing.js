@@ -1128,7 +1128,7 @@ const setScriptStatusAndComments = (db, clientId, scriptId, status, clientCommen
   // 1. Update the status and comments directly on the script itself
   db.prepare(`
     UPDATE marketing_scripts
-    SET status = ?, client_comments = ?, updated_at = ?
+    SET status = ?, client_comments = ?, has_unseen_changes = 1, last_changed_by = 'staff', updated_at = ?
     WHERE id = ?
   `).run(status, clientComments || null, now, scriptId);
 
@@ -1160,7 +1160,7 @@ router.get('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manage
   try {
     const { month } = req.query;
     let query = `
-      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
+      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.has_unseen_changes, s.last_changed_by, s.created_at, s.updated_at,
              t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
@@ -1195,8 +1195,8 @@ router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manag
     }
 
     const result = db.prepare(`
-      INSERT INTO marketing_scripts (client_id, month, title, script_text, reference_video_link, reaction_video_link, format, status, client_comments)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO marketing_scripts (client_id, month, title, script_text, reference_video_link, reaction_video_link, format, status, client_comments, has_unseen_changes, last_changed_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'staff')
     `).run(
       req.params.id, 
       month, 
@@ -1222,7 +1222,7 @@ router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manag
     });
 
     const script = db.prepare(`
-      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
+      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.has_unseen_changes, s.last_changed_by, s.created_at, s.updated_at,
              t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
@@ -1257,6 +1257,8 @@ router.patch('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_
 
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
+      updates.has_unseen_changes = 1;
+      updates.last_changed_by = 'staff';
       const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
       db.prepare(`UPDATE marketing_scripts SET ${setClauses} WHERE id = ?`)
         .run(...Object.values(updates), req.params.scriptId);
@@ -1278,7 +1280,7 @@ router.patch('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_
     });
 
     const updatedScript = db.prepare(`
-      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.created_at, s.updated_at,
+      SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.has_unseen_changes, s.last_changed_by, s.created_at, s.updated_at,
              t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
@@ -1343,7 +1345,7 @@ router.put('/:id/marketing/scripts/:scriptId/status', authorize('admin', 'ops_so
     // 1. Update status on script itself
     db.prepare(`
       UPDATE marketing_scripts
-      SET status = ?, client_comments = ?, updated_at = ?
+      SET status = ?, client_comments = ?, has_unseen_changes = 1, last_changed_by = 'staff', updated_at = ?
       WHERE id = ?
     `).run(status, rejection_reason || null, now, scriptId);
 
@@ -1379,6 +1381,31 @@ router.put('/:id/marketing/scripts/:scriptId/status', authorize('admin', 'ops_so
     res.json({ success: true, status, relation_id: relation.id });
   } catch (err) {
     console.error('[MARKETING] Script status update error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+/**
+ * POST /api/clients/:id/marketing/scripts/mark-seen
+ * Mark scripts as seen for a client.
+ */
+router.post('/:id/marketing/scripts/mark-seen', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const clientId = req.params.id;
+    const { scriptId } = req.body || {};
+    if (scriptId) {
+      db.prepare(`
+        UPDATE marketing_scripts
+        SET has_unseen_changes = 0
+        WHERE id = ? AND client_id = ?
+      `).run(scriptId, clientId);
+    } else {
+      db.prepare(`
+        UPDATE marketing_scripts
+        SET has_unseen_changes = 0
+        WHERE client_id = ?
+      `).run(clientId);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[MARKETING] Mark script seen error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

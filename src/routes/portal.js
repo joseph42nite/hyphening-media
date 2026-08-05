@@ -689,7 +689,7 @@ router.post('/:token/content-plan/script/:scriptId/approve', portalAuth, (req, r
     // 1. Update script itself
     db.prepare(`
       UPDATE marketing_scripts
-      SET status = 'Client Approved', client_comments = NULL, updated_at = ?
+      SET status = 'Client Approved', client_comments = NULL, has_unseen_changes = 1, last_changed_by = 'client', updated_at = ?
       WHERE id = ?
     `).run(now, req.params.scriptId);
 
@@ -748,7 +748,7 @@ router.post('/:token/content-plan/script/:scriptId/reject', portalAuth, (req, re
     // 1. Update script itself
     db.prepare(`
       UPDATE marketing_scripts
-      SET status = 'Client Rejected', client_comments = ?, updated_at = ?
+      SET status = 'Client Rejected', client_comments = ?, has_unseen_changes = 1, last_changed_by = 'client', updated_at = ?
       WHERE id = ?
     `).run(comment, now, req.params.scriptId);
 

@@ -67,7 +67,8 @@ function countDueAudits() {
 function countScriptResponses() {
   const row = db.prepare(`
     SELECT COUNT(*) AS n FROM marketing_scripts
-    WHERE status = 'Client Approved'
+    WHERE has_unseen_changes = 1
+       OR status = 'Client Approved'
        OR (client_comments IS NOT NULL AND TRIM(client_comments) != '')
   `).get();
   return row.n;

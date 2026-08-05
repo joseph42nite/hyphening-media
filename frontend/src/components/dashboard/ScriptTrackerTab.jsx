@@ -99,34 +99,61 @@ export default function ScriptTrackerTab({
     }
   };
 
+  const handleMarkScriptSeen = async (scriptId = null) => {
+    if (!selectedScriptClient) return;
+    try {
+      await fetch(`${API_BASE}/api/clients/${selectedScriptClient.id}/marketing/scripts/mark-seen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scriptId }),
+        credentials: 'include'
+      });
+      fetchMarketingData(selectedScriptClient.id);
+    } catch (err) {
+      console.error('Failed to mark script seen:', err);
+    }
+  };
+
   if (!isAdmin && !isSMM) return null;
 
   const monthlyScripts = marketingScripts.filter(item => item.month === scriptMonth);
+  const unseenCount = monthlyScripts.filter(item => item.has_unseen_changes === 1).length;
 
   return (
     <div style={{ textAlign: 'left' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
         <h3 style={{ margin: 0 }}>Script Tracker</h3>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setEditingScript(null);
-            setScriptFormData({
-              title: '',
-              script_text: '',
-              month: scriptMonth,
-              reference_video_link: '',
-              reaction_video_link: '',
-              format: 'reel',
-              status: 'Pending Client Approval',
-              client_comments: ''
-            });
-            setShowScriptModal(true);
-          }}
-          style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <Plus size={16} /> Add Script
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {unseenCount > 0 && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => handleMarkScriptSeen(null)}
+              style={{ padding: '8px 14px', fontSize: '0.85rem', borderColor: '#eab308', color: '#ca8a04' }}
+            >
+              ✓ Mark All Seen ({unseenCount})
+            </button>
+          )}
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setEditingScript(null);
+              setScriptFormData({
+                title: '',
+                script_text: '',
+                month: scriptMonth,
+                reference_video_link: '',
+                reaction_video_link: '',
+                format: 'reel',
+                status: 'Pending Client Approval',
+                client_comments: ''
+              });
+              setShowScriptModal(true);
+            }}
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Plus size={16} /> Add Script
+          </button>
+        </div>
       </div>
       <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '20px' }}>
         Review and update marketing scripts and statuses for the selected client and month.
@@ -178,8 +205,57 @@ export default function ScriptTrackerTab({
             marginBottom: '24px'
           }}
         >
-          {monthlyScripts.map(item => (
-            <div key={item.id} className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {monthlyScripts.map(item => {
+            const isUnseen = item.has_unseen_changes === 1;
+            return (
+              <div 
+                key={item.id} 
+                className="glass" 
+                style={{ 
+                  padding: '24px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '14px',
+                  backgroundColor: isUnseen ? 'rgba(254, 240, 138, 0.18)' : undefined,
+                  border: isUnseen ? '2px solid #eab308' : '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: isUnseen ? '0 0 16px rgba(234, 179, 8, 0.35)' : undefined,
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {isUnseen && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '-2px' }}>
+                    <span
+                      style={{
+                        background: '#fef08a',
+                        color: '#854d0e',
+                        border: '1px solid #eab308',
+                        padding: '2px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.72rem',
+                        fontWeight: 'bold',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      {item.last_changed_by === 'client' ? '💬 Updated by Client' : '⚡ Modified by Staff'}
+                    </span>
+                    <button
+                      onClick={() => handleMarkScriptSeen(item.id)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ca8a04',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Mark Seen
+                    </button>
+                  </div>
+                )}
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                 <h4 style={{ fontSize: '1.2rem', margin: 0, flexGrow: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {item.title}
@@ -300,7 +376,8 @@ export default function ScriptTrackerTab({
                 </div>
               )}
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
 
