@@ -1,0 +1,20 @@
+-- Migration: 061_add_generic_audit_score.sql
+-- Fallback score column for audit types with no dedicated one.
+--
+-- Only 9 of ~24 audit types map to a dedicated column (technical_score,
+-- content_score, schema_score, geo_score, local_score, backlinks_score,
+-- sxo_score, health_score, plus content_brief sharing content_score). Everything
+-- else — sitemap, hreflang, cluster, ecommerce, programmatic, page, plan, flow,
+-- competitor_pages, images, google — had nowhere to write.
+--
+-- That was silent rather than an error: the worker extracted a real score from
+-- the report (audit 257, sitemap, score 60), tried to store it, matched nothing,
+-- and dropped it — every score column on that row reads null. Found by testing
+-- the sitemap skill end to end rather than by inspection.
+--
+-- One generic column rather than ~15 new dedicated ones, since most of these
+-- types will only ever hold one skill's score and a dedicated column per skill
+-- is unwarranted. Skills that already have a real column keep using it —
+-- resolveAuditScore() in routes/seo.js prefers the specific column first — this
+-- is purely the fallback for what has none.
+ALTER TABLE seo_audits ADD COLUMN audit_score INTEGER;

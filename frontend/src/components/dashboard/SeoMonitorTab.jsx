@@ -69,7 +69,7 @@ const SCORE_COLUMN_BY_TYPE = {
 const ALL_SCORE_COLUMNS = [
   'health_score', 'technical_score', 'content_score', 'on_page_score',
   'schema_score', 'performance_score', 'geo_score', 'backlinks_score',
-  'local_score', 'sxo_score',
+  'local_score', 'sxo_score', 'audit_score',
 ];
 
 function getAuditScore(audit) {
@@ -77,6 +77,10 @@ function getAuditScore(audit) {
   const preferred = SCORE_COLUMN_BY_TYPE[audit.audit_type];
   if (preferred && audit[preferred] != null) return audit[preferred];
   if (audit.health_score != null) return audit.health_score;
+  // audit_score is the fallback for the ~15 audit types with no dedicated
+  // column — sitemap, hreflang, cluster, and others. Without this a real
+  // score, correctly extracted from the report, reads as "--" on the card.
+  if (audit.audit_score != null) return audit.audit_score;
   for (const col of ALL_SCORE_COLUMNS) {
     if (audit[col] != null) return audit[col];
   }

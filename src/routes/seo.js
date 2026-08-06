@@ -53,7 +53,7 @@ const SCORE_COLUMN_BY_TYPE = {
 const ALL_SCORE_COLUMNS = [
   'health_score', 'technical_score', 'content_score', 'on_page_score',
   'schema_score', 'performance_score', 'geo_score', 'backlinks_score',
-  'local_score', 'sxo_score',
+  'local_score', 'sxo_score', 'audit_score',
 ];
 
 /**
@@ -98,6 +98,11 @@ function resolveAuditScore(audit) {
   const preferred = SCORE_COLUMN_BY_TYPE[audit.audit_type];
   if (preferred && audit[preferred] != null) return audit[preferred];
   if (audit.health_score != null) return audit.health_score;
+  // audit_score is the fallback for the ~15 audit types with no dedicated
+  // column — sitemap, hreflang, cluster, ecommerce, and others. Found when the
+  // sitemap skill's score was extracted correctly and then silently dropped
+  // because nothing matched it.
+  if (audit.audit_score != null) return audit.audit_score;
   for (const col of ALL_SCORE_COLUMNS) {
     if (audit[col] != null) return audit[col];
   }
@@ -165,13 +170,14 @@ router.get('/:id/seo/agents/status', (req, res) => {
     const statusMap = [];
 
     for (const conf of configs) {
-      // Selects every score column — content_score, sxo_score, geo_score and
-      // performance_score were previously omitted, so skills writing those
-      // showed no score on their card no matter what the audit contained.
+      // Selects every score column, including audit_score — the fallback for
+      // audit types with no dedicated column. Omitting any of these means a
+      // real score reads as no score on the card, silently, which is how
+      // sitemap's score was lost for one full audit before this existed.
       const lastAudit = db.prepare(`
         SELECT id, created_at, audit_type, health_score, technical_score, content_score,
                on_page_score, schema_score, performance_score, geo_score,
-               backlinks_score, local_score, sxo_score
+               backlinks_score, local_score, sxo_score, audit_score
         FROM seo_audits
         WHERE client_id = ? AND audit_type = ?
         ORDER BY created_at DESC LIMIT 1

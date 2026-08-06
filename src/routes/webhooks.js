@@ -1406,7 +1406,7 @@ function handleCreateSeoAudit(payload) {
 
   const results = payload.results && Array.isArray(payload.results)
     ? payload.results
-    : [{ page_url: payload.page_url || payload.url, health_score: payload.health_score, technical_score: payload.technical_score, content_score: payload.content_score, on_page_score: payload.on_page_score, schema_score: payload.schema_score, performance_score: payload.performance_score, geo_score: payload.geo_score, backlinks_score: payload.backlinks_score, local_score: payload.local_score, sxo_score: payload.sxo_score, summary: payload.summary, report_json: payload.report_json, recommendations: payload.recommendations, token_usage: payload.token_usage }];
+    : [{ page_url: payload.page_url || payload.url, health_score: payload.health_score, technical_score: payload.technical_score, content_score: payload.content_score, on_page_score: payload.on_page_score, schema_score: payload.schema_score, performance_score: payload.performance_score, geo_score: payload.geo_score, backlinks_score: payload.backlinks_score, local_score: payload.local_score, sxo_score: payload.sxo_score, audit_score: payload.audit_score, summary: payload.summary, report_json: payload.report_json, recommendations: payload.recommendations, token_usage: payload.token_usage }];
 
   let totalAuditsCreated = 0;
   let firstAuditId = null;
@@ -1425,8 +1425,8 @@ function handleCreateSeoAudit(payload) {
     INSERT INTO seo_audits (
       client_id, audit_type, url, page_url, health_score, technical_score, content_score,
       on_page_score, schema_score, performance_score, geo_score, backlinks_score,
-      local_score, sxo_score, summary, report_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      local_score, sxo_score, audit_score, summary, report_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   for (const result of results) {
@@ -1476,6 +1476,7 @@ function handleCreateSeoAudit(payload) {
       result.backlinks_score ?? null,
       result.local_score ?? null,
       result.sxo_score ?? null,
+      result.audit_score ?? null,
       result.summary ?? null,
       result.report_json ? JSON.stringify(result.report_json) : null
     );
