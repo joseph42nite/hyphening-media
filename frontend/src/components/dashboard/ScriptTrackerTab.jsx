@@ -121,10 +121,7 @@ export default function ScriptTrackerTab({
 
   React.useEffect(() => {
     if (selectedScriptClient && (marketingScripts || []).some(s => s.has_unseen_changes === 1)) {
-      const timer = setTimeout(() => {
-        handleMarkScriptSeen(null);
-      }, 1000);
-      return () => clearTimeout(timer);
+      handleMarkScriptSeen(null);
     }
   }, [selectedScriptClient?.id, marketingScripts]);
 

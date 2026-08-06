@@ -67,7 +67,7 @@ function countDueAudits() {
 function countScriptResponses() {
   const row = db.prepare(`
     SELECT COUNT(*) AS n FROM marketing_scripts
-    WHERE has_unseen_changes = 1
+    WHERE has_unseen_changes = 1 AND last_changed_by = 'client'
   `).get();
   return row.n;
 }
