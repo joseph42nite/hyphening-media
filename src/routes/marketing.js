@@ -1382,6 +1382,9 @@ router.put('/:id/marketing/scripts/:scriptId/status', authorize('admin', 'ops_so
   } catch (err) {
     console.error('[MARKETING] Script status update error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /**
  * POST /api/clients/:id/marketing/scripts/mark-seen
  * Mark scripts as seen for a client.
