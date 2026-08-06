@@ -848,15 +848,32 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     }
   };
 
-  // Filters applicable agents by client type
+  // Filters applicable agents by client type.
+  //
+  // Only for cases where the skill makes no sense at all for this client type —
+  // e-commerce SEO for an artist-curation client is a structural mismatch, not
+  // a missing-data gap. Contrast with 'local' below, which is data-dependent
+  // and rendered instead, not filtered: a client missing a phone number can add
+  // one, so hiding the card outright left no way to discover why it was gone.
   const getFilteredAgents = () => {
     if (!selectedClient) return [];
     return agents.filter(agent => {
       const type = agent.agentType;
       if (type === 'ecommerce' && selectedClient.client_type === 'artist_curation') return false;
-      if (type === 'local' && selectedClient.client_type === 'marketing' && !selectedClient.contact_phone) return false;
       return true;
     });
+  };
+
+  // Reason a card is unavailable for the *currently selected client*, as
+  // opposed to UNAVAILABLE_SKILLS which is the same for every client. 'local'
+  // audits NAP (Name, Address, Phone) consistency, so running one without a
+  // phone on file would be auditing incomplete data — but the fix is one CRM
+  // field, so this is surfaced on the card rather than hidden.
+  const clientUnavailableReason = (agentType) => {
+    if (agentType === 'local' && selectedClient?.client_type === 'marketing' && !selectedClient?.contact_phone) {
+      return 'Add a contact phone number to unlock local SEO audits.';
+    }
+    return null;
   };
 
   const calculatedPadding = activeConsoleAgent
@@ -982,7 +999,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 const run = activeRuns[agent.agentType];
                 const isRunning = !!run;
                 const isPending = !run && !!pendingApprovals[agent.agentType];
-                const unavailableReason = UNAVAILABLE_SKILLS.get(agent.agentType);
+                const unavailableReason = UNAVAILABLE_SKILLS.get(agent.agentType) || clientUnavailableReason(agent.agentType);
                 const isUnavailable = !!unavailableReason;
 
                 return (
