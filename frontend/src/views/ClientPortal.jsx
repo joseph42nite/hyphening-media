@@ -1862,7 +1862,7 @@ export default function ClientPortal({ showToast }) {
                 style={{ position: 'relative' }}
               >
                 <Calendar size={16} /> Content
-                {overview?.pending_approvals > 0 && (
+                {activeTab !== 'content' && overview?.pending_approvals > 0 && (
                   <span style={{ position: 'absolute', top: '8px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />
                 )}
               </button>

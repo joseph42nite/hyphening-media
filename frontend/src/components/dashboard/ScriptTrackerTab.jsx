@@ -116,7 +116,28 @@ export default function ScriptTrackerTab({
 
   if (!isAdmin && !isSMM) return null;
 
-  const monthlyScripts = marketingScripts.filter(item => item.month === scriptMonth);
+  const formatMonthLabel = (m) => {
+    if (!m) return '-';
+    const parts = m.split('-');
+    if (parts.length !== 2) return m;
+    const [year, month] = parts;
+    const monthName = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ][parseInt(month) - 1];
+    return `${monthName} ${year}`;
+  };
+
+  const availableMonths = Array.from(new Set((marketingScripts || []).map(s => s.month)))
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a));
+
+  if (!availableMonths.includes(scriptMonth) && scriptMonth) {
+    availableMonths.unshift(scriptMonth);
+    availableMonths.sort((a, b) => b.localeCompare(a));
+  }
+
+  const monthlyScripts = (marketingScripts || []).filter(item => item.month === scriptMonth);
   const unseenCount = monthlyScripts.filter(item => item.has_unseen_changes === 1).length;
 
   return (
@@ -191,6 +212,59 @@ export default function ScriptTrackerTab({
           </div>
         </div>
       </div>
+
+      {/* Quick Month Chips Selector */}
+      {availableMonths.length > 0 && (
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)' }}>Months:</span>
+          {availableMonths.map(m => {
+            const scriptsInMonth = (marketingScripts || []).filter(s => s.month === m);
+            const unseenInMonth = scriptsInMonth.filter(s => s.has_unseen_changes === 1).length;
+            const isSelected = scriptMonth === m;
+
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setScriptMonth(m)}
+                className={`btn ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '0.82rem',
+                  borderRadius: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: isSelected ? '800' : '600',
+                  cursor: 'pointer',
+                  borderColor: isSelected ? '#000' : (unseenInMonth > 0 ? '#eab308' : undefined),
+                  boxShadow: isSelected ? '2px 2px 0px #000' : undefined
+                }}
+              >
+                <span>{formatMonthLabel(m)}</span>
+                <span style={{
+                  background: isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)',
+                  padding: '1px 7px',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800
+                }}>
+                  {scriptsInMonth.length}
+                </span>
+                {unseenInMonth > 0 && (
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: '#eab308',
+                    display: 'inline-block'
+                  }} title={`${unseenInMonth} unseen change(s)`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {monthlyScripts.length === 0 ? (
         <div className="glass" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>

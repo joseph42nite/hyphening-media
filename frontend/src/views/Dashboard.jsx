@@ -55,7 +55,8 @@ function TabBadge({ count }) {
       alignItems: 'center',
       justifyContent: 'center',
       boxShadow: '1px 1px 0px #000',
-      zIndex: 10
+      zIndex: 10,
+      pointerEvents: 'none'
     }}>
       {count > 99 ? '99+' : count}
     </span>
@@ -163,6 +164,30 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Telegram digests: visible only while the work exists, and gone once it is
   // done, rather than pushed every morning regardless.
   const [tabCounts, setTabCounts] = useState({});
+  const [viewedTabs, setViewedTabs] = useState({});
+
+  useEffect(() => {
+    if (activeTab) {
+      setViewedTabs(prev => ({ ...prev, [activeTab]: true }));
+    }
+  }, [activeTab]);
+
+  const handleTabClick = (tabName) => {
+    setActiveTab(tabName);
+    setViewedTabs(prev => ({ ...prev, [tabName]: true }));
+    if (tabName === 'scripts') {
+      if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
+      const pendingScript = (marketingScripts || []).find(s => s.has_unseen_changes === 1 || s.content_status === 'Pending Client Approval');
+      if (pendingScript && pendingScript.month) {
+        setScriptMonth(pendingScript.month);
+      }
+    }
+  };
+
+  const getTabBadgeCount = (tabName, count) => {
+    if (activeTab === tabName || viewedTabs[tabName]) return 0;
+    return count || 0;
+  };
 
   // SSE State
   const [sseConnected, setSseConnected] = useState(false);
@@ -1185,77 +1210,74 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       {/* Tabs Menu */}
       <div className="dashboard-tabs">
         {/* 1. Kanban Tasks */}
-        <button onClick={() => setActiveTab('tasks')} className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.tasks ? `${tabCounts.tasks} task(s) overdue` : undefined}>
+        <button onClick={() => handleTabClick('tasks')} className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.tasks ? `${tabCounts.tasks} task(s) overdue` : undefined}>
           <Layers size={16} /> Kanban Tasks
-          <TabBadge count={tabCounts.tasks} />
+          <TabBadge count={getTabBadgeCount('tasks', tabCounts.tasks)} />
         </button>
 
         {/* 2. Client Workspace */}
         <button 
-          onClick={() => setActiveTab('client-workspaces')} 
+          onClick={() => handleTabClick('client-workspaces')} 
           className={`btn ${activeTab === 'client-workspaces' ? 'btn-primary' : 'btn-secondary'}`}
           style={{ position: 'relative' }}
         >
           <MessageSquare size={16} /> Client Workspace
-          <TabBadge count={Object.values(unseenCounts).reduce((a, c) => a + (c || 0), 0)} />
+          <TabBadge count={getTabBadgeCount('client-workspaces', Object.values(unseenCounts).reduce((a, c) => a + (c || 0), 0))} />
         </button>
 
         {/* 3. Marketing Data */}
         {(isAdmin || isSMM) && (
-          <button onClick={() => setActiveTab('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>
+          <button onClick={() => handleTabClick('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>
             <FileSpreadsheet size={16} /> Marketing Data
           </button>
         )}
 
         {/* SEO Monitor */}
         {(isAdmin || isSMM) && (
-          <button onClick={() => setActiveTab('seo')} className={`btn ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.seo ? `${tabCounts.seo} audit(s) due` : undefined}>
+          <button onClick={() => handleTabClick('seo')} className={`btn ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.seo ? `${tabCounts.seo} audit(s) due` : undefined}>
             <Cpu size={16} /> SEO Monitor
-            <TabBadge count={tabCounts.seo} />
+            <TabBadge count={getTabBadgeCount('seo', tabCounts.seo)} />
           </button>
         )}
 
         {/* 4. Scripts */}
         {(isAdmin || isSMM) && (
-          <button onClick={() => {
-            setActiveTab('scripts');
-            if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
-          }} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.scripts ? `${tabCounts.scripts} script change(s) pending review` : undefined}>
+          <button onClick={() => handleTabClick('scripts')} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.scripts ? `${tabCounts.scripts} script change(s) pending review` : undefined}>
             <FileText size={16} /> Scripts
-            <TabBadge count={tabCounts.scripts} />
+            <TabBadge count={getTabBadgeCount('scripts', tabCounts.scripts)} />
           </button>
         )}
 
         {/* 5. Calendar */}
-        <button onClick={() => setActiveTab('calendar')} className={`btn ${activeTab === 'calendar' ? 'btn-primary' : 'btn-secondary'}`}>
+        <button onClick={() => handleTabClick('calendar')} className={`btn ${activeTab === 'calendar' ? 'btn-primary' : 'btn-secondary'}`}>
           <Calendar size={16} /> Calendar
         </button>
 
         {/* 6. Artist Curation */}
         {(isAdmin || isSMM) && (
-          <button onClick={() => setActiveTab('curation')} className={`btn ${activeTab === 'curation' ? 'btn-primary' : 'btn-secondary'}`}>
+          <button onClick={() => handleTabClick('curation')} className={`btn ${activeTab === 'curation' ? 'btn-primary' : 'btn-secondary'}`}>
             <Calendar size={16} /> Artist Curation
           </button>
         )}
 
         {/* 7. Blogs */}
         {isAdmin && (
-          <button onClick={() => setActiveTab('blog')} className={`btn ${activeTab === 'blog' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.blog ? `${tabCounts.blog} draft post(s)` : undefined}>
+          <button onClick={() => handleTabClick('blog')} className={`btn ${activeTab === 'blog' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative' }} title={tabCounts.blog ? `${tabCounts.blog} draft post(s)` : undefined}>
             <FileText size={16} /> Blogs
-            <TabBadge count={tabCounts.blog} />
+            <TabBadge count={getTabBadgeCount('blog', tabCounts.blog)} />
           </button>
         )}
 
         {/* 8. Clients */}
         {isAdmin && (
-          <button onClick={() => setActiveTab('clients')} className={`btn ${activeTab === 'clients' ? 'btn-primary' : 'btn-secondary'}`}>
+          <button onClick={() => handleTabClick('clients')} className={`btn ${activeTab === 'clients' ? 'btn-primary' : 'btn-secondary'}`}>
             <Folder size={16} /> Clients
           </button>
         )}
 
         {/* 9. Freelancers */}
         {isAdmin && (
-          <button onClick={() => setActiveTab('freelancers')} className={`btn ${activeTab === 'freelancers' ? 'btn-primary' : 'btn-secondary'}`}>
+          <button onClick={() => handleTabClick('freelancers')} className={`btn ${activeTab === 'freelancers' ? 'btn-primary' : 'btn-secondary'}`}>
             <Users size={16} /> Freelancers
           </button>
         )}
@@ -1263,7 +1285,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
         {/* 10. Audit Log */}
         {isAdmin && (
-          <button onClick={() => setActiveTab('audit')} className={`btn ${activeTab === 'audit' ? 'btn-primary' : 'btn-secondary'}`}>
+          <button onClick={() => handleTabClick('audit')} className={`btn ${activeTab === 'audit' ? 'btn-primary' : 'btn-secondary'}`}>
             <Shield size={16} /> Audit Log
           </button>
         )}
