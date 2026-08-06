@@ -647,7 +647,7 @@ tr:hover td {
   gap: 12px;
   margin-bottom: 24px;
   overflow-x: auto;
-  padding: 4px 10px 8px 4px;
+  padding: 10px 14px 10px 6px;
   scrollbar-width: thin;
   box-sizing: border-box;
 }
@@ -1090,7 +1090,7 @@ tr:hover td {
     gap: 8px;
     margin-bottom: 14px;
     overflow-x: auto;
-    padding: 4px 2px 8px 2px;
+    padding: 10px 10px 10px 6px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
@@ -1109,6 +1109,7 @@ tr:hover td {
     display: inline-flex !important;
     align-items: center !important;
     gap: 6px !important;
+    overflow: visible !important;
   }
   
   .workspace-layout {
