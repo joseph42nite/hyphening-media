@@ -11,7 +11,8 @@ export default function ScriptTrackerTab({
   selectedScriptClient,
   setSelectedScriptClient,
   scriptMonth,
-  setScriptMonth
+  setScriptMonth,
+  fetchTabCounts
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSMM = auth?.role === 'ops_social_media_manager';
@@ -56,6 +57,7 @@ export default function ScriptTrackerTab({
         client_comments: ''
       });
       fetchMarketingData(selectedScriptClient.id);
+      if (fetchTabCounts) fetchTabCounts();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -75,6 +77,7 @@ export default function ScriptTrackerTab({
 
       showToast('Script deleted successfully', 'success');
       fetchMarketingData(selectedScriptClient.id);
+      if (fetchTabCounts) fetchTabCounts();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -94,6 +97,7 @@ export default function ScriptTrackerTab({
 
       showToast('Script status updated successfully', 'success');
       fetchMarketingData(selectedScriptClient.id);
+      if (fetchTabCounts) fetchTabCounts();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -109,10 +113,20 @@ export default function ScriptTrackerTab({
         credentials: 'include'
       });
       fetchMarketingData(selectedScriptClient.id);
+      if (fetchTabCounts) fetchTabCounts();
     } catch (err) {
       console.error('Failed to mark script seen:', err);
     }
   };
+
+  React.useEffect(() => {
+    if (selectedScriptClient && (marketingScripts || []).some(s => s.has_unseen_changes === 1)) {
+      const timer = setTimeout(() => {
+        handleMarkScriptSeen(null);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedScriptClient?.id, marketingScripts]);
 
   if (!isAdmin && !isSMM) return null;
 
