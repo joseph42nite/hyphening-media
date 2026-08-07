@@ -119,7 +119,12 @@ router.use(authenticate);
 router.get('/:id/seo/audits', (req, res) => {
   try {
     const { type } = req.query;
-    let query = 'SELECT * FROM seo_audits WHERE client_id = ?';
+    // Competitor audits are research, not the client's own results, so they
+    // stay out of the default list. ?competitors=1 opts into them.
+    const includeCompetitors = req.query.competitors === '1';
+    let query = includeCompetitors
+      ? 'SELECT * FROM seo_audits WHERE client_id = ?'
+      : 'SELECT * FROM seo_audits WHERE client_id = ? AND is_competitor = 0';
     const params = [req.params.id];
     
     if (type) {
@@ -179,7 +184,7 @@ router.get('/:id/seo/agents/status', (req, res) => {
                on_page_score, schema_score, performance_score, geo_score,
                backlinks_score, local_score, sxo_score, audit_score
         FROM seo_audits
-        WHERE client_id = ? AND audit_type = ?
+        WHERE client_id = ? AND audit_type = ? AND is_competitor = 0
         ORDER BY created_at DESC LIMIT 1
       `).get(client.id, conf.audit_type);
 
@@ -328,7 +333,7 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     if (!force) {
       const lastAudit = db.prepare(`
         SELECT created_at FROM seo_audits
-        WHERE client_id = ? AND audit_type = ?
+        WHERE client_id = ? AND audit_type = ? AND is_competitor = 0
         ORDER BY created_at DESC LIMIT 1
       `).get(clientId, agentType);
 
@@ -515,6 +520,222 @@ router.patch('/:id/seo/recommendations/:recId', (req, res) => {
     res.json({ success: true, status });
   } catch (err) {
     console.error('[SEO ROUTE] Update recommendation error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/clients/:id/seo/competitors
+ * Tracked competitors plus their latest audit score per skill, for comparison.
+ */
+router.get('/:id/seo/competitors', (req, res) => {
+  try {
+    const clientId = req.params.id;
+    const competitors = db.prepare(`
+      SELECT * FROM client_competitors WHERE client_id = ? ORDER BY status, domain
+    `).all(clientId);
+
+    // Latest competitor audit per (domain, audit_type), so the comparison view
+    // shows current standing rather than every historical run.
+    const audits = db.prepare(`
+      SELECT a.* FROM seo_audits a
+      WHERE a.client_id = ? AND a.is_competitor = 1
+      ORDER BY a.created_at DESC
+    `).all(clientId);
+
+    const byDomain = {};
+    for (const audit of audits) {
+      let host;
+      try { host = new URL(audit.target_url || audit.url).hostname.replace(/^www\./, ''); }
+      catch { continue; }
+      byDomain[host] ??= {};
+      // First seen wins: the query is newest-first, so this keeps the latest.
+      byDomain[host][audit.audit_type] ??= {
+        auditId: audit.id,
+        score: resolveAuditScore(audit),
+        createdAt: audit.created_at,
+      };
+    }
+
+    // The client's own latest scores, to compare against.
+    const ownAudits = db.prepare(`
+      SELECT * FROM seo_audits
+      WHERE client_id = ? AND is_competitor = 0
+      ORDER BY created_at DESC
+    `).all(clientId);
+    const own = {};
+    for (const audit of ownAudits) {
+      own[audit.audit_type] ??= {
+        auditId: audit.id,
+        score: resolveAuditScore(audit),
+        createdAt: audit.created_at,
+      };
+    }
+
+    res.json({
+      competitors: competitors.map(c => ({
+        ...c,
+        scores: byDomain[c.domain.replace(/^www\./, '')] || {},
+      })),
+      own,
+    });
+  } catch (err) {
+    console.error('[SEO ROUTE] Competitors fetch error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/clients/:id/seo/competitors/:competitorId
+ * Approve, reject, or relabel a competitor.
+ *
+ * Discovery proposes; this is where a human decides. A rejected row is kept
+ * rather than deleted so discovery can skip re-proposing the same directory
+ * or aggregator on every run.
+ */
+router.patch('/:id/seo/competitors/:competitorId', (req, res) => {
+  try {
+    const { status, label, notes } = req.body;
+    const allowed = ['discovered', 'approved', 'rejected'];
+    if (status && !allowed.includes(status)) {
+      return res.status(400).json({ error: `status must be one of: ${allowed.join(', ')}` });
+    }
+
+    const existing = db.prepare(
+      'SELECT * FROM client_competitors WHERE id = ? AND client_id = ?'
+    ).get(req.params.competitorId, req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Competitor not found' });
+
+    db.prepare(`
+      UPDATE client_competitors
+      SET status = COALESCE(?, status),
+          label = COALESCE(?, label),
+          notes = COALESCE(?, notes),
+          updated_at = datetime('now')
+      WHERE id = ?
+    `).run(status ?? null, label ?? null, notes ?? null, req.params.competitorId);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'update_competitor',
+      entityType: 'client_competitor',
+      entityId: Number(req.params.competitorId),
+      diff: { domain: existing.domain, status: status ?? existing.status },
+    });
+
+    res.json({ competitor: db.prepare('SELECT * FROM client_competitors WHERE id = ?').get(req.params.competitorId) });
+  } catch (err) {
+    console.error('[SEO ROUTE] Competitor update error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/seo/competitors
+ * Add a competitor by hand, already approved.
+ */
+router.post('/:id/seo/competitors', (req, res) => {
+  try {
+    const { url, label } = req.body;
+    if (!url) return res.status(400).json({ error: 'url is required' });
+
+    let parsed;
+    try { parsed = new URL(url.startsWith('http') ? url : `https://${url}`); }
+    catch { return res.status(400).json({ error: 'url is not a valid URL' }); }
+
+    const domain = parsed.hostname.replace(/^www\./, '');
+    const client = db.prepare('SELECT website_url FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    // Auditing the client's own site as its own competitor would sit in the
+    // comparison view claiming they are behind themselves.
+    try {
+      if (new URL(client.website_url).hostname.replace(/^www\./, '') === domain) {
+        return res.status(400).json({ error: 'That is this client\'s own site, not a competitor' });
+      }
+    } catch { /* client has no valid website_url; nothing to clash with */ }
+
+    const result = db.prepare(`
+      INSERT INTO client_competitors (client_id, domain, url, label, status)
+      VALUES (?, ?, ?, ?, 'approved')
+      ON CONFLICT(client_id, domain) DO UPDATE SET
+        status = 'approved', label = COALESCE(excluded.label, label), updated_at = datetime('now')
+    `).run(req.params.id, domain, parsed.origin, label || null);
+
+    res.json({ competitor: db.prepare('SELECT * FROM client_competitors WHERE client_id = ? AND domain = ?').get(req.params.id, domain), created: result.changes > 0 });
+  } catch (err) {
+    console.error('[SEO ROUTE] Competitor create error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/seo/competitors/:competitorId/audit/:agentType
+ * Queue an audit against a competitor's URL.
+ *
+ * Only approved competitors can be audited — a discovered-but-unreviewed row
+ * is a suggestion, and auditing one costs ten minutes and real tokens on a site
+ * nobody has confirmed is actually a competitor.
+ */
+router.post('/:id/seo/competitors/:competitorId/audit/:agentType', (req, res) => {
+  try {
+    const agentType = req.params.agentType;
+    const competitor = db.prepare(
+      'SELECT * FROM client_competitors WHERE id = ? AND client_id = ?'
+    ).get(req.params.competitorId, req.params.id);
+    if (!competitor) return res.status(404).json({ error: 'Competitor not found' });
+    if (competitor.status !== 'approved') {
+      return res.status(400).json({
+        error: 'not_approved',
+        message: `'${competitor.domain}' is still ${competitor.status}. Approve it before auditing.`,
+      });
+    }
+
+    const unavailable = UNAVAILABLE_SKILLS.get(agentType);
+    if (unavailable) {
+      return res.status(400).json({ error: 'skill_unavailable', message: `'${agentType}' cannot be run: ${unavailable}` });
+    }
+
+    // Skills that read Search Console or GA4 cannot work on a domain we do not
+    // own, so they would produce a report whose most valuable sections are all
+    // "unavailable" — ten minutes and real tokens for very little.
+    if (agentType === 'google') {
+      return res.status(400).json({
+        error: 'not_applicable',
+        message: 'The google skill reads Search Console and GA4, which need ownership of the domain. It cannot audit a competitor.',
+      });
+    }
+
+    const existing = db.prepare(`
+      SELECT id FROM seo_agent_runs
+      WHERE client_id = ? AND agent_type = ? AND target_url = ? AND status IN ('queued','running')
+    `).get(req.params.id, agentType, competitor.url);
+    if (existing) {
+      return res.status(409).json({ error: 'already_running', message: `Run #${existing.id} is already auditing ${competitor.domain} for '${agentType}'.` });
+    }
+
+    const result = db.prepare(`
+      INSERT INTO seo_agent_runs (client_id, agent_type, status, requested_by, target_url, is_competitor, created_at)
+      VALUES (?, ?, 'queued', ?, ?, 1, datetime('now'))
+    `).run(req.params.id, agentType, req.user.email, competitor.url);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'trigger_competitor_audit',
+      entityType: 'seo_agent_run',
+      entityId: Number(result.lastInsertRowid),
+      diff: { agentType, competitor: competitor.domain },
+    });
+
+    res.json({
+      status: 'queued',
+      runId: result.lastInsertRowid,
+      message: `Queued '${agentType}' against ${competitor.domain}.`,
+    });
+  } catch (err) {
+    console.error('[SEO ROUTE] Competitor audit trigger error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

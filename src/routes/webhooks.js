@@ -170,7 +170,7 @@ router.post('/webhook', (req, res) => {
       'send_chat_message', 'update_knowledge', 'optimize_queue',
       'create_blog_post', 'update_blog_post', 'create_seo_audit',
       'agent_activity_log', 'skill_inventory_report', 'claim_seo_runs',
-      'seo_run_log'
+      'seo_run_log', 'report_competitors'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -261,6 +261,7 @@ function executeEvent(eventType, payload) {
       case 'skill_inventory_report': return handleSkillInventoryReport(payload);
       case 'claim_seo_runs': return handleClaimSeoRuns(payload);
       case 'seo_run_log': return handleSeoRunLog(payload);
+      case 'report_competitors': return handleReportCompetitors(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -325,6 +326,68 @@ function handleSeoRunLog(payload) {
 }
 
 /**
+ * Records competitors the worker found via live search.
+ *
+ * Everything lands as 'discovered', never 'approved' — a search result is a
+ * suggestion, not a verdict. Directories and aggregators (JustDial, Practo,
+ * Yelp) routinely outrank the actual businesses for head terms, and auditing
+ * one costs ten minutes and real tokens for a report about a listing page.
+ *
+ * A domain already marked 'rejected' stays rejected: discovery re-runs would
+ * otherwise re-propose the same directories every time.
+ */
+function handleReportCompetitors(payload) {
+  const clientId = parseInt(payload?.client_id, 10);
+  if (!clientId || !Array.isArray(payload?.competitors)) {
+    return { success: false, summary: 'client_id and a competitors array are required' };
+  }
+
+  const client = db.prepare('SELECT website_url FROM crm_clients WHERE id = ?').get(clientId);
+  if (!client) return { success: false, summary: `Client ${clientId} not found` };
+
+  let ownDomain = null;
+  try { ownDomain = new URL(client.website_url).hostname.replace(/^www\./, ''); } catch { /* no valid site */ }
+
+  const insert = db.prepare(`
+    INSERT INTO client_competitors (client_id, domain, url, label, status, discovered_for_query, discovered_position)
+    VALUES (?, ?, ?, ?, 'discovered', ?, ?)
+    ON CONFLICT(client_id, domain) DO UPDATE SET
+      -- Only refresh the discovery context. status is deliberately untouched:
+      -- a human decision, either way, outranks a fresh search result.
+      discovered_for_query = excluded.discovered_for_query,
+      discovered_position = excluded.discovered_position,
+      updated_at = datetime('now')
+  `);
+
+  let added = 0;
+  let skipped = 0;
+  const store = db.transaction(() => {
+    for (const c of payload.competitors) {
+      let parsed;
+      try { parsed = new URL(String(c?.url || '').startsWith('http') ? c.url : `https://${c?.url}`); }
+      catch { skipped++; continue; }
+
+      const domain = parsed.hostname.replace(/^www\./, '');
+      if (ownDomain && domain === ownDomain) { skipped++; continue; }
+
+      insert.run(
+        clientId, domain, parsed.origin, c.label || null,
+        c.query || null,
+        Number.isInteger(c.position) ? c.position : null,
+      );
+      added++;
+    }
+  });
+  store();
+
+  console.log(`[WEBHOOK] Competitor discovery for client ${clientId}: ${added} recorded, ${skipped} skipped.`);
+  return {
+    success: true,
+    summary: `Recorded ${added} competitor(s) as discovered, skipped ${skipped}. All await approval before they can be audited.`,
+  };
+}
+
+/**
  * Hands queued SEO runs to the local worker.
  *
  * Inverts how audits have been dispatched. Until now the backend reached out to
@@ -343,7 +406,7 @@ function handleClaimSeoRuns(payload) {
   const claim = db.transaction(() => {
     const queued = db.prepare(`
       SELECT r.id, r.client_id, r.agent_type, r.requested_by, c.website_url, c.name AS client_name,
-             c.gsc_property, c.ga4_property_id
+             c.gsc_property, c.ga4_property_id, r.target_url, r.is_competitor
       FROM seo_agent_runs r
       JOIN crm_clients c ON c.id = r.client_id
       WHERE r.status = 'queued'
@@ -376,13 +439,22 @@ function handleClaimSeoRuns(payload) {
         client_id: r.client_id,
         client_name: r.client_name,
         audit_type: r.agent_type,
-        url: r.website_url,
+        // target_url overrides the client's own site for competitor research.
+        // Falls back to website_url, so every existing run behaves unchanged.
+        url: r.target_url || r.website_url,
         requested_by: r.requested_by,
+        is_competitor: r.is_competitor === 1,
         // Passed per run rather than defaulted in the plugin's own config, so a
         // Search Console query can never return another client's data. Null
         // means the skill reports that section as unavailable.
-        gsc_property: r.gsc_property || null,
-        ga4_property_id: r.ga4_property_id || null,
+        //
+        // Deliberately withheld for competitor runs: we have no Search Console
+        // access to anyone else's domain, and passing the client's property
+        // while auditing a competitor's URL would attribute our own search data
+        // to their site — the same wrong-client-data failure this field exists
+        // to prevent.
+        gsc_property: r.is_competitor === 1 ? null : (r.gsc_property || null),
+        ga4_property_id: r.is_competitor === 1 ? null : (r.ga4_property_id || null),
       })),
     },
   };
@@ -1421,12 +1493,22 @@ function handleCreateSeoAudit(payload) {
   const auditFailed = payload.status === 'error' || payload.status === 'failed';
 
   // Insert one audit row per URL
+  // A competitor run reports is_competitor so the audit is stored as research,
+  // not as the client's own result. The run row is the authority — reading it
+  // back rather than trusting the payload, since the flag decides whether this
+  // audit counts toward the client's freshness.
+  const originRun = payload.run_id
+    ? db.prepare('SELECT target_url, is_competitor FROM seo_agent_runs WHERE id = ?').get(payload.run_id)
+    : null;
+  const isCompetitorAudit = originRun?.is_competitor === 1 ? 1 : 0;
+  const auditTargetUrl = originRun?.target_url || null;
+
   const insertAudit = db.prepare(`
     INSERT INTO seo_audits (
       client_id, audit_type, url, page_url, health_score, technical_score, content_score,
       on_page_score, schema_score, performance_score, geo_score, backlinks_score,
-      local_score, sxo_score, audit_score, summary, report_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      local_score, sxo_score, audit_score, summary, report_json, target_url, is_competitor
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   for (const result of results) {
@@ -1478,7 +1560,9 @@ function handleCreateSeoAudit(payload) {
       result.sxo_score ?? null,
       result.audit_score ?? null,
       result.summary ?? null,
-      result.report_json ? JSON.stringify(result.report_json) : null
+      result.report_json ? JSON.stringify(result.report_json) : null,
+      auditTargetUrl,
+      isCompetitorAudit
     );
 
     const auditId = auditResult.lastInsertRowid;

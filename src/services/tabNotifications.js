@@ -36,7 +36,7 @@ function countDueAudits() {
   const configs = db.prepare('SELECT audit_type, stale_after_days FROM agent_run_config').all();
   const lastAudit = db.prepare(`
     SELECT created_at FROM seo_audits
-    WHERE client_id = ? AND audit_type = ?
+    WHERE client_id = ? AND audit_type = ? AND is_competitor = 0
     ORDER BY created_at DESC LIMIT 1
   `);
 
