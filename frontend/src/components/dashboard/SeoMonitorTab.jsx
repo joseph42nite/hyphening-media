@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ChevronUp, ChevronDown, XCircle } from 'lucide-react';
+import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ChevronUp, ChevronDown, XCircle, Users, Check, X } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 const IN_FLIGHT_STATUSES = ['queued', 'running'];
@@ -331,6 +331,15 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   const [audits, setAudits] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [selectedAuditId, setSelectedAuditId] = useState('');
+
+  // Competitor comparison. `own` holds this client's latest score per skill so
+  // the modal can show the gap rather than a bare number — a competitor's 74
+  // means nothing without knowing you are at 54.
+  const [competitors, setCompetitors] = useState([]);
+  const [ownScores, setOwnScores] = useState({});
+  const [showCompetitorModal, setShowCompetitorModal] = useState(false);
+  const [competitorBusy, setCompetitorBusy] = useState(null);
+  const [newCompetitorUrl, setNewCompetitorUrl] = useState('');
   
   // Default to first active client if stored is missing or invalid
   useEffect(() => {
@@ -479,6 +488,79 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       .catch(err => console.error('[SEO TAB] Fetch freelancers failed:', err));
   }, []);
 
+  const fetchCompetitors = async (clientId) => {
+    if (!clientId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${clientId}/seo/competitors`, { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      setCompetitors(data.competitors || []);
+      setOwnScores(data.own || {});
+    } catch (err) {
+      console.error('[SEO TAB] Fetch competitors failed:', err);
+    }
+  };
+
+  const addCompetitor = async () => {
+    const url = newCompetitorUrl.trim();
+    if (!url) return;
+    setCompetitorBusy('add');
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/competitors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error);
+      setNewCompetitorUrl('');
+      showToast(`Added ${data.competitor.domain}`, 'success');
+      await fetchCompetitors(selectedClientId);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setCompetitorBusy(null);
+    }
+  };
+
+  const setCompetitorStatus = async (competitorId, status) => {
+    setCompetitorBusy(competitorId);
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/competitors/${competitorId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error);
+      await fetchCompetitors(selectedClientId);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setCompetitorBusy(null);
+    }
+  };
+
+  const auditCompetitor = async (competitorId, agentType) => {
+    setCompetitorBusy(competitorId);
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/competitors/${competitorId}/audit/${agentType}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error);
+      showToast(data.message, 'success');
+      await fetchCompetitors(selectedClientId);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setCompetitorBusy(null);
+    }
+  };
+
   // Fetch agent status & recommendations on client change
   const fetchClientData = async (clientId) => {
     if (!clientId) return;
@@ -547,6 +629,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   useEffect(() => {
     if (selectedClientId) {
       fetchClientData(selectedClientId);
+      fetchCompetitors(selectedClientId);
     }
   }, [selectedClientId]);
 
@@ -976,6 +1059,14 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
                 >
                   <Terminal size={16} /> {isTerminalOpen ? 'Hide Console' : 'Live Console'} ({consoleLogs.length})
+                </button>
+                <button
+                  onClick={() => setShowCompetitorModal(true)}
+                  className="btn btn-secondary seo-cmd-btn"
+                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
+                  title="Compare this client's scores against tracked competitors"
+                >
+                  <Users size={16} /> Competitors ({competitors.filter(c => c.status === 'approved').length})
                 </button>
               </div>
             )}
@@ -1545,6 +1636,168 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       )}
 
       {/* Full Report Modal */}
+      {showCompetitorModal && (
+        <div className="modal-overlay" onClick={() => setShowCompetitorModal(false)}>
+          <div
+            className="modal-content glass-premium"
+            onClick={e => e.stopPropagation()}
+            style={{ border: '2px solid #000', maxWidth: '900px', width: '95%', maxHeight: '88vh', overflowY: 'auto', boxSizing: 'border-box' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <h3 style={{ margin: 0, fontWeight: 'bold' }}>Competitors — {selectedClient?.name}</h3>
+              <button onClick={() => setShowCompetitorModal(false)} className="btn btn-secondary" style={{ border: '2px solid #000', padding: '4px 10px' }}>Close</button>
+            </div>
+            <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Auditing a competitor runs the same skills against their site. Search Console and GA4 are
+              unavailable for domains you don't own, so the <code>google</code> skill is not offered here.
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
+              <input
+                value={newCompetitorUrl}
+                onChange={e => setNewCompetitorUrl(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addCompetitor(); }}
+                placeholder="competitor.com"
+                style={{ flex: '1 1 240px', padding: '8px 10px', border: '2px solid #000', borderRadius: '4px', fontSize: '0.85rem' }}
+              />
+              <button
+                onClick={addCompetitor}
+                disabled={competitorBusy === 'add' || !newCompetitorUrl.trim()}
+                className="btn btn-primary"
+                style={{ border: '2px solid #000', padding: '8px 16px', fontWeight: 'bold' }}
+              >
+                {competitorBusy === 'add' ? 'Adding…' : 'Add'}
+              </button>
+            </div>
+
+            {competitors.length === 0 ? (
+              <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                  No competitors tracked yet. Add one above.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {competitors.map(comp => {
+                  const isApproved = comp.status === 'approved';
+                  const isRejected = comp.status === 'rejected';
+                  const busy = competitorBusy === comp.id;
+                  // Only skills with a score to compare are worth showing side by
+                  // side; the rest produce findings, not numbers.
+                  const comparable = Object.keys(ownScores).filter(t => t !== 'google');
+
+                  return (
+                    <div
+                      key={comp.id}
+                      style={{
+                        border: '2px solid #000',
+                        borderLeft: `6px solid ${isApproved ? '#22c55e' : isRejected ? '#94a3b8' : '#eab308'}`,
+                        borderRadius: '4px',
+                        padding: '12px',
+                        background: isRejected ? '#f8fafc' : '#fff',
+                        opacity: isRejected ? 0.6 : 1,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', wordBreak: 'break-all' }}>
+                            {comp.label || comp.domain}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {comp.domain}
+                            {comp.discovered_for_query && (
+                              <> · found at #{comp.discovered_position ?? '?'} for “{comp.discovered_for_query}”</>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span className="badge" style={{
+                            background: isApproved ? '#22c55e' : isRejected ? '#94a3b8' : '#eab308',
+                            color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 8px', border: '1px solid #000',
+                          }}>
+                            {comp.status}
+                          </span>
+                          {!isApproved && (
+                            <button onClick={() => setCompetitorStatus(comp.id, 'approved')} disabled={busy}
+                              className="btn" title="Approve — allows auditing"
+                              style={{ padding: '3px 8px', border: '2px solid #000', background: '#22c55e', color: '#fff', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              <Check size={13} />
+                            </button>
+                          )}
+                          {!isRejected && (
+                            <button onClick={() => setCompetitorStatus(comp.id, 'rejected')} disabled={busy}
+                              className="btn" title="Reject — keeps discovery from re-proposing it"
+                              style={{ padding: '3px 8px', border: '2px solid #000', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              <X size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isApproved && (
+                        <div style={{ marginTop: '12px', overflowX: 'auto' }}>
+                          <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: '100%' }}>
+                            <thead>
+                              <tr>
+                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc', textAlign: 'left' }}>Skill</th>
+                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}>Them</th>
+                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}>You</th>
+                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}>Gap</th>
+                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {comparable.map(type => {
+                                const theirs = comp.scores?.[type]?.score ?? null;
+                                const mine = ownScores[type]?.score ?? null;
+                                const gap = (theirs !== null && mine !== null) ? mine - theirs : null;
+                                return (
+                                  <tr key={type}>
+                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', fontWeight: 600 }}>{type}</td>
+                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center' }}>
+                                      {theirs ?? '—'}
+                                    </td>
+                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center' }}>
+                                      {mine ?? '—'}
+                                    </td>
+                                    <td style={{
+                                      border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center', fontWeight: 'bold',
+                                      color: gap === null ? '#94a3b8' : gap >= 0 ? '#15803d' : '#b91c1c',
+                                    }}>
+                                      {gap === null ? '—' : gap > 0 ? `+${gap}` : gap}
+                                    </td>
+                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center' }}>
+                                      <button
+                                        onClick={() => auditCompetitor(comp.id, type)}
+                                        disabled={busy}
+                                        className="btn btn-secondary"
+                                        style={{ padding: '2px 8px', fontSize: '0.7rem', border: '1px solid #000' }}
+                                        title={`Run '${type}' against ${comp.domain}`}
+                                      >
+                                        {theirs === null ? 'Run' : 'Re-run'}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                          {comparable.length === 0 && (
+                            <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              Run some audits on this client first — there is nothing to compare against yet.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {showReportModal && currentAudit?.report_json && (
         <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
           <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '700px', width: '90%', maxHeight: '85vh', overflowY: 'auto', wordBreak: 'break-word', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
