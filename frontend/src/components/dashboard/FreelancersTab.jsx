@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, CheckCircle, DollarSign } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
@@ -9,6 +9,50 @@ export default function FreelancersTab({
   showToast
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
+
+  // Payment period. '' is the lifetime view the tab has always shown; a YYYY-MM
+  // scopes both sides of the balance to that month, which is how freelancers
+  // actually invoice.
+  const [paymentMonth, setPaymentMonth] = useState('');
+  const [availableMonths, setAvailableMonths] = useState([]);
+  const [monthlyRows, setMonthlyRows] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/freelancers/payment-months`, { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : { months: [] }))
+      .then(d => setAvailableMonths(d.months || []))
+      .catch(() => setAvailableMonths([]));
+  }, []);
+
+  const loadMonth = async (month) => {
+    if (!month) { setMonthlyRows(null); return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/freelancers?month=${month}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load monthly payment data');
+      const data = await res.json();
+      setMonthlyRows(data.freelancers || []);
+    } catch (err) {
+      showToast(err.message, 'error');
+      setMonthlyRows(null);
+    }
+  };
+
+  useEffect(() => { loadMonth(paymentMonth); }, [paymentMonth]);
+
+  const refreshRoster = () => {
+    fetchFreelancers();
+    if (paymentMonth) loadMonth(paymentMonth);
+  };
+
+  const rows = paymentMonth && monthlyRows ? monthlyRows : freelancers;
+
+  const formatMonthLabel = (m) => {
+    if (!m) return '';
+    const [year, mon] = m.split('-');
+    const name = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'][parseInt(mon, 10) - 1];
+    return `${name} ${year}`;
+  };
 
   // Modal local states
   const [showFreelancerModal, setShowFreelancerModal] = useState(false);
@@ -66,11 +110,26 @@ export default function FreelancersTab({
   };
 
   const handleQuickIncrementPaid = async (freelancer) => {
-    const currentPaid = freelancer.videos_paid || 0;
-    const newPaid = currentPaid + 1;
+    const newPaid = (freelancer.videos_paid || 0) + 1;
+
+    // With a month selected the payment belongs to that month, not to the
+    // lifetime counter — crediting July's payment to the running total would
+    // silently mark an earlier month's backlog as settled.
+    const request = paymentMonth
+      ? {
+          url: `/api/freelancers/${freelancer.id}/payments/${paymentMonth}`,
+          method: 'PUT',
+          label: `for ${formatMonthLabel(paymentMonth)}`
+        }
+      : {
+          url: `/api/freelancers/${freelancer.id}`,
+          method: 'PATCH',
+          label: `(Total: ${newPaid})`
+        };
+
     try {
-      const res = await fetch(`${API_BASE}/api/freelancers/${freelancer.id}`, {
-        method: 'PATCH',
+      const res = await fetch(`${API_BASE}${request.url}`, {
+        method: request.method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videos_paid: newPaid }),
         credentials: 'include'
@@ -79,8 +138,8 @@ export default function FreelancersTab({
         const data = await res.json();
         throw new Error(data.error || 'Failed to update payment count');
       }
-      showToast(`Logged +1 video paid for ${freelancer.name} (Total: ${newPaid})`, 'success');
-      fetchFreelancers();
+      showToast(`Logged +1 video paid for ${freelancer.name} ${request.label}`, 'success');
+      refreshRoster();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -117,12 +176,29 @@ export default function FreelancersTab({
         <div>
           <h3>Freelancer Roster & Payment Tracker</h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            Track assigned content count, completed videos, payment history, and balance due.
+            {paymentMonth
+              ? `Videos posted in ${formatMonthLabel(paymentMonth)} and what is still due for that month.`
+              : 'Track assigned content count, completed videos, payment history, and balance due.'}
           </p>
         </div>
-        <button onClick={() => openFreelancerModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={16} /> Add Freelancer
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <select
+            value={paymentMonth}
+            onChange={e => setPaymentMonth(e.target.value)}
+            style={{ padding: '8px 12px', fontSize: '0.85rem', fontWeight: '700', border: '2px solid #000', borderRadius: '6px', cursor: 'pointer' }}
+            title="Scope payment due to a single month"
+          >
+            <option value="">All time</option>
+            {availableMonths.map(m => (
+              <option key={m.month} value={m.month}>
+                {formatMonthLabel(m.month)} ({m.posted_videos})
+              </option>
+            ))}
+          </select>
+          <button onClick={() => openFreelancerModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={16} /> Add Freelancer
+          </button>
+        </div>
       </div>
 
       <div className="table-container">
@@ -133,25 +209,29 @@ export default function FreelancersTab({
               <th>Contact / Company</th>
               <th>Specialization</th>
               <th>Rate / Video</th>
-              <th>Videos Done</th>
-              <th>Videos Paid</th>
-              <th>Balance Due</th>
+              <th>{paymentMonth ? `Videos Done (${formatMonthLabel(paymentMonth)})` : 'Videos Done'}</th>
+              <th>{paymentMonth ? 'Paid This Month' : 'Videos Paid'}</th>
+              <th>{paymentMonth ? 'Due This Month' : 'Balance Due'}</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {freelancers.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                   No freelancers added yet.
                 </td>
               </tr>
             ) : (
-              freelancers.map(free => {
+              rows.map(free => {
                 const rate = free.rate_per_video || 0;
                 const posted = free.posted_videos || 0;
-                const total = free.total_videos || 0;
+                // In month view every figure is that month's, assigned included,
+                // so a lifetime total is not shown next to a monthly count.
+                const total = paymentMonth
+                  ? (free.assigned_videos_in_month || 0)
+                  : (free.total_videos || 0);
                 const paid = free.videos_paid || 0;
                 const unpaidCount = Math.max(0, posted - paid);
                 const balanceDue = unpaidCount * rate;
@@ -183,7 +263,7 @@ export default function FreelancersTab({
                         {posted} posted
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        ({total} assigned total)
+                        ({total} assigned{paymentMonth ? ' this month' : ' total'})
                       </div>
                     </td>
                     <td>
@@ -209,12 +289,12 @@ export default function FreelancersTab({
                           </span>
                         ) : (
                           <span className="badge badge-success" style={{ fontWeight: '800', background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' }}>
-                            ✓ Fully Paid
+                            ✓ {paymentMonth ? 'Settled' : 'Fully Paid'}
                           </span>
                         )}
                         {rate > 0 && (
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                            Earned: ₹{totalEarned.toLocaleString()}
+                            {paymentMonth ? 'Earned this month' : 'Earned'}: ₹{totalEarned.toLocaleString()}
                           </div>
                         )}
                       </div>

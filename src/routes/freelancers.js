@@ -12,20 +12,42 @@ const router = Router();
 
 router.use(authenticate);
 
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 /**
  * GET /api/freelancers
  */
 router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
   try {
-    const { is_active, specialization } = req.query;
-    let query = `
+    const { is_active, specialization, month } = req.query;
+
+    if (month !== undefined && !MONTH_RE.test(month)) {
+      return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+    }
+
+    // Scoped to a month, both sides of the balance come from that month: videos
+    // posted within it, and payments recorded against it. Unscoped, the lifetime
+    // counter on the freelancer row stands as before.
+    let query = month ? `
+      SELECT f.*,
+        (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id) AS total_videos,
+        (SELECT COUNT(*) FROM marketing_content_tracker
+          WHERE freelancer_id = f.id AND status = 'Posted' AND substr(date, 1, 7) = ?) AS posted_videos,
+        (SELECT COUNT(*) FROM marketing_content_tracker
+          WHERE freelancer_id = f.id AND substr(date, 1, 7) = ?) AS assigned_videos_in_month,
+        COALESCE((SELECT videos_paid FROM freelancer_monthly_payments
+          WHERE freelancer_id = f.id AND month = ?), 0) AS videos_paid,
+        f.videos_paid AS lifetime_videos_paid
+      FROM freelancers f
+      WHERE 1=1
+    ` : `
       SELECT f.*,
         (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id) AS total_videos,
         (SELECT COUNT(*) FROM marketing_content_tracker WHERE freelancer_id = f.id AND status = 'Posted') AS posted_videos
       FROM freelancers f
       WHERE 1=1
     `;
-    const params = [];
+    const params = month ? [month, month, month] : [];
 
     if (is_active !== undefined) {
       query += ' AND f.is_active = ?';
@@ -40,6 +62,74 @@ router.get('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manager
     res.json({ freelancers: db.prepare(query).all(...params) });
   } catch (err) {
     console.error('[FREELANCERS] List error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/freelancers/payment-months
+ * Months that actually have freelancer-assigned content, for the month picker.
+ * Declared before /:id so "payment-months" is not read as an id.
+ */
+router.get('/payment-months', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT substr(date, 1, 7) AS month, COUNT(*) AS posted_videos
+      FROM marketing_content_tracker
+      WHERE freelancer_id IS NOT NULL AND date IS NOT NULL AND status = 'Posted'
+      GROUP BY month
+      ORDER BY month DESC
+    `).all();
+    res.json({ months: rows });
+  } catch (err) {
+    console.error('[FREELANCERS] Payment months error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/freelancers/:id/payments/:month
+ * Record how many videos have been paid for in a given month.
+ */
+router.put('/:id/payments/:month', authorize('admin'), (req, res) => {
+  try {
+    const { id, month } = req.params;
+    if (!MONTH_RE.test(month)) {
+      return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+    }
+
+    const freelancer = db.prepare('SELECT id, name FROM freelancers WHERE id = ?').get(id);
+    if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
+
+    const videosPaid = parseInt(req.body?.videos_paid, 10);
+    if (!Number.isInteger(videosPaid) || videosPaid < 0) {
+      return res.status(400).json({ error: 'videos_paid must be a non-negative integer' });
+    }
+
+    const previous = db.prepare(
+      'SELECT videos_paid FROM freelancer_monthly_payments WHERE freelancer_id = ? AND month = ?'
+    ).get(id, month);
+
+    db.prepare(`
+      INSERT INTO freelancer_monthly_payments (freelancer_id, month, videos_paid, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT (freelancer_id, month)
+      DO UPDATE SET videos_paid = excluded.videos_paid, updated_at = excluded.updated_at
+    `).run(id, month, videosPaid);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'update',
+      entityType: 'freelancer_monthly_payment',
+      entityId: parseInt(id, 10),
+      diff: { month, videos_paid: { from: previous?.videos_paid ?? 0, to: videosPaid } },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, freelancer_id: parseInt(id, 10), month, videos_paid: videosPaid });
+  } catch (err) {
+    console.error('[FREELANCERS] Monthly payment error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
