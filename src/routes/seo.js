@@ -93,6 +93,43 @@ function skillStateFor(agentType) {
   return { enforced: true, ok: true, skillName, reportedAt: row.reported_at };
 }
 
+/**
+ * External data source each skill genuinely depends on.
+ *
+ * Only skills that are useless without a specific source are listed. `technical`
+ * reads PageSpeed but still produces real findings from the crawl alone, so it
+ * is absent — a missing source there degrades the report rather than voiding it.
+ */
+const REQUIRED_CAPABILITY = {
+  backlinks: { family: 'backlink_apis', sources: ['moz', 'bing', 'dataforseo'], label: 'a backlink data source (Moz, Bing Webmaster, or DataForSEO)' },
+  google: { family: 'google_apis', sources: ['psi', 'crux', 'gsc', 'ga4'], label: 'the Google APIs' },
+};
+
+/**
+ * Whether this audit ran without the data it needed.
+ *
+ * Returns a human-readable reason, or null when the run had what it required.
+ * Audits stored before capabilities were recorded return null rather than being
+ * assumed broken — absence of evidence is not evidence of an outage.
+ */
+function detectDataGap(auditType, audit) {
+  const required = REQUIRED_CAPABILITY[auditType];
+  if (!required || !audit?.report_json) return null;
+
+  let parsed;
+  try {
+    parsed = typeof audit.report_json === 'string' ? JSON.parse(audit.report_json) : audit.report_json;
+  } catch { return null; }
+
+  const capabilities = parsed?.capabilities?.[required.family];
+  if (!capabilities || !Array.isArray(capabilities.available)) return null;
+
+  const hasAny = required.sources.some(s => capabilities.available.includes(s));
+  if (hasAny) return null;
+
+  return `Ran without ${required.label}, so this audit reports the outage rather than the site.`;
+}
+
 function resolveAuditScore(audit) {
   if (!audit) return null;
   const preferred = SCORE_COLUMN_BY_TYPE[audit.audit_type];
@@ -192,18 +229,29 @@ router.get('/:id/seo/agents/status', (req, res) => {
       let ageDays = null;
       let lastRunAt = null;
       let score = null;
+      let dataGap = null;
 
       if (lastAudit) {
         lastRunAt = lastAudit.created_at;
         const lastDate = new Date(lastAudit.created_at);
         const diffMs = Date.now() - lastDate.getTime();
         ageDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        
+
         if (ageDays < conf.stale_after_days) {
           freshness = 'fresh';
         } else {
           freshness = 'stale';
         }
+
+        // A run that completed without its data source is not a fresh audit —
+        // it is a report about an outage. The backlinks card read FRESH while
+        // all five of its findings were "Moz access denied", "Bing access
+        // denied", "referring domain data gap": nothing was learned about the
+        // client's actual link profile, and the badge stopped asking for a
+        // re-run. Age alone cannot see that distinction, so the audit's
+        // recorded capabilities are checked too.
+        dataGap = detectDataGap(conf.audit_type, lastAudit);
+        if (dataGap) freshness = 'stale';
 
         // Map score based on agent
         score = resolveAuditScore(lastAudit);
@@ -219,6 +267,7 @@ router.get('/:id/seo/agents/status', (req, res) => {
         ageDays,
         lastRunAt,
         score,
+        dataGap,
         activeRun: activeRun && {
           id: activeRun.id,
           status: activeRun.status,

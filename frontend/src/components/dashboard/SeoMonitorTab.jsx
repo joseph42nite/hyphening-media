@@ -1135,6 +1135,15 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       <div style={{ margin: '8px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         <div>Cadence: {agent.staleAfterDays} days</div>
                         <div>Last Run: {agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleDateString() : 'Never'}</div>
+                        {/* A run that completed without its data source reads as
+                            stale, which on its own looks like ordinary expiry.
+                            Saying why stops the obvious response — re-running it
+                            — from producing the same empty report again. */}
+                        {agent.dataGap && (
+                          <div style={{ marginTop: '4px', color: '#b45309', fontWeight: 600, lineHeight: 1.35 }}>
+                            ⚠ {agent.dataGap}
+                          </div>
+                        )}
                       </div>
                     </div>
 

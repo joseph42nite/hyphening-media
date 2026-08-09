@@ -89,6 +89,145 @@ function findMatchingMedia(item, mediaList) {
 }
 
 /**
+ * Extract a YouTube video ID from a watch/shorts/youtu.be URL
+ */
+function extractYouTubeVideoId(link) {
+  if (!link) return null;
+  const match = link.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|shorts\/|watch\?v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * YouTube Data API returns statistics as strings ("766"), so coerce carefully —
+ * a legitimate "0" must not fall through to the stored value.
+ */
+function toCount(value, fallback = 0) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Fetch the connected channel's uploads for a client (cached per sync run)
+ */
+const ytVideoListCache = new Map();
+async function getClientYouTubeVideos(clientId) {
+  if (ytVideoListCache.has(clientId)) return ytVideoListCache.get(clientId);
+  try {
+    const res = await executeClientAction(clientId, 'YOUTUBE_LIST_CHANNEL_VIDEOS', {
+      mine: true,
+      maxResults: 50
+    });
+    const items = Array.isArray(res?.data?.items) ? res.data.items : [];
+    const list = items
+      .map(i => ({
+        videoId: i.snippet?.resourceId?.videoId || null,
+        title: i.snippet?.title || '',
+        description: i.snippet?.description || '',
+        publishedAt: i.snippet?.publishedAt || null
+      }))
+      .filter(v => v.videoId);
+    ytVideoListCache.set(clientId, list);
+    return list;
+  } catch (e) {
+    console.warn(`[METRIC-SYNC] Could not fetch YouTube video list for client #${clientId}:`, e.message);
+    ytVideoListCache.set(clientId, []);
+    return [];
+  }
+}
+
+function normalizeTitle(t) {
+  return (t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Match a content tracker row to a channel upload.
+ * Strategy: 1) Match by title  2) Match by publish date proximity (±2 days)
+ */
+function findMatchingYouTubeVideo(item, videos) {
+  const title = normalizeTitle(item.title);
+  if (title) {
+    const match = videos.find(v => normalizeTitle(v.title) === title);
+    if (match) return match;
+  }
+
+  if (item.date) {
+    const itemDate = new Date(item.date);
+    const candidates = videos.filter(v => {
+      if (!v.publishedAt) return false;
+      const diffDays = Math.abs((new Date(v.publishedAt) - itemDate) / (1000 * 60 * 60 * 24));
+      return diffDays <= 2;
+    });
+
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => {
+        const diffA = Math.abs(new Date(a.publishedAt) - itemDate);
+        const diffB = Math.abs(new Date(b.publishedAt) - itemDate);
+        return diffA - diffB;
+      });
+      return candidates[0];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve a YouTube video ID for the item and pull live statistics into `metrics`.
+ * Returns the resolved video ID, or null if the post could not be matched.
+ *
+ * Note: views/likes/comments come from the YouTube Data API. Watch time, average
+ * view duration and CTR live in the YouTube Analytics API, which the Composio
+ * youtube toolkit does not expose — those columns are left untouched.
+ */
+async function syncYouTubeMetrics(item, metrics) {
+  let videoId = item.youtube_video_id
+    || extractYouTubeVideoId(item.youtube_link)
+    || extractYouTubeVideoId(item.link);
+  const updateFields = {};
+
+  // Fall back to matching against the channel feed when no link is stored
+  if (!videoId) {
+    const matched = findMatchingYouTubeVideo(item, await getClientYouTubeVideos(item.client_id));
+    if (matched) {
+      videoId = matched.videoId;
+      if (!item.title && matched.title) updateFields.title = matched.title;
+    }
+  }
+
+  if (!videoId) return null;
+
+  if (videoId !== item.youtube_video_id) updateFields.youtube_video_id = videoId;
+  if (!item.link) updateFields.link = `https://youtu.be/${videoId}`;
+
+  const detailsRes = await executeClientAction(item.client_id, 'YOUTUBE_GET_VIDEO_DETAILS_BATCH', {
+    id: [videoId],
+    parts: ['snippet', 'statistics']
+  });
+
+  const video = detailsRes?.data?.items?.[0];
+  if (!video) {
+    throw new Error(`Video ${videoId} not returned by YouTube (deleted, private, or on another channel)`);
+  }
+
+  const stats = video.statistics || {};
+  metrics.youtube_views = toCount(stats.viewCount, metrics.youtube_views);
+  metrics.likes = toCount(stats.likeCount, metrics.likes);
+  metrics.comments = toCount(stats.commentCount, metrics.comments);
+
+  if (!item.caption && video.snippet?.description) {
+    updateFields.caption = video.snippet.description;
+  }
+
+  if (Object.keys(updateFields).length > 0) {
+    const setClauses = Object.keys(updateFields).map(k => `${k} = ?`).join(', ');
+    db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
+      .run(...Object.values(updateFields), item.id);
+  }
+
+  return videoId;
+}
+
+/**
  * Fetch and sync metrics for a single post item
  */
 export async function syncSingleContentMetrics(contentId) {
@@ -105,15 +244,30 @@ export async function syncSingleContentMetrics(contentId) {
 
   let numericMediaId = item.instagram_media_id || item.platform_post_id;
   const platform = (item.platform || 'instagram').toLowerCase();
+  const isYouTube = platform.includes('youtube') || platform.includes('shorts');
+  const isInstagram = platform.includes('instagram') || platform.includes('meta');
   let metrics = {
     views: item.views || 0,
+    youtube_views: item.youtube_views || 0,
     likes: item.likes || 0,
     comments: item.comments || 0,
     shares: item.shares || 0,
     saves: item.saves || 0
   };
+  let youtubeSynced = false;
 
-  if (process.env.COMPOSIO_API_KEY && (platform.includes('instagram') || platform.includes('meta'))) {
+  if (process.env.COMPOSIO_API_KEY && isYouTube) {
+    try {
+      youtubeSynced = !!(await syncYouTubeMetrics(item, metrics));
+      if (!youtubeSynced) {
+        console.warn(`[METRIC-SYNC] No YouTube video matched for post #${contentId} — add a link or title to match on.`);
+      }
+    } catch (err) {
+      console.error(`[METRIC-SYNC] YouTube metric fetch failed for content #${contentId}:`, err.message);
+    }
+  }
+
+  if (process.env.COMPOSIO_API_KEY && isInstagram) {
     try {
       // 1. Resolve numeric Graph API media ID if we don't have a valid one
       if (!numericMediaId || !/^\d+$/.test(numericMediaId)) {
@@ -182,12 +336,17 @@ export async function syncSingleContentMetrics(contentId) {
     }
   }
 
+  // YouTube view counts live in youtube_views; reports sum `views + youtube_views`,
+  // so leaving a stale `views` on a YouTube row would double-count it.
+  if (youtubeSynced) metrics.views = 0;
+
   // Calculate engagement rate, save rate & content score
-  const viewsVal = Math.max(metrics.views, 1);
+  const effectiveViews = isYouTube ? metrics.youtube_views : metrics.views;
+  const viewsVal = Math.max(effectiveViews, 1);
   const totalEngagements = metrics.likes + metrics.comments + metrics.shares + metrics.saves;
   const engagementRatePct = Math.round((totalEngagements / viewsVal) * 10000) / 100;
   const saveRatePct = Math.round((metrics.saves / viewsVal) * 10000) / 100;
-  const contentScore = Math.round(metrics.views * 0.1 + metrics.likes * 0.5 + metrics.comments * 1.5 + metrics.shares * 2.0 + metrics.saves * 2.0);
+  const contentScore = Math.round(effectiveViews * 0.1 + metrics.likes * 0.5 + metrics.comments * 1.5 + metrics.shares * 2.0 + metrics.saves * 2.0);
 
   const avgWatchTimePct = metrics.avg_watch_time_pct !== undefined ? metrics.avg_watch_time_pct : (item.avg_watch_time_pct || null);
   const skipRatePct = avgWatchTimePct !== null && avgWatchTimePct !== undefined ? Math.max(0, Math.round((100 - avgWatchTimePct) * 100) / 100) : (item.skip_rate_pct || null);
