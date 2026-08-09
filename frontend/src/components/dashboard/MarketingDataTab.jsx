@@ -145,7 +145,9 @@ export default function MarketingDataTab({
       ? selectedAdMonth
       : new Date().toISOString().slice(0, 7);
     if (ad) {
-      setEditingAd(ad);
+      // A lead-derived row is passed in with id null: pre-fill from it, but
+      // create rather than update, since there is no record to update.
+      setEditingAd(ad.id ? ad : null);
       setAdFormData({
         platform: ad.platform || 'Meta',
         ad_campaign_name: ad.ad_campaign_name || '',
@@ -974,8 +976,23 @@ export default function MarketingDataTab({
                         )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        {(isAdmin || isSMM) && !String(ad.id).startsWith('synth-') && (
-                          <button onClick={() => openAdModal(ad)} className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '0.7rem' }}>Edit</button>
+                        {(isAdmin || isSMM) && (
+                          String(ad.id).startsWith('synth-') ? (
+                            // This row was assembled from leads — there is no campaign
+                            // record behind it to edit. Opening the form pre-filled with
+                            // its name and platform creates one that those same leads
+                            // will match, which is the only way to give it a spend.
+                            <button
+                              onClick={() => openAdModal({ ...ad, id: null, month: selectedAdMonth && selectedAdMonth !== 'all' ? selectedAdMonth : undefined })}
+                              className="btn btn-secondary"
+                              style={{ padding: '2px 8px', fontSize: '0.7rem' }}
+                              title="No spend recorded yet — add this campaign so you can enter its spend"
+                            >
+                              Add spend
+                            </button>
+                          ) : (
+                            <button onClick={() => openAdModal(ad)} className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '0.7rem' }}>Edit</button>
+                          )
                         )}
                       </td>
                     </tr>

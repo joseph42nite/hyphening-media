@@ -1157,7 +1157,9 @@ router.patch('/:id/marketing/ads/:adId', authorize('admin', 'ops_social_media_ma
       .get(req.params.adId, req.params.id);
     if (!ad) return res.status(404).json({ error: 'Ad campaign not found' });
 
-    const allowedFields = ['platform', 'ad_campaign_name', 'leads', 'total_ad_spend_inr', 'impressions', 'clicks', 'revenue_generated'];
+    // `month` decides which period a campaign's spend lands in and is editable
+    // in the form, so leaving it out here silently discarded the correction.
+    const allowedFields = ['platform', 'ad_campaign_name', 'month', 'leads', 'total_ad_spend_inr', 'impressions', 'clicks', 'revenue_generated'];
     const updates = {};
 
     for (const field of allowedFields) {
