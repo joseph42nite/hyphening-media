@@ -1086,7 +1086,13 @@ export default function MarketingDataTab({
       {/* Ad Campaign Modal — six fields; everything else is derived */}
       {showAdModal && (
         <div className="modal-overlay" onClick={() => setShowAdModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+          {/* glass-premium carries the background, border and padding —
+              modal-content alone is transparent and unpadded. */}
+          <div
+            className="modal-content glass-premium"
+            style={{ textAlign: 'left', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box' }}
+            onClick={e => e.stopPropagation()}
+          >
             <h3 style={{ marginTop: 0 }}>{editingAd ? 'Edit Campaign' : 'Add Ad Campaign'}</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-6px' }}>
               Leads, qualified leads and bookings come from the CRM by campaign name and month.
@@ -1156,7 +1162,11 @@ export default function MarketingDataTab({
       {/* Procedure Prices Modal */}
       {showPriceModal && (
         <div className="modal-overlay" onClick={() => setShowPriceModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+          <div
+            className="modal-content glass-premium"
+            style={{ textAlign: 'left', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box' }}
+            onClick={e => e.stopPropagation()}
+          >
             <h3 style={{ marginTop: 0 }}>Procedure Prices</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-6px' }}>
               What each procedure is worth. Every booking is valued by what it was actually for,
@@ -1168,17 +1178,29 @@ export default function MarketingDataTab({
                   No treatment types recorded on this client's leads yet.
                 </p>
               ) : (
-                <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '12px' }}>
+                // The modal scrolls as a whole; a second scroller in here left
+                // the list clipped with its own stray scrollbar.
+                <div style={{ marginBottom: '12px' }}>
                   {priceRows.map((row, i) => (
-                    <div key={row.treatment_type} style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{row.treatment_type}</div>
+                    <div
+                      key={row.treatment_type}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
+                        padding: '8px 10px', marginBottom: '6px',
+                        border: '2px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-secondary)'
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {row.treatment_type}
+                        </div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                           {row.bookings} booking{row.bookings === 1 ? '' : 's'} · {row.leads} lead{row.leads === 1 ? '' : 's'}
                         </div>
                       </div>
                       <input
                         className="form-control" type="number" min="0" step="0.01" placeholder="₹"
+                        style={{ width: '120px', flex: '0 0 120px' }}
                         value={row.price_inr}
                         onChange={e => {
                           const next = [...priceRows];
