@@ -11,6 +11,7 @@ import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js';
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
 import { syncSingleContentMetrics } from '../services/metricSyncWorker.js';
+import { estimateBookingRevenue, withEfficiency } from '../services/bookingValue.js';
 
 const router = Router();
 
@@ -115,7 +116,14 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
       const totalLeads = (leadTotals && leadTotals.total_leads > 0) ? leadTotals.total_leads : (adStats ? adStats.total_leads || 0 : 0);
       const totalRev = adStats ? adStats.total_revenue || 0 : 0;
       const avgCpl = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
-      const overallRoas = totalSpend > 0 ? parseFloat((totalRev / totalSpend).toFixed(2)) : 0;
+
+      const efficiency = withEfficiency({
+        spend: totalSpend,
+        bookings: leadTotals ? leadTotals.confirmed_bookings || 0 : 0,
+        revenueGenerated: totalRev,
+        estimate: estimateBookingRevenue({ clientId: client.id, month })
+      });
+      const overallRoas = efficiency.roas ?? 0;
 
       // 2. Content Metrics
       const contentStats = db.prepare(`
@@ -156,6 +164,10 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
           clicks: adStats ? adStats.total_clicks : 0,
           avg_cpl: avgCpl,
           roas: overallRoas,
+          cost_per_booking_inr: efficiency.cost_per_booking_inr,
+          estimated_revenue_inr: efficiency.estimated_revenue_inr,
+          unpriced_bookings: efficiency.unpriced_bookings,
+          roas_is_estimated: efficiency.roas_is_estimated,
           campaigns_count: adStats ? adStats.ad_campaigns_count : 0
         },
         content_metrics: {
@@ -747,6 +759,133 @@ const getAdWithLeads = (adId) => {
 };
 
 /**
+ * GET /api/clients/:id/treatment-prices
+ * The client's price list, plus every treatment_type their leads actually
+ * mention. treatment_type is free text from the CRM, so offering the values
+ * already in use stops the list being populated with names that never match.
+ */
+router.get('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const clientId = req.params.id;
+
+    const client = db.prepare('SELECT id, default_booking_value_inr FROM crm_clients WHERE id = ?').get(clientId);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const prices = db.prepare(`
+      SELECT treatment_type, price_inr
+      FROM client_treatment_prices
+      WHERE client_id = ?
+      ORDER BY treatment_type ASC
+    `).all(clientId);
+
+    // Treatment types seen on this client's leads, with how many of each became
+    // a booking — so the highest-impact prices to fill in are obvious.
+    const observed = db.prepare(`
+      SELECT TRIM(treatment_type) AS treatment_type,
+             COUNT(*) AS leads,
+             SUM(CASE WHEN
+               LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+               OR LOWER(TRIM(COALESCE(lead_status, ''))) = 'appointment booked'
+             THEN 1 ELSE 0 END) AS bookings
+      FROM campaign_leads
+      WHERE client_id = ? AND treatment_type IS NOT NULL AND TRIM(treatment_type) != ''
+      GROUP BY LOWER(TRIM(treatment_type))
+      ORDER BY bookings DESC, leads DESC
+    `).all(clientId);
+
+    const untypedBookings = db.prepare(`
+      SELECT COUNT(*) AS n FROM campaign_leads
+      WHERE client_id = ?
+        AND (treatment_type IS NULL OR TRIM(treatment_type) = '')
+        AND (
+          LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
+          OR LOWER(TRIM(COALESCE(lead_status, ''))) = 'appointment booked'
+        )
+    `).get(clientId).n;
+
+    res.json({
+      prices,
+      observed_treatments: observed,
+      untyped_bookings: untypedBookings,
+      default_booking_value_inr: client.default_booking_value_inr
+    });
+  } catch (err) {
+    console.error('[MARKETING] Treatment prices fetch error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/clients/:id/treatment-prices
+ * Body: { prices: [{ treatment_type, price_inr }], default_booking_value_inr }
+ */
+router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const clientId = req.params.id;
+    const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(clientId);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const { prices, default_booking_value_inr } = req.body || {};
+    if (prices !== undefined && !Array.isArray(prices)) {
+      return res.status(400).json({ error: 'prices must be an array' });
+    }
+
+    for (const p of (prices || [])) {
+      const value = Number(p?.price_inr);
+      if (!p?.treatment_type || !String(p.treatment_type).trim()) {
+        return res.status(400).json({ error: 'each price needs a treatment_type' });
+      }
+      if (!Number.isFinite(value) || value < 0) {
+        return res.status(400).json({ error: `price_inr for "${p.treatment_type}" must be a non-negative number` });
+      }
+    }
+
+    const defaultValue = default_booking_value_inr === '' || default_booking_value_inr === null || default_booking_value_inr === undefined
+      ? null
+      : Number(default_booking_value_inr);
+    if (defaultValue !== null && (!Number.isFinite(defaultValue) || defaultValue < 0)) {
+      return res.status(400).json({ error: 'default_booking_value_inr must be a non-negative number' });
+    }
+
+    const upsert = db.prepare(`
+      INSERT INTO client_treatment_prices (client_id, treatment_type, price_inr, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT (client_id, treatment_type)
+      DO UPDATE SET price_inr = excluded.price_inr, updated_at = excluded.updated_at
+    `);
+
+    // Replace wholesale: the editor submits the full list, so a row the user
+    // removed has to disappear rather than linger and keep pricing bookings.
+    db.transaction(() => {
+      if (prices !== undefined) {
+        db.prepare('DELETE FROM client_treatment_prices WHERE client_id = ?').run(clientId);
+        for (const p of prices) {
+          upsert.run(clientId, String(p.treatment_type).trim(), Number(p.price_inr));
+        }
+      }
+      if (default_booking_value_inr !== undefined) {
+        db.prepare('UPDATE crm_clients SET default_booking_value_inr = ? WHERE id = ?').run(defaultValue, clientId);
+      }
+    })();
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'update',
+      entityType: 'client_treatment_prices',
+      entityId: parseInt(clientId, 10),
+      diff: { count: (prices || []).length, default_booking_value_inr: defaultValue },
+      ip: req.ip,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[MARKETING] Treatment prices save error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/clients/:id/marketing/ads
  * Accepts optional ?month=YYYY-MM parameter
  */
@@ -890,7 +1029,26 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
       roas: 0
     }));
 
-    const finalAds = [...explicitAds, ...syntheticAds];
+    // Cost per booking is measured from bookings already on the leads; estimated
+    // revenue prices each of those bookings by its treatment_type.
+    const finalAds = [...explicitAds, ...syntheticAds].map(ad => {
+      const bookings = ad.actual_confirmed_bookings || 0;
+      const estimate = estimateBookingRevenue({
+        clientId: parseInt(clientId, 10),
+        month: monthFilter,
+        campaignName: ad.ad_campaign_name,
+        platform: ad.platform
+      });
+      return {
+        ...ad,
+        ...withEfficiency({
+          spend: ad.total_ad_spend_inr,
+          bookings,
+          revenueGenerated: ad.revenue_generated,
+          estimate
+        })
+      };
+    });
 
     // Client-portal parity: totals come straight from campaign_leads for the same month,
     // so they can never drift from what the portal reports even if campaign matching changes.
@@ -910,6 +1068,10 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
       ${leadWhere}
     `).get(...leadParams);
 
+    const totalSpend = finalAds.reduce((acc, a) => acc + (a.total_ad_spend_inr || 0), 0);
+    const totalActualRevenue = finalAds.reduce((acc, a) => acc + (a.revenue_generated || 0), 0);
+    const monthEstimate = estimateBookingRevenue({ clientId: parseInt(clientId, 10), month: monthFilter });
+
     res.json({
       ads: finalAds,
       available_months: campaignMonths,
@@ -918,7 +1080,15 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
         total_leads: totals.total_leads || 0,
         qualified_leads: totals.qualified_leads || 0,
         confirmed_bookings: totals.confirmed_bookings || 0
-      }
+      },
+      // Totals are valued off the month's bookings directly rather than summed
+      // from the campaigns, so bookings that matched no campaign still count.
+      efficiency: withEfficiency({
+        spend: totalSpend,
+        bookings: totals.confirmed_bookings || 0,
+        revenueGenerated: totalActualRevenue,
+        estimate: monthEstimate
+      })
     });
   } catch (err) {
     console.error('[MARKETING] Ads list error:', err);

@@ -335,6 +335,7 @@ export default function AllClientsMarketingDashboard({
               <th>Qual. Leads</th>
               <th>Bookings</th>
               <th>Avg CPL</th>
+              <th title="Spend divided by confirmed bookings — measured">Cost / Booking</th>
               <th>ROAS</th>
               <th>Content Views</th>
               <th>Web Traffic</th>
@@ -372,8 +373,17 @@ export default function AllClientsMarketingDashboard({
                   <td style={{ fontWeight: 700 }}>
                     {client.ad_metrics?.avg_cpl ? `₹${client.ad_metrics.avg_cpl}` : '-'}
                   </td>
+                  <td style={{ fontWeight: 800 }}>
+                    {client.ad_metrics?.cost_per_booking_inr != null
+                      ? `₹${client.ad_metrics.cost_per_booking_inr.toLocaleString()}`
+                      : '-'}
+                  </td>
                   <td style={{ fontWeight: 800, color: (client.ad_metrics?.roas || 0) >= 2 ? '#059669' : '#000000' }}>
                     {client.ad_metrics?.roas ? `${client.ad_metrics.roas}x` : '-'}
+                    {client.ad_metrics?.roas_is_estimated && (
+                      <span title="Estimated from procedure prices — no actual revenue entered"
+                        style={{ marginLeft: '4px', fontSize: '0.6rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e', padding: '1px 4px', borderRadius: '4px', verticalAlign: 'middle' }}>EST</span>
+                    )}
                   </td>
                   <td style={{ fontWeight: 700 }}>
                     {(client.content_metrics?.total_views || 0).toLocaleString()}

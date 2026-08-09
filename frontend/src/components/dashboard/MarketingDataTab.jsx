@@ -129,6 +129,142 @@ export default function MarketingDataTab({
     }
   };
 
+  // Ad campaign entry. Leads, qualified leads and bookings are derived from
+  // campaign_leads by name and month, so the form only asks for what nothing
+  // else can know — and never for CTR/CPC/CPL/ROAS, which are computed.
+  const AD_FORM_DEFAULTS = {
+    platform: 'Meta', ad_campaign_name: '', month: '',
+    total_ad_spend_inr: '', impressions: '', clicks: '', revenue_generated: ''
+  };
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [editingAd, setEditingAd] = useState(null);
+  const [adFormData, setAdFormData] = useState({ ...AD_FORM_DEFAULTS });
+
+  const openAdModal = (ad = null) => {
+    const fallbackMonth = selectedAdMonth && selectedAdMonth !== 'all'
+      ? selectedAdMonth
+      : new Date().toISOString().slice(0, 7);
+    if (ad) {
+      setEditingAd(ad);
+      setAdFormData({
+        platform: ad.platform || 'Meta',
+        ad_campaign_name: ad.ad_campaign_name || '',
+        month: ad.month || fallbackMonth,
+        total_ad_spend_inr: ad.total_ad_spend_inr != null ? String(ad.total_ad_spend_inr) : '',
+        impressions: ad.impressions != null ? String(ad.impressions) : '',
+        clicks: ad.clicks != null ? String(ad.clicks) : '',
+        revenue_generated: ad.revenue_generated ? String(ad.revenue_generated) : ''
+      });
+    } else {
+      setEditingAd(null);
+      setAdFormData({ ...AD_FORM_DEFAULTS, month: fallbackMonth });
+    }
+    setShowAdModal(true);
+  };
+
+  const handleAdSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedClientForReports?.id) return;
+    const num = (v) => (v === '' || v === null || v === undefined ? 0 : Number(v));
+
+    const url = editingAd
+      ? `/api/clients/${selectedClientForReports.id}/marketing/ads/${editingAd.id}`
+      : `/api/clients/${selectedClientForReports.id}/marketing/ads`;
+
+    try {
+      const res = await fetch(`${API_BASE}${url}`, {
+        method: editingAd ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          platform: adFormData.platform,
+          ad_campaign_name: adFormData.ad_campaign_name,
+          month: adFormData.month,
+          total_ad_spend_inr: num(adFormData.total_ad_spend_inr),
+          impressions: num(adFormData.impressions),
+          clicks: num(adFormData.clicks),
+          revenue_generated: num(adFormData.revenue_generated)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save campaign');
+
+      showToast(`Campaign ${editingAd ? 'updated' : 'added'} successfully`, 'success');
+      setShowAdModal(false);
+      fetchMarketingData(selectedClientForReports.id, adFormData.month);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  // Procedure price list. Estimated revenue values each booking by what it was
+  // actually for, so this is what makes Est. ROAS mean anything.
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [priceRows, setPriceRows] = useState([]);
+  const [defaultBookingValue, setDefaultBookingValue] = useState('');
+  const [priceMeta, setPriceMeta] = useState({ observed: [], untyped: 0 });
+
+  const openPriceModal = async () => {
+    if (!selectedClientForReports?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/treatment-prices`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load procedure prices');
+      const data = await res.json();
+
+      // Seed from the treatment types the client's leads actually mention, so
+      // rows cannot be typed in with names that will never match a booking.
+      const priced = new Map((data.prices || []).map(p => [p.treatment_type.trim().toLowerCase(), p]));
+      const rows = (data.observed_treatments || []).map(o => ({
+        treatment_type: o.treatment_type,
+        bookings: o.bookings,
+        leads: o.leads,
+        price_inr: priced.has(o.treatment_type.trim().toLowerCase())
+          ? String(priced.get(o.treatment_type.trim().toLowerCase()).price_inr)
+          : ''
+      }));
+      // Anything priced previously whose treatment no longer appears on a lead
+      // is kept, rather than silently dropped on the next save.
+      for (const p of (data.prices || [])) {
+        if (!rows.some(r => r.treatment_type.trim().toLowerCase() === p.treatment_type.trim().toLowerCase())) {
+          rows.push({ treatment_type: p.treatment_type, bookings: 0, leads: 0, price_inr: String(p.price_inr) });
+        }
+      }
+
+      setPriceRows(rows);
+      setDefaultBookingValue(data.default_booking_value_inr != null ? String(data.default_booking_value_inr) : '');
+      setPriceMeta({ observed: data.observed_treatments || [], untyped: data.untyped_bookings || 0 });
+      setShowPriceModal(true);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handlePriceSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedClientForReports?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/treatment-prices`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          prices: priceRows
+            .filter(r => r.price_inr !== '' && Number(r.price_inr) >= 0)
+            .map(r => ({ treatment_type: r.treatment_type, price_inr: Number(r.price_inr) })),
+          default_booking_value_inr: defaultBookingValue === '' ? null : Number(defaultBookingValue)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save procedure prices');
+
+      showToast('Procedure prices saved', 'success');
+      setShowPriceModal(false);
+      fetchMarketingData(selectedClientForReports.id, selectedAdMonth);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   // Content CRUD Handlers
   const openContentModal = (content = null) => {
     if (content) {
@@ -683,6 +819,17 @@ export default function MarketingDataTab({
                 ))}
               </select>
 
+              {(isAdmin || isSMM) && (
+                <>
+                  <button onClick={openPriceModal} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }} title="Set what each procedure is worth, used for estimated revenue">
+                    ₹ Procedure Prices
+                  </button>
+                  <button onClick={() => openAdModal()} className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
+                    <Plus size={13} style={{ marginRight: '3px' }} /> Add Campaign
+                  </button>
+                </>
+              )}
+
               <button
                 className="btn btn-secondary"
                 style={{ padding: '4px 8px', fontSize: '0.8rem' }}
@@ -722,6 +869,16 @@ export default function MarketingDataTab({
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Qualified Leads</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)', marginTop: '2px' }}>
                       {adLeadTotals.qualified_leads}
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Cost / Booking</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#2563eb', marginTop: '2px' }}>
+                      {(() => {
+                        const spend = adCampaigns.reduce((acc, c) => acc + (c.total_ad_spend_inr || 0), 0);
+                        const bookings = adLeadTotals.confirmed_bookings || 0;
+                        return bookings > 0 && spend > 0 ? `₹${Math.round(spend / bookings).toLocaleString()}` : '-';
+                      })()}
                     </div>
                   </div>
                   <div style={{ background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -772,13 +929,15 @@ export default function MarketingDataTab({
                   <th>Clicks</th>
                   <th>CTR</th>
                   <th>CPL</th>
+                  <th title="Spend divided by confirmed bookings — measured, no pricing assumed">Cost / Booking</th>
                   <th>ROAS</th>
+                  <th style={{ width: '60px', textAlign: 'center' }}>Edit</th>
                 </tr>
               </thead>
               <tbody>
                 {adCampaigns.length === 0 ? (
                   <tr>
-                    <td colSpan="12" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    <td colSpan="14" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                       No ad campaigns tracked for this selection.
                     </td>
                   </tr>
@@ -802,7 +961,23 @@ export default function MarketingDataTab({
                         ) : '-'}
                       </td>
                       <td>₹{ad.cpl_inr}</td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{ad.roas}x</td>
+                      <td style={{ fontWeight: 800, color: '#2563eb' }}>
+                        {ad.cost_per_booking_inr != null ? `₹${ad.cost_per_booking_inr.toLocaleString()}` : '-'}
+                      </td>
+                      <td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>
+                        {ad.roas != null ? `${ad.roas}x` : '-'}
+                        {ad.roas_is_estimated && (
+                          <span
+                            title={`Estimated from ${ad.actual_confirmed_bookings ?? 0} booking(s) priced at ₹${(ad.estimated_revenue_inr || 0).toLocaleString()} — no actual revenue entered`}
+                            style={{ marginLeft: '4px', fontSize: '0.6rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e', padding: '1px 4px', borderRadius: '4px', verticalAlign: 'middle' }}
+                          >EST</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {(isAdmin || isSMM) && !String(ad.id).startsWith('synth-') && (
+                          <button onClick={() => openAdModal(ad)} className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '0.7rem' }}>Edit</button>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -904,6 +1079,135 @@ export default function MarketingDataTab({
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Ad Campaign Modal — six fields; everything else is derived */}
+      {showAdModal && (
+        <div className="modal-overlay" onClick={() => setShowAdModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>{editingAd ? 'Edit Campaign' : 'Add Ad Campaign'}</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-6px' }}>
+              Leads, qualified leads and bookings come from the CRM by campaign name and month.
+              CTR, CPC, CPL and ROAS are calculated — don't enter them.
+            </p>
+            <form onSubmit={handleAdSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label>Platform</label>
+                  <select className="form-control" value={adFormData.platform}
+                    onChange={e => setAdFormData({ ...adFormData, platform: e.target.value })}>
+                    <option value="Meta">Meta</option>
+                    <option value="Google">Google</option>
+                    <option value="YouTube">YouTube</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Month</label>
+                  <input className="form-control" type="month" required value={adFormData.month}
+                    onChange={e => setAdFormData({ ...adFormData, month: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Campaign Name</label>
+                <input className="form-control" required value={adFormData.ad_campaign_name}
+                  placeholder="e.g. Janya IVF - Meta Lead Gen (Aug)"
+                  onChange={e => setAdFormData({ ...adFormData, ad_campaign_name: e.target.value })} />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                  Leads are matched to this name — keep it identical to the CRM's campaign name.
+                </small>
+              </div>
+              <div className="form-group">
+                <label>Total Ad Spend (₹)</label>
+                <input className="form-control" type="number" min="0" step="0.01" required
+                  value={adFormData.total_ad_spend_inr}
+                  onChange={e => setAdFormData({ ...adFormData, total_ad_spend_inr: e.target.value })} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label>Impressions</label>
+                  <input className="form-control" type="number" min="0" value={adFormData.impressions}
+                    onChange={e => setAdFormData({ ...adFormData, impressions: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Clicks</label>
+                  <input className="form-control" type="number" min="0" value={adFormData.clicks}
+                    onChange={e => setAdFormData({ ...adFormData, clicks: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Actual Revenue (₹) — optional</label>
+                <input className="form-control" type="number" min="0" step="0.01" value={adFormData.revenue_generated}
+                  placeholder="Leave blank to estimate from procedure prices"
+                  onChange={e => setAdFormData({ ...adFormData, revenue_generated: e.target.value })} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAdModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{editingAd ? 'Save Changes' : 'Add Campaign'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Procedure Prices Modal */}
+      {showPriceModal && (
+        <div className="modal-overlay" onClick={() => setShowPriceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>Procedure Prices</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-6px' }}>
+              What each procedure is worth. Every booking is valued by what it was actually for,
+              so estimated revenue is used only where no actual revenue has been entered.
+            </p>
+            <form onSubmit={handlePriceSubmit}>
+              {priceRows.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  No treatment types recorded on this client's leads yet.
+                </p>
+              ) : (
+                <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '12px' }}>
+                  {priceRows.map((row, i) => (
+                    <div key={row.treatment_type} style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{row.treatment_type}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {row.bookings} booking{row.bookings === 1 ? '' : 's'} · {row.leads} lead{row.leads === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                      <input
+                        className="form-control" type="number" min="0" step="0.01" placeholder="₹"
+                        value={row.price_inr}
+                        onChange={e => {
+                          const next = [...priceRows];
+                          next[i] = { ...next[i], price_inr: e.target.value };
+                          setPriceRows(next);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="form-group" style={{ borderTop: '2px solid var(--border-color)', paddingTop: '12px' }}>
+                <label>Fallback value per booking (₹)</label>
+                <input className="form-control" type="number" min="0" step="0.01" value={defaultBookingValue}
+                  placeholder="Used when a booking has no procedure or no price"
+                  onChange={e => setDefaultBookingValue(e.target.value)} />
+                {priceMeta.untyped > 0 && (
+                  <small style={{ color: '#92400e', fontWeight: 700, fontSize: '0.72rem' }}>
+                    {priceMeta.untyped} booking{priceMeta.untyped === 1 ? '' : 's'} on this client have no procedure recorded — without a fallback they count as ₹0.
+                  </small>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPriceModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Prices</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
