@@ -90,17 +90,26 @@ function findMatchingMedia(item, mediaList) {
 }
 
 /**
- * INSTAGRAM_GET_IG_MEDIA_INSIGHTS is strictly per-post — it cannot be batched —
- * so it dominates the Composio call budget. Posts older than this window keep
- * their stored insight figures and are refreshed from the account feed instead,
- * which costs one call per client no matter how many posts it covers.
+ * How far back a sync run reaches, on both platforms. Roughly two months by
+ * default: recent posts are the ones still moving and the ones anyone analyses,
+ * and the roster is expected to grow, so each new client should cost a bounded
+ * number of calls rather than a number that climbs with their back catalogue.
+ *
+ * Posts outside the window keep their stored figures. On Instagram they still
+ * pick up likes and comments from the account feed, which is fetched once per
+ * client regardless. The trade is that an older video's view count freezes —
+ * YouTube in particular keeps earning views for months — so widen this if the
+ * long tail matters more than the call budget.
  */
-const INSIGHTS_WINDOW_DAYS = parseInt(process.env.METRIC_INSIGHTS_WINDOW_DAYS, 10) || 60;
+const SYNC_WINDOW_DAYS = parseInt(
+  process.env.METRIC_SYNC_WINDOW_DAYS || process.env.METRIC_INSIGHTS_WINDOW_DAYS,
+  10
+) || 60;
 
-function isWithinInsightsWindow(item) {
+function isWithinSyncWindow(item) {
   if (!item.date) return true; // undated posts can't be aged out — keep them live
   const ageDays = (Date.now() - new Date(item.date).getTime()) / (1000 * 60 * 60 * 24);
-  return !Number.isFinite(ageDays) || ageDays <= INSIGHTS_WINDOW_DAYS;
+  return !Number.isFinite(ageDays) || ageDays <= SYNC_WINDOW_DAYS;
 }
 
 /**
@@ -352,7 +361,7 @@ async function syncYouTubeMetrics(item, metrics) {
 /**
  * Fetch and sync metrics for a single post item
  */
-export async function syncSingleContentMetrics(contentId) {
+export async function syncSingleContentMetrics(contentId, { bulk = false } = {}) {
   const item = db.prepare(`
     SELECT t.*, c.composio_entity_id
     FROM marketing_content_tracker t
@@ -383,7 +392,11 @@ export async function syncSingleContentMetrics(contentId) {
   };
   let youtubeSynced = false;
 
-  if (process.env.COMPOSIO_API_KEY && isYouTube) {
+  // Single-post refreshes are deliberate — an operator asked for this row — so
+  // they bypass the window. Only the sweep is bounded by it.
+  const withinWindow = isWithinSyncWindow(item);
+
+  if (process.env.COMPOSIO_API_KEY && isYouTube && (withinWindow || !bulk)) {
     try {
       youtubeSynced = !!(await syncYouTubeMetrics(item, metrics));
       if (!youtubeSynced) {
@@ -429,20 +442,10 @@ export async function syncSingleContentMetrics(contentId) {
         }
       }
 
-      // 2. Older posts skip the per-post insights call and take whatever the
-      //    account feed still carries — likes and comments come back for free
-      //    there. Views/saves/shares keep their last synced values.
-      const recentEnoughForInsights = isWithinInsightsWindow(item);
-      if (!recentEnoughForInsights && numericMediaId) {
-        const feedItem = (await getClientMediaList(item.client_id)).find(m => m.id === numericMediaId);
-        if (feedItem) {
-          metrics.likes = toCount(feedItem.like_count, metrics.likes);
-          metrics.comments = toCount(feedItem.comments_count, metrics.comments);
-        }
-      }
-
-      // 3. Fetch live insights via INSTAGRAM_GET_IG_MEDIA_INSIGHTS
-      if (recentEnoughForInsights && numericMediaId && /^\d+$/.test(numericMediaId)) {
+      // 2. Fetch live insights via INSTAGRAM_GET_IG_MEDIA_INSIGHTS. The sweep
+      //    filters out-of-window rows before they get here, so anything that
+      //    reaches this point is meant to hit the API.
+      if (numericMediaId && /^\d+$/.test(numericMediaId)) {
         try {
           const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
             ig_media_id: numericMediaId,
@@ -498,7 +501,8 @@ export async function syncSingleContentMetrics(contentId) {
     UPDATE marketing_content_tracker
     SET views = ?, youtube_views = ?, likes = ?, comments = ?, shares = ?, saves = ?,
         avg_watch_time_pct = ?, skip_rate_pct = ?, boosted = ?,
-        engagement_rate_pct = ?, save_rate_pct = ?, content_score = ?
+        engagement_rate_pct = ?, save_rate_pct = ?, content_score = ?,
+        metrics_synced_at = datetime('now')
     WHERE id = ?
   `).run(
     metrics.views,
@@ -536,7 +540,7 @@ async function prefetchYouTubeStats(items) {
   for (const item of items) {
     const platform = (item.platform || '').toLowerCase();
     const isYt = platform.includes('youtube') || platform.includes('shorts') || hasYouTubeVideo(item);
-    if (!isYt) continue;
+    if (!isYt || !(isWithinSyncWindow(item) || !item.metrics_synced_at)) continue;
     if (!byClient.has(item.client_id)) byClient.set(item.client_id, []);
     byClient.get(item.client_id).push(item);
   }
@@ -567,7 +571,8 @@ async function prefetchYouTubeStats(items) {
  */
 export async function runMetricSyncWorker({ clientId = null } = {}) {
   const summary = {
-    total: 0, synced: 0, failed: 0, youtube: 0, instagram: 0,
+    total: 0, synced: 0, failed: 0, skippedStale: 0, youtube: 0, instagram: 0,
+    windowDays: SYNC_WINDOW_DAYS,
     startedAt: new Date().toISOString(), finishedAt: null
   };
 
@@ -580,7 +585,7 @@ export async function runMetricSyncWorker({ clientId = null } = {}) {
 
     // Sync ALL posted items, not just those with links
     const itemsToRefresh = db.prepare(`
-      SELECT id, client_id, date, title, platform, link, youtube_link, youtube_video_id
+      SELECT id, client_id, date, title, platform, link, youtube_link, youtube_video_id, metrics_synced_at
       FROM marketing_content_tracker
       WHERE status = 'Posted' ${clientId ? 'AND client_id = ?' : ''}
     `).all(...(clientId ? [clientId] : []));
@@ -600,16 +605,23 @@ export async function runMetricSyncWorker({ clientId = null } = {}) {
     for (const row of itemsToRefresh) {
       const platform = (row.platform || '').toLowerCase();
       const isYt = platform.includes('youtube') || platform.includes('shorts') || hasYouTubeVideo(row);
+      // A row that has never been fetched gets one pass whatever its date —
+      // otherwise anything entered late would fall outside the window on first
+      // sight and stay blank forever. After that the window governs refreshes:
+      // recomputing an old row would only rewrite the values it already holds.
+      const inWindow = isWithinSyncWindow(row) || !row.metrics_synced_at;
+
+      if (!inWindow) {
+        summary.skippedStale++;
+        continue;
+      }
+
       try {
-        await syncSingleContentMetrics(row.id);
+        await syncSingleContentMetrics(row.id, { bulk: true });
         summary.synced++;
         if (isYt) summary.youtube++; else summary.instagram++;
-        // Rate-limit only between posts that actually reach the API. Most posts
-        // now read from the primed batch or sit outside the insights window, and
-        // pausing on those just makes the dashboard button feel broken.
-        if (isYt || isWithinInsightsWindow(row)) {
-          await new Promise(res => setTimeout(res, 300));
-        }
+        // 300ms rate-limit pause between posts that actually reach the API.
+        await new Promise(res => setTimeout(res, 300));
       } catch (err) {
         summary.failed++;
         console.warn(`[METRIC-SYNC] Skipped post #${row.id}:`, err.message);
