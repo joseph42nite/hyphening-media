@@ -2595,8 +2595,6 @@ export default function ClientPortal({ showToast }) {
               {[
                 { key: 'instagram', name: 'Instagram Business', desc: 'Reels & Media Insights', icon: '📸' },
                 { key: 'facebook', name: 'Facebook Page', desc: 'Page Reels & Insights', icon: '📘' },
-                { key: 'facebook_ads', name: 'Meta Ads Manager', desc: 'Ad Campaigns & Spend Analytics', icon: '🎯' },
-                { key: 'google_ads', name: 'Google Ads', desc: 'Search & Display Campaigns', icon: '📈' },
                 { key: 'youtube', name: 'YouTube Channel', desc: 'Shorts & Video Analytics', icon: '▶️' },
                 { key: 'linkedin', name: 'LinkedIn Company', desc: 'Professional Video Posts', icon: '💼' },
                 { key: 'x', name: 'X (Twitter)', desc: 'Direct Social Video Posts', icon: '𝕏' }

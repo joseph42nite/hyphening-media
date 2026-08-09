@@ -131,8 +131,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     const targetMonth = month ? month : (availableMonths.length > 0 ? availableMonths[0] : currentMonth);
     const monthFilter = targetMonth !== 'all' ? targetMonth : null;
 
-    // Leads marked "Other" are test entries and are excluded from every figure
-    // the portal reports.
+    // Leads flagged as tests are excluded from every figure the portal reports.
     let leadWhere = `WHERE client_id = ? AND ${countableLeadSql()}`;
     const leadParams = [clientId];
     if (monthFilter) {
@@ -926,7 +925,10 @@ router.post('/:token/feedback', portalAuth, (req, res) => {
 router.get('/:token/integrations/status', portalAuth, async (req, res) => {
   try {
     const accounts = await getClientConnectedAccounts(req.portalClient.id);
-    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'facebook_ads', 'google_ads', 'x'];
+    // Only toolkits Composio actually provides. facebook_ads and google_ads
+    // resolve to nothing, so offering them produced a Connect button that could
+    // never succeed.
+    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'x'];
     const statusMap = {};
 
     platforms.forEach(p => {

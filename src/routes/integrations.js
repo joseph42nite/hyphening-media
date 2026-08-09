@@ -45,7 +45,10 @@ router.get('/clients/:id/integrations/status', async (req, res) => {
     const clientId = parseInt(req.params.id, 10);
     const accounts = await getClientConnectedAccounts(clientId);
 
-    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'facebook_ads', 'google_ads', 'x'];
+    // Only toolkits Composio actually provides. facebook_ads and google_ads
+    // resolve to nothing, so offering them produced a Connect button that could
+    // never succeed.
+    const platforms = ['instagram', 'youtube', 'linkedin', 'facebook', 'x'];
     const statusMap = {};
 
     platforms.forEach(p => {
