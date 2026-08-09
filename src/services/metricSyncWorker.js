@@ -1,5 +1,6 @@
 import db from '../../database.js';
 import { executeClientAction } from './composioService.js';
+import { extractYouTubeId } from './linkExtractor.js';
 
 /**
  * Extract Instagram shortcode from post link URL
@@ -137,13 +138,10 @@ function ratePct(part, whole) {
 }
 
 /**
- * Extract a YouTube video ID from a watch/shorts/youtu.be URL
+ * Extract a YouTube video ID from a watch/shorts/youtu.be URL. Shared with the
+ * create/update path so a link resolves to the same video in both places.
  */
-function extractYouTubeVideoId(link) {
-  if (!link) return null;
-  const match = link.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|shorts\/|watch\?v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-  return match ? match[1] : null;
-}
+const extractYouTubeVideoId = extractYouTubeId;
 
 /**
  * YouTube Data API returns statistics as strings ("766"), so coerce carefully —
@@ -217,6 +215,15 @@ function findMatchingYouTubeVideo(item, videos) {
   }
 
   return null;
+}
+
+/**
+ * True when the row points at a YouTube video, whatever its `platform` says.
+ */
+function hasYouTubeVideo(item) {
+  return !!(item.youtube_video_id
+    || extractYouTubeVideoId(item.youtube_link)
+    || extractYouTubeVideoId(item.link));
 }
 
 /**
@@ -359,7 +366,12 @@ export async function syncSingleContentMetrics(contentId) {
 
   let numericMediaId = item.instagram_media_id || item.platform_post_id;
   const platform = (item.platform || 'instagram').toLowerCase();
-  const isYouTube = platform.includes('youtube') || platform.includes('shorts');
+  // `platform` names the primary channel, but Shorts are routinely logged as
+  // platform=instagram/post_type=Reel with the YouTube URL in `link` — the same
+  // cut posted to both. Route on the links present, not on the label, or every
+  // cross-posted Short goes unsynced.
+  const isYouTubePrimary = platform.includes('youtube') || platform.includes('shorts');
+  const isYouTube = isYouTubePrimary || hasYouTubeVideo(item);
   const isInstagram = platform.includes('instagram') || platform.includes('meta');
   let metrics = {
     views: item.views || 0,
@@ -464,11 +476,14 @@ export async function syncSingleContentMetrics(contentId) {
   }
 
   // YouTube view counts live in youtube_views; reports sum `views + youtube_views`,
-  // so leaving a stale `views` on a YouTube row would double-count it.
-  if (youtubeSynced) metrics.views = 0;
+  // so leaving a stale `views` on a YouTube-only row would double-count it. A
+  // cross-posted row keeps both: `views` is its Instagram figure, earned
+  // separately, and zeroing it here would delete real data.
+  if (youtubeSynced && isYouTubePrimary) metrics.views = 0;
 
-  // Calculate engagement rate, save rate & content score
-  const effectiveViews = isYouTube ? metrics.youtube_views : metrics.views;
+  // Calculate engagement rate, save rate & content score against the channel the
+  // post actually belongs to.
+  const effectiveViews = isYouTubePrimary ? metrics.youtube_views : metrics.views;
   const viewsVal = Math.max(effectiveViews, 1);
   const totalEngagements = metrics.likes + metrics.comments + metrics.shares + metrics.saves;
   const engagementRatePct = Math.round((totalEngagements / viewsVal) * 10000) / 100;
@@ -520,7 +535,8 @@ async function prefetchYouTubeStats(items) {
   const byClient = new Map();
   for (const item of items) {
     const platform = (item.platform || '').toLowerCase();
-    if (!platform.includes('youtube') && !platform.includes('shorts')) continue;
+    const isYt = platform.includes('youtube') || platform.includes('shorts') || hasYouTubeVideo(item);
+    if (!isYt) continue;
     if (!byClient.has(item.client_id)) byClient.set(item.client_id, []);
     byClient.get(item.client_id).push(item);
   }
@@ -583,7 +599,7 @@ export async function runMetricSyncWorker({ clientId = null } = {}) {
 
     for (const row of itemsToRefresh) {
       const platform = (row.platform || '').toLowerCase();
-      const isYt = platform.includes('youtube') || platform.includes('shorts');
+      const isYt = platform.includes('youtube') || platform.includes('shorts') || hasYouTubeVideo(row);
       try {
         await syncSingleContentMetrics(row.id);
         summary.synced++;

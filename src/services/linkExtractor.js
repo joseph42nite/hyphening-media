@@ -3,16 +3,42 @@
  * Utility functions to extract platform-specific post/video/media IDs from URL inputs.
  */
 
+/**
+ * A `link` field often holds more than one URL — cross-posted content is logged
+ * as "<youtube url> , <instagram url>" in the single column. Split before
+ * matching so a pattern cannot run from one URL into the next.
+ */
+function urlCandidates(link) {
+  return String(link).split(/[\s,]+/).filter(Boolean);
+}
+
+/**
+ * Enumerate the real YouTube URL shapes rather than using a catch-all path
+ * segment. The previous `[^\/]+\/.+\/` alternative was greedy enough to skip
+ * over the video ID it was aiming at and return the Instagram shortcode from a
+ * later URL in the same string — youtube.com/shorts/o-YJ-kHj968 alongside an
+ * instagram.com/reel/DXwAwOiolWn link yielded "DXwAwOiolWn".
+ */
+const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:shorts\/|live\/|embed\/|v\/|watch\?(?:[^\s]*&)?v=)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/i;
+
+export function extractYouTubeId(link) {
+  if (!link) return null;
+  for (const candidate of urlCandidates(link)) {
+    const match = candidate.match(YOUTUBE_ID_RE);
+    if (match && match[1]) return match[1];
+  }
+  return null;
+}
+
 export function extractPlatformId(link, platform) {
   if (!link) return {};
   const plat = (platform || '').toLowerCase();
 
   try {
     if (plat.includes('youtube')) {
-      const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|shorts\/|watch\?v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
-      const match = link.match(ytRegex);
-      if (match && match[1]) {
-        return { youtube_video_id: match[1] };
+      const videoId = extractYouTubeId(link);
+      if (videoId) {
+        return { youtube_video_id: videoId };
       }
     } else if (plat.includes('facebook')) {
       const fbRegex = /(?:(?:posts|videos|reel|watch|story)\/|permalink\.php\?story_fbid=|story_fbid=|fbid=|[?&]v=)([0-9]{8,20})/i;

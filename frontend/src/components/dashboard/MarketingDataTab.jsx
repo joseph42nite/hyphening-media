@@ -58,10 +58,22 @@ export default function MarketingDataTab({
 
   // Platform filter — the tracker is sorted by date, so a client whose YouTube
   // posts are older than their Instagram ones has them stranded pages deep.
+  //
+  // Cross-posted Shorts are logged as platform=instagram with the YouTube URL in
+  // `link`, so matching on `platform` alone would hide most of the YouTube
+  // catalogue. Ask whether the row has a YouTube video instead.
   const [platformFilter, setPlatformFilter] = useState('all');
+  const hasYouTube = (i) => !!(
+    i.youtube_video_id ||
+    (i.platform || '').toLowerCase().includes('youtube') ||
+    /(?:youtube\.com|youtu\.be)\//i.test(i.link || '') ||
+    /(?:youtube\.com|youtu\.be)\//i.test(i.youtube_link || '')
+  );
   const visibleContent = platformFilter === 'all'
     ? marketingContent
-    : marketingContent.filter(i => (i.platform || '').toLowerCase() === platformFilter);
+    : platformFilter === 'youtube'
+      ? marketingContent.filter(hasYouTube)
+      : marketingContent.filter(i => (i.platform || '').toLowerCase() === 'instagram' && !hasYouTube(i));
 
   // Video length as m:ss (YouTube durations are short enough that hours are rare)
   const formatDuration = (seconds) => {
