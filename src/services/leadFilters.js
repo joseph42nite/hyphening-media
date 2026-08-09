@@ -1,9 +1,9 @@
 /**
  * Lead Counting Rules
  *
- * A lead whose call outcome is "Other" is treated as not a real lead. In
- * practice that value is used to park test entries, and counting them inflates
- * lead totals, drags CPL down and lets a test booking earn revenue.
+ * A lead flagged is_test does not count anywhere: not in lead totals, not in
+ * qualified or booking counts, and not in the revenue those bookings are priced
+ * into.
  *
  * The rule lives here because leads are counted in fourteen places across the
  * portal, the marketing routes and booking valuation, and those totals are
@@ -12,8 +12,8 @@
  * some of them and not others would silently break that.
  *
  * This excludes them from counts only. The rows stay visible and editable, since
- * "Other" is set by hand from the portal's call-outcome dropdown and a row that
- * vanished when marked could never be put back.
+ * the flag is set by hand and a row that vanished when marked could never be put
+ * back.
  */
 
 /**
@@ -21,13 +21,13 @@
  * @param {string} [alias] table alias used by the surrounding query, e.g. 'l'
  */
 export function countableLeadSql(alias = '') {
-  const column = alias ? `${alias}.call_outcome` : 'call_outcome';
-  return `LOWER(TRIM(COALESCE(${column}, ''))) != 'other'`;
+  const column = alias ? `${alias}.is_test` : 'is_test';
+  return `COALESCE(${column}, 0) = 0`;
 }
 
 /** Same rule for JS-side filtering, so both sides cannot drift. */
 export function isCountableLead(lead) {
-  return String(lead?.call_outcome ?? '').trim().toLowerCase() !== 'other';
+  return !lead?.is_test;
 }
 
 export default { countableLeadSql, isCountableLead };

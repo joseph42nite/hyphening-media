@@ -458,7 +458,8 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       appointment_date, 
       rejection_reason,
       treatment_type,
-      created_at
+      created_at,
+      is_test
     } = req.body;
 
     const lead = db.prepare('SELECT * FROM campaign_leads WHERE id = ? AND client_id = ?').get(leadId, req.portalClient.id);
@@ -474,6 +475,9 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
     const newRejection = rejection_reason !== undefined ? rejection_reason : lead.rejection_reason;
     const newTreatment = treatment_type !== undefined ? (treatment_type && treatment_type.trim() ? treatment_type.trim() : null) : lead.treatment_type;
     const newCreatedAt = created_at !== undefined ? (created_at && created_at.trim().includes(':') ? created_at.trim() : `${created_at.trim()} 12:00:00`) : lead.created_at;
+    // Orthogonal to call_outcome: a test lead can still record what happened on
+    // the call without that putting it back into the totals.
+    const newIsTest = is_test !== undefined ? (is_test ? 1 : 0) : (lead.is_test ? 1 : 0);
 
     // Validate inputs
     if (newQual && !['Pending', 'Qualified', 'Disqualified'].includes(newQual)) {
@@ -507,6 +511,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
         treatment_type = ?,
         created_at = ?,
         lead_status = ?,
+        is_test = ?,
         updated_at = datetime('now')
       WHERE id = ?
     `).run(
@@ -518,6 +523,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       newTreatment,
       newCreatedAt,
       calculatedLeadStatus,
+      newIsTest,
       leadId
     );
 
@@ -530,7 +536,8 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       rejection_reason: (newQual === 'Disqualified' || newApptStatus === 'Not Booked') ? newRejection : null,
       treatment_type: newTreatment,
       created_at: newCreatedAt,
-      lead_status: calculatedLeadStatus
+      lead_status: calculatedLeadStatus,
+      is_test: newIsTest
     });
   } catch (err) {
     console.error('[PORTAL] Update lead status error:', err);

@@ -1451,9 +1451,13 @@ export default function ClientPortal({ showToast }) {
           rejection_reason: data.rejection_reason,
           treatment_type: data.treatment_type !== undefined ? data.treatment_type : l.treatment_type,
           created_at: data.created_at !== undefined ? data.created_at : l.created_at,
-          lead_status: data.lead_status
+          lead_status: data.lead_status,
+          is_test: data.is_test
         } : l));
         showToast('Lead updated successfully', 'success');
+        // Marking a lead as a test changes the counts in the cards above this
+        // table, so they have to be re-read rather than left showing the old ones.
+        if (updates.is_test !== undefined) checkPortalAuth();
       } else {
         throw new Error(data.error || 'Failed to update lead');
       }
@@ -3156,17 +3160,21 @@ export default function ClientPortal({ showToast }) {
                                       <option value="No Answer">🔇 No Answer</option>
                                       <option value="Other">❓ Other</option>
                                     </select>
-                                    {/* "Other" marks a test entry, which is left out of every
-                                        lead figure. Saying so here explains why the totals
-                                        above do not match the number of rows below. */}
-                                    {lead.call_outcome === 'Other' && (
-                                      <div
-                                        title="Marked Other — treated as a test entry and left out of lead, qualified and booking totals"
-                                        style={{ marginTop: '4px', fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4px', color: '#92400e' }}
-                                      >
-                                        Not counted
-                                      </div>
-                                    )}
+                                    {/* A test lead is left out of every figure, so saying so
+                                        here explains why the totals above do not match the
+                                        number of rows below. */}
+                                    <label
+                                      title="Exclude this lead from lead, qualified, booking and revenue totals"
+                                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', color: lead.is_test ? '#92400e' : 'var(--text-muted)' }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={!!lead.is_test}
+                                        onChange={(e) => handleUpdateLead(lead.id, { is_test: e.target.checked })}
+                                        style={{ cursor: 'pointer', margin: 0 }}
+                                      />
+                                      {lead.is_test ? 'TEST — NOT COUNTED' : 'Test'}
+                                    </label>
                                   </td>
                                   <td>
                                     <select 
