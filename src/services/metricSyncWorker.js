@@ -354,12 +354,13 @@ export async function syncSingleContentMetrics(contentId) {
 
   db.prepare(`
     UPDATE marketing_content_tracker
-    SET views = ?, likes = ?, comments = ?, shares = ?, saves = ?,
+    SET views = ?, youtube_views = ?, likes = ?, comments = ?, shares = ?, saves = ?,
         avg_watch_time_pct = ?, skip_rate_pct = ?, boosted = ?,
         engagement_rate_pct = ?, save_rate_pct = ?, content_score = ?
     WHERE id = ?
   `).run(
     metrics.views,
+    metrics.youtube_views,
     metrics.likes,
     metrics.comments,
     metrics.shares,
@@ -386,12 +387,14 @@ export async function syncSingleContentMetrics(contentId) {
 
 /**
  * Refresh metrics for ALL posted items — including those without links.
- * Fetches each client's IG feed once and auto-matches by shortcode or date.
+ * Fetches each client's IG feed / YouTube uploads once and auto-matches by
+ * shortcode, title or date.
  */
 export async function runMetricSyncWorker() {
   try {
-    // Clear cache at start of each run
+    // Clear caches at start of each run
     mediaListCache.clear();
+    ytVideoListCache.clear();
 
     // Sync ALL posted items, not just those with links
     const itemsToRefresh = db.prepare(`
