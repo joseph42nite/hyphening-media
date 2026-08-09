@@ -3156,6 +3156,17 @@ export default function ClientPortal({ showToast }) {
                                       <option value="No Answer">🔇 No Answer</option>
                                       <option value="Other">❓ Other</option>
                                     </select>
+                                    {/* "Other" marks a test entry, which is left out of every
+                                        lead figure. Saying so here explains why the totals
+                                        above do not match the number of rows below. */}
+                                    {lead.call_outcome === 'Other' && (
+                                      <div
+                                        title="Marked Other — treated as a test entry and left out of lead, qualified and booking totals"
+                                        style={{ marginTop: '4px', fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4px', color: '#92400e' }}
+                                      >
+                                        Not counted
+                                      </div>
+                                    )}
                                   </td>
                                   <td>
                                     <select 

@@ -12,6 +12,7 @@ import { notifyAdmin } from '../services/telegram.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { getConnectUrl, getClientConnectedAccounts, executeClientAction } from '../services/composioService.js';
 import { fetchPostComments, replyToComment } from '../services/commentSync.js';
+import { countableLeadSql } from '../services/leadFilters.js';
 
 const router = Router();
 
@@ -130,7 +131,9 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     const targetMonth = month ? month : (availableMonths.length > 0 ? availableMonths[0] : currentMonth);
     const monthFilter = targetMonth !== 'all' ? targetMonth : null;
 
-    let leadWhere = 'WHERE client_id = ?';
+    // Leads marked "Other" are test entries and are excluded from every figure
+    // the portal reports.
+    let leadWhere = `WHERE client_id = ? AND ${countableLeadSql()}`;
     const leadParams = [clientId];
     if (monthFilter) {
       leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";

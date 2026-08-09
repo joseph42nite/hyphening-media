@@ -12,6 +12,7 @@ import { computeContentMetrics, computeAdMetrics } from '../services/metrics.js'
 import { extractAllPlatformIds } from '../services/linkExtractor.js';
 import { syncSingleContentMetrics } from '../services/metricSyncWorker.js';
 import { estimateBookingRevenue, withEfficiency } from '../services/bookingValue.js';
+import { countableLeadSql } from '../services/leadFilters.js';
 
 const router = Router();
 
@@ -109,7 +110,7 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
             OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('appointment booked', 'booked', 'confirmed')
           THEN 1 ELSE 0 END), 0) as confirmed_bookings
         FROM campaign_leads
-        WHERE client_id = ? ${month ? 'AND substr(created_at, 1, 7) = ?' : ''}
+        WHERE client_id = ? AND ${countableLeadSql()} ${month ? 'AND substr(created_at, 1, 7) = ?' : ''}
       `).get(...(month ? [client.id, month] : [client.id]));
 
       const totalSpend = adStats ? adStats.total_spend || 0 : 0;
@@ -720,6 +721,7 @@ const getAdWithLeads = (adId) => {
             OR
             ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = '' OR LOWER(TRIM(l.campaign_name)) = 'manual entry') AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
           )
+          AND ${countableLeadSql('l')}
           AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
       ) as actual_leads,
       (
@@ -736,6 +738,7 @@ const getAdWithLeads = (adId) => {
             OR LOWER(TRIM(COALESCE(l.lead_status, ''))) IN ('qualified', 'appointment booked', 'hot', 'converted')
             OR LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
           )
+          AND ${countableLeadSql('l')}
           AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
       ) as actual_qualified_leads,
       (
@@ -751,6 +754,7 @@ const getAdWithLeads = (adId) => {
             LOWER(TRIM(COALESCE(l.appointment_status, ''))) IN ('booked', 'confirmed')
             OR LOWER(TRIM(COALESCE(l.lead_status, ''))) = 'appointment booked'
           )
+          AND ${countableLeadSql('l')}
           AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
       ) as actual_confirmed_bookings
     FROM marketing_ad_campaigns a
@@ -788,14 +792,15 @@ router.get('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
                OR LOWER(TRIM(COALESCE(lead_status, ''))) = 'appointment booked'
              THEN 1 ELSE 0 END) AS bookings
       FROM campaign_leads
-      WHERE client_id = ? AND treatment_type IS NOT NULL AND TRIM(treatment_type) != ''
+      WHERE client_id = ? AND ${countableLeadSql()}
+        AND treatment_type IS NOT NULL AND TRIM(treatment_type) != ''
       GROUP BY LOWER(TRIM(treatment_type))
       ORDER BY bookings DESC, leads DESC
     `).all(clientId);
 
     const untypedBookings = db.prepare(`
       SELECT COUNT(*) AS n FROM campaign_leads
-      WHERE client_id = ?
+      WHERE client_id = ? AND ${countableLeadSql()}
         AND (treatment_type IS NULL OR TRIM(treatment_type) = '')
         AND (
           LOWER(TRIM(COALESCE(appointment_status, ''))) IN ('booked', 'confirmed')
@@ -933,6 +938,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
           SELECT COUNT(l.id) 
           FROM campaign_leads l 
           WHERE l.client_id = a.client_id 
+            AND ${countableLeadSql('l')}
             AND (
               (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
               OR
@@ -944,6 +950,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
           SELECT COUNT(l.id) 
           FROM campaign_leads l 
           WHERE l.client_id = a.client_id 
+            AND ${countableLeadSql('l')}
             AND (
               (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
               OR
@@ -960,6 +967,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
           SELECT COUNT(l.id) 
           FROM campaign_leads l 
           WHERE l.client_id = a.client_id 
+            AND ${countableLeadSql('l')}
             AND (
               (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != '' AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
               OR
@@ -977,7 +985,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
     `).all(...queryParams);
 
     // Fetch synthetic lead campaigns from campaign_leads to capture campaigns not explicitly listed in marketing_ad_campaigns
-    let leadWhere = 'WHERE client_id = ?';
+    let leadWhere = `WHERE client_id = ? AND ${countableLeadSql()}`;
     const leadParams = [clientId];
     if (monthFilter) {
       leadWhere += " AND SUBSTR(created_at, 1, 7) = ?";

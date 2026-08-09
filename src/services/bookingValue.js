@@ -13,6 +13,7 @@
  */
 
 import db from '../../database.js';
+import { countableLeadSql } from './leadFilters.js';
 
 /** Matches the booking definition used by the ads and overview queries. */
 const BOOKED_SQL = `(
@@ -52,7 +53,8 @@ export function getDefaultBookingValue(clientId) {
  * @returns {{bookings: number, estimated_revenue: number, unpriced_bookings: number}}
  */
 export function estimateBookingRevenue({ clientId, month = null, campaignName = null, platform = null }) {
-  const clauses = ['client_id = ?', BOOKED_SQL];
+  // A test lead must not earn revenue, so the same exclusion applies here.
+  const clauses = ['client_id = ?', countableLeadSql(), BOOKED_SQL];
   const params = [clientId];
 
   if (month) {
