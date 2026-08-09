@@ -59,12 +59,32 @@ router.get('/marketing/review-queue', authorize('admin', 'ops_social_media_manag
  */
 router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
+    const requestedMonth = req.query.month;
+    if (requestedMonth && requestedMonth !== 'all' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)) {
+      return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+    }
+    const month = requestedMonth && requestedMonth !== 'all' ? requestedMonth : null;
+
+    // Every source dates its rows differently: ad campaigns and monthly reports
+    // carry a YYYY-MM of their own, content rows a full date, and leads only the
+    // timestamp they were captured at. The union is what the picker can offer.
+    const availableMonths = db.prepare(`
+      SELECT DISTINCT month FROM (
+        SELECT month FROM marketing_ad_campaigns WHERE month IS NOT NULL
+        UNION SELECT month FROM marketing_monthly_report WHERE month IS NOT NULL
+        UNION SELECT substr(date, 1, 7) FROM marketing_content_tracker WHERE date IS NOT NULL
+        UNION SELECT substr(created_at, 1, 7) FROM campaign_leads WHERE created_at IS NOT NULL
+      )
+      WHERE month IS NOT NULL AND month != ''
+      ORDER BY month DESC
+    `).all().map(r => r.month);
+
     const clients = db.prepare("SELECT c.id, c.name, p.name AS parent_name, c.client_type FROM crm_clients c LEFT JOIN crm_clients p ON c.parent_id = p.id WHERE c.client_type != 'artist_curation' ORDER BY c.name ASC").all();
 
     const overview = clients.map(client => {
       // 1. Ad Metrics
       const adStats = db.prepare(`
-        SELECT 
+        SELECT
           COALESCE(SUM(total_ad_spend_inr), 0) as total_spend,
           COALESCE(SUM(leads), 0) as total_leads,
           COALESCE(SUM(impressions), 0) as total_impressions,
@@ -72,8 +92,8 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
           COALESCE(SUM(revenue_generated), 0) as total_revenue,
           COUNT(id) as ad_campaigns_count
         FROM marketing_ad_campaigns
-        WHERE client_id = ?
-      `).get(client.id);
+        WHERE client_id = ? ${month ? 'AND month = ?' : ''}
+      `).get(...(month ? [client.id, month] : [client.id]));
 
       const leadTotals = db.prepare(`
         SELECT 
@@ -88,8 +108,8 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
             OR LOWER(TRIM(COALESCE(lead_status, ''))) IN ('appointment booked', 'booked', 'confirmed')
           THEN 1 ELSE 0 END), 0) as confirmed_bookings
         FROM campaign_leads
-        WHERE client_id = ?
-      `).get(client.id);
+        WHERE client_id = ? ${month ? 'AND substr(created_at, 1, 7) = ?' : ''}
+      `).get(...(month ? [client.id, month] : [client.id]));
 
       const totalSpend = adStats ? adStats.total_spend || 0 : 0;
       const totalLeads = (leadTotals && leadTotals.total_leads > 0) ? leadTotals.total_leads : (adStats ? adStats.total_leads || 0 : 0);
@@ -108,20 +128,20 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
           COALESCE(SUM(saves), 0) as total_saves,
           COALESCE(AVG(engagement_rate_pct), 0) as avg_engagement_pct
         FROM marketing_content_tracker
-        WHERE client_id = ?
-      `).get(client.id);
+        WHERE client_id = ? ${month ? 'AND substr(date, 1, 7) = ?' : ''}
+      `).get(...(month ? [client.id, month] : [client.id]));
 
       // 3. SEO / GMB Monthly Metrics
       const seoStats = db.prepare(`
-        SELECT 
+        SELECT
           COALESCE(SUM(website_traffic), 0) as total_website_traffic,
           COALESCE(SUM(gmb_views), 0) as total_gmb_views,
           COALESCE(SUM(gmb_clicks), 0) as total_gmb_clicks,
           COALESCE(SUM(calls), 0) as total_calls,
           COALESCE(SUM(directions), 0) as total_directions
         FROM marketing_monthly_report
-        WHERE client_id = ?
-      `).get(client.id);
+        WHERE client_id = ? ${month ? 'AND month = ?' : ''}
+      `).get(...(month ? [client.id, month] : [client.id]));
 
       return {
         id: client.id,
@@ -157,7 +177,9 @@ router.get('/marketing/all-overview', authorize('admin', 'ops_social_media_manag
       };
     });
 
-    res.json({ overview });
+    // selected_month echoes what was actually applied, so the picker's label can
+    // never claim a period the numbers beneath it do not belong to.
+    res.json({ overview, available_months: availableMonths, selected_month: month || '' });
   } catch (err) {
     console.error('[MARKETING] All overview error:', err);
     res.status(500).json({ error: 'Internal server error' });

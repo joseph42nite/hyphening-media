@@ -147,6 +147,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Selected client for marketing reports
   const [selectedClientForReports, setSelectedClientForReports] = useState({ id: 'all', name: 'All Clients' });
   const [allClientsOverview, setAllClientsOverview] = useState([]);
+  const [overviewMonths, setOverviewMonths] = useState([]);
+  const [overviewMonth, setOverviewMonth] = useState('');
   const [marketingContent, setMarketingContent] = useState([]);
   const [adCampaigns, setAdCampaigns] = useState([]);
   const [availableAdMonths, setAvailableAdMonths] = useState([]);
@@ -703,14 +705,23 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
+  // The leaderboard's period is its own: it spans every client, so it has no
+  // reason to move when the single-client ad month does.
+  const fetchAllClientsOverview = async (month = overviewMonth) => {
+    const oRes = await authFetch(`/api/clients/marketing/all-overview${month ? `?month=${month}` : ''}`);
+    if (!oRes.ok) return;
+    const oData = await oRes.json();
+    setAllClientsOverview(oData.overview || []);
+    if (oData.available_months?.length > 0) setOverviewMonths(oData.available_months);
+    // Mirror the month the server applied, so the label can never claim a
+    // period the numbers below it don't belong to.
+    setOverviewMonth(oData.selected_month ?? '');
+  };
+
   const fetchMarketingData = async (clientId, monthFilter = selectedAdMonth) => {
     try {
       if (clientId === 'all') {
-        const oRes = await authFetch('/api/clients/marketing/all-overview');
-        if (oRes.ok) {
-          const oData = await oRes.json();
-          setAllClientsOverview(oData.overview || []);
-        }
+        await fetchAllClientsOverview();
         return;
       }
       const cRes = await authFetch(`/api/clients/${clientId}/marketing/content`);
@@ -1395,6 +1406,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             auth={auth}
             clients={clients}
             allClientsOverview={allClientsOverview}
+            overviewMonths={overviewMonths}
+            overviewMonth={overviewMonth}
+            onOverviewMonthChange={fetchAllClientsOverview}
             marketingContent={marketingContent}
             adCampaigns={adCampaigns}
             availableAdMonths={availableAdMonths}

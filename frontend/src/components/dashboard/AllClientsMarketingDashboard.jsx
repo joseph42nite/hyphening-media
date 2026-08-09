@@ -1,17 +1,54 @@
 import React, { useState } from 'react';
 import { BarChart3, TrendingUp, Users, DollarSign, Eye, Globe, ChevronRight } from 'lucide-react';
 
-export default function AllClientsMarketingDashboard({ overviewData = [], onSelectClient }) {
+export default function AllClientsMarketingDashboard({
+  overviewData = [],
+  onSelectClient,
+  availableMonths = [],
+  selectedMonth = '',
+  onMonthChange
+}) {
   const [activeChartTab, setActiveChartTab] = useState('ad_leads'); // 'ad_leads' | 'efficiency' | 'content_views' | 'seo_traffic'
+
+  const formatMonthLabel = (m) => {
+    if (!m) return 'All time';
+    const [year, mon] = m.split('-');
+    const name = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'][parseInt(mon, 10) - 1];
+    return `${name} ${year}`;
+  };
+
+  const monthPicker = onMonthChange && availableMonths.length > 0 ? (
+    <select
+      value={selectedMonth}
+      onChange={e => onMonthChange(e.target.value)}
+      style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: 800, border: '2px solid #000', borderRadius: '6px', cursor: 'pointer', background: '#fff' }}
+      title="Scope every figure on this dashboard to one month"
+    >
+      <option value="">All time</option>
+      {availableMonths.map(m => (
+        <option key={m} value={m}>{formatMonthLabel(m)}</option>
+      ))}
+    </select>
+  ) : null;
 
   if (!overviewData || overviewData.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)', margin: '16px 0' }}>
-        <BarChart3 size={48} style={{ color: '#000000', marginBottom: '12px', opacity: 0.5 }} />
-        <h4 style={{ margin: '0 0 8px 0', color: '#000000', fontWeight: 900, textTransform: 'uppercase' }}>No Marketing Data Found</h4>
-        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>
-          Select an individual client or ensure clients have recorded marketing activity.
-        </p>
+      <div style={{ margin: '16px 0' }}>
+        {/* The picker stays reachable here — a month with no activity must not
+            strand you with no way to select another one. */}
+        {monthPicker && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>{monthPicker}</div>
+        )}
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)' }}>
+          <BarChart3 size={48} style={{ color: '#000000', marginBottom: '12px', opacity: 0.5 }} />
+          <h4 style={{ margin: '0 0 8px 0', color: '#000000', fontWeight: 900, textTransform: 'uppercase' }}>No Marketing Data Found</h4>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>
+            {selectedMonth
+              ? `No recorded activity for ${formatMonthLabel(selectedMonth)}. Try another month.`
+              : 'Select an individual client or ensure clients have recorded marketing activity.'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -42,6 +79,15 @@ export default function AllClientsMarketingDashboard({ overviewData = [], onSele
 
   return (
     <div style={{ textAlign: 'left', marginTop: '16px' }}>
+      {/* The month picker lives down in the leaderboard header but scopes every
+          figure on this page, so the period is stated above the cards it governs
+          rather than leaving them to read as all-time totals. */}
+      {selectedMonth && (
+        <div style={{ display: 'inline-block', marginBottom: '12px', padding: '4px 12px', background: '#fef3c7', border: '2px solid #000', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Showing {formatMonthLabel(selectedMonth)}
+        </div>
+      )}
+
       {/* 1. Global Overview Bento Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         
@@ -263,9 +309,19 @@ export default function AllClientsMarketingDashboard({ overviewData = [], onSele
       </div>
 
       {/* 3. Neo-Brutalist Client Leaderboard Table */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900 }}>Client Performance Leaderboard</h3>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Click on any client row to open their detailed report</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
+        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900 }}>
+          Client Performance Leaderboard
+          {selectedMonth && (
+            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+              · {formatMonthLabel(selectedMonth)}
+            </span>
+          )}
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Click on any client row to open their detailed report</span>
+          {monthPicker}
+        </div>
       </div>
 
       <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>

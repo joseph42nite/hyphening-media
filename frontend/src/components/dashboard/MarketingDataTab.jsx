@@ -9,6 +9,9 @@ export default function MarketingDataTab({
   auth,
   clients,
   allClientsOverview = [],
+  overviewMonths = [],
+  overviewMonth = '',
+  onOverviewMonthChange,
   marketingContent,
   adCampaigns = [],
   availableAdMonths = [],
@@ -324,6 +327,9 @@ export default function MarketingDataTab({
       {(!selectedClientForReports || selectedClientForReports.id === 'all') ? (
         <AllClientsMarketingDashboard
           overviewData={allClientsOverview}
+          availableMonths={overviewMonths}
+          selectedMonth={overviewMonth}
+          onMonthChange={onOverviewMonthChange}
           onSelectClient={(client) => {
             setSelectedClientForReports(client);
             fetchMarketingData(client.id);
