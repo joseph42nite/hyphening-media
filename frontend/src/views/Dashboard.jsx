@@ -25,6 +25,9 @@ import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } fro
 let isRefreshing = false;
 let refreshPromise = null;
 
+/** Tabs the server keeps a count for — mirrors BADGED_TABS in tabNotifications.js. */
+const BADGED_TABS = ['seo', 'scripts', 'tasks', 'blog'];
+
 /**
  * Count badge on a nav tab.
  *
@@ -165,13 +168,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // Telegram digests: visible only while the work exists, and gone once it is
   // done, rather than pushed every morning regardless.
   const [tabCounts, setTabCounts] = useState({});
-  const [viewedTabs, setViewedTabs] = useState({});
-
-  useEffect(() => {
-    if (activeTab) {
-      setViewedTabs(prev => ({ ...prev, [activeTab]: true }));
-    }
-  }, [activeTab]);
 
   const fetchTabCounts = async () => {
     try {
@@ -184,9 +180,35 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
+  /**
+   * Opening a tab dismisses its badge for good — the server records the moment,
+   * and the count restarts at 1 the next time something new shows up (a client
+   * replies to a script, an audit ages out, a task goes overdue). This used to
+   * be a `viewedTabs` object in React state, which lost the dismissal on every
+   * reload and, worse, hid the badge for the rest of the session so genuinely
+   * new work never showed at all.
+   *
+   * The response carries the recomputed counts, so the badge clears in one
+   * round trip instead of waiting for the next poll.
+   */
+  const markTabSeen = async (tabName) => {
+    if (!BADGED_TABS.includes(tabName)) return;
+    setTabCounts(prev => ({ ...prev, [tabName]: 0 }));
+    try {
+      const res = await fetch(`${API_BASE}/api/notifications/tabs/${tabName}/seen`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.tabs) setTabCounts(data.tabs);
+    } catch {
+      // The optimistic clear above stands until the next poll corrects it.
+    }
+  };
+
   const handleTabClick = (tabName) => {
     setActiveTab(tabName);
-    setViewedTabs(prev => ({ ...prev, [tabName]: true }));
     if (tabName === 'scripts') {
       if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
       const pendingScript = (marketingScripts || []).find(s => s.has_unseen_changes === 1 || s.content_status === 'Pending Client Approval');
@@ -196,10 +218,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
-  const getTabBadgeCount = (tabName, count) => {
-    if (activeTab === tabName || viewedTabs[tabName]) return 0;
-    return count || 0;
-  };
+  // Nothing to badge on the tab you are already looking at.
+  const getTabBadgeCount = (tabName, count) => (activeTab === tabName ? 0 : count || 0);
 
   // SSE State
   const [sseConnected, setSseConnected] = useState(false);
@@ -251,11 +271,15 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const chatContainerRef = useRef(null);
 
   // Auto-scroll only the chat messages container (not the page)
-  // Badge counts: on mount, whenever the tab changes (so acting on something
-  // clears its badge without a reload), and on a slow timer for anything that
-  // changes server-side.
+  // Badge counts: whenever the tab changes and on a slow timer for anything
+  // that changes server-side. Opening a badged tab marks it seen first — that
+  // call returns the fresh counts, so the plain fetch is only for the others.
   useEffect(() => {
-    fetchTabCounts();
+    if (BADGED_TABS.includes(activeTab)) {
+      markTabSeen(activeTab);
+    } else {
+      fetchTabCounts();
+    }
     const t = setInterval(fetchTabCounts, 120000);
     return () => { clearInterval(t); };
   }, [activeTab]);
