@@ -89,6 +89,20 @@ function findMatchingMedia(item, mediaList) {
 }
 
 /**
+ * INSTAGRAM_GET_IG_MEDIA_INSIGHTS is strictly per-post — it cannot be batched —
+ * so it dominates the Composio call budget. Posts older than this window keep
+ * their stored insight figures and are refreshed from the account feed instead,
+ * which costs one call per client no matter how many posts it covers.
+ */
+const INSIGHTS_WINDOW_DAYS = parseInt(process.env.METRIC_INSIGHTS_WINDOW_DAYS, 10) || 60;
+
+function isWithinInsightsWindow(item) {
+  if (!item.date) return true; // undated posts can't be aged out — keep them live
+  const ageDays = (Date.now() - new Date(item.date).getTime()) / (1000 * 60 * 60 * 24);
+  return !Number.isFinite(ageDays) || ageDays <= INSIGHTS_WINDOW_DAYS;
+}
+
+/**
  * Extract a YouTube video ID from a watch/shorts/youtu.be URL
  */
 function extractYouTubeVideoId(link) {
@@ -172,6 +186,67 @@ function findMatchingYouTubeVideo(item, videos) {
 }
 
 /**
+ * Resolve an item's video ID without spending an API call: stored ID first, then
+ * the link columns, then the (already cached) channel upload feed.
+ */
+async function resolveYouTubeVideoId(item) {
+  const stored = item.youtube_video_id
+    || extractYouTubeVideoId(item.youtube_link)
+    || extractYouTubeVideoId(item.link);
+  if (stored) return { videoId: stored, matched: null };
+
+  const matched = findMatchingYouTubeVideo(item, await getClientYouTubeVideos(item.client_id));
+  return { videoId: matched?.videoId || null, matched };
+}
+
+/**
+ * Look up video statistics, fetching in batches of 50 and memoising per client.
+ *
+ * YOUTUBE_GET_VIDEO_DETAILS_BATCH costs one Composio call whether it carries a
+ * single ID or fifty, so a whole channel's back catalogue collapses into one or
+ * two calls per run instead of one call per post.
+ */
+const YT_BATCH_SIZE = 50;
+const ytStatsCache = new Map();
+const ytStatsErrors = new Map();
+async function primeYouTubeStats(clientId, videoIds) {
+  let cache = ytStatsCache.get(clientId);
+  if (!cache) {
+    cache = new Map();
+    ytStatsCache.set(clientId, cache);
+  }
+
+  const missing = [...new Set(videoIds)].filter(id => id && !cache.has(id));
+  for (let i = 0; i < missing.length; i += YT_BATCH_SIZE) {
+    const chunk = missing.slice(i, i + YT_BATCH_SIZE);
+    try {
+      const res = await executeClientAction(clientId, 'YOUTUBE_GET_VIDEO_DETAILS_BATCH', {
+        id: chunk,
+        parts: ['snippet', 'statistics']
+      });
+      for (const video of (res?.data?.items || [])) {
+        if (video?.id) cache.set(video.id, video);
+      }
+      // IDs YouTube did not return are deleted, private, or on another channel.
+      // Cache the miss so later posts in the same run don't re-request them.
+      for (const id of chunk) {
+        if (!cache.has(id)) cache.set(id, null);
+      }
+    } catch (e) {
+      console.warn(`[METRIC-SYNC] YouTube stats batch failed for client #${clientId}:`, e.message);
+      ytStatsErrors.set(clientId, e.message);
+      // A failed toolkit call — no connection, revoked auth — won't heal between
+      // posts, so cache the miss rather than retrying it once per post.
+      for (const id of chunk) {
+        if (!cache.has(id)) cache.set(id, null);
+      }
+    }
+  }
+
+  return cache;
+}
+
+/**
  * Resolve a YouTube video ID for the item and pull live statistics into `metrics`.
  * Returns the resolved video ID, or null if the post could not be matched.
  *
@@ -180,33 +255,23 @@ function findMatchingYouTubeVideo(item, videos) {
  * youtube toolkit does not expose — those columns are left untouched.
  */
 async function syncYouTubeMetrics(item, metrics) {
-  let videoId = item.youtube_video_id
-    || extractYouTubeVideoId(item.youtube_link)
-    || extractYouTubeVideoId(item.link);
-  const updateFields = {};
-
-  // Fall back to matching against the channel feed when no link is stored
-  if (!videoId) {
-    const matched = findMatchingYouTubeVideo(item, await getClientYouTubeVideos(item.client_id));
-    if (matched) {
-      videoId = matched.videoId;
-      if (!item.title && matched.title) updateFields.title = matched.title;
-    }
-  }
-
+  const { videoId, matched } = await resolveYouTubeVideoId(item);
   if (!videoId) return null;
 
+  const updateFields = {};
+  if (matched && !item.title && matched.title) updateFields.title = matched.title;
   if (videoId !== item.youtube_video_id) updateFields.youtube_video_id = videoId;
   if (!item.link) updateFields.link = `https://youtu.be/${videoId}`;
 
-  const detailsRes = await executeClientAction(item.client_id, 'YOUTUBE_GET_VIDEO_DETAILS_BATCH', {
-    id: [videoId],
-    parts: ['snippet', 'statistics']
-  });
-
-  const video = detailsRes?.data?.items?.[0];
+  // Already primed by the worker for batch runs; falls back to a chunk of one
+  // when called from the single-post refresh endpoint.
+  const statsCache = await primeYouTubeStats(item.client_id, [videoId]);
+  const video = statsCache.get(videoId);
   if (!video) {
-    throw new Error(`Video ${videoId} not returned by YouTube (deleted, private, or on another channel)`);
+    const batchError = ytStatsErrors.get(item.client_id);
+    throw new Error(batchError
+      ? `YouTube stats unavailable for ${videoId} — ${batchError} (is YouTube connected for this client?)`
+      : `Video ${videoId} not returned by YouTube (deleted, private, or on another channel)`);
   }
 
   const stats = video.statistics || {};
@@ -302,8 +367,20 @@ export async function syncSingleContentMetrics(contentId) {
         }
       }
 
-      // 2. Fetch live insights via INSTAGRAM_GET_IG_MEDIA_INSIGHTS
-      if (numericMediaId && /^\d+$/.test(numericMediaId)) {
+      // 2. Older posts skip the per-post insights call and take whatever the
+      //    account feed still carries — likes and comments come back for free
+      //    there. Views/saves/shares keep their last synced values.
+      const recentEnoughForInsights = isWithinInsightsWindow(item);
+      if (!recentEnoughForInsights && numericMediaId) {
+        const feedItem = (await getClientMediaList(item.client_id)).find(m => m.id === numericMediaId);
+        if (feedItem) {
+          metrics.likes = toCount(feedItem.like_count, metrics.likes);
+          metrics.comments = toCount(feedItem.comments_count, metrics.comments);
+        }
+      }
+
+      // 3. Fetch live insights via INSTAGRAM_GET_IG_MEDIA_INSIGHTS
+      if (recentEnoughForInsights && numericMediaId && /^\d+$/.test(numericMediaId)) {
         try {
           const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
             ig_media_id: numericMediaId,
@@ -386,6 +463,32 @@ export async function syncSingleContentMetrics(contentId) {
 }
 
 /**
+ * Resolve every YouTube post's video ID up front so their statistics can be
+ * pulled 50 at a time, rather than one Composio call per post inside the loop.
+ */
+async function prefetchYouTubeStats(items) {
+  const byClient = new Map();
+  for (const item of items) {
+    const platform = (item.platform || '').toLowerCase();
+    if (!platform.includes('youtube') && !platform.includes('shorts')) continue;
+    if (!byClient.has(item.client_id)) byClient.set(item.client_id, []);
+    byClient.get(item.client_id).push(item);
+  }
+
+  for (const [clientId, clientItems] of byClient) {
+    const videoIds = [];
+    for (const item of clientItems) {
+      const { videoId } = await resolveYouTubeVideoId(item);
+      if (videoId) videoIds.push(videoId);
+    }
+    if (videoIds.length > 0) {
+      await primeYouTubeStats(clientId, videoIds);
+      console.log(`[METRIC-SYNC] Primed ${videoIds.length} YouTube video(s) for client #${clientId} in ${Math.ceil(videoIds.length / YT_BATCH_SIZE)} call(s).`);
+    }
+  }
+}
+
+/**
  * Refresh metrics for ALL posted items — including those without links.
  * Fetches each client's IG feed / YouTube uploads once and auto-matches by
  * shortcode, title or date.
@@ -395,16 +498,22 @@ export async function runMetricSyncWorker() {
     // Clear caches at start of each run
     mediaListCache.clear();
     ytVideoListCache.clear();
+    ytStatsCache.clear();
+    ytStatsErrors.clear();
 
     // Sync ALL posted items, not just those with links
     const itemsToRefresh = db.prepare(`
-      SELECT id FROM marketing_content_tracker
+      SELECT id, client_id, date, title, platform, link, youtube_link, youtube_video_id
+      FROM marketing_content_tracker
       WHERE status = 'Posted'
     `).all();
 
     if (itemsToRefresh.length === 0) return;
 
     console.log(`[METRIC-SYNC] Syncing live metrics for ${itemsToRefresh.length} posted item(s) (Composio Free Tier Safe)...`);
+    if (process.env.COMPOSIO_API_KEY) {
+      await prefetchYouTubeStats(itemsToRefresh);
+    }
     for (const row of itemsToRefresh) {
       try {
         await syncSingleContentMetrics(row.id);
