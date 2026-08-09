@@ -11,6 +11,7 @@ import { logAction } from '../services/auditLogger.js';
 import { notifyAdmin } from '../services/telegram.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { getConnectUrl, getClientConnectedAccounts, executeClientAction } from '../services/composioService.js';
+import { fetchPostComments, replyToComment } from '../services/commentSync.js';
 
 const router = Router();
 
@@ -972,41 +973,24 @@ router.post('/:token/comments/sync', portalAuth, async (req, res) => {
         AND (t.link IS NOT NULL OR t.platform_post_id IS NOT NULL OR t.instagram_media_id IS NOT NULL OR t.youtube_video_id IS NOT NULL)
     `).all(req.portalClient.id);
 
+    const insertComment = db.prepare(`
+      INSERT OR IGNORE INTO social_comments (
+        content_id, client_id, platform, comment_id, commenter_name, comment_text, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
     let synced = 0;
     for (const post of recentPosts) {
-      let postId = post.instagram_media_id || post.platform_post_id || post.youtube_video_id;
-      if (!postId && post.link) {
-        const igMatch = post.link.match(/instagram\.com\/(?:reel|p)\/([A-Za-z0-9_-]+)/);
-        if (igMatch) postId = igMatch[1];
-        const ytMatch = post.link.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]+)/);
-        if (!postId && ytMatch) postId = ytMatch[1];
-      }
-
-      if (!postId) continue;
-
-      const platform = (post.platform || 'instagram').toLowerCase();
-
       try {
-        const action = platform.includes('youtube') ? 'YOUTUBE_GET_COMMENTS' : 'INSTAGRAM_GET_IG_MEDIA_COMMENTS';
-        const paramKey = platform.includes('youtube') ? 'video_id' : 'ig_media_id';
-
-        const result = await executeClientAction(req.portalClient.id, action, { [paramKey]: postId });
-        const comments = result?.comments || result?.data?.data || result?.data || [];
-
-        for (const comm of comments) {
-          const commenterName = comm.username || comm.from?.username || comm.from?.name || comm.user?.username || comm.user?.name || comm.owner?.username || comm.authorDisplayName || comm.snippet?.topLevelComment?.snippet?.authorDisplayName || 'Instagram User';
-          db.prepare(`
-            INSERT OR IGNORE INTO social_comments (
-              content_id, client_id, platform, comment_id, commenter_name, comment_text, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).run(
+        for (const comment of await fetchPostComments(req.portalClient.id, post)) {
+          insertComment.run(
             post.id,
             req.portalClient.id,
-            post.platform,
-            comm.id || comm.comment_id,
-            commenterName,
-            comm.text || comm.textDisplay || '',
-            comm.timestamp || new Date().toISOString()
+            comment.platform,
+            comment.id,
+            comment.author,
+            comment.text,
+            comment.publishedAt || new Date().toISOString()
           );
           synced++;
         }
@@ -1055,15 +1039,9 @@ router.post('/:token/comments/reply', portalAuth, async (req, res) => {
       return res.status(400).json({ error: 'commentId and replyText are required' });
     }
 
-    const p = platform.toLowerCase();
-    const actionName = p.includes('youtube') ? 'YOUTUBE_REPLY_COMMENT' : 'INSTAGRAM_REPLY_COMMENT';
-    const params = p.includes('youtube') 
-      ? { comment_id: commentId, text: replyText }
-      : { comment_id: commentId, message: replyText };
-
     let result = null;
     if (process.env.COMPOSIO_API_KEY) {
-      result = await executeClientAction(req.portalClient.id, actionName, params);
+      result = await replyToComment(req.portalClient.id, platform, commentId, replyText);
     } else {
       console.log(`[PORTAL-COMMENTS] [MOCK] Dry-run reply to comment ${commentId}: "${replyText}"`);
       result = { success: true, mock: true };

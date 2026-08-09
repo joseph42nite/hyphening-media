@@ -38,13 +38,22 @@ export async function runAutoPublisher() {
           caption: item.caption || '',
           video_url: item.link
         };
+        let needsFileUpload = false;
 
         if (platform.includes('youtube')) {
-          actionName = 'YOUTUBE_POST_VIDEO';
+          // YouTube uploads bytes rather than fetching a URL, so `link` has to
+          // be the source video itself here, not a page it lives on.
+          if (!/^https?:\/\//i.test(item.link || '')) {
+            throw new Error('YouTube upload needs `link` to be a direct http(s) URL to the video file');
+          }
+          actionName = 'YOUTUBE_MULTIPART_UPLOAD_VIDEO';
+          needsFileUpload = true;
           params = {
             title: item.title || 'New Video',
             description: item.caption || '',
-            video_url: item.link
+            categoryId: process.env.YOUTUBE_CATEGORY_ID || '22', // People & Blogs
+            privacyStatus: process.env.YOUTUBE_PRIVACY_STATUS || 'public',
+            videoFile: item.link
           };
         } else if (platform.includes('linkedin')) {
           actionName = 'LINKEDIN_CREATE_VIDEO_POST';
@@ -64,13 +73,24 @@ export async function runAutoPublisher() {
         
         let result = null;
         if (process.env.COMPOSIO_API_KEY) {
-          result = await executeClientAction(item.client_id, actionName, params);
+          result = await executeClientAction(item.client_id, actionName, params, { withFileUpload: needsFileUpload });
         } else {
           console.log(`[AUTO-PUBLISHER] [MOCK] Dry-run publishing item #${item.id} to ${platform}. (Set COMPOSIO_API_KEY to publish live).`);
           result = { id: `mock_post_${Date.now()}` };
         }
 
-        const postId = result?.id || result?.media_id || result?.video_id || `post_${Date.now()}`;
+        // Composio reports a refused action in the envelope rather than by
+        // throwing, so an unchecked result would mark the row Posted and
+        // fabricate an id for something that never went out.
+        if (result?.successful === false) {
+          throw new Error(result.error || `${actionName} was not successful`);
+        }
+
+        const payload = result?.data ?? result;
+        const postId = payload?.id || payload?.media_id || payload?.video_id;
+        if (!postId) {
+          throw new Error(`${actionName} returned no post id — not marking #${item.id} as Posted`);
+        }
 
         // Update content tracker status to Posted
         db.prepare(`

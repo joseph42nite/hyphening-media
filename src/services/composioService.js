@@ -2,9 +2,24 @@ import { Composio } from '@composio/core';
 import db from '../../database.js';
 
 const composioApiKey = process.env.COMPOSIO_API_KEY || '';
-const composioClient = composioApiKey ? new Composio({ 
+const composioClient = composioApiKey ? new Composio({
   apiKey: composioApiKey,
-  dangerouslySkipVersionCheck: true 
+  dangerouslySkipVersionCheck: true
+}) : null;
+
+/**
+ * Separate client for actions that take a file parameter.
+ *
+ * YouTube's API uploads bytes — unlike Instagram, it will not fetch a URL you
+ * hand it — and the SDK only resolves a URL into an upload when auto-upload is
+ * enabled. That switch also permits uploading from local paths, so it is kept
+ * off the client every other call goes through: only the publisher reaches for
+ * this one, and only ever with an http(s) URL.
+ */
+const composioUploadClient = composioApiKey ? new Composio({
+  apiKey: composioApiKey,
+  dangerouslySkipVersionCheck: true,
+  dangerouslyAllowAutoUploadDownloadFiles: true
 }) : null;
 
 /**
@@ -121,15 +136,16 @@ export async function getClientConnectedAccounts(clientId) {
 /**
  * Execute a platform action (e.g. upload video, post reel, reply comment)
  */
-export async function executeClientAction(clientId, actionName, params = {}) {
-  if (!composioClient) {
+export async function executeClientAction(clientId, actionName, params = {}, { withFileUpload = false } = {}) {
+  const client = withFileUpload ? composioUploadClient : composioClient;
+  if (!client) {
     throw new Error('COMPOSIO_API_KEY is not configured');
   }
 
   const entityId = getEntityId(clientId);
 
   try {
-    const response = await composioClient.tools.execute(actionName, {
+    const response = await client.tools.execute(actionName, {
       userId: entityId,
       arguments: params,
       dangerouslySkipVersionCheck: true
