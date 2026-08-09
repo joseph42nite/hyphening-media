@@ -56,6 +56,21 @@ export default function MarketingDataTab({
     blogs: '', calls: '', directions: '', reviews: '', avg_rating: '', top_keywords: '', da: '', ai_overview_visible: 'No'
   });
 
+  // Platform filter — the tracker is sorted by date, so a client whose YouTube
+  // posts are older than their Instagram ones has them stranded pages deep.
+  const [platformFilter, setPlatformFilter] = useState('all');
+  const visibleContent = platformFilter === 'all'
+    ? marketingContent
+    : marketingContent.filter(i => (i.platform || '').toLowerCase() === platformFilter);
+
+  // Video length as m:ss (YouTube durations are short enough that hours are rare)
+  const formatDuration = (seconds) => {
+    if (seconds === null || seconds === undefined) return '-';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
   // Format month helper locally
   const formatMonthStr = (monthStr) => {
     if (!monthStr) return '-';
@@ -307,6 +322,15 @@ export default function MarketingDataTab({
           <div className="marketing-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ margin: 0 }}>Content Performance Tracker</h3>
             <div className="marketing-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <select
+                value={platformFilter}
+                onChange={e => { setPlatformFilter(e.target.value); setContentPage(1); }}
+                style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: '700', border: '2px solid #000', borderRadius: '6px', cursor: 'pointer' }}
+              >
+                <option value="all">All platforms</option>
+                <option value="instagram">Instagram only</option>
+                <option value="youtube">YouTube only</option>
+              </select>
               {(isAdmin || isSMM) && (
                 <>
                   {lastSync?.finishedAt && !isSyncing && (
@@ -330,13 +354,13 @@ export default function MarketingDataTab({
               )}
             </div>
           </div>
-          <div className="table-container table-scrollable-y" style={{ marginBottom: marketingContent.length > 0 ? '12px' : '32px' }}>
+          <div className="table-container table-scrollable-y" style={{ marginBottom: visibleContent.length > 0 ? '12px' : '32px' }}>
             <table>
               <thead>
                 <tr>
                   <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5', whiteSpace: 'nowrap', fontWeight: '900' }}>Metadata</th>
                   <th colSpan="12" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#fee2e2', color: '#991b1b', whiteSpace: 'nowrap', fontWeight: '900' }}>Instagram Metrics</th>
-                  <th colSpan="4" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#dbeafe', color: '#1e40af', whiteSpace: 'nowrap', fontWeight: '900' }}>YouTube Metrics</th>
+                  <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#dbeafe', color: '#1e40af', whiteSpace: 'nowrap', fontWeight: '900' }}>YouTube Metrics</th>
                   <th style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5', whiteSpace: 'nowrap', fontWeight: '900' }}>Actions</th>
                 </tr>
                 <tr>
@@ -361,6 +385,10 @@ export default function MarketingDataTab({
                   <th>Save Rate %</th>
                   <th>Score</th>
                   <th>Views</th>
+                  <th title="Views per day since publish — comparable across video ages">Views/Day</th>
+                  <th title="Short (≤60s) or long-form">Format</th>
+                  <th>Length</th>
+                  <th title="Likes as a percentage of views">Like %</th>
                   <th>Watch Time (hrs)</th>
                   <th>Avg Duration</th>
                   <th>CTR%</th>
@@ -368,14 +396,14 @@ export default function MarketingDataTab({
                 </tr>
               </thead>
               <tbody>
-                {marketingContent.length === 0 ? (
+                {visibleContent.length === 0 ? (
                   <tr>
-                    <td colSpan="25" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    <td colSpan="29" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                       No content items tracked yet.
                     </td>
                   </tr>
                 ) : (
-                  marketingContent
+                  visibleContent
                     .slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT)
                     .map(item => (
                     <tr key={item.id}>
@@ -490,6 +518,30 @@ export default function MarketingDataTab({
                       <td style={{ fontWeight: 'bold' }}>{item.content_score || '-'}</td>
 
                       <td>{item.youtube_views?.toLocaleString() || '0'}</td>
+                      <td style={{ fontWeight: 'bold' }}>
+                        {item.youtube_views_per_day !== null && item.youtube_views_per_day !== undefined
+                          ? item.youtube_views_per_day.toLocaleString()
+                          : '-'}
+                      </td>
+                      <td>
+                        {item.youtube_format ? (
+                          <span style={{
+                            padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold',
+                            background: item.youtube_format === 'Short' ? '#fef3c7' : '#e0e7ff',
+                            color: item.youtube_format === 'Short' ? '#92400e' : '#3730a3'
+                          }}>
+                            {item.youtube_format}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td>{formatDuration(item.youtube_duration_seconds)}</td>
+                      <td>
+                        {item.youtube_like_rate_pct !== null && item.youtube_like_rate_pct !== undefined ? (
+                          <span style={{ color: item.youtube_like_rate_pct >= 1 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+                            {item.youtube_like_rate_pct}%
+                          </span>
+                        ) : '-'}
+                      </td>
                       <td>{item.youtube_watch_time !== null && item.youtube_watch_time !== undefined ? item.youtube_watch_time.toLocaleString() : '0'}</td>
                       <td>{item.youtube_avg_view_duration || '-'}</td>
                       <td>
@@ -527,10 +579,10 @@ export default function MarketingDataTab({
             </table>
           </div>
 
-          {marketingContent.length > 0 && (
+          {visibleContent.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '32px', flexWrap: 'wrap', gap: '12px' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                Showing {Math.min((contentPage - 1) * ITEMS_PER_PAGE_CONTENT + 1, marketingContent.length)} to {Math.min(contentPage * ITEMS_PER_PAGE_CONTENT, marketingContent.length)} of {marketingContent.length} entries
+                Showing {Math.min((contentPage - 1) * ITEMS_PER_PAGE_CONTENT + 1, visibleContent.length)} to {Math.min(contentPage * ITEMS_PER_PAGE_CONTENT, visibleContent.length)} of {visibleContent.length} entries
               </span>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button
@@ -541,7 +593,7 @@ export default function MarketingDataTab({
                 >
                   Previous
                 </button>
-                {Array.from({ length: Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT) }, (_, i) => i + 1).map(page => (
+                {Array.from({ length: Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT) }, (_, i) => i + 1).map(page => (
                   <button
                     key={page}
                     onClick={() => setContentPage(page)}
@@ -552,10 +604,10 @@ export default function MarketingDataTab({
                   </button>
                 ))}
                 <button
-                  onClick={() => setContentPage(p => Math.min(Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT), p + 1))}
-                  disabled={contentPage >= Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT)}
+                  onClick={() => setContentPage(p => Math.min(Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT), p + 1))}
+                  disabled={contentPage >= Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT)}
                   className="btn btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: contentPage >= Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT) ? 0.5 : 1, cursor: contentPage >= Math.ceil(marketingContent.length / ITEMS_PER_PAGE_CONTENT) ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: contentPage >= Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT) ? 0.5 : 1, cursor: contentPage >= Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT) ? 'not-allowed' : 'pointer' }}
                 >
                   Next
                 </button>

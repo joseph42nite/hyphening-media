@@ -103,6 +103,40 @@ function isWithinInsightsWindow(item) {
 }
 
 /**
+ * Parse an ISO 8601 duration (PT1H2M41S) into seconds.
+ */
+function parseIsoDuration(iso) {
+  const m = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/.exec(iso || '');
+  if (!m) return null;
+  const [, d, h, min, s] = m;
+  return (+(d || 0)) * 86400 + (+(h || 0)) * 3600 + (+(min || 0)) * 60 + Math.round(+(s || 0));
+}
+
+/**
+ * YouTube treats a video as a Short when it is 60s or under (3 minutes for
+ * uploads after Oct 2024, but the 60s line matches how this channel posts and
+ * keeps the label stable for older videos).
+ */
+const SHORTS_MAX_SECONDS = 60;
+
+/**
+ * Views per day since publication. Raw view count mostly measures how long a
+ * video has been up; this is what makes a 3-day-old video comparable to one
+ * from last year.
+ */
+function viewsPerDay(views, publishedAt) {
+  if (!publishedAt || !views) return null;
+  const ageDays = (Date.now() - new Date(publishedAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (!Number.isFinite(ageDays) || ageDays <= 0) return null;
+  return Math.round((views / Math.max(ageDays, 1)) * 10) / 10;
+}
+
+function ratePct(part, whole) {
+  if (!whole) return null;
+  return Math.round((part / whole) * 10000) / 100;
+}
+
+/**
  * Extract a YouTube video ID from a watch/shorts/youtu.be URL
  */
 function extractYouTubeVideoId(link) {
@@ -222,7 +256,7 @@ async function primeYouTubeStats(clientId, videoIds) {
     try {
       const res = await executeClientAction(clientId, 'YOUTUBE_GET_VIDEO_DETAILS_BATCH', {
         id: chunk,
-        parts: ['snippet', 'statistics']
+        parts: ['snippet', 'statistics', 'contentDetails']
       });
       for (const video of (res?.data?.items || [])) {
         if (video?.id) cache.set(video.id, video);
@@ -255,11 +289,10 @@ async function primeYouTubeStats(clientId, videoIds) {
  * youtube toolkit does not expose — those columns are left untouched.
  */
 async function syncYouTubeMetrics(item, metrics) {
-  const { videoId, matched } = await resolveYouTubeVideoId(item);
+  const { videoId } = await resolveYouTubeVideoId(item);
   if (!videoId) return null;
 
   const updateFields = {};
-  if (matched && !item.title && matched.title) updateFields.title = matched.title;
   if (videoId !== item.youtube_video_id) updateFields.youtube_video_id = videoId;
   if (!item.link) updateFields.link = `https://youtu.be/${videoId}`;
 
@@ -279,6 +312,23 @@ async function syncYouTubeMetrics(item, metrics) {
   metrics.likes = toCount(stats.likeCount, metrics.likes);
   metrics.comments = toCount(stats.commentCount, metrics.comments);
 
+  // Performance context: age and length, so a video can be judged against its
+  // own format and how long it has had to accumulate views.
+  const publishedAt = video.snippet?.publishedAt || null;
+  const durationSeconds = parseIsoDuration(video.contentDetails?.duration);
+
+  updateFields.youtube_published_at = publishedAt;
+  updateFields.youtube_duration_seconds = durationSeconds;
+  updateFields.youtube_format = durationSeconds === null
+    ? null
+    : (durationSeconds <= SHORTS_MAX_SECONDS ? 'Short' : 'Long');
+  updateFields.youtube_views_per_day = viewsPerDay(metrics.youtube_views, publishedAt);
+  updateFields.youtube_like_rate_pct = ratePct(metrics.likes, metrics.youtube_views);
+  updateFields.youtube_comment_rate_pct = ratePct(metrics.comments, metrics.youtube_views);
+
+  if (!item.title && video.snippet?.title) {
+    updateFields.title = video.snippet.title;
+  }
   if (!item.caption && video.snippet?.description) {
     updateFields.caption = video.snippet.description;
   }
