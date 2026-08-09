@@ -489,11 +489,22 @@ async function prefetchYouTubeStats(items) {
 }
 
 /**
- * Refresh metrics for ALL posted items — including those without links.
+ * Refresh metrics for posted items — including those without links.
  * Fetches each client's IG feed / YouTube uploads once and auto-matches by
  * shortcode, title or date.
+ *
+ * @param {object} [options]
+ * @param {number} [options.clientId] Restrict the run to a single client. The
+ *   nightly cron omits it; the dashboard button passes the selected client so
+ *   the request returns in seconds instead of walking every account.
+ * @returns {Promise<object>} Summary for the caller to display.
  */
-export async function runMetricSyncWorker() {
+export async function runMetricSyncWorker({ clientId = null } = {}) {
+  const summary = {
+    total: 0, synced: 0, failed: 0, youtube: 0, instagram: 0,
+    startedAt: new Date().toISOString(), finishedAt: null
+  };
+
   try {
     // Clear caches at start of each run
     mediaListCache.clear();
@@ -505,27 +516,48 @@ export async function runMetricSyncWorker() {
     const itemsToRefresh = db.prepare(`
       SELECT id, client_id, date, title, platform, link, youtube_link, youtube_video_id
       FROM marketing_content_tracker
-      WHERE status = 'Posted'
-    `).all();
+      WHERE status = 'Posted' ${clientId ? 'AND client_id = ?' : ''}
+    `).all(...(clientId ? [clientId] : []));
 
-    if (itemsToRefresh.length === 0) return;
+    summary.total = itemsToRefresh.length;
+    if (itemsToRefresh.length === 0) {
+      summary.finishedAt = new Date().toISOString();
+      return summary;
+    }
 
-    console.log(`[METRIC-SYNC] Syncing live metrics for ${itemsToRefresh.length} posted item(s) (Composio Free Tier Safe)...`);
+    const scope = clientId ? `client #${clientId}` : 'all clients';
+    console.log(`[METRIC-SYNC] Syncing live metrics for ${itemsToRefresh.length} posted item(s), ${scope} (Composio Free Tier Safe)...`);
     if (process.env.COMPOSIO_API_KEY) {
       await prefetchYouTubeStats(itemsToRefresh);
     }
+
     for (const row of itemsToRefresh) {
+      const platform = (row.platform || '').toLowerCase();
+      const isYt = platform.includes('youtube') || platform.includes('shorts');
       try {
         await syncSingleContentMetrics(row.id);
-        // 300ms rate-limit delay between API calls
-        await new Promise(res => setTimeout(res, 300));
+        summary.synced++;
+        if (isYt) summary.youtube++; else summary.instagram++;
+        // Rate-limit only between posts that actually reach the API. Most posts
+        // now read from the primed batch or sit outside the insights window, and
+        // pausing on those just makes the dashboard button feel broken.
+        if (isYt || isWithinInsightsWindow(row)) {
+          await new Promise(res => setTimeout(res, 300));
+        }
       } catch (err) {
+        summary.failed++;
         console.warn(`[METRIC-SYNC] Skipped post #${row.id}:`, err.message);
       }
     }
-    console.log(`[METRIC-SYNC] ✓ Live metrics sync complete.`);
+
+    summary.finishedAt = new Date().toISOString();
+    console.log(`[METRIC-SYNC] ✓ Live metrics sync complete — ${summary.synced} synced, ${summary.failed} failed.`);
+    return summary;
   } catch (err) {
     console.error('[METRIC-SYNC] Error running metric sync worker:', err.message);
+    summary.finishedAt = new Date().toISOString();
+    summary.error = err.message;
+    return summary;
   }
 }
 

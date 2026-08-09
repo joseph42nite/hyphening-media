@@ -2,14 +2,19 @@ import express from 'express';
 import db from '../../database.js';
 import { getConnectUrl, getClientConnectedAccounts } from '../services/composioService.js';
 import { syncSingleContentMetrics, runMetricSyncWorker } from '../services/metricSyncWorker.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Every route here spends paid Composio quota or mints OAuth connect links, so
+// none of it may be reachable anonymously.
+router.use(authenticate);
 
 /**
  * POST /api/clients/:id/integrations/connect
  * Initiate OAuth flow for a client platform
  */
-router.post('/clients/:id/integrations/connect', async (req, res) => {
+router.post('/clients/:id/integrations/connect', authorize('admin', 'ops_social_media_manager'), async (req, res) => {
   try {
     const clientId = parseInt(req.params.id, 10);
     const { appName, redirectUrl } = req.body;
@@ -61,12 +66,22 @@ router.get('/clients/:id/integrations/status', async (req, res) => {
 
 /**
  * POST /api/marketing/content/sync-all-metrics
- * On-demand batch refresh for all posted content metrics
+ * On-demand batch refresh for posted content metrics.
+ * Body: { clientId } — optional; omit to sweep every client.
  */
-router.post('/marketing/content/sync-all-metrics', async (req, res) => {
+router.post('/marketing/content/sync-all-metrics', authorize('admin', 'ops_social_media_manager'), async (req, res) => {
   try {
-    await runMetricSyncWorker();
-    res.json({ success: true, message: 'All post metrics synced successfully' });
+    const raw = req.body?.clientId;
+    const clientId = raw === undefined || raw === null || raw === '' || raw === 'all'
+      ? null
+      : parseInt(raw, 10);
+
+    if (clientId !== null && !Number.isInteger(clientId)) {
+      return res.status(400).json({ error: 'clientId must be a number, "all", or omitted' });
+    }
+
+    const summary = await runMetricSyncWorker({ clientId });
+    res.json({ success: true, summary });
   } catch (err) {
     console.error('[INTEGRATIONS] Batch metric sync failed:', err.message);
     res.status(500).json({ error: err.message || 'Failed to sync metrics' });
@@ -77,7 +92,7 @@ router.post('/marketing/content/sync-all-metrics', async (req, res) => {
  * POST /api/marketing/content/:id/refresh-metrics
  * On-demand manual refresh for content metrics
  */
-router.post('/marketing/content/:id/refresh-metrics', async (req, res) => {
+router.post('/marketing/content/:id/refresh-metrics', authorize('admin', 'ops_social_media_manager'), async (req, res) => {
   try {
     const contentId = parseInt(req.params.id, 10);
     const updatedMetrics = await syncSingleContentMetrics(contentId);

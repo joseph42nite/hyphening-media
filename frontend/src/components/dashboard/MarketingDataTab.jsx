@@ -71,16 +71,22 @@ export default function MarketingDataTab({
 
   // Sync All Metrics handler
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState(null);
   const handleSyncAllMetrics = async () => {
     if (!selectedClientForReports || isSyncing) return;
     setIsSyncing(true);
     try {
       const resp = await fetch(`${API_BASE}/api/marketing/content/sync-all-metrics`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth?.token}` }
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ clientId: selectedClientForReports.id })
       });
       if (resp.ok) {
-        showToast?.('✅ All metrics synced successfully!');
+        const { summary } = await resp.json();
+        setLastSync(summary);
+        const failed = summary?.failed ? `, ${summary.failed} failed` : '';
+        showToast?.(`✅ Synced ${summary?.synced ?? 0} of ${summary?.total ?? 0} posts${failed}`);
         fetchMarketingData(selectedClientForReports.id);
       } else {
         const err = await resp.json().catch(() => ({}));
@@ -302,10 +308,20 @@ export default function MarketingDataTab({
             <h3 style={{ margin: 0 }}>Content Performance Tracker</h3>
             <div className="marketing-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {(isAdmin || isSMM) && (
-                <button onClick={handleSyncAllMetrics} disabled={isSyncing} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                  <RefreshCw size={14} style={{ marginRight: '4px', animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
-                  {isSyncing ? 'Syncing...' : '🔄 Sync All Metrics'}
-                </button>
+                <>
+                  {lastSync?.finishedAt && !isSyncing && (
+                    <span style={{ fontSize: '0.75rem', color: '#71717a', whiteSpace: 'nowrap' }}>
+                      Last synced {new Date(lastSync.finishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {lastSync.failed > 0 && (
+                        <span style={{ color: '#991b1b', fontWeight: 'bold' }}> · {lastSync.failed} failed</span>
+                      )}
+                    </span>
+                  )}
+                  <button onClick={handleSyncAllMetrics} disabled={isSyncing} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                    <RefreshCw size={14} style={{ marginRight: '4px', animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                    {isSyncing ? 'Syncing...' : '🔄 Sync Metrics'}
+                  </button>
+                </>
               )}
               {(isAdmin || isSMM) && (
                 <button onClick={() => openContentModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
