@@ -345,6 +345,7 @@ router.get('/:token/leads', portalAuth, (req, res) => {
         id, name, email, phone, platform, source, campaign_name, treatment_type, lead_status, rejection_reason,
         call_duration_seconds, additional_data, created_at,
         qualification_status, call_outcome, appointment_status, appointment_date,
+        follow_up_date,
         -- Without this the checkbox reads undefined on every load, so ticking it
         -- appears to do nothing the moment the list is re-read.
         is_test
@@ -461,7 +462,8 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       rejection_reason,
       treatment_type,
       created_at,
-      is_test
+      is_test,
+      follow_up_date
     } = req.body;
 
     const lead = db.prepare('SELECT * FROM campaign_leads WHERE id = ? AND client_id = ?').get(leadId, req.portalClient.id);
@@ -480,6 +482,8 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
     // Orthogonal to call_outcome: a test lead can still record what happened on
     // the call without that putting it back into the totals.
     const newIsTest = is_test !== undefined ? (is_test ? 1 : 0) : (lead.is_test ? 1 : 0);
+    const rawFollowUp = follow_up_date !== undefined ? follow_up_date : lead.follow_up_date;
+    const newFollowUp = rawFollowUp && String(rawFollowUp).trim() ? String(rawFollowUp).trim().slice(0, 10) : null;
 
     // Validate inputs
     if (newQual && !['Pending', 'Qualified', 'Disqualified'].includes(newQual)) {
@@ -490,6 +494,9 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
     }
     if (newApptStatus && !['Follow Up', 'Booked', 'Not Booked'].includes(newApptStatus)) {
       return res.status(400).json({ error: 'Invalid appointment status' });
+    }
+    if (newFollowUp && !/^\d{4}-\d{2}-\d{2}$/.test(newFollowUp)) {
+      return res.status(400).json({ error: 'follow_up_date must be YYYY-MM-DD' });
     }
 
     // Compute lead_status for backward compatibility with dashboard metrics
@@ -514,6 +521,7 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
         created_at = ?,
         lead_status = ?,
         is_test = ?,
+        follow_up_date = ?,
         updated_at = datetime('now')
       WHERE id = ?
     `).run(
@@ -526,6 +534,10 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       newCreatedAt,
       calculatedLeadStatus,
       newIsTest,
+      // A follow-up date only means anything while the lead is still awaiting
+      // one; booking or closing it clears the reminder, as appointment_date
+      // already does in the other direction.
+      newApptStatus === 'Follow Up' ? newFollowUp : null,
       leadId
     );
 
@@ -539,7 +551,8 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
       treatment_type: newTreatment,
       created_at: newCreatedAt,
       lead_status: calculatedLeadStatus,
-      is_test: newIsTest
+      is_test: newIsTest,
+      follow_up_date: newApptStatus === 'Follow Up' ? newFollowUp : null
     });
   } catch (err) {
     console.error('[PORTAL] Update lead status error:', err);

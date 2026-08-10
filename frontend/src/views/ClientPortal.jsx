@@ -1432,6 +1432,28 @@ export default function ClientPortal({ showToast }) {
   };
 
   // Update lead fields (qualification status, call outcome, appointment status/date, rejection reason)
+  // Follow-up reminders. Compared as plain YYYY-MM-DD against the viewer's local
+  // today, because the date was chosen in their calendar, not in UTC.
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  /** 'overdue' | 'due' | null — only meaningful while the lead awaits follow-up. */
+  const followUpState = (lead) => {
+    if (!lead?.follow_up_date) return null;
+    if ((lead.appointment_status || 'Follow Up') !== 'Follow Up') return null;
+    const today = todayStr();
+    if (lead.follow_up_date < today) return 'overdue';
+    if (lead.follow_up_date === today) return 'due';
+    return null;
+  };
+
+  const daysBetween = (dateStr) => {
+    const diff = (new Date(todayStr()) - new Date(dateStr)) / 86400000;
+    return Math.max(0, Math.round(diff));
+  };
+
   const handleUpdateLead = async (leadId, updates) => {
     try {
       const response = await fetch(`${API_BASE}/api/portal/${token}/leads/${leadId}/status`, {
@@ -1452,7 +1474,8 @@ export default function ClientPortal({ showToast }) {
           treatment_type: data.treatment_type !== undefined ? data.treatment_type : l.treatment_type,
           created_at: data.created_at !== undefined ? data.created_at : l.created_at,
           lead_status: data.lead_status,
-          is_test: data.is_test
+          is_test: data.is_test,
+          follow_up_date: data.follow_up_date
         } : l));
         showToast('Lead updated successfully', 'success');
         // Marking a lead as a test changes the counts in the cards above this
@@ -2918,8 +2941,37 @@ export default function ClientPortal({ showToast }) {
                 Disqualified: leads.filter(l => l.qualification_status === 'Disqualified').length,
               };
 
+              const dueLeads = leads.filter(l => followUpState(l));
+              const overdueCount = dueLeads.filter(l => followUpState(l) === 'overdue').length;
+
               return (
                 <div>
+                  {/* The reminder has to be visible without opening a lead row,
+                      or a follow-up date is just something nobody sees again. */}
+                  {dueLeads.length > 0 && (
+                    <div
+                      onClick={() => { setAppointmentFilter('Follow Up'); setQualificationFilter('all'); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+                        marginBottom: '14px', padding: '10px 14px', borderRadius: '10px',
+                        border: '2px solid #000',
+                        background: overdueCount > 0 ? '#fee2e2' : '#fef3c7',
+                        color: overdueCount > 0 ? '#991b1b' : '#92400e', fontWeight: 800, fontSize: '0.85rem'
+                      }}
+                      title="Show the leads awaiting follow-up"
+                    >
+                      <span style={{ fontSize: '1.05rem' }}>⏰</span>
+                      <span>
+                        {overdueCount > 0 && `${overdueCount} follow-up${overdueCount === 1 ? '' : 's'} overdue`}
+                        {overdueCount > 0 && dueLeads.length > overdueCount && ' · '}
+                        {dueLeads.length > overdueCount && `${dueLeads.length - overdueCount} due today`}
+                      </span>
+                      <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 700, opacity: 0.75 }}>
+                        {dueLeads.slice(0, 3).map(l => l.name).filter(Boolean).join(', ')}
+                        {dueLeads.length > 3 ? ` +${dueLeads.length - 3} more` : ''}
+                      </span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                     <div>
                       <h3 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Captured Leads Log</h3>
@@ -3238,6 +3290,32 @@ export default function ClientPortal({ showToast }) {
                                             width: '100%'
                                           }}
                                         />
+                                      )}
+                                      {(lead.appointment_status || 'Follow Up') === 'Follow Up' && (
+                                        <>
+                                          <input
+                                            type="date"
+                                            value={lead.follow_up_date || ''}
+                                            onChange={(e) => handleUpdateLead(lead.id, { follow_up_date: e.target.value })}
+                                            className="portal-select"
+                                            title="When should this lead be contacted again?"
+                                            style={{
+                                              padding: '4px 6px',
+                                              fontSize: '0.75rem',
+                                              borderRadius: '6px',
+                                              border: followUpState(lead) ? '1.5px solid #b91c1c' : '1.5px solid #18181b',
+                                              background: followUpState(lead) === 'overdue' ? '#fee2e2' : followUpState(lead) === 'due' ? '#fef3c7' : undefined,
+                                              width: '100%'
+                                            }}
+                                          />
+                                          {followUpState(lead) && (
+                                            <div style={{ marginTop: '3px', fontSize: '0.66rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3px', color: followUpState(lead) === 'overdue' ? '#991b1b' : '#92400e' }}>
+                                              {followUpState(lead) === 'overdue'
+                                                ? `⏰ Overdue by ${daysBetween(lead.follow_up_date)} day${daysBetween(lead.follow_up_date) === 1 ? '' : 's'}`
+                                                : '⏰ Follow up today'}
+                                            </div>
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                   </td>
