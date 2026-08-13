@@ -12,7 +12,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
     calendar_sync_link: '', drive_folder_link: '', instagram_business_account_id: '',
     instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: '',
-    parent_id: '', website_url: '', instagram_url: '', youtube_url: ''
+    parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: ''
   });
 
   const filteredClients = clients.filter(c =>
@@ -38,7 +38,9 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
         parent_id: client.parent_id || '',
         website_url: client.website_url || '',
         instagram_url: client.instagram_url || '',
-        youtube_url: client.youtube_url || ''
+        youtube_url: client.youtube_url || '',
+        gsc_property: client.gsc_property || '',
+        ga4_property_id: client.ga4_property_id || ''
       });
     } else {
       setEditingClient(null);
@@ -46,7 +48,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
         calendar_sync_link: '', drive_folder_link: '', instagram_business_account_id: '',
         instagram_access_token: '', youtube_channel_id: '', youtube_api_key: '', google_ads_customer_id: '',
-        parent_id: '', website_url: '', instagram_url: '', youtube_url: ''
+        parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: ''
       });
     }
     setShowClientModal(true);
@@ -356,6 +358,43 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                 <div className="form-group">
                   <label className="form-label">YouTube Channel URL</label>
                   <input type="url" className="form-control" placeholder="https://..." value={clientFormData.youtube_url} onChange={e => setClientFormData({...clientFormData, youtube_url: e.target.value})} />
+                </div>
+              </div>
+
+              <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>SEO Data Sources</h4>
+              <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Stored per client, never shared. A global default would return one client's search
+                data during another client's audit. Grant{' '}
+                <code style={{ fontSize: '0.72rem' }}>claudeseo@fit-sanctum-454909-s0.iam.gserviceaccount.com</code>{' '}
+                access in each property first.
+              </p>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Search Console Property</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="sc-domain:example.com or https://www.example.com/"
+                    value={clientFormData.gsc_property}
+                    onChange={e => setClientFormData({...clientFormData, gsc_property: e.target.value})}
+                  />
+                  <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Copy the exact form shown in Search Console — a domain property and a URL-prefix
+                    property are different and not interchangeable.
+                  </small>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">GA4 Property ID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="370846881"
+                    value={clientFormData.ga4_property_id}
+                    onChange={e => setClientFormData({...clientFormData, ga4_property_id: e.target.value})}
+                  />
+                  <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    GA4 → Admin → Property Settings. The plain number, not the G- measurement ID.
+                  </small>
                 </div>
               </div>
 

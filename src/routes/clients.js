@@ -207,7 +207,11 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       'calendar_sync_link', 'drive_folder_link',
       'instagram_business_account_id', 'youtube_channel_id', 'google_ads_customer_id',
       'is_active', 'portal_enabled', 'parent_id',
-      'website_url', 'instagram_url', 'youtube_url'
+      'website_url', 'instagram_url', 'youtube_url',
+      // Per-client, never a shared default: a global Search Console property
+      // would return one client's search data during another client's audit,
+      // attributed to the wrong client with nothing in the report to show it.
+      'gsc_property', 'ga4_property_id'
     ];
 
     const updates = {};
