@@ -9,7 +9,6 @@ import bcrypt from 'bcryptjs';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { encrypt, decrypt } from '../services/encryption.js';
 
 const router = Router();
 
@@ -72,8 +71,6 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
       const { instagram_access_token_enc, youtube_api_key_enc, portal_pin, ...safe } = c;
       return {
         ...safe,
-        has_instagram_token: !!instagram_access_token_enc,
-        has_youtube_key: !!youtube_api_key_enc,
         has_portal_pin: !!portal_pin,
       };
     });
@@ -109,8 +106,6 @@ router.get('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_edi
     const { instagram_access_token_enc, youtube_api_key_enc, portal_pin, ...safe } = client;
     res.json({
       ...safe,
-      has_instagram_token: !!instagram_access_token_enc,
-      has_youtube_key: !!youtube_api_key_enc,
       has_portal_pin: !!portal_pin,
     });
   } catch (err) {
@@ -127,45 +122,32 @@ router.post('/', authorize('admin'), (req, res) => {
   try {
     const {
       name, client_type, contact_person, contact_email, contact_phone,
-      calendar_sync_link, drive_folder_link,
-      instagram_access_token, instagram_business_account_id,
-      youtube_channel_id, youtube_api_key,
-      google_ads_customer_id, parent_id,
-      website_url, instagram_url, youtube_url
+      parent_id, website_url, instagram_url, youtube_url,
+      gsc_property, ga4_property_id
     } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Client name is required' });
     }
 
-    const apiKey = process.env.API_CREDENTIALS_KEY;
-
     const result = db.prepare(`
       INSERT INTO crm_clients (
         name, client_type, contact_person, contact_email, contact_phone,
-        calendar_sync_link, drive_folder_link,
-        instagram_access_token_enc, instagram_business_account_id,
-        youtube_channel_id, youtube_api_key_enc,
-        google_ads_customer_id, parent_id,
-        website_url, instagram_url, youtube_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        parent_id, website_url, instagram_url, youtube_url,
+        gsc_property, ga4_property_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       client_type || 'marketing',
       contact_person || null,
       contact_email || null,
       contact_phone || null,
-      calendar_sync_link || null,
-      drive_folder_link || null,
-      instagram_access_token && apiKey ? encrypt(instagram_access_token, apiKey) : null,
-      instagram_business_account_id || null,
-      youtube_channel_id || null,
-      youtube_api_key && apiKey ? encrypt(youtube_api_key, apiKey) : null,
-      google_ads_customer_id || null,
       parent_id && !isNaN(parseInt(parent_id)) ? parseInt(parent_id) : null,
       website_url || null,
       instagram_url || null,
-      youtube_url || null
+      youtube_url || null,
+      gsc_property || null,
+      ga4_property_id || null
     );
 
     logAction({
@@ -204,8 +186,6 @@ router.patch('/:id', authorize('admin'), (req, res) => {
 
     const allowedFields = [
       'name', 'client_type', 'contact_person', 'contact_email', 'contact_phone',
-      'calendar_sync_link', 'drive_folder_link',
-      'instagram_business_account_id', 'youtube_channel_id', 'google_ads_customer_id',
       'is_active', 'portal_enabled', 'parent_id',
       'website_url', 'instagram_url', 'youtube_url',
       // Per-client, never a shared default: a global Search Console property
@@ -226,21 +206,6 @@ router.patch('/:id', authorize('admin'), (req, res) => {
         updates[field] = val;
         diff[field] = { from: client[field], to: val };
       }
-    }
-
-    // Handle encrypted fields separately
-    const apiKey = process.env.API_CREDENTIALS_KEY;
-    if (req.body.instagram_access_token !== undefined && apiKey) {
-      updates.instagram_access_token_enc = req.body.instagram_access_token
-        ? encrypt(req.body.instagram_access_token, apiKey)
-        : null;
-      diff.instagram_access_token = { from: '***', to: req.body.instagram_access_token ? '***' : null };
-    }
-    if (req.body.youtube_api_key !== undefined && apiKey) {
-      updates.youtube_api_key_enc = req.body.youtube_api_key
-        ? encrypt(req.body.youtube_api_key, apiKey)
-        : null;
-      diff.youtube_api_key = { from: '***', to: req.body.youtube_api_key ? '***' : null };
     }
 
     if (Object.keys(updates).length === 0) {
