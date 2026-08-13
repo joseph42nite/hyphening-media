@@ -279,7 +279,49 @@ router.get('/:id/seo/agents/status', (req, res) => {
       });
     }
 
-    res.json({ agents: statusMap });
+    // What this client is missing before its audits can use every data source.
+    // Surfaced so whoever manages SEO can see the gap and fix it, rather than
+    // discovering it as an empty section in a report ten minutes after
+    // triggering a run — which is how five google audits produced nothing.
+    const clientRow = db.prepare(
+      'SELECT gsc_property, ga4_property_id, contact_phone, website_url FROM crm_clients WHERE id = ?'
+    ).get(req.params.id);
+
+    const setupGaps = [];
+    if (!clientRow?.website_url) {
+      setupGaps.push({
+        field: 'website_url',
+        severity: 'blocking',
+        label: 'No website URL',
+        detail: 'Nothing can be audited without it. Add it on the client record.',
+      });
+    }
+    if (!clientRow?.gsc_property) {
+      setupGaps.push({
+        field: 'gsc_property',
+        severity: 'limiting',
+        label: 'Search Console not linked',
+        detail: 'No clicks, impressions, position or indexation data. Verify the site in Search Console, grant the service account access, then store the property.',
+      });
+    }
+    if (!clientRow?.ga4_property_id) {
+      setupGaps.push({
+        field: 'ga4_property_id',
+        severity: 'limiting',
+        label: 'GA4 not linked',
+        detail: 'No organic traffic, sessions or landing-page data. Add the service account as a Viewer in GA4, then store the numeric property ID.',
+      });
+    }
+    if (!clientRow?.contact_phone) {
+      setupGaps.push({
+        field: 'contact_phone',
+        severity: 'limiting',
+        label: 'No contact phone',
+        detail: 'Local SEO audits check NAP consistency, which needs a phone number on the client record.',
+      });
+    }
+
+    res.json({ agents: statusMap, setupGaps });
   } catch (err) {
     console.error('[SEO ROUTE] Status status error:', err);
     res.status(500).json({ error: 'Internal server error' });

@@ -335,6 +335,11 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   // Competitor comparison. `own` holds this client's latest score per skill so
   // the modal can show the gap rather than a bare number — a competitor's 74
   // means nothing without knowing you are at 54.
+  // Data sources this client has not been connected to yet. Shown so the gap is
+  // visible before someone spends ten minutes on a run that returns an empty
+  // section, rather than after.
+  const [setupGaps, setSetupGaps] = useState([]);
+
   const [competitors, setCompetitors] = useState([]);
   const [ownScores, setOwnScores] = useState({});
   const [showCompetitorModal, setShowCompetitorModal] = useState(false);
@@ -571,6 +576,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       if (agentRes.ok) {
         const list = agentData.agents || [];
         setAgents(list);
+        setSetupGaps(agentData.setupGaps || []);
 
         // The server is the authority on what is in flight — this is what
         // survives a refresh, a re-login, or a different browser.
@@ -1084,6 +1090,47 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
           {/* Main Workspace Area */}
           <div>
             {/* 25-Agent Bento Grid */}
+            {setupGaps.length > 0 && (
+              <div style={{
+                border: '2px solid #000',
+                borderLeft: `6px solid ${setupGaps.some(g => g.severity === 'blocking') ? '#ef4444' : '#eab308'}`,
+                borderRadius: '4px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                background: '#fffbeb',
+              }}>
+                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px' }}>
+                  Setup incomplete for {selectedClient?.name} — {setupGaps.length} data source{setupGaps.length === 1 ? '' : 's'} not connected
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {setupGaps.map(gap => (
+                    <div key={gap.field} style={{ fontSize: '0.8rem', lineHeight: 1.45 }}>
+                      <span style={{
+                        display: 'inline-block',
+                        background: gap.severity === 'blocking' ? '#fee2e2' : '#fef3c7',
+                        color: gap.severity === 'blocking' ? '#991b1b' : '#92400e',
+                        border: '1px solid #000',
+                        borderRadius: '3px',
+                        padding: '1px 6px',
+                        fontSize: '0.65rem',
+                        fontWeight: 'bold',
+                        marginRight: '6px',
+                      }}>
+                        {gap.severity === 'blocking' ? 'BLOCKING' : 'LIMITS DATA'}
+                      </span>
+                      <strong>{gap.label}</strong>
+                      {' — '}
+                      <span style={{ color: 'var(--text-muted)' }}>{gap.detail}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Audits still run without these, but the affected sections report the source as
+                  unavailable rather than guessing at the numbers.
+                </div>
+              </div>
+            )}
+
             <h3 style={{ marginBottom: '12px', fontWeight: 'bold' }}>Agent Fleet Matrix ({getFilteredAgents().length} active)</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginBottom: '24px' }}>
               {getFilteredAgents().map(agent => {
