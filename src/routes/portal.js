@@ -561,6 +561,50 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
 });
 
 /**
+ * DELETE /api/portal/:token/leads/:leadId
+ * Remove a lead outright.
+ *
+ * Marking a lead as a test only stops it counting — the row stays on the table,
+ * so a portal filling up with triggered test entries had no way to be cleared.
+ *
+ * Nothing references a lead: no foreign key points at campaign_leads, and every
+ * total is computed from it live rather than cached, so a deleted row leaves
+ * neither orphans nor stale figures. It also leaves no undo, which is why the
+ * whole row is written to the audit log before it goes, and why the caller is
+ * expected to confirm first.
+ */
+router.delete('/:token/leads/:leadId', portalAuth, (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    // Scoped to the calling client's own leads, so a portal token cannot reach
+    // another client's rows by guessing an id.
+    const lead = db.prepare('SELECT * FROM campaign_leads WHERE id = ? AND client_id = ?')
+      .get(leadId, req.portalClient.id);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    db.prepare('DELETE FROM campaign_leads WHERE id = ? AND client_id = ?')
+      .run(leadId, req.portalClient.id);
+
+    logAction({
+      actorId: null,
+      actorEmail: req.portalClient.contact_email,
+      action: 'client_delete_lead',
+      entityType: 'campaign_lead',
+      entityId: parseInt(leadId),
+      diff: { client: req.portalClient.name, deleted: lead },
+    });
+
+    res.json({ success: true, id: parseInt(leadId) });
+  } catch (err) {
+    console.error('[PORTAL] Delete lead error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/portal/:token/lead-alerts
  * Toggle leads alerts setting (toggles lead_alerts_enabled).
  */

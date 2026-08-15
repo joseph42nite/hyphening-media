@@ -1489,6 +1489,35 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
+  /**
+   * Delete a lead after confirming. Used by the Test button, whose job is to
+   * clear out entries that were fired to check the pipeline rather than to
+   * record them as not counting.
+   */
+  const handleDeleteLead = async (lead) => {
+    const label = lead.name || lead.phone || `lead #${lead.id}`;
+    if (!window.confirm(
+      `Delete ${label} permanently?\n\nThis removes the lead from your portal for good — it cannot be undone.`
+    )) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/leads/${lead.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to delete lead');
+
+      setLeads(prev => prev.filter(l => l.id !== lead.id));
+      showToast('Lead deleted', 'success');
+      // A deleted lead drops out of the counts in the cards above this table,
+      // the same way marking one as a test does.
+      checkPortalAuth();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const handleAddManualLead = async (e) => {
     e.preventDefault();
     if (!newLeadData.name.trim() || !newLeadData.phone.trim()) {
@@ -3210,21 +3239,17 @@ export default function ClientPortal({ showToast }) {
                                       <option value="No Answer">🔇 No Answer</option>
                                       <option value="Other">❓ Other</option>
                                     </select>
-                                    {/* A test lead is left out of every figure, so saying so
-                                        here explains why the totals above do not match the
-                                        number of rows below. */}
-                                    <label
-                                      title="Exclude this lead from lead, qualified, booking and revenue totals"
-                                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', color: lead.is_test ? '#92400e' : 'var(--text-muted)' }}
+                                    {/* Test entries are fired to check the pipeline, so the
+                                        useful thing to do with one is get rid of it. Deleting
+                                        cannot be undone, hence the confirmation. */}
+                                    <button
+                                      type="button"
+                                      title="Delete this lead — use it to clear out test entries"
+                                      onClick={() => handleDeleteLead(lead)}
+                                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px', padding: 0, border: 'none', background: 'none', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', color: lead.is_test ? '#b91c1c' : 'var(--text-muted)' }}
                                     >
-                                      <input
-                                        type="checkbox"
-                                        checked={!!lead.is_test}
-                                        onChange={(e) => handleUpdateLead(lead.id, { is_test: e.target.checked })}
-                                        style={{ cursor: 'pointer', margin: 0 }}
-                                      />
-                                      {lead.is_test ? 'TEST — NOT COUNTED' : 'Test'}
-                                    </label>
+                                      🗑 {lead.is_test ? 'TEST — DELETE' : 'Test'}
+                                    </button>
                                   </td>
                                   <td>
                                     <select 
