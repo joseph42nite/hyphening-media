@@ -447,16 +447,26 @@ export async function syncSingleContentMetrics(contentId, { bulk = false } = {})
       //    reaches this point is meant to hit the API.
       if (numericMediaId && /^\d+$/.test(numericMediaId)) {
         try {
+          const postType = (item.post_type || '').toLowerCase();
+          const isCarousel = postType === 'carousel';
+          const isStatic = postType === 'static' || postType === 'story';
+
+          // Carousels and static images do not support video/reel specific metrics like avg_watch_time or views in Graph API
+          let metricsToFetch = ['views', 'reach', 'likes', 'comments', 'saved', 'shares', 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time'];
+          if (isCarousel || isStatic) {
+            metricsToFetch = ['impressions', 'reach', 'saved', 'shares', 'total_interactions'];
+          }
+
           const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
             ig_media_id: numericMediaId,
-            metric: ['views', 'reach', 'likes', 'comments', 'saved', 'shares', 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time']
+            metric: metricsToFetch
           });
 
           const insightArray = insightsRes?.data?.data || insightsRes?.data || [];
           if (Array.isArray(insightArray)) {
             insightArray.forEach(m => {
               const val = m.values?.[0]?.value || 0;
-              if (m.name === 'views') metrics.views = val;
+              if (m.name === 'views' || (m.name === 'impressions' && !metrics.views)) metrics.views = val;
               if (m.name === 'likes') metrics.likes = val;
               if (m.name === 'comments') metrics.comments = val;
               if (m.name === 'saved') metrics.saves = val;
@@ -469,8 +479,24 @@ export async function syncSingleContentMetrics(contentId, { bulk = false } = {})
           }
         } catch (e) {
           console.warn(`[METRIC-SYNC] Insights fetch failed for post #${contentId}:`, e.message);
-          // Clear invalid media ID so it re-resolves on next sync
-          db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = NULL WHERE id = ?').run(contentId);
+          // If the error was a media type mismatch or invalid parameter, retry with minimal safe metrics
+          try {
+            const fallbackRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
+              ig_media_id: numericMediaId,
+              metric: ['reach', 'saved', 'shares']
+            });
+            const fallbackArray = fallbackRes?.data?.data || fallbackRes?.data || [];
+            if (Array.isArray(fallbackArray)) {
+              fallbackArray.forEach(m => {
+                const val = m.values?.[0]?.value || 0;
+                if (m.name === 'saved') metrics.saves = val;
+                if (m.name === 'shares') metrics.shares = val;
+              });
+            }
+          } catch (fallbackErr) {
+            // Clear invalid media ID so it re-resolves on next sync
+            db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = NULL WHERE id = ?').run(contentId);
+          }
         }
       }
     } catch (err) {
