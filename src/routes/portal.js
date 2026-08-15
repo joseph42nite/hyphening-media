@@ -130,9 +130,8 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     }
     const availableMonths = Array.from(new Set(rawMonths)).sort().reverse();
 
-    // No month param means "not chosen yet" -> default to the latest month with data.
-    // Only an explicit ?month=all aggregates across every month.
-    const targetMonth = month ? month : (availableMonths.length > 0 ? availableMonths[0] : currentMonth);
+    // Default to 'all' (all months aggregated) unless a specific month is selected.
+    const targetMonth = month ? month : 'all';
     const monthFilter = targetMonth !== 'all' ? targetMonth : null;
 
     // Leads flagged as tests are excluded from every figure the portal reports.

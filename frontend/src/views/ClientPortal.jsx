@@ -1126,7 +1126,7 @@ export default function ClientPortal({ showToast }) {
   
   // Expanded card state
   const [expandedItems, setExpandedItems] = useState({});
-  const [selectedPortalMonth, setSelectedPortalMonth] = useState('');
+  const [selectedPortalMonth, setSelectedPortalMonth] = useState('all');
   const [availablePortalMonths, setAvailablePortalMonths] = useState([]);
 
   const toggleExpand = (id) => {
