@@ -118,8 +118,12 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       SELECT DISTINCT COALESCE(NULLIF(month, ''), SUBSTR(created_at, 1, 7)) as month
       FROM marketing_ad_campaigns
       WHERE client_id = ? AND created_at IS NOT NULL
+      UNION
+      SELECT DISTINCT SUBSTR(COALESCE(NULLIF(date, ''), created_at), 1, 7) as month
+      FROM marketing_content_tracker
+      WHERE client_id = ? AND (date IS NOT NULL OR created_at IS NOT NULL)
       ORDER BY month DESC
-    `).all(clientId, clientId).map(r => r.month).filter(m => m && m.length === 7);
+    `).all(clientId, clientId, clientId).map(r => r.month).filter(m => m && m.length === 7);
 
     if (!rawMonths.includes(currentMonth)) {
       rawMonths.unshift(currentMonth);
@@ -139,6 +143,13 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       leadParams.push(monthFilter);
     }
 
+    let contentWhere = "WHERE client_id = ? AND is_tracked = 1";
+    const contentParams = [clientId];
+    if (monthFilter) {
+      contentWhere += " AND SUBSTR(COALESCE(NULLIF(date, ''), created_at), 1, 7) = ?";
+      contentParams.push(monthFilter);
+    }
+
     const contentStats = db.prepare(`
       SELECT 
         COUNT(*) as total_posts,
@@ -152,9 +163,8 @@ router.get('/:token/overview', portalAuth, (req, res) => {
         SUM(shares) as total_shares,
         SUM(saves) as total_saves
       FROM marketing_content_tracker 
-      WHERE client_id = ? AND is_tracked = 1
-      ${monthFilter ? "AND SUBSTR(created_at, 1, 7) = '" + monthFilter + "'" : ""}
-    `).get(clientId);
+      ${contentWhere}
+    `).get(...contentParams);
 
     const leadStats = db.prepare(`
       SELECT 
@@ -181,10 +191,9 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     const platformBreakdown = db.prepare(`
       SELECT platform, COUNT(*) as count, SUM(views) as views
       FROM marketing_content_tracker
-      WHERE client_id = ? AND is_tracked = 1
-      ${monthFilter ? "AND SUBSTR(created_at, 1, 7) = '" + monthFilter + "'" : ""}
+      ${contentWhere}
       GROUP BY platform
-    `).all(clientId);
+    `).all(...contentParams);
 
     const adsBreakdown = db.prepare(`
       SELECT 
@@ -206,14 +215,20 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       ORDER BY leads DESC
     `).all(...leadParams);
 
+    let trendWhere = "WHERE client_id = ? AND is_tracked = 1 AND status IN ('Posted', 'Client Approved')";
+    const trendParams = [clientId];
+    if (monthFilter) {
+      trendWhere += " AND SUBSTR(COALESCE(NULLIF(date, ''), created_at), 1, 7) = ?";
+      trendParams.push(monthFilter);
+    }
+
     const viewsTrend = db.prepare(`
       SELECT date, title, (COALESCE(views, 0) + COALESCE(youtube_views, 0)) AS views, COALESCE(engagement_rate_pct, 0.0) AS engagement_rate_pct
       FROM marketing_content_tracker
-      WHERE client_id = ? AND is_tracked = 1 AND status IN ('Posted', 'Client Approved')
-      ${monthFilter ? "AND SUBSTR(created_at, 1, 7) = '" + monthFilter + "'" : ""}
+      ${trendWhere}
       ORDER BY date DESC
       LIMIT 8
-    `).all(clientId);
+    `).all(...trendParams);
 
     // Reverse array to render chronologically (oldest to newest) from left to right
     viewsTrend.reverse();
