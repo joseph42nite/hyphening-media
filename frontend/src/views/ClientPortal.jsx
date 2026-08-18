@@ -1040,8 +1040,8 @@ export default function ClientPortal({ showToast }) {
   const [overview, setOverview] = useState(null);
   const [contentList, setContentList] = useState([]);
   const [leads, setLeads] = useState([]);
-  // Totals behind the contact-activity box above the leads table.
-  const [contactClicks, setContactClicks] = useState({ call_clicks: 0, whatsapp_clicks: 0, today: 0, leads_contacted: 0 });
+  // Which capture month the leads tab is showing; 'all' for every month.
+  const [leadsMonth, setLeadsMonth] = useState('all');
   const [seoReports, setSeoReports] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -1179,7 +1179,6 @@ export default function ClientPortal({ showToast }) {
         const res = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
         const data = await res.json();
         if (res.ok && data.leads) {
-          if (data.contact_clicks) setContactClicks(data.contact_clicks);
           // Compare lists to identify new leads
           const existingIds = new Set(leads.map(l => l.id));
           const newLeads = data.leads.filter(l => !existingIds.has(l.id));
@@ -1317,10 +1316,7 @@ export default function ClientPortal({ showToast }) {
         try {
           const resLeads = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
           const dataLeads = await resLeads.json();
-          if (resLeads.ok) {
-            setLeads(dataLeads.leads || []);
-            if (dataLeads.contact_clicks) setContactClicks(dataLeads.contact_clicks);
-          }
+          if (resLeads.ok) setLeads(dataLeads.leads || []);
         } catch (e) {
           console.error('Error fetching leads:', e);
         } finally {
@@ -1530,17 +1526,13 @@ export default function ClientPortal({ showToast }) {
       window.open(`https://wa.me/${number}`, '_blank', 'noopener,noreferrer');
     }
 
-    // Optimistic, so the counters move the instant the button is pressed.
+    // Optimistic, so the cards above the table move the instant the button is
+    // pressed. They are summed from these per-lead counts, so this is the only
+    // place the numbers have to be kept up to date.
     setLeads(prev => prev.map(l => l.id === lead.id
       ? { ...l, call_clicks: (l.call_clicks || 0) + (channel === 'call' ? 1 : 0),
               whatsapp_clicks: (l.whatsapp_clicks || 0) + (channel === 'whatsapp' ? 1 : 0) }
       : l));
-    setContactClicks(prev => ({
-      ...prev,
-      call_clicks: (prev.call_clicks || 0) + (channel === 'call' ? 1 : 0),
-      whatsapp_clicks: (prev.whatsapp_clicks || 0) + (channel === 'whatsapp' ? 1 : 0),
-      today: (prev.today || 0) + 1,
-    }));
 
     try {
       const response = await fetch(`${API_BASE}/api/portal/${token}/leads/${lead.id}/contact-click`, {
@@ -1556,7 +1548,6 @@ export default function ClientPortal({ showToast }) {
       setLeads(prev => prev.map(l => l.id === lead.id
         ? { ...l, call_clicks: data.call_clicks, whatsapp_clicks: data.whatsapp_clicks }
         : l));
-      if (data.totals) setContactClicks(data.totals);
     } catch (err) {
       console.error('[PORTAL] Contact click not recorded:', err);
     }
@@ -2990,6 +2981,27 @@ export default function ClientPortal({ showToast }) {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Same month control as the overview, so the table and the
+                    contact cards cover one period rather than all time.
+                    Filtered here rather than re-fetched: the full list is
+                    already loaded, and every other filter on this tab works
+                    the same way. */}
+                {availablePortalMonths.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Select Month:</span>
+                    <select
+                      className="form-control"
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold', borderRadius: '8px', border: '2px solid #18181b' }}
+                      value={leadsMonth}
+                      onChange={(e) => { setLeadsMonth(e.target.value); setLeadsPage(1); }}
+                    >
+                      <option value="all">All Months (Total)</option>
+                      {availablePortalMonths.map(m => (
+                        <option key={m} value={m}>{formatMonthName(m)}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <button 
                   onClick={() => setShowAddLeadModal(true)}
                   className="portal-btn portal-btn-primary"
@@ -3008,33 +3020,16 @@ export default function ClientPortal({ showToast }) {
               </div>
             </div>
 
-            {/* Contact activity — how often the call and WhatsApp buttons below
-                have actually been pressed, so outreach effort is visible without
-                reading every row. */}
-            <div
-              className="portal-bento-card"
-              style={{ padding: '14px 18px', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '22px', flexWrap: 'wrap' }}
-            >
-              <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>
-                Contact Activity
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb' }}>{contactClicks.call_clicks || 0}</span>
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b' }}>📞 Calls made</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#16a34a' }}>{contactClicks.whatsapp_clicks || 0}</span>
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b' }}>💬 WhatsApp opened</span>
-              </div>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: '16px', fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>
-                <span>{contactClicks.today || 0} today</span>
-                <span>{contactClicks.leads_contacted || 0} of {leads.length} leads contacted</span>
-              </div>
-            </div>
-
             {/* Leads Table Container */}
             {(() => {
-              const filteredLeads = leads.filter(lead => {
+              // Everything on this tab — the table, the filter counts and the
+              // contact cards — reads off the selected month, so they can never
+              // describe different periods.
+              const monthLeads = leadsMonth === 'all'
+                ? leads
+                : leads.filter(l => (l.created_at || '').slice(0, 7) === leadsMonth);
+
+              const filteredLeads = monthLeads.filter(lead => {
                 const apptStatus = lead.appointment_status || 'Follow Up';
                 if (appointmentFilter !== 'all' && apptStatus !== appointmentFilter) return false;
 
@@ -3054,29 +3049,63 @@ export default function ClientPortal({ showToast }) {
               });
 
               const apptCounts = {
-                all: leads.length,
-                Booked: leads.filter(l => l.appointment_status === 'Booked').length,
-                'Follow Up': leads.filter(l => (l.appointment_status || 'Follow Up') === 'Follow Up').length,
-                'Not Booked': leads.filter(l => l.appointment_status === 'Not Booked').length,
+                all: monthLeads.length,
+                Booked: monthLeads.filter(l => l.appointment_status === 'Booked').length,
+                'Follow Up': monthLeads.filter(l => (l.appointment_status || 'Follow Up') === 'Follow Up').length,
+                'Not Booked': monthLeads.filter(l => l.appointment_status === 'Not Booked').length,
               };
 
               const qualCounts = {
-                all: leads.length,
-                Pending: leads.filter(l => (l.qualification_status || 'Pending') === 'Pending').length,
-                Qualified: leads.filter(l => l.qualification_status === 'Qualified').length,
-                Disqualified: leads.filter(l => l.qualification_status === 'Disqualified').length,
+                all: monthLeads.length,
+                Pending: monthLeads.filter(l => (l.qualification_status || 'Pending') === 'Pending').length,
+                Qualified: monthLeads.filter(l => l.qualification_status === 'Qualified').length,
+                Disqualified: monthLeads.filter(l => l.qualification_status === 'Disqualified').length,
               };
 
+              // Summed from the leads themselves, so picking a month narrows
+              // these the same way it narrows the table.
+              const callClicks = monthLeads.reduce((sum, l) => sum + (l.call_clicks || 0), 0);
+              const whatsappClicks = monthLeads.reduce((sum, l) => sum + (l.whatsapp_clicks || 0), 0);
+              const contactedLeads = monthLeads.filter(l => (l.call_clicks || 0) + (l.whatsapp_clicks || 0) > 0).length;
+
+              // Deliberately not month-scoped: an overdue follow-up is about
+              // today, and hiding it because it was captured in another month
+              // is exactly how it gets missed.
               const dueLeads = leads.filter(l => followUpState(l));
               const overdueCount = dueLeads.filter(l => followUpState(l) === 'overdue').length;
 
               return (
                 <div>
+                  {/* How often the buttons on each row below were actually
+                      pressed — outreach effort, without reading every row. */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>📞 Calls Made</span>
+                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#2563eb', display: 'block', marginTop: '4px' }}>
+                        {callClicks.toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>💬 WhatsApp Opened</span>
+                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#16a34a', display: 'block', marginTop: '4px' }}>
+                        {whatsappClicks.toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
+                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Leads Contacted</span>
+                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>
+                        {contactedLeads}<span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#64748b' }}> / {monthLeads.length}</span>
+                      </span>
+                    </div>
+                  </div>
+
                   {/* The reminder has to be visible without opening a lead row,
                       or a follow-up date is just something nobody sees again. */}
                   {dueLeads.length > 0 && (
                     <div
-                      onClick={() => { setAppointmentFilter('Follow Up'); setQualificationFilter('all'); }}
+                      onClick={() => { setAppointmentFilter('Follow Up'); setQualificationFilter('all'); setLeadsMonth('all'); setLeadsPage(1); }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
                         marginBottom: '14px', padding: '10px 14px', borderRadius: '10px',
@@ -3182,9 +3211,9 @@ export default function ClientPortal({ showToast }) {
                       </select>
                     </div>
 
-                    {(appointmentFilter !== 'all' || qualificationFilter !== 'all' || leadSearchQuery !== '') && (
+                    {(appointmentFilter !== 'all' || qualificationFilter !== 'all' || leadSearchQuery !== '' || leadsMonth !== 'all') && (
                       <button
-                        onClick={() => { setAppointmentFilter('all'); setQualificationFilter('all'); setLeadSearchQuery(''); setLeadsPage(1); }}
+                        onClick={() => { setAppointmentFilter('all'); setQualificationFilter('all'); setLeadSearchQuery(''); setLeadsMonth('all'); setLeadsPage(1); }}
                         className="portal-btn"
                         style={{ padding: '6px 14px', fontSize: '0.78rem', fontWeight: 800 }}
                       >
@@ -3202,7 +3231,7 @@ export default function ClientPortal({ showToast }) {
                       No leads match the selected filter criteria.
                       <div style={{ marginTop: '12px' }}>
                         <button
-                          onClick={() => { setAppointmentFilter('all'); setQualificationFilter('all'); setLeadSearchQuery(''); setLeadsPage(1); }}
+                          onClick={() => { setAppointmentFilter('all'); setQualificationFilter('all'); setLeadSearchQuery(''); setLeadsMonth('all'); setLeadsPage(1); }}
                           className="portal-btn portal-btn-primary"
                           style={{ padding: '8px 16px', fontSize: '0.8rem' }}
                         >

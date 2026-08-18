@@ -373,7 +373,7 @@ router.get('/:token/leads', portalAuth, (req, res) => {
       ORDER BY l.created_at DESC
     `).all(req.portalClient.id);
 
-    res.json({ leads, contact_clicks: contactClickTotals(req.portalClient.id) });
+    res.json({ leads });
   } catch (err) {
     console.error('[PORTAL] Get leads error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -580,36 +580,10 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
 });
 
 /**
- * Totals for the contact-button counter shown above the leads table.
- * Counted from lead_contact_clicks rather than stored on the client, so a
- * deleted lead's clicks disappear along with it.
- */
-function contactClickTotals(clientId) {
-  const row = db.prepare(`
-    SELECT
-      SUM(CASE WHEN channel = 'call' THEN 1 ELSE 0 END) AS call_clicks,
-      SUM(CASE WHEN channel = 'whatsapp' THEN 1 ELSE 0 END) AS whatsapp_clicks,
-      SUM(CASE WHEN date(created_at) = date('now') THEN 1 ELSE 0 END) AS today,
-      COUNT(DISTINCT lead_id) AS leads_contacted,
-      MAX(created_at) AS last_click_at
-    FROM lead_contact_clicks
-    WHERE client_id = ?
-  `).get(clientId) || {};
-
-  return {
-    call_clicks: row.call_clicks || 0,
-    whatsapp_clicks: row.whatsapp_clicks || 0,
-    today: row.today || 0,
-    leads_contacted: row.leads_contacted || 0,
-    last_click_at: row.last_click_at || null,
-  };
-}
-
-/**
  * POST /api/portal/:token/leads/:leadId/contact-click
  * Record that the client opened this lead's phone dialler or WhatsApp thread
- * from the portal. Fired by the buttons on the leads table; the returned totals
- * feed the counter above it.
+ * from the portal. Fired by the buttons on the leads table; the returned counts
+ * are summed per month into the cards above it.
  */
 router.post('/:token/leads/:leadId/contact-click', portalAuth, (req, res) => {
   try {
@@ -644,7 +618,6 @@ router.post('/:token/leads/:leadId/contact-click', portalAuth, (req, res) => {
       lead_id: lead.id,
       call_clicks: leadCounts.call_clicks || 0,
       whatsapp_clicks: leadCounts.whatsapp_clicks || 0,
-      totals: contactClickTotals(req.portalClient.id),
     });
   } catch (err) {
     console.error('[PORTAL] Lead contact click error:', err);
