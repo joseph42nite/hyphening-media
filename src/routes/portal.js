@@ -373,7 +373,19 @@ router.get('/:token/leads', portalAuth, (req, res) => {
       ORDER BY l.created_at DESC
     `).all(req.portalClient.id);
 
-    res.json({ leads });
+    // Bucketed by month so the leads tab can filter them with its own month
+    // selector without a second request.
+    const landingClicks = db.prepare(`
+      SELECT
+        SUBSTR(created_at, 1, 7) AS month,
+        SUM(CASE WHEN channel = 'call' THEN 1 ELSE 0 END) AS call_clicks,
+        SUM(CASE WHEN channel = 'whatsapp' THEN 1 ELSE 0 END) AS whatsapp_clicks
+      FROM landing_contact_clicks
+      WHERE client_id = ?
+      GROUP BY month
+    `).all(req.portalClient.id);
+
+    res.json({ leads, landing_clicks: landingClicks });
   } catch (err) {
     console.error('[PORTAL] Get leads error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -684,6 +696,46 @@ router.post('/:token/lead-alerts', portalAuth, (req, res) => {
     res.json({ success: true, lead_alerts_enabled: val === 1 });
   } catch (err) {
     console.error('[PORTAL] Toggle lead alerts error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/portal/:token/contact-click
+ * A visitor tapped Call or WhatsApp on the client's landing page.
+ *
+ * Unauthenticated for the same reason the capture webhook below is: it is
+ * called from a public page that holds nothing but the portal token.
+ *
+ * Use this rather than leads/capture for button taps. A tap is an anonymous
+ * visitor showing interest — there is no name, and filing one as a lead put
+ * placeholder rows in the leads log that nobody could follow up.
+ */
+router.post('/:token/contact-click', (req, res) => {
+  try {
+    const { token } = req.params;
+    const { channel, campaign_name, page_url } = req.body || {};
+
+    if (!['call', 'whatsapp'].includes(channel)) {
+      return res.status(400).json({ error: 'channel must be call or whatsapp' });
+    }
+
+    const client = db.prepare(
+      'SELECT id FROM crm_clients WHERE portal_token = ? AND portal_enabled = 1 AND is_active = 1'
+    ).get(token);
+
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found or portal disabled' });
+    }
+
+    db.prepare(`
+      INSERT INTO landing_contact_clicks (client_id, channel, campaign_name, page_url)
+      VALUES (?, ?, ?, ?)
+    `).run(client.id, channel, campaign_name || null, page_url || null);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[PORTAL] Landing contact click error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

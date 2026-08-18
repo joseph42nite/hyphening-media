@@ -1042,6 +1042,8 @@ export default function ClientPortal({ showToast }) {
   const [leads, setLeads] = useState([]);
   // Which capture month the leads tab is showing; 'all' for every month.
   const [leadsMonth, setLeadsMonth] = useState('all');
+  // Landing-page Call/WhatsApp taps, one bucket per month.
+  const [landingClicks, setLandingClicks] = useState([]);
   const [seoReports, setSeoReports] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -1179,6 +1181,7 @@ export default function ClientPortal({ showToast }) {
         const res = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
         const data = await res.json();
         if (res.ok && data.leads) {
+          setLandingClicks(data.landing_clicks || []);
           // Compare lists to identify new leads
           const existingIds = new Set(leads.map(l => l.id));
           const newLeads = data.leads.filter(l => !existingIds.has(l.id));
@@ -1316,7 +1319,10 @@ export default function ClientPortal({ showToast }) {
         try {
           const resLeads = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
           const dataLeads = await resLeads.json();
-          if (resLeads.ok) setLeads(dataLeads.leads || []);
+          if (resLeads.ok) {
+            setLeads(dataLeads.leads || []);
+            setLandingClicks(dataLeads.landing_clicks || []);
+          }
         } catch (e) {
           console.error('Error fetching leads:', e);
         } finally {
@@ -3068,6 +3074,15 @@ export default function ClientPortal({ showToast }) {
               const whatsappClicks = monthLeads.reduce((sum, l) => sum + (l.whatsapp_clicks || 0), 0);
               const contactedLeads = monthLeads.filter(l => (l.call_clicks || 0) + (l.whatsapp_clicks || 0) > 0).length;
 
+              // Landing-page taps are scoped by when the tap happened; the
+              // cards above are scoped by when the lead was captured. Different
+              // clocks, so they are labelled and grouped separately.
+              const landingBuckets = leadsMonth === 'all'
+                ? landingClicks
+                : landingClicks.filter(b => b.month === leadsMonth);
+              const landingCalls = landingBuckets.reduce((sum, b) => sum + (b.call_clicks || 0), 0);
+              const landingWhatsapp = landingBuckets.reduce((sum, b) => sum + (b.whatsapp_clicks || 0), 0);
+
               // Deliberately not month-scoped: an overdue follow-up is about
               // today, and hiding it because it was captured in another month
               // is exactly how it gets missed.
@@ -3097,6 +3112,25 @@ export default function ClientPortal({ showToast }) {
                       <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Leads Contacted</span>
                       <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>
                         {contactedLeads}<span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#64748b' }}> / {monthLeads.length}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Taps on the landing page's own Call and WhatsApp buttons.
+                      Visitor interest, with no name attached — which is why it
+                      is a count here rather than a row in the log below. */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#fafafa', boxShadow: '3px 3px 0px #18181b' }}>
+                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>📞 Landing Page Call Taps</span>
+                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#2563eb', display: 'block', marginTop: '4px' }}>
+                        {landingCalls.toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#fafafa', boxShadow: '3px 3px 0px #18181b' }}>
+                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>💬 Landing Page WhatsApp Taps</span>
+                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#16a34a', display: 'block', marginTop: '4px' }}>
+                        {landingWhatsapp.toLocaleString()}
                       </span>
                     </div>
                   </div>
