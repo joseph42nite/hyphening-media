@@ -356,19 +356,24 @@ router.get('/:token/leads', portalAuth, (req, res) => {
   try {
     const leads = db.prepare(`
       SELECT 
-        id, name, email, phone, platform, source, campaign_name, treatment_type, lead_status, rejection_reason,
-        call_duration_seconds, additional_data, created_at,
-        qualification_status, call_outcome, appointment_status, appointment_date,
-        follow_up_date,
+        l.id, l.name, l.email, l.phone, l.platform, l.source, l.campaign_name, l.treatment_type,
+        l.lead_status, l.rejection_reason,
+        l.call_duration_seconds, l.additional_data, l.created_at,
+        l.qualification_status, l.call_outcome, l.appointment_status, l.appointment_date,
+        l.follow_up_date,
         -- Without this the checkbox reads undefined on every load, so ticking it
         -- appears to do nothing the moment the list is re-read.
-        is_test
-      FROM campaign_leads
-      WHERE client_id = ?
-      ORDER BY created_at DESC
+        l.is_test,
+        (SELECT COUNT(*) FROM lead_contact_clicks c
+          WHERE c.lead_id = l.id AND c.channel = 'call') AS call_clicks,
+        (SELECT COUNT(*) FROM lead_contact_clicks c
+          WHERE c.lead_id = l.id AND c.channel = 'whatsapp') AS whatsapp_clicks
+      FROM campaign_leads l
+      WHERE l.client_id = ?
+      ORDER BY l.created_at DESC
     `).all(req.portalClient.id);
 
-    res.json({ leads });
+    res.json({ leads, contact_clicks: contactClickTotals(req.portalClient.id) });
   } catch (err) {
     console.error('[PORTAL] Get leads error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -570,6 +575,79 @@ router.post('/:token/leads/:leadId/status', portalAuth, (req, res) => {
     });
   } catch (err) {
     console.error('[PORTAL] Update lead status error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Totals for the contact-button counter shown above the leads table.
+ * Counted from lead_contact_clicks rather than stored on the client, so a
+ * deleted lead's clicks disappear along with it.
+ */
+function contactClickTotals(clientId) {
+  const row = db.prepare(`
+    SELECT
+      SUM(CASE WHEN channel = 'call' THEN 1 ELSE 0 END) AS call_clicks,
+      SUM(CASE WHEN channel = 'whatsapp' THEN 1 ELSE 0 END) AS whatsapp_clicks,
+      SUM(CASE WHEN date(created_at) = date('now') THEN 1 ELSE 0 END) AS today,
+      COUNT(DISTINCT lead_id) AS leads_contacted,
+      MAX(created_at) AS last_click_at
+    FROM lead_contact_clicks
+    WHERE client_id = ?
+  `).get(clientId) || {};
+
+  return {
+    call_clicks: row.call_clicks || 0,
+    whatsapp_clicks: row.whatsapp_clicks || 0,
+    today: row.today || 0,
+    leads_contacted: row.leads_contacted || 0,
+    last_click_at: row.last_click_at || null,
+  };
+}
+
+/**
+ * POST /api/portal/:token/leads/:leadId/contact-click
+ * Record that the client opened this lead's phone dialler or WhatsApp thread
+ * from the portal. Fired by the buttons on the leads table; the returned totals
+ * feed the counter above it.
+ */
+router.post('/:token/leads/:leadId/contact-click', portalAuth, (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { channel } = req.body;
+
+    if (!['call', 'whatsapp'].includes(channel)) {
+      return res.status(400).json({ error: 'channel must be call or whatsapp' });
+    }
+
+    // Scoped to the caller's own leads so a portal token cannot log clicks
+    // against another client's rows.
+    const lead = db.prepare('SELECT id FROM campaign_leads WHERE id = ? AND client_id = ?')
+      .get(leadId, req.portalClient.id);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    db.prepare('INSERT INTO lead_contact_clicks (client_id, lead_id, channel) VALUES (?, ?, ?)')
+      .run(req.portalClient.id, lead.id, channel);
+
+    const leadCounts = db.prepare(`
+      SELECT
+        SUM(CASE WHEN channel = 'call' THEN 1 ELSE 0 END) AS call_clicks,
+        SUM(CASE WHEN channel = 'whatsapp' THEN 1 ELSE 0 END) AS whatsapp_clicks
+      FROM lead_contact_clicks
+      WHERE lead_id = ?
+    `).get(lead.id);
+
+    res.json({
+      success: true,
+      lead_id: lead.id,
+      call_clicks: leadCounts.call_clicks || 0,
+      whatsapp_clicks: leadCounts.whatsapp_clicks || 0,
+      totals: contactClickTotals(req.portalClient.id),
+    });
+  } catch (err) {
+    console.error('[PORTAL] Lead contact click error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

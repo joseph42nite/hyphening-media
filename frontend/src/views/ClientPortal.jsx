@@ -1040,6 +1040,8 @@ export default function ClientPortal({ showToast }) {
   const [overview, setOverview] = useState(null);
   const [contentList, setContentList] = useState([]);
   const [leads, setLeads] = useState([]);
+  // Totals behind the contact-activity box above the leads table.
+  const [contactClicks, setContactClicks] = useState({ call_clicks: 0, whatsapp_clicks: 0, today: 0, leads_contacted: 0 });
   const [seoReports, setSeoReports] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -1177,6 +1179,7 @@ export default function ClientPortal({ showToast }) {
         const res = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
         const data = await res.json();
         if (res.ok && data.leads) {
+          if (data.contact_clicks) setContactClicks(data.contact_clicks);
           // Compare lists to identify new leads
           const existingIds = new Set(leads.map(l => l.id));
           const newLeads = data.leads.filter(l => !existingIds.has(l.id));
@@ -1314,7 +1317,10 @@ export default function ClientPortal({ showToast }) {
         try {
           const resLeads = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
           const dataLeads = await resLeads.json();
-          if (resLeads.ok) setLeads(dataLeads.leads || []);
+          if (resLeads.ok) {
+            setLeads(dataLeads.leads || []);
+            if (dataLeads.contact_clicks) setContactClicks(dataLeads.contact_clicks);
+          }
         } catch (e) {
           console.error('Error fetching leads:', e);
         } finally {
@@ -1486,6 +1492,73 @@ export default function ClientPortal({ showToast }) {
       }
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  };
+
+  /**
+   * wa.me needs a country code and nothing but digits. Indian numbers are
+   * routinely stored as 10 digits with no prefix, so those get 91; anything
+   * already carrying a country code is left alone.
+   */
+  const whatsappNumber = (phone) => {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) return `91${digits}`;
+    if (digits.length === 11 && digits.startsWith('0')) return `91${digits.slice(1)}`;
+    return digits;
+  };
+
+  /**
+   * Open the dialler or the WhatsApp thread for a lead and record the click, so
+   * the box above the table shows how much the leads are actually being worked.
+   * The link is opened first — a failed log should never cost the client the call.
+   */
+  const handleContactClick = async (lead, channel) => {
+    if (!lead.phone) {
+      showToast('This lead has no phone number', 'error');
+      return;
+    }
+
+    if (channel === 'call') {
+      window.location.href = `tel:${String(lead.phone).replace(/\s/g, '')}`;
+    } else {
+      const number = whatsappNumber(lead.phone);
+      if (!number) {
+        showToast('This lead has no usable phone number', 'error');
+        return;
+      }
+      window.open(`https://wa.me/${number}`, '_blank', 'noopener,noreferrer');
+    }
+
+    // Optimistic, so the counters move the instant the button is pressed.
+    setLeads(prev => prev.map(l => l.id === lead.id
+      ? { ...l, call_clicks: (l.call_clicks || 0) + (channel === 'call' ? 1 : 0),
+              whatsapp_clicks: (l.whatsapp_clicks || 0) + (channel === 'whatsapp' ? 1 : 0) }
+      : l));
+    setContactClicks(prev => ({
+      ...prev,
+      call_clicks: (prev.call_clicks || 0) + (channel === 'call' ? 1 : 0),
+      whatsapp_clicks: (prev.whatsapp_clicks || 0) + (channel === 'whatsapp' ? 1 : 0),
+      today: (prev.today || 0) + 1,
+    }));
+
+    try {
+      const response = await fetch(`${API_BASE}/api/portal/${token}/leads/${lead.id}/contact-click`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel }),
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to record contact');
+
+      // Replace the optimistic guess with what was actually stored.
+      setLeads(prev => prev.map(l => l.id === lead.id
+        ? { ...l, call_clicks: data.call_clicks, whatsapp_clicks: data.whatsapp_clicks }
+        : l));
+      if (data.totals) setContactClicks(data.totals);
+    } catch (err) {
+      console.error('[PORTAL] Contact click not recorded:', err);
     }
   };
 
@@ -2935,6 +3008,30 @@ export default function ClientPortal({ showToast }) {
               </div>
             </div>
 
+            {/* Contact activity — how often the call and WhatsApp buttons below
+                have actually been pressed, so outreach effort is visible without
+                reading every row. */}
+            <div
+              className="portal-bento-card"
+              style={{ padding: '14px 18px', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '22px', flexWrap: 'wrap' }}
+            >
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>
+                Contact Activity
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb' }}>{contactClicks.call_clicks || 0}</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b' }}>📞 Calls made</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#16a34a' }}>{contactClicks.whatsapp_clicks || 0}</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b' }}>💬 WhatsApp opened</span>
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '16px', fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>
+                <span>{contactClicks.today || 0} today</span>
+                <span>{contactClicks.leads_contacted || 0} of {leads.length} leads contacted</span>
+              </div>
+            </div>
+
             {/* Leads Table Container */}
             {(() => {
               const filteredLeads = leads.filter(lead => {
@@ -3145,6 +3242,36 @@ export default function ClientPortal({ showToast }) {
                                       <span style={{ fontWeight: '800', color: '#09090b', fontSize: '0.88rem' }}>{cleanName}</span>
                                       {cleanEmail && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{cleanEmail}</span>}
                                       <span style={{ fontSize: '0.75rem', color: '#09090b', fontWeight: '800' }}>{lead.phone}</span>
+                                      {lead.phone && (
+                                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleContactClick(lead, 'call')}
+                                            title="Call this lead"
+                                            style={{
+                                              display: 'flex', alignItems: 'center', gap: '4px',
+                                              padding: '3px 9px', borderRadius: '9999px',
+                                              border: '1.5px solid #18181b', background: '#dbeafe', color: '#1e40af',
+                                              fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer'
+                                            }}
+                                          >
+                                            📞 Call{lead.call_clicks ? ` · ${lead.call_clicks}` : ''}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleContactClick(lead, 'whatsapp')}
+                                            title="Open this lead on WhatsApp"
+                                            style={{
+                                              display: 'flex', alignItems: 'center', gap: '4px',
+                                              padding: '3px 9px', borderRadius: '9999px',
+                                              border: '1.5px solid #18181b', background: '#dcfce7', color: '#166534',
+                                              fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer'
+                                            }}
+                                          >
+                                            💬 WhatsApp{lead.whatsapp_clicks ? ` · ${lead.whatsapp_clicks}` : ''}
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
                                   </td>
                                   <td>
