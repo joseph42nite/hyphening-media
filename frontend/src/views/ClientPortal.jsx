@@ -3068,15 +3068,8 @@ export default function ClientPortal({ showToast }) {
                 Disqualified: monthLeads.filter(l => l.qualification_status === 'Disqualified').length,
               };
 
-              // Summed from the leads themselves, so picking a month narrows
-              // these the same way it narrows the table.
-              const callClicks = monthLeads.reduce((sum, l) => sum + (l.call_clicks || 0), 0);
-              const whatsappClicks = monthLeads.reduce((sum, l) => sum + (l.whatsapp_clicks || 0), 0);
-              const contactedLeads = monthLeads.filter(l => (l.call_clicks || 0) + (l.whatsapp_clicks || 0) > 0).length;
-
-              // Landing-page taps are scoped by when the tap happened; the
-              // cards above are scoped by when the lead was captured. Different
-              // clocks, so they are labelled and grouped separately.
+              // Scoped by when the tap happened, unlike everything else on this
+              // tab, which is scoped by when the lead was captured.
               const landingBuckets = leadsMonth === 'all'
                 ? landingClicks
                 : landingClicks.filter(b => b.month === leadsMonth);
@@ -3091,43 +3084,20 @@ export default function ClientPortal({ showToast }) {
 
               return (
                 <div>
-                  {/* How often the buttons on each row below were actually
-                      pressed — outreach effort, without reading every row. */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
-                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>📞 Calls Made</span>
-                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#2563eb', display: 'block', marginTop: '4px' }}>
-                        {callClicks.toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>💬 WhatsApp Opened</span>
-                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#16a34a', display: 'block', marginTop: '4px' }}>
-                        {whatsappClicks.toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Leads Contacted</span>
-                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>
-                        {contactedLeads}<span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#64748b' }}> / {monthLeads.length}</span>
-                      </span>
-                    </div>
-                  </div>
-
                   {/* Taps on the landing page's own Call and WhatsApp buttons.
                       Visitor interest, with no name attached — which is why it
-                      is a count here rather than a row in the log below. */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
-                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#fafafa', boxShadow: '3px 3px 0px #18181b' }}>
+                      is a count here rather than a row in the log below.
+                      Capped rather than stretched, so two cards do not span the
+                      full width and read as banners. */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px', maxWidth: '760px' }}>
+                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
                       <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>📞 Landing Page Call Taps</span>
                       <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#2563eb', display: 'block', marginTop: '4px' }}>
                         {landingCalls.toLocaleString()}
                       </span>
                     </div>
 
-                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#fafafa', boxShadow: '3px 3px 0px #18181b' }}>
+                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
                       <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>💬 Landing Page WhatsApp Taps</span>
                       <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#16a34a', display: 'block', marginTop: '4px' }}>
                         {landingWhatsapp.toLocaleString()}
