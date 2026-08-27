@@ -603,14 +603,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         setClients(allClients);
         if (allClients.length > 0) {
           const marketingClients = allClients.filter(c => c.client_type !== 'artist_curation');
-          // Video editors don't need marketing reports/scripts data
-          if (!isVideoEditor && marketingClients.length > 0) {
+          if (marketingClients.length > 0) {
             if (!selectedClientForReports || selectedClientForReports.id === 'all') {
               const allClientsOption = { id: 'all', name: 'All Clients' };
               setSelectedClientForReports(allClientsOption);
               fetchMarketingData('all');
             }
-            if (!selectedScriptClient) {
+            // Scripts stay closed to video editors, so there is no client to preselect.
+            if (!isVideoEditor && !selectedScriptClient) {
               setSelectedScriptClient(marketingClients[0]);
             }
           }
@@ -1262,7 +1262,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         </button>
 
         {/* 3. Marketing Data */}
-        {(isAdmin || isSMM) && (
+        {(isAdmin || isSMM || isVideoEditor) && (
           <button onClick={() => handleTabClick('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>
             <FileSpreadsheet size={16} /> Marketing Data
           </button>

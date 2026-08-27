@@ -32,6 +32,7 @@ export default function MarketingDataTab({
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSMM = auth?.role === 'ops_social_media_manager';
+  const isVideoEditor = auth?.role === 'ops_video_editor';
 
   // Content Tracker Pagination State
   const [contentPage, setContentPage] = useState(1);
@@ -429,7 +430,9 @@ export default function MarketingDataTab({
     }
   };
 
-  if (!isAdmin && !isSMM) return null;
+  // Video editors get the tab read-only: every add/edit/delete control below
+  // is gated on (isAdmin || isSMM), and the API refuses them the writes too.
+  if (!isAdmin && !isSMM && !isVideoEditor) return null;
 
   return (
     <div style={{ textAlign: 'left' }}>
