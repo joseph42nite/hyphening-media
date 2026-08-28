@@ -18,11 +18,10 @@ const IN_FLIGHT_FOR_ABORT = ['queued', 'running'];
 // data source does not fail, it writes a plausible-looking audit from training
 // knowledge, which is how a fabricated Critical recommendation reaches a client.
 //
-// Mirrors UNAVAILABLE_SKILLS in SeoMonitorTab.jsx; keep the two in sync.
+// Static blocks only — conditions no configuration change flips on its own.
+// Anything whose availability can change is decided by unavailableReason()
+// below and sent to the dashboard, rather than mirrored into the frontend.
 const UNAVAILABLE_SKILLS = new Map([
-  // Installed, but the MCP server that supplies their data is not configured.
-  ['dataforseo', 'Requires the DataForSEO MCP server, which is not configured'],
-  ['maps', 'Requires the DataForSEO MCP server, which is not configured'],
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
   // 'google' was unblocked 2026-08-04: the worker reports tier 0, so PageSpeed,
   // CrUX and CrUX History return real field data. Search Console, Indexing and
@@ -33,6 +32,94 @@ const UNAVAILABLE_SKILLS = new Map([
   // before one exists reports every element as new rather than as drift.
   ['drift', 'Needs a stored baseline first — capture one before comparing'],
 ]);
+
+/**
+ * Skills that are useless without DataForSEO, gated on whether it is actually
+ * there rather than on a hardcoded belief that it is not.
+ *
+ * These two used to sit in the map above with the reason "Requires the
+ * DataForSEO MCP server, which is not configured". That sentence was true when
+ * it was written and became a lie the moment credentials were added, with
+ * nothing to notice — the same way image_gen's entry outlived the nanobanana
+ * server being connected. A hardcoded fact about a changeable thing decays
+ * silently, and this list is copied into two other files, so it decays three
+ * times over.
+ *
+ * The worker already reports what it can reach: facts.mjs probes DataForSEO on
+ * every run and the capabilities land in seo_audits.report_json, which
+ * detectDataGap() below already reads for exactly this purpose.
+ */
+const DATAFORSEO_SKILLS = new Set(['dataforseo', 'maps']);
+
+let dfsCache = { at: 0, available: null };
+
+/**
+ * Whether the worker last reported DataForSEO as reachable.
+ *
+ * Returns null when no run has reported either way — an unknown, which is
+ * treated as unavailable by the caller. Absence of evidence is not evidence
+ * that it works, and the cost of guessing wrong is a skill that runs without
+ * its data source and writes a plausible audit from training knowledge.
+ *
+ * Cached for a minute: the agents/status route asks once per card.
+ */
+function dataForSeoAvailable() {
+  if (Date.now() - dfsCache.at < 60_000) return dfsCache.available;
+
+  let available = null;
+  try {
+    // Recent runs only. A months-old row saying DataForSEO worked is not
+    // evidence about today, and scanning the whole table to find one would
+    // make an outage look like uptime for as long as the table is kept.
+    const rows = db.prepare(`
+      SELECT report_json FROM seo_audits
+      WHERE report_json IS NOT NULL AND is_competitor = 0
+      ORDER BY created_at DESC LIMIT 20
+    `).all();
+
+    for (const row of rows) {
+      let parsed;
+      try {
+        parsed = typeof row.report_json === 'string' ? JSON.parse(row.report_json) : row.report_json;
+      } catch { continue; }
+      const dfs = parsed?.capabilities?.dataforseo;
+      if (dfs && typeof dfs.available === 'boolean') {
+        available = dfs.available;
+        break;
+      }
+    }
+  } catch (err) {
+    // A failed lookup must not unblock a skill. Staying blocked costs a button;
+    // guessing available costs a fabricated audit.
+    console.error('[SEO ROUTE] DataForSEO capability lookup failed:', err.message);
+    available = null;
+  }
+
+  dfsCache = { at: Date.now(), available };
+  return available;
+}
+
+/**
+ * Why this skill cannot run, or null if it can.
+ *
+ * The single place both the trigger routes and the dashboard ask. Replaces
+ * three copies of a Map that had already drifted out of sync with each other.
+ */
+function unavailableReason(agentType) {
+  const stat = UNAVAILABLE_SKILLS.get(agentType);
+  if (stat) return stat;
+
+  if (DATAFORSEO_SKILLS.has(agentType)) {
+    const available = dataForSeoAvailable();
+    if (available === true) return null;
+    if (available === false) {
+      return 'The worker reports DataForSEO as unreachable — check credentials and account balance';
+    }
+    return 'Requires DataForSEO. No run has reported on it yet; run any other audit once to register the worker\'s capabilities.';
+  }
+
+  return null;
+}
 
 // Each skill writes a different one of the ten score columns on seo_audits.
 // Prefer the column matching the audit type, then the generic health_score,
@@ -268,6 +355,12 @@ router.get('/:id/seo/agents/status', (req, res) => {
         lastRunAt,
         score,
         dataGap,
+        // Sent rather than re-derived in the browser. The dashboard used to
+        // keep its own copy of the unavailable-skills map with a "keep the two
+        // in sync" comment on both; they drifted, and image_gen stayed greyed
+        // out after the tool it needs was connected. Now the server decides and
+        // the card renders what it is told.
+        unavailableReason: unavailableReason(conf.audit_type),
         activeRun: activeRun && {
           id: activeRun.id,
           status: activeRun.status,
@@ -356,7 +449,7 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     // completes the workflow and POSTs a create_seo_audit anyway. The result is
     // a fabricated audit row, indistinguishable from a real one, which then
     // feeds the freshness gate and the client's report.
-    const unavailable = UNAVAILABLE_SKILLS.get(agentType);
+    const unavailable = unavailableReason(agentType);
     if (unavailable) {
       return res.status(400).json({
         error: 'skill_unavailable',
@@ -783,7 +876,7 @@ router.post('/:id/seo/competitors/:competitorId/audit/:agentType', (req, res) =>
       });
     }
 
-    const unavailable = UNAVAILABLE_SKILLS.get(agentType);
+    const unavailable = unavailableReason(agentType);
     if (unavailable) {
       return res.status(400).json({ error: 'skill_unavailable', message: `'${agentType}' cannot be run: ${unavailable}` });
     }
@@ -871,7 +964,7 @@ queueRouter.get('/skills', (req, res) => {
         skill: state.skillName,
         ok: state.ok,
         reason: state.reason || null,
-        blockedLocally: UNAVAILABLE_SKILLS.get(audit_type) || null,
+        blockedLocally: unavailableReason(audit_type) || null,
       };
     }
 

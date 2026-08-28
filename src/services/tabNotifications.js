@@ -74,7 +74,13 @@ export function markTabSeen(userId, tab) {
  * clear on a click and come back on its own when the next skill ages out.
  */
 const ON_DEMAND_THRESHOLD_DAYS = 365;
-const UNRUNNABLE_SKILLS = ['dataforseo', 'maps', 'image_gen', 'drift'];
+// Skills nothing can make due, because no amount of waiting makes them
+// runnable. `dataforseo` and `maps` used to be here too; they are gated on
+// whether the worker actually reports DataForSEO, so once it is configured they
+// age out and become due like anything else. Leaving them listed would have
+// meant a configured, paid API whose two skills never once appeared in the
+// badge — the reverse of the problem this count exists to solve.
+const UNRUNNABLE_SKILLS = ['image_gen', 'drift'];
 
 function countDueAudits(since) {
   const placeholders = UNRUNNABLE_SKILLS.map(() => '?').join(',');

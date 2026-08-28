@@ -34,20 +34,31 @@ function formatElapsed(sinceIso, now) {
 // seo-audit, which is exactly what our trigger message already asks for, and
 // it is unblocked as of 2026-08-03.
 //
-// Mirrors UNAVAILABLE_SKILLS in src/routes/seo.js; keep the two in sync.
+// The server decides availability and sends it as `unavailableReason` on each
+// agent's status. This copy is the fallback for a stale cached response that
+// predates that field — not a second source of truth.
+//
+// It used to be the full mirror of UNAVAILABLE_SKILLS in src/routes/seo.js,
+// with "keep the two in sync" on both. They did not stay in sync: image_gen sat
+// greyed out reading "nanobanana is not configured" after the server it needs
+// was connected, because unblocking it meant remembering to edit three files.
+// Anything whose availability can change is now decided in one place.
 const UNAVAILABLE_SKILLS = new Map([
-  // Installed, but the MCP server that supplies their data is not configured.
-  // A skill with no data source does not fail — it writes a plausible audit
-  // from training knowledge, which is how a fabricated finding reaches a client.
-  ['dataforseo', 'Requires the DataForSEO MCP server, which is not configured'],
-  ['maps', 'Requires the DataForSEO MCP server, which is not configured'],
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
-  // 'google' unblocked 2026-08-04 — the worker has a Google API key, so
-  // PageSpeed and CrUX return real field data. Search Console and GA4 still
-  // need a service account.
   // Installed and working, but compares against a stored baseline.
   ['drift', 'Needs a stored baseline first — capture one before comparing'],
 ]);
+
+/**
+ * Whether a card is blocked, by the server's verdict where it has one.
+ *
+ * Used by the run-all button as well as the card, so it cannot queue a skill
+ * the trigger route is about to reject with a 400.
+ */
+function isAgentUnavailable(agent) {
+  if (agent?.unavailableReason !== undefined) return !!agent.unavailableReason;
+  return UNAVAILABLE_SKILLS.has(agent?.agentType);
+}
 
 // seo_audits carries ten score columns and each skill fills a different one.
 // Reading a hardcoded few means a real score renders as "--": a 'content'
@@ -904,7 +915,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     // reject it with a 409 anyway, and this keeps the toast count honest.
     const activeAgents = getFilteredAgents().filter(agent =>
       agent.agentType !== 'full' &&
-      !UNAVAILABLE_SKILLS.has(agent.agentType) &&
+      !isAgentUnavailable(agent) &&
       agent.freshness !== 'fresh' &&
       !activeRuns[agent.agentType]
     );
@@ -1137,7 +1148,13 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 const run = activeRuns[agent.agentType];
                 const isRunning = !!run;
                 const isPending = !run && !!pendingApprovals[agent.agentType];
-                const unavailableReason = UNAVAILABLE_SKILLS.get(agent.agentType) || clientUnavailableReason(agent.agentType);
+                // `agent.unavailableReason` is the server's verdict, which knows
+                // what the worker can actually reach. `undefined` means the
+                // response predates the field, so fall back to the local map.
+                const unavailableReason = (agent.unavailableReason !== undefined
+                  ? agent.unavailableReason
+                  : UNAVAILABLE_SKILLS.get(agent.agentType))
+                  || clientUnavailableReason(agent.agentType);
                 const isUnavailable = !!unavailableReason;
 
                 return (
