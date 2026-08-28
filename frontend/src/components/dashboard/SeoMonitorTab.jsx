@@ -45,7 +45,11 @@ function formatElapsed(sinceIso, now) {
 // Anything whose availability can change is now decided in one place.
 const UNAVAILABLE_SKILLS = new Map([
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
-  // Installed and working, but compares against a stored baseline.
+  // drift is decided per client by the server now — a baseline belongs to a
+  // site, so one client having one says nothing about another. Kept here as the
+  // conservative fallback for a cached response with no `unavailableReason`:
+  // blocked is the safe direction, since running drift without a baseline
+  // reports every element as changed rather than failing.
   ['drift', 'Needs a stored baseline first — capture one before comparing'],
 ]);
 

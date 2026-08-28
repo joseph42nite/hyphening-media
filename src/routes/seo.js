@@ -27,10 +27,6 @@ const UNAVAILABLE_SKILLS = new Map([
   // CrUX and CrUX History return real field data. Search Console, Indexing and
   // GA4 still need a service account, and facts.mjs records that per run so the
   // report states them as unavailable instead of estimating.
-  //
-  // Installed and working, but compares against a stored baseline. Running it
-  // before one exists reports every element as new rather than as drift.
-  ['drift', 'Needs a stored baseline first — capture one before comparing'],
 ]);
 
 /**
@@ -66,37 +62,57 @@ let dfsCache = { at: 0, available: null };
 function dataForSeoAvailable() {
   if (Date.now() - dfsCache.at < 60_000) return dfsCache.available;
 
-  let available = null;
+  const available = latestCapability(
+    null, caps => (typeof caps?.dataforseo?.available === 'boolean' ? caps.dataforseo.available : undefined),
+  );
+  dfsCache = { at: Date.now(), available };
+  return available;
+}
+
+/**
+ * The most recent run's answer to one question about capabilities.
+ *
+ * `read` returns undefined when a row does not answer it, so an older audit
+ * predating the field is skipped rather than counted as a no. Null overall
+ * means nothing has reported — an unknown, which every caller treats as
+ * blocked. Absence of evidence is not evidence a source works, and the cost of
+ * guessing wrong is a skill that runs without its data and writes a plausible
+ * audit from training knowledge.
+ *
+ * Scoped to one client when `clientId` is given, because a drift baseline
+ * belongs to a URL rather than to the installation.
+ */
+function latestCapability(clientId, read) {
   try {
     // Recent runs only. A months-old row saying DataForSEO worked is not
     // evidence about today, and scanning the whole table to find one would
     // make an outage look like uptime for as long as the table is kept.
-    const rows = db.prepare(`
-      SELECT report_json FROM seo_audits
-      WHERE report_json IS NOT NULL AND is_competitor = 0
-      ORDER BY created_at DESC LIMIT 20
-    `).all();
+    const rows = clientId == null
+      ? db.prepare(`
+          SELECT report_json FROM seo_audits
+          WHERE report_json IS NOT NULL AND is_competitor = 0
+          ORDER BY created_at DESC LIMIT 20
+        `).all()
+      : db.prepare(`
+          SELECT report_json FROM seo_audits
+          WHERE report_json IS NOT NULL AND is_competitor = 0 AND client_id = ?
+          ORDER BY created_at DESC LIMIT 20
+        `).all(clientId);
 
     for (const row of rows) {
       let parsed;
       try {
         parsed = typeof row.report_json === 'string' ? JSON.parse(row.report_json) : row.report_json;
       } catch { continue; }
-      const dfs = parsed?.capabilities?.dataforseo;
-      if (dfs && typeof dfs.available === 'boolean') {
-        available = dfs.available;
-        break;
-      }
+      const answer = read(parsed?.capabilities);
+      if (answer !== undefined) return answer;
     }
   } catch (err) {
     // A failed lookup must not unblock a skill. Staying blocked costs a button;
     // guessing available costs a fabricated audit.
-    console.error('[SEO ROUTE] DataForSEO capability lookup failed:', err.message);
-    available = null;
+    console.error('[SEO ROUTE] Capability lookup failed:', err.message);
   }
-
-  dfsCache = { at: Date.now(), available };
-  return available;
+  return null;
 }
 
 /**
@@ -105,7 +121,7 @@ function dataForSeoAvailable() {
  * The single place both the trigger routes and the dashboard ask. Replaces
  * three copies of a Map that had already drifted out of sync with each other.
  */
-function unavailableReason(agentType) {
+function unavailableReason(agentType, clientId = null) {
   const stat = UNAVAILABLE_SKILLS.get(agentType);
   if (stat) return stat;
 
@@ -116,6 +132,22 @@ function unavailableReason(agentType) {
       return 'The worker reports DataForSEO as unreachable — check credentials and account balance';
     }
     return 'Requires DataForSEO. No run has reported on it yet; run any other audit once to register the worker\'s capabilities.';
+  }
+
+  // drift is per client, not per installation: a baseline is a snapshot of one
+  // site's pages, so having one for Janya says nothing about Dr Divya. It was
+  // previously a static "needs a stored baseline first", which was true when
+  // written and stayed on the card after a baseline was captured — the entry
+  // described a condition but never rechecked it.
+  if (agentType === 'drift') {
+    const present = latestCapability(
+      clientId, caps => (typeof caps?.drift_baseline?.present === 'boolean' ? caps.drift_baseline.present : undefined),
+    );
+    if (present === true) return null;
+    if (present === false) {
+      return 'No drift baseline for this site yet — capture one, then compare against it';
+    }
+    return 'Needs a stored baseline first. No run has reported on it yet; run any other audit once for this client.';
   }
 
   return null;
@@ -360,7 +392,7 @@ router.get('/:id/seo/agents/status', (req, res) => {
         // in sync" comment on both; they drifted, and image_gen stayed greyed
         // out after the tool it needs was connected. Now the server decides and
         // the card renders what it is told.
-        unavailableReason: unavailableReason(conf.audit_type),
+        unavailableReason: unavailableReason(conf.audit_type, client.id),
         activeRun: activeRun && {
           id: activeRun.id,
           status: activeRun.status,
@@ -449,7 +481,12 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     // completes the workflow and POSTs a create_seo_audit anyway. The result is
     // a fabricated audit row, indistinguishable from a real one, which then
     // feeds the freshness gate and the client's report.
-    const unavailable = unavailableReason(agentType);
+    // Scoped to this client. A drift baseline belongs to a site, so an
+    // unscoped lookup would clear the check for every client as soon as any one
+    // of them had a baseline — unblocking in the unsafe direction, which for
+    // drift means comparing a page against nothing and reporting every element
+    // as changed.
+    const unavailable = unavailableReason(agentType, clientId);
     if (unavailable) {
       return res.status(400).json({
         error: 'skill_unavailable',
@@ -876,7 +913,7 @@ router.post('/:id/seo/competitors/:competitorId/audit/:agentType', (req, res) =>
       });
     }
 
-    const unavailable = unavailableReason(agentType);
+    const unavailable = unavailableReason(agentType, req.params.id);
     if (unavailable) {
       return res.status(400).json({ error: 'skill_unavailable', message: `'${agentType}' cannot be run: ${unavailable}` });
     }
