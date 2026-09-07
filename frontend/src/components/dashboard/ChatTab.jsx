@@ -23,6 +23,11 @@ export default function ChatTab({
   const [newChatMessage, setNewChatMessage] = useState('');
   const inputRef = useRef(null);
 
+  // Reply-to state: the message the next send will quote, if any
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+  const messageRefs = useRef({});
+
   // Mention system state
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -57,6 +62,21 @@ export default function ChatTab({
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatMessages]);
+
+  // A reply target only makes sense inside the thread it was picked from
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [selectedChatClient?.id]);
+
+  // Grow the composer with its content instead of scrolling a one-line box
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    // scrollHeight excludes the border, and the box is border-box, so add it back
+    const border = el.offsetHeight - el.clientHeight;
+    el.style.height = `${Math.min(el.scrollHeight + border, 140)}px`;
+  }, [newChatMessage, replyingTo]);
 
   // Click outside to close mention dropdown
   useEffect(() => {
@@ -101,17 +121,49 @@ export default function ChatTab({
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setActiveMentionIndex(prev => (prev + 1) % mentionSuggestions.length);
+        return;
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setActiveMentionIndex(prev => (prev - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+        return;
       } else if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
         selectMentionUser(mentionSuggestions[activeMentionIndex]);
+        return;
       } else if (e.key === 'Escape') {
         e.preventDefault();
         setShowMentionDropdown(false);
+        return;
       }
     }
+
+    // Enter sends; Shift+Enter (or Ctrl/Cmd+Enter) drops to the next line.
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      sendChatMessage(e);
+      return;
+    }
+
+    if (e.key === 'Escape' && replyingTo) {
+      e.preventDefault();
+      setReplyingTo(null);
+    }
+  };
+
+  const startReply = (msg) => {
+    setReplyingTo(msg);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  // Jump to the message a reply quotes and flash it so it is easy to spot
+  const scrollToMessage = (messageId) => {
+    const el = messageRefs.current[messageId];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedMessageId(messageId);
+    setTimeout(() => {
+      setHighlightedMessageId(prev => (prev === messageId ? null : prev));
+    }, 1600);
   };
 
   const selectMentionUser = (user) => {
@@ -171,16 +223,21 @@ export default function ChatTab({
     e.preventDefault();
     if (!newChatMessage.trim() || !selectedChatClient) return;
 
+    // A reply is filed against the client the quoted message belongs to, so it
+    // stays with its parent even when the thread mixes brands of one family.
+    const targetClientId = replyingTo?.client_id || selectedChatClient.id;
+
     try {
-      const res = await fetch(`${API_BASE}/api/clients/${selectedChatClient.id}/chats`, {
+      const res = await fetch(`${API_BASE}/api/clients/${targetClientId}/chats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: newChatMessage }),
+        body: JSON.stringify({ message: newChatMessage, reply_to_id: replyingTo?.id || null }),
         credentials: 'include'
       });
       const data = await res.json();
       if (res.ok) {
         setNewChatMessage('');
+        setReplyingTo(null);
         setShowMentionDropdown(false);
         fetchChats(selectedChatClient.id);
       } else {
@@ -325,15 +382,71 @@ export default function ChatTab({
                   const isMe = msg.sender_id === auth?.id;
                   const messageClient = clients.find(cl => cl.id === msg.client_id);
                   const showBrandName = messageClient && messageClient.id !== selectedChatClient.id;
+                  const isHighlighted = highlightedMessageId === msg.id;
                   return (
                     <div
                       key={msg.id}
+                      ref={el => { messageRefs.current[msg.id] = el; }}
                       className={`chat-message-bubble ${isMe ? 'chat-message-me' : 'chat-message-other'}`}
+                      style={isHighlighted ? { outline: '3px solid var(--warning)', outlineOffset: '2px' } : undefined}
                     >
-                      <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: isMe ? '#a1a1aa' : 'var(--text-muted)', marginBottom: '2px' }}>
-                        {msg.sender_name} {showBrandName && `(${messageClient.name})`} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: isMe ? '#a1a1aa' : 'var(--text-muted)' }}>
+                          {msg.sender_name} {showBrandName && `(${messageClient.name})`} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <button
+                          type="button"
+                          className="chat-reply-btn"
+                          onClick={() => startReply(msg)}
+                          title="Reply to this message"
+                          style={{
+                            marginLeft: 'auto',
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '0 2px',
+                            cursor: 'pointer',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase',
+                            color: isMe ? '#a1a1aa' : 'var(--text-muted)'
+                          }}
+                        >
+                          ↩ Reply
+                        </button>
                       </div>
-                      <div style={{ fontWeight: '500', fontSize: '0.9rem', wordBreak: 'break-word', lineHeight: '1.4' }}>
+
+                      {msg.reply_to_id && (
+                        <div
+                          onClick={() => scrollToMessage(msg.reply_to_id)}
+                          title="Go to the quoted message"
+                          style={{
+                            borderLeft: `3px solid ${isMe ? '#a1a1aa' : '#000'}`,
+                            background: isMe ? 'rgba(255,255,255,0.12)' : '#f4f4f5',
+                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            marginBottom: '6px',
+                            cursor: 'pointer',
+                            opacity: 0.9
+                          }}
+                        >
+                          <div style={{ fontSize: '0.68rem', fontWeight: 'bold' }}>
+                            {msg.reply_to_sender_name || 'Deleted message'}
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}>
+                            {msg.reply_to_message || 'This message is no longer available'}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ fontWeight: '500', fontSize: '0.9rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.4' }}>
                         {renderMessageContent(msg.message)}
                       </div>
                     </div>
@@ -394,16 +507,53 @@ export default function ChatTab({
                   })}
                 </div>
               )}
-              <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '12px' }}>
-                <input
+              {replyingTo && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  padding: '8px 10px',
+                  marginBottom: '8px',
+                  background: '#f4f4f5',
+                  border: '2px solid #000',
+                  borderRadius: '6px'
+                }}>
+                  <div style={{ borderLeft: '3px solid #000', paddingLeft: '8px', flexGrow: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                      Replying to {replyingTo.sender_name}
+                    </div>
+                    <div style={{
+                      fontSize: '0.8rem',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}>
+                      {replyingTo.message}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    title="Cancel reply"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', lineHeight: 1 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              <form onSubmit={sendChatMessage} style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                <textarea
                   ref={inputRef}
-                  type="text"
+                  rows={1}
                   className="form-control chat-input-field"
-                  placeholder="Type internal chat message..."
+                  placeholder="Type internal chat message...  (Enter to send, Shift+Enter for a new line)"
                   value={newChatMessage}
                   onChange={handleInputChange}
                   onKeyDown={handleInputKeyDown}
-                  style={{ flexGrow: 1 }}
+                  style={{ flexGrow: 1, resize: 'none', overflowY: 'auto', maxHeight: '140px', lineHeight: '1.4', fontFamily: 'inherit' }}
                   required
                 />
                 <button type="submit" className="btn btn-primary">

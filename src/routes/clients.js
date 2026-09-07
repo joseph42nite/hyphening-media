@@ -267,8 +267,13 @@ router.get('/:id/chats', (req, res) => {
     }
 
     const placeholders = clientIds.map(() => '?').join(', ');
+    // The self-join carries the quoted message along with the reply, so the UI can
+    // render the quote without a second round trip per message.
     const chats = db.prepare(
-      `SELECT * FROM internal_chat_messages WHERE client_id IN (${placeholders}) ORDER BY created_at ASC`
+      `SELECT m.*, r.sender_name AS reply_to_sender_name, r.message AS reply_to_message
+       FROM internal_chat_messages m
+       LEFT JOIN internal_chat_messages r ON r.id = m.reply_to_id
+       WHERE m.client_id IN (${placeholders}) ORDER BY m.created_at ASC`
     ).all(...clientIds);
     res.json({ chats });
   } catch (err) {
@@ -290,16 +295,40 @@ router.post('/:id/chats', (req, res) => {
       }
     }
 
-    const { message } = req.body;
-    if (!message) {
+    const { message, reply_to_id } = req.body;
+    if (!message || !message.trim()) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    const result = db.prepare(
-      'INSERT INTO internal_chat_messages (client_id, sender_id, sender_name, message) VALUES (?, ?, ?, ?)'
-    ).run(req.params.id, req.user.id, req.user.name, message);
+    // A reply may only quote a message from the same parent/child client family,
+    // which is exactly the set the chat thread shows.
+    let replyToId = null;
+    if (reply_to_id !== undefined && reply_to_id !== null && reply_to_id !== '') {
+      const client = db.prepare('SELECT id, parent_id FROM crm_clients WHERE id = ?').get(req.params.id);
+      if (!client) return res.status(404).json({ error: 'Client not found' });
+      const parentId = client.parent_id || client.id;
+      const family = db.prepare('SELECT id FROM crm_clients WHERE id = ? OR parent_id = ?').all(parentId, parentId);
+      const familyIds = family.map(c => c.id);
+      const placeholders = familyIds.map(() => '?').join(', ');
+      const target = db.prepare(
+        `SELECT id FROM internal_chat_messages WHERE id = ? AND client_id IN (${placeholders})`
+      ).get(parseInt(reply_to_id), ...familyIds);
+      if (!target) {
+        return res.status(400).json({ error: 'Cannot reply to a message outside this chat' });
+      }
+      replyToId = target.id;
+    }
 
-    const newMessage = db.prepare('SELECT * FROM internal_chat_messages WHERE id = ?').get(result.lastInsertRowid);
+    const result = db.prepare(
+      'INSERT INTO internal_chat_messages (client_id, sender_id, sender_name, message, reply_to_id) VALUES (?, ?, ?, ?, ?)'
+    ).run(req.params.id, req.user.id, req.user.name, message, replyToId);
+
+    const newMessage = db.prepare(
+      `SELECT m.*, r.sender_name AS reply_to_sender_name, r.message AS reply_to_message
+       FROM internal_chat_messages m
+       LEFT JOIN internal_chat_messages r ON r.id = m.reply_to_id
+       WHERE m.id = ?`
+    ).get(result.lastInsertRowid);
 
     // Broadcast message via SSE
     import('../../server.js').then(({ broadcastEvent }) => {

@@ -774,6 +774,17 @@ tr:hover td {
   color: #000;
 }
 
+/* Reply affordance stays out of the way until the bubble is hovered */
+.chat-reply-btn {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chat-message-bubble:hover .chat-reply-btn,
+.chat-reply-btn:focus-visible {
+  opacity: 1;
+}
+
 .kanban-mobile-tabs {
   display: none;
 }
@@ -1154,6 +1165,11 @@ tr:hover td {
   .chat-message-bubble {
     max-width: 88% !important;
     padding: 8px 12px !important;
+  }
+
+  /* No hover on touch, so the reply button is always visible */
+  .chat-reply-btn {
+    opacity: 1 !important;
   }
 
   .mention-dropdown {
