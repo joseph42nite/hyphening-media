@@ -356,6 +356,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   const [setupGaps, setSetupGaps] = useState([]);
 
   const [competitors, setCompetitors] = useState([]);
+  // Which approved competitor the backlink_gap card compares against. Held here
+  // rather than in the card so the choice survives the status poll re-render.
+  const [gapCompetitor, setGapCompetitor] = useState('');
   const [ownScores, setOwnScores] = useState({});
   const [showCompetitorModal, setShowCompetitorModal] = useState(false);
   const [competitorBusy, setCompetitorBusy] = useState(null);
@@ -651,6 +654,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     if (selectedClientId) {
       fetchClientData(selectedClientId);
       fetchCompetitors(selectedClientId);
+      // Competitors are per client, so a selection made for the previous one is
+      // meaningless here and would be silently sent with the next gap run.
+      setGapCompetitor('');
     }
   }, [selectedClientId]);
 
@@ -795,10 +801,19 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   // Trigger agent execution
   const triggerAgent = async (agentType, force = false, autoOpenConsole = true) => {
     try {
+      // backlink_gap is the one skill that needs a second target: the tracked
+      // competitor to compare referring domains against. Read from the card's
+      // own selection rather than defaulting to the first approved competitor —
+      // a silent default would run a comparison nobody chose and bill for it.
+      const competitorDomain = agentType === 'backlink_gap' ? (gapCompetitor || '') : '';
+      if (agentType === 'backlink_gap' && !competitorDomain) {
+        showToast('Pick a competitor to compare against first.', 'error');
+        return;
+      }
       const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/seo/trigger/${agentType}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force }),
+        body: JSON.stringify({ force, ...(competitorDomain ? { competitor_domain: competitorDomain } : {}) }),
         credentials: 'include'
       });
       const data = await res.json();
@@ -917,8 +932,15 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
     // wastes tokens on every single click of this button.
     // Anything already queued or running is skipped too — the server would
     // reject it with a 409 anyway, and this keeps the toast count honest.
+    // backlink_gap is excluded on purpose. It needs a competitor chosen per
+    // run, and there is no defensible way to pick one on the client's behalf
+    // inside a bulk action — running it against whoever sorts first would spend
+    // DataForSEO calls on a comparison nobody asked for, and running it against
+    // every approved competitor would multiply the cost of this button by the
+    // length of that list. It stays a deliberate, single-target run.
     const activeAgents = getFilteredAgents().filter(agent =>
       agent.agentType !== 'full' &&
+      agent.agentType !== 'backlink_gap' &&
       !isAgentUnavailable(agent) &&
       agent.freshness !== 'fresh' &&
       !activeRuns[agent.agentType]
@@ -1210,6 +1232,30 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         {agent.dataGap && (
                           <div style={{ marginTop: '4px', color: '#b45309', fontWeight: 600, lineHeight: 1.35 }}>
                             ⚠ {agent.dataGap}
+                          </div>
+                        )}
+                        {/* backlink_gap is the only card that needs a second
+                            target. The list is approved competitors only,
+                            matching what the trigger route will accept — an
+                            option here that the server rejects is worse than no
+                            option, because the cost of finding out is a click
+                            and a red toast. No default is selected: running a
+                            comparison against whoever happened to sort first is
+                            a real DataForSEO spend on a question nobody asked. */}
+                        {agent.agentType === 'backlink_gap' && !isUnavailable && (
+                          <div onClick={e => e.stopPropagation()} style={{ marginTop: '6px' }}>
+                            <select
+                              value={gapCompetitor}
+                              onChange={e => setGapCompetitor(e.target.value)}
+                              disabled={isRunning}
+                              style={{ width: '100%', padding: '4px 6px', border: '2px solid #000', borderRadius: '4px', fontSize: '0.7rem', background: '#fff' }}
+                              title="Which tracked competitor to compare referring domains against"
+                            >
+                              <option value="">compare vs…</option>
+                              {competitors.filter(c => c.status === 'approved').map(c => (
+                                <option key={c.id} value={c.domain}>{c.label || c.domain}</option>
+                              ))}
+                            </select>
                           </div>
                         )}
                       </div>

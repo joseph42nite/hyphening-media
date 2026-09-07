@@ -71,8 +71,8 @@ export async function abortOpenClawRun(run) {
  * do not control, and a worker that was offline collects its backlog on waking
  * rather than the work being lost.
  */
-export function startAgentRun({ clientId, agentType, model, requestedBy, pendingActionId = null, agentId = null }) {
-  const { run, conflict } = createRun({ clientId, agentType, model, requestedBy, pendingActionId, agentId });
+export function startAgentRun({ clientId, agentType, model, requestedBy, pendingActionId = null, agentId = null, competitorDomain = null }) {
+  const { run, conflict } = createRun({ clientId, agentType, model, requestedBy, pendingActionId, agentId, competitorDomain });
   if (conflict) return { conflict };
 
   console.log(`[AGENT] Run #${run.id} (${agentType}) queued for a worker.`);

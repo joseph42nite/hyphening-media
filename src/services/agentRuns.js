@@ -99,12 +99,18 @@ export function listQueue({ includeRecent = true, recentLimit = 20 } = {}) {
  * the partial unique index makes that decision atomically, so two racing
  * requests cannot both win.
  */
-export function createRun({ clientId, agentType, model, requestedBy, pendingActionId = null, agentId = null }) {
+export function createRun({
+  clientId, agentType, model, requestedBy,
+  pendingActionId = null, agentId = null,
+  // The domain a backlink_gap run compares against. Null for every other audit
+  // type. Validated by the caller — this layer stores what it is handed.
+  competitorDomain = null,
+}) {
   try {
     const result = db.prepare(`
-      INSERT INTO seo_agent_runs (client_id, agent_type, status, model, requested_by, pending_action_id, agent_id)
-      VALUES (?, ?, 'queued', ?, ?, ?, ?)
-    `).run(clientId, agentType, model || null, requestedBy || null, pendingActionId, agentId);
+      INSERT INTO seo_agent_runs (client_id, agent_type, status, model, requested_by, pending_action_id, agent_id, competitor_domain)
+      VALUES (?, ?, 'queued', ?, ?, ?, ?, ?)
+    `).run(clientId, agentType, model || null, requestedBy || null, pendingActionId, agentId, competitorDomain);
 
     const run = getRun(result.lastInsertRowid);
     broadcastRunStatus(run);

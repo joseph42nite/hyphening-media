@@ -45,7 +45,11 @@ const UNAVAILABLE_SKILLS = new Map([
  * every run and the capabilities land in seo_audits.report_json, which
  * detectDataGap() below already reads for exactly this purpose.
  */
-const DATAFORSEO_SKILLS = new Set(['dataforseo', 'maps']);
+// backlink_gap belongs here too: the comparison it exists to make comes from
+// backlinks_domain_intersection, which has no free equivalent at all. Moz
+// cannot enumerate another domain's referring domains on this installation and
+// Common Crawl returns quarterly domain-level PageRank, not a link list.
+const DATAFORSEO_SKILLS = new Set(['dataforseo', 'maps', 'backlink_gap']);
 
 let dfsCache = { at: 0, available: null };
 
@@ -124,6 +128,24 @@ function latestCapability(clientId, read) {
 function unavailableReason(agentType, clientId = null) {
   const stat = UNAVAILABLE_SKILLS.get(agentType);
   if (stat) return stat;
+
+  // backlink_gap has two prerequisites, not one, and has to clear both. This
+  // runs before the DataForSEO branch below and deliberately falls through
+  // instead of returning null: a client with no approved competitor and a
+  // working DataForSEO account still cannot run this skill, and returning null
+  // here would report the card as ready.
+  //
+  // Per client for the same reason drift is — an approved competitor for Janya
+  // says nothing about Dr Divya. Gated here rather than left to fail at trigger
+  // time so the card explains itself before anyone clicks it.
+  if (agentType === 'backlink_gap') {
+    const approved = db.prepare(
+      "SELECT COUNT(*) AS n FROM client_competitors WHERE client_id = ? AND status = 'approved'"
+    ).get(clientId)?.n || 0;
+    if (approved === 0) {
+      return 'No approved competitor to compare against — add one under Competitors and approve it';
+    }
+  }
 
   if (DATAFORSEO_SKILLS.has(agentType)) {
     const available = dataForSeoAvailable();
@@ -471,6 +493,44 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     const conf = db.prepare('SELECT * FROM agent_run_config WHERE audit_type = ?').get(agentType);
     if (!conf) return res.status(400).json({ error: `Unknown agent type: ${agentType}` });
 
+    // backlink_gap compares this client's referring domains against one
+    // competitor's, so it needs that competitor named on the request. Resolved
+    // and validated here, ahead of the budget and freshness gates, because a
+    // request naming a competitor we do not track is malformed rather than
+    // merely expensive — there is nothing to weigh it against.
+    //
+    // Only 'approved' competitors qualify, matching the competitor-audit route
+    // above: a 'discovered' row is an unreviewed suggestion, and comparing
+    // against a directory somebody's discovery pass proposed would fill the
+    // prospect list with directories.
+    let competitorDomain = null;
+    if (agentType === 'backlink_gap') {
+      const requested = String(req.body.competitor_domain || '').trim().toLowerCase().replace(/^www\./, '');
+      if (!requested) {
+        return res.status(400).json({
+          error: 'competitor_required',
+          message: "'backlink_gap' compares against a competitor. Pass competitor_domain.",
+        });
+      }
+      const competitor = db.prepare(`
+        SELECT * FROM client_competitors
+        WHERE client_id = ? AND lower(replace(domain, 'www.', '')) = ?
+      `).get(clientId, requested);
+      if (!competitor) {
+        return res.status(404).json({
+          error: 'competitor_not_tracked',
+          message: `'${requested}' is not a tracked competitor for this client. Add it under Competitors first.`,
+        });
+      }
+      if (competitor.status !== 'approved') {
+        return res.status(400).json({
+          error: 'not_approved',
+          message: `'${competitor.domain}' is still ${competitor.status}. Approve it before comparing against it.`,
+        });
+      }
+      competitorDomain = competitor.domain;
+    }
+
     // Refuse skills OpenClaw cannot actually serve. This was previously
     // enforced only in SeoMonitorTab, which meant it guarded the buttons and
     // nothing else — a direct API call, a stale tab or a scheduled run went
@@ -551,12 +611,25 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     }
 
     // 2. Freshness check
+    //
+    // Scoped to the competitor for backlink_gap. Without that clause a gap run
+    // against one competitor would mark the skill fresh for every other
+    // competitor too, so comparing against the second and third names on the
+    // list would be refused for 30 days on the strength of a report that never
+    // mentioned them.
     if (!force) {
-      const lastAudit = db.prepare(`
-        SELECT created_at FROM seo_audits
-        WHERE client_id = ? AND audit_type = ? AND is_competitor = 0
-        ORDER BY created_at DESC LIMIT 1
-      `).get(clientId, agentType);
+      const lastAudit = competitorDomain
+        ? db.prepare(`
+            SELECT created_at FROM seo_audits
+            WHERE client_id = ? AND audit_type = ? AND is_competitor = 0
+              AND competitor_domain = ?
+            ORDER BY created_at DESC LIMIT 1
+          `).get(clientId, agentType, competitorDomain)
+        : db.prepare(`
+            SELECT created_at FROM seo_audits
+            WHERE client_id = ? AND audit_type = ? AND is_competitor = 0
+            ORDER BY created_at DESC LIMIT 1
+          `).get(clientId, agentType);
 
       if (lastAudit) {
         const lastDate = new Date(lastAudit.created_at);
@@ -578,7 +651,8 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
       agentType,
       url: client.website_url,
       model: selectedModel,
-      requested_by_email: req.user.email
+      requested_by_email: req.user.email,
+      ...(competitorDomain ? { competitor_domain: competitorDomain } : {})
     });
 
     if (userRole === 'admin' || userRole === 'super_admin') {
@@ -599,7 +673,8 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
         // Per-skill routing: conf.agent_id names the OpenClaw agent, and the
         // agent determines the model. req.body.agentId allows a one-off
         // override for comparing two agents on the same skill.
-        agentId: req.body.agentId || conf.agent_id || null
+        agentId: req.body.agentId || conf.agent_id || null,
+        competitorDomain
       });
 
       if (conflict) {

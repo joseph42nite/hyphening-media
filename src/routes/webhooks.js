@@ -406,7 +406,7 @@ function handleClaimSeoRuns(payload) {
   const claim = db.transaction(() => {
     const queued = db.prepare(`
       SELECT r.id, r.client_id, r.agent_type, r.requested_by, c.website_url, c.name AS client_name,
-             c.gsc_property, c.ga4_property_id, r.target_url, r.is_competitor
+             c.gsc_property, c.ga4_property_id, r.target_url, r.is_competitor, r.competitor_domain
       FROM seo_agent_runs r
       JOIN crm_clients c ON c.id = r.client_id
       WHERE r.status = 'queued'
@@ -455,6 +455,11 @@ function handleClaimSeoRuns(payload) {
         // to prevent.
         gsc_property: r.is_competitor === 1 ? null : (r.gsc_property || null),
         ga4_property_id: r.is_competitor === 1 ? null : (r.ga4_property_id || null),
+        // The domain a backlink_gap run compares against. Null for every other
+        // audit type, so a worker that ignores the field behaves exactly as it
+        // did before — the field is additive to the wire format, not a change
+        // to it.
+        competitor_domain: r.competitor_domain || null,
       })),
     },
   };
@@ -1498,17 +1503,23 @@ function handleCreateSeoAudit(payload) {
   // back rather than trusting the payload, since the flag decides whether this
   // audit counts toward the client's freshness.
   const originRun = payload.run_id
-    ? db.prepare('SELECT target_url, is_competitor FROM seo_agent_runs WHERE id = ?').get(payload.run_id)
+    ? db.prepare('SELECT target_url, is_competitor, competitor_domain FROM seo_agent_runs WHERE id = ?').get(payload.run_id)
     : null;
   const isCompetitorAudit = originRun?.is_competitor === 1 ? 1 : 0;
   const auditTargetUrl = originRun?.target_url || null;
+  // Read from the run for the same reason is_competitor is: the run row is what
+  // the trigger validated against client_competitors, and a payload field would
+  // let a worker store a comparison against a domain nobody approved. Also what
+  // the per-competitor freshness check reads back.
+  const auditCompetitorDomain = originRun?.competitor_domain || null;
 
   const insertAudit = db.prepare(`
     INSERT INTO seo_audits (
       client_id, audit_type, url, page_url, health_score, technical_score, content_score,
       on_page_score, schema_score, performance_score, geo_score, backlinks_score,
-      local_score, sxo_score, audit_score, summary, report_json, target_url, is_competitor
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      local_score, sxo_score, audit_score, summary, report_json, target_url, is_competitor,
+      competitor_domain
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   for (const result of results) {
@@ -1562,7 +1573,8 @@ function handleCreateSeoAudit(payload) {
       result.summary ?? null,
       result.report_json ? JSON.stringify(result.report_json) : null,
       auditTargetUrl,
-      isCompetitorAudit
+      isCompetitorAudit,
+      auditCompetitorDomain
     );
 
     const auditId = auditResult.lastInsertRowid;
