@@ -305,6 +305,11 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
   const IMMUTABLE = /\.(webp|avif|png|jpe?g|gif|svg|ico|woff2?|mp4|webm)$/i;
   const VENDOR = /three\.min\.js$/i;
   app.use(express.static(frontendPath, {
+    // "/" must not be answered with dist/index.html straight off disk: that
+    // short-circuits the SPA fallback below, and with it the canonical tag it
+    // injects, so the homepage — the one page that most needs one — shipped
+    // without any. Letting "/" fall through gives every route the same tag.
+    index: false,
     setHeaders: (res, filePath) => {
       const hashed = filePath.includes(`${path.sep}assets${path.sep}`);
       if (hashed || VENDOR.test(filePath) || IMMUTABLE.test(filePath)) {

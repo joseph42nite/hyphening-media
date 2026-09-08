@@ -1326,9 +1326,16 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 
 /* The active chapter owns a bottom-anchored near plane. Its former stage is
    retained only long enough to dissolve into the next chapter's scene. */
+/* The overflow-x:clip on .sec above only reaches these while they are still
+   in flow. An active stage is position:fixed, which escapes ancestor clipping
+   altogether, so its pieces — anchored deliberately past both edges — hung
+   outside the viewport and let a touch screen pan sideways onto them. Fixed
+   boxes contribute nothing to scrollWidth, which is why this never showed up
+   on a desktop. Clip the same axis here, the same way: clip pairs with
+   visible without coercing it, so every bit of vertical bleed still survives. */
 .fg.fg-active,.fg.fg-retiring{
   position:fixed; left:0; right:0; top:auto; bottom:0; height:min(56svh,680px);
-  z-index:1; overflow:visible; pointer-events:none;
+  z-index:1; overflow-x:clip; overflow-y:visible; pointer-events:none;
 }
 .fg.fg-active .fg-el{
   opacity:1; transform:none;
