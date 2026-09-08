@@ -65,7 +65,7 @@ import {
 export function KageLandingPage(props: LandingPageProps & PageTypographyProps) {
   const [type, frame] = splitTypographyProps(props);
   const customization = usePageTypography(KAGE_TYPOGRAPHY, type);
-  return <LandingPageFrame {...frame} customization={customization} title="Hyphening Media — Where craft scales into performance" sourceUrl="/landing-pages/kage.html?v=ing-media-14" />;
+  return <LandingPageFrame {...frame} customization={customization} title="Hyphening Media — Where craft scales into performance" sourceUrl="/landing-pages/kage.html?v=ing-media-15" />;
 }
 
 export function CompleteShelfLandingPage(props: LandingPageProps & PageTypographyProps) {

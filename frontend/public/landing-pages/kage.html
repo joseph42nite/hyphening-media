@@ -5756,7 +5756,16 @@ function queue() { TIMER ? setTimeout(() => frame(performance.now()), 16) : requ
 
 /* ======================================================== 14 · booting */
 const JOBS = [
-  ['Reading the type', () => document.fonts ? Promise.all([document.fonts.load('800 320px "Onest"'), document.fonts.ready]) : Promise.resolve()],
+  ['Reading the type', () => {
+    if (!document.fonts) return Promise.resolve();
+    return Promise.race([
+      Promise.all([
+        document.fonts.load('800 320px "Onest"').catch(() => {}),
+        document.fonts.ready.catch(() => {})
+      ]),
+      new Promise(resolve => setTimeout(resolve, 250))
+    ]);
+  }],
   ['Pouring the ground', () => { initGL(); WORLD.uT = { value: 0 }; buildRig(); buildLights(); }],
   ['Cutting the approach', () => buildShell()],
   ['Raising the hall', () => buildTemple()],
@@ -5808,13 +5817,18 @@ function boot() {
   document.body.classList.add('is-locked');
   let i = 0;
   const step = () => {
+    if (started) return;
+    if (i >= JOBS.length) {
+      setTimeout(start, 120);
+      return;
+    }
     const j = JOBS[i];
     const done = () => {
       i++;
-      const p = i / JOBS.length;
+      const p = Math.min(1, i / JOBS.length);
       preFill.style.right = ((1 - p) * 100).toFixed(1) + '%';
       prePct.textContent = Math.round(p * 100);
-      if (i < JOBS.length) setTimeout(step, 16); else setTimeout(start, 220);
+      if (i < JOBS.length) setTimeout(step, 16); else setTimeout(start, 120);
     };
     let r;
     try { r = j[1](); }
@@ -5822,9 +5836,25 @@ function boot() {
       console.error('[kage] job "' + j[0] + '" failed', err);
       if (i <= 1) return fallback(err);          /* no renderer, no scene */
     }
-    (r && r.then) ? r.then(done, done) : done();
+    if (r && r.then) {
+      Promise.race([
+        r,
+        new Promise(resolve => setTimeout(resolve, 1200))
+      ]).then(done, done);
+    } else {
+      done();
+    }
   };
-  setTimeout(step, 60);
+  setTimeout(step, 40);
+
+  /* Global preloader safety timer: never block mobile screens for more than 2.5s */
+  setTimeout(() => {
+    if (!started) {
+      preFill.style.right = '0%';
+      prePct.textContent = '100';
+      start();
+    }
+  }, 2500);
 }
 
 function fallback(err) {
@@ -5836,7 +5866,10 @@ function fallback(err) {
   window.__kage = window.__secret = { fallback: true, error: String(err && err.message || err) };
 }
 
+let started = false;
 function start() {
+  if (started) return;
+  started = true;
   addEventListener('resize', () => { resize(); }, { passive: true });
   addEventListener('orientationchange', () => setTimeout(resize, 250));
   document.addEventListener('visibilitychange', () => {
