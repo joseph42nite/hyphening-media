@@ -1537,9 +1537,13 @@ html.in-iframe header.nav,
 html.in-iframe #nav{
   display: none !important;
 }
-html.in-iframe .hero{
-  padding-top: clamp(80px, 12vh, 120px);
-}
+/* No extra top padding when embedded. This was added to stand in for the nav
+   that gets hidden inside the frame, but .hero-top already reserves --nav-h
+   for exactly that, so the two stacked: ~102px here plus ~106px there pushed
+   the eyebrow to 208px from the hero's top while the vertical JP column —
+   absolutely positioned, and so untouched by this padding — stayed at 110px,
+   leaving the two 99px out of line. --nav-h alone clears the site's navbar,
+   which ends at 74px. */
 </style>
 </head>
 <body data-layout-hero="b" data-layout-story="b" data-layout-gallery="b"
