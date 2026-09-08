@@ -1652,6 +1652,11 @@ tr:hover td {
   pointer-events: none;
   visibility: hidden;
   transition: visibility 0.3s;
+  /* The closed drawer parks itself at translateX(120%), which on a phone lands
+     roughly 40px past the right edge and let the whole page be panned sideways.
+     Clipping here keeps that parked position out of the scrollable area; the
+     open drawer sits fully inside these bounds, so nothing visible is cut. */
+  overflow: hidden;
 }
 
 .landing-drawer.open {
@@ -3506,13 +3511,22 @@ tr:hover td {
 /* ==========================================================================
    THREEUI KAGE 3D LANDING PAGE STYLES
    ========================================================================== */
+/* Height is the small viewport, not the large one: 100vh on a phone measures
+   the screen with the URL bar hidden, so the frame is taller than what is
+   actually visible and the page rocks as the bar slides in and out. 100svh is
+   the stable smallest height, so the scene always fits exactly. The 720px
+   floor is desktop-only for the same reason — it alone overflows a 667px
+   phone. Plain vh stays first as the fallback for browsers without svh. */
 .shader-frame {
   position: relative;
   width: 100%;
   height: 100vh;
-  min-height: 720px;
+  height: 100svh;
   overflow: hidden;
   background: #05070a;
+}
+@media (min-width: 768px) {
+  .shader-frame { min-height: 720px; }
 }
 
 .shader-frame .landing-page-frame {
@@ -3526,8 +3540,17 @@ tr:hover td {
   position: relative;
   width: 100%;
   height: 100vh;
-  min-height: 720px;
+  height: 100svh;
   background: #05070a;
+}
+@media (min-width: 768px) {
+  .kage-hero-section { min-height: 720px; }
+}
+
+/* Set here rather than inline in Landing.jsx so the vh→svh fallback pair works */
+.landing-root {
+  height: 100vh;
+  height: 100svh;
 }
 
 .kage-hero-floating-hud {

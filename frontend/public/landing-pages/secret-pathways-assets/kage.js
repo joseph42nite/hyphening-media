@@ -3624,11 +3624,18 @@ function frame(now) {
   fadeIn = INTRO.t0 ? sat((now - INTRO.t0) / 700) : 1;
 
   if (!PERF.locked && clock > 2.2) {
-    PERF.acc += raw; PERF.n++;      /* … but the governor reads the truth */
-    if (PERF.n >= 40 || PERF.acc > .9) {
+    /* … but the governor reads the truth — with one-off hitches excluded
+       rather than averaged in. A single shader compile or image decode is
+       enough to blow past a 0.9s accumulator on its own, and that alone used
+       to ratchet the scale down. Past 250ms is a hitch, not a frame rate. */
+    if (raw < .25) { PERF.acc += raw; PERF.n++; }
+    if (PERF.n >= 40) {
       const avg = PERF.acc / PERF.n; PERF.acc = 0; PERF.n = 0;
       if (avg > .0230 && PERF.scale > .55) { PERF.scale = Math.max(.55, PERF.scale * (avg > .05 ? .64 : .85)); resize(); }
-      else if (avg < .0138 && PERF.scale < 1) { PERF.scale = Math.min(1, PERF.scale + .08); resize(); }
+      /* Climbing back out wanted avg < 13.8ms — 72fps — which vsync puts out
+         of reach on a 60Hz screen, so the scale could only ever fall and the
+         page ran permanently downscaled. 18ms clears a healthy 60fps frame. */
+      else if (avg < .0180 && PERF.scale < 1) { PERF.scale = Math.min(1, PERF.scale + .08); resize(); }
     }
   }
   RIG.prog = progressFor(scrollY);

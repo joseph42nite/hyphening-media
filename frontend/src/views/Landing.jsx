@@ -108,7 +108,9 @@ function Landing() {
   }, [location]);
 
   return (
-    <div className="landing-root" style={{ width: '100%', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+    // height comes from .landing-root so the 100vh→100svh fallback applies;
+    // an inline height would win over it and reintroduce the mobile wobble
+    <div className="landing-root" style={{ width: '100%', overflow: 'hidden', position: 'relative' }}>
       <SEOHead 
         title="Hyphening Media | Creative Operations & Marketing Performance Agency" 
         canonicalUrl="https://hyphening.com/" 
@@ -118,7 +120,7 @@ function Landing() {
       <Navbar />
 
       {/* ===== 3D Kyoto Temple Interactive World (Kage — The Complete Experience) ===== */}
-      <section className="kage-hero-section" id="scene" style={{ width: '100%', height: '100vh', position: 'absolute', inset: 0 }}>
+      <section className="kage-hero-section" id="scene" style={{ width: '100%', position: 'absolute', inset: 0 }}>
         <SceneErrorBoundary>
           <Scene />
         </SceneErrorBoundary>
