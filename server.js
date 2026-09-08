@@ -6,6 +6,7 @@
 import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
+import compression from 'compression';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
@@ -64,6 +65,14 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 // MIDDLEWARE STACK (ordered as per spec)
 // ============================================================
 
+// 0. Compression — gzip/brotli every text response.
+//
+// The landing page ships ~900 KB of text (HTML + three.js + a base64 font
+// sheet). Uncompressed that is what stalled the preloader on mobile links;
+// compressed it is roughly a quarter of that. Runs first so it wraps
+// express.static and the SPA fallback alike.
+app.use(compression({ threshold: 1024 }));
+
 // 1. Helmet — security headers
 app.use(helmet({
   contentSecurityPolicy: IS_PROD ? {
@@ -71,7 +80,9 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      // The landing page's font sheet inlines its woff2 files as base64
+      // data: URIs, so data: has to be allowed or every face is blocked.
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "http://localhost", "capacitor://localhost"],
     },
@@ -284,7 +295,25 @@ app.get('/api/audit-logs', (req, res) => {
 
 const frontendPath = path.join(__dirname, 'frontend', 'dist');
 if (IS_PROD || fs.existsSync(frontendPath)) {
-  app.use(express.static(frontendPath));
+  // Static assets.
+  //
+  // A year is only safe for files whose name changes when their contents do:
+  // Vite's content-hashed bundles, binary media, and the pinned three.js
+  // build. The landing page's own hand-written HTML/CSS/JS carry stable
+  // names, so they revalidate instead — an ETag 304 costs one small round
+  // trip and guarantees a deploy is never half-applied in someone's cache.
+  const IMMUTABLE = /\.(webp|avif|png|jpe?g|gif|svg|ico|woff2?|mp4|webm)$/i;
+  const VENDOR = /three\.min\.js$/i;
+  app.use(express.static(frontendPath, {
+    setHeaders: (res, filePath) => {
+      const hashed = filePath.includes(`${path.sep}assets${path.sep}`);
+      if (hashed || VENDOR.test(filePath) || IMMUTABLE.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }));
   
   // SPA fallback — serve index.html for all non-API routes with dynamic canonical injection & 301 trailing slash normalization
   app.get('*', (req, res) => {
