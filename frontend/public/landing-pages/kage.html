@@ -988,12 +988,20 @@ body[data-layout-hero="b"] .peek-cap b.jp{ font-size:clamp(20px,2.2vw,34px); let
 /* The Japanese title reads down the right edge, hung under the navigation —
    the one mark on that side of the frame now that the romanization has gone. */
 body[data-layout-hero="b"] .hero-side{
-  left:auto; right:var(--pad); top:calc(var(--nav-h) + clamp(14px,3vh,42px));
+  left:auto;
+  /* The column is absolutely positioned, so its right edge is only as safe as
+     the containing block's. Clear the notch inset explicitly — the page opts
+     into viewport-fit=cover and nothing else accounted for it — and cap the
+     width so a glyph column can never reach past the frame. */
+  right:max(var(--pad), env(safe-area-inset-right, 0px) + 16px);
+  top:calc(var(--nav-h) + clamp(14px,3vh,42px));
   bottom:auto; transform:none; display:block;
 }
 body[data-layout-hero="b"] .hero-side .v{
   position:static; transform:none;
-  font-size:clamp(30px,3.2vw,54px); letter-spacing:.12em; color:rgba(223,231,224,.62);
+  /* The 30px floor meant the column never narrowed below 30px however small
+     the screen — or however far the reader had zoomed the page up. */
+  font-size:clamp(20px,3.2vw,54px); letter-spacing:.12em; color:rgba(223,231,224,.62);
 }
 
 /* — story B · spread: the title crosses two columns, the reading column is
