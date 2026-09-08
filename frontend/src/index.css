@@ -3502,3 +3502,378 @@ tr:hover td {
   font-weight: 700;
   text-transform: uppercase;
 }
+
+/* ==========================================================================
+   THREEUI KAGE 3D LANDING PAGE STYLES
+   ========================================================================== */
+.shader-frame {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 720px;
+  overflow: hidden;
+  background: #05070a;
+}
+
+.shader-frame .landing-page-frame {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.kage-hero-section {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 720px;
+  background: #05070a;
+}
+
+.kage-hero-floating-hud {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.kage-hero-badge {
+  background: rgba(10, 14, 18, 0.8);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(223, 231, 224, 0.18);
+  color: #dfe7e0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.kage-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e0231c;
+  box-shadow: 0 0 10px #e0231c;
+  animation: kagePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes kagePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.kage-scroll-cue {
+  pointer-events: auto;
+  background: #e0231c;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 20px rgba(224, 35, 28, 0.45);
+}
+
+.kage-scroll-cue:hover {
+  background: #ff2d25;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 26px rgba(224, 35, 28, 0.7);
+}
+
+@media (max-width: 768px) {
+  .kage-hero-floating-hud {
+    bottom: 20px;
+    flex-direction: column;
+    gap: 8px;
+    width: 90%;
+    max-width: 360px;
+  }
+  .kage-hero-badge {
+    font-size: 0.65rem;
+    padding: 6px 12px;
+  }
+  .kage-scroll-cue {
+    font-size: 0.7rem;
+    padding: 8px 16px;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   KYOTO TEMPLE DARK AESTHETIC THEME FOR LANDING PAGE
+   ========================================================================== */
+.landing-root {
+  background: #05070a !important;
+  color: #dfe7e0 !important;
+}
+
+.landing-root .landing-nav {
+  background: rgba(10, 14, 18, 0.82) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(223, 231, 224, 0.14) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6) !important;
+}
+
+.landing-root .landing-nav-logo {
+  color: #dfe7e0 !important;
+}
+
+.landing-root .landing-nav-links a {
+  color: #dfe7e0 !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+}
+
+.landing-root .landing-nav-links a:hover {
+  color: #e0231c !important;
+}
+
+.landing-root .landing-nav-hamburger {
+  background: rgba(10, 14, 18, 0.9) !important;
+  border: 1px solid rgba(223, 231, 224, 0.2) !important;
+  color: #dfe7e0 !important;
+  box-shadow: none !important;
+}
+
+.landing-root .landing-nav-hamburger:hover {
+  background: rgba(224, 35, 28, 0.2) !important;
+  border-color: #e0231c !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 15px rgba(224, 35, 28, 0.4) !important;
+}
+
+.landing-root .landing-drawer-content {
+  background: #0a0e12 !important;
+  border-left: 1px solid rgba(223, 231, 224, 0.15) !important;
+  color: #dfe7e0 !important;
+}
+
+.landing-root .landing-drawer-links a {
+  color: #dfe7e0 !important;
+  border-bottom: 1px solid rgba(223, 231, 224, 0.08) !important;
+}
+
+.landing-root .landing-drawer-links a:hover {
+  color: #e0231c !important;
+}
+
+.landing-root .stats-bar {
+  background: rgba(10, 14, 18, 0.85) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(223, 231, 224, 0.12) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(223, 231, 224, 0.08) !important;
+  margin: 40px auto !important;
+  max-width: 1200px !important;
+}
+
+.landing-root .stat-item {
+  border-right: 1px solid rgba(223, 231, 224, 0.08) !important;
+}
+
+.landing-root .stat-item-number {
+  color: #dfe7e0 !important;
+  font-weight: 800 !important;
+  text-shadow: 0 0 30px rgba(224, 35, 28, 0.3) !important;
+}
+
+.landing-root .stat-item-label {
+  color: #8b9b90 !important;
+  letter-spacing: 0.12em !important;
+}
+
+.landing-root .japanese-image-wrapper picture img {
+  border: 1px solid rgba(223, 231, 224, 0.14) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(224, 35, 28, 0.15) !important;
+}
+
+.landing-root .landing-section {
+  background: transparent !important;
+  color: #dfe7e0 !important;
+}
+
+.landing-root .section-label {
+  background: rgba(224, 35, 28, 0.12) !important;
+  color: #ff5247 !important;
+  border: 1px solid rgba(224, 35, 28, 0.3) !important;
+  border-radius: 999px !important;
+  padding: 6px 14px !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.landing-root .section-heading {
+  color: #dfe7e0 !important;
+  font-family: var(--font-heading) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.landing-root .cap-card {
+  background: rgba(14, 19, 25, 0.75) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(223, 231, 224, 0.1) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+  color: #dfe7e0 !important;
+}
+
+.landing-root .cap-card:hover {
+  border-color: rgba(224, 35, 28, 0.45) !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.7), 0 0 30px rgba(224, 35, 28, 0.25) !important;
+}
+
+.landing-root .cap-card-content h3 {
+  color: #dfe7e0 !important;
+  font-weight: 700 !important;
+}
+
+.landing-root .cap-card-content p {
+  color: #8b9b90 !important;
+  line-height: 1.6 !important;
+}
+
+.landing-root .cap-card-banner {
+  border-bottom: 1px solid rgba(223, 231, 224, 0.1) !important;
+  background: #020305 !important;
+}
+
+.landing-root .cap-card-icon-wrap {
+  background: rgba(224, 35, 28, 0.15) !important;
+  color: #e0231c !important;
+  border: 1px solid rgba(224, 35, 28, 0.3) !important;
+}
+
+.landing-root .portfolio-card {
+  background: rgba(14, 19, 25, 0.75) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(223, 231, 224, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6) !important;
+  color: #dfe7e0 !important;
+}
+
+.landing-root .portfolio-card:hover {
+  border-color: rgba(224, 35, 28, 0.5) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(224, 35, 28, 0.3) !important;
+}
+
+.landing-root .portfolio-tag {
+  color: #e0231c !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+}
+
+.landing-root .portfolio-card-body h3 {
+  color: #dfe7e0 !important;
+}
+
+.landing-root .portfolio-card-body p {
+  color: #8b9b90 !important;
+}
+
+.landing-root .portfolio-metric-val {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+.landing-root .portfolio-metric-label {
+  color: #8b9b90 !important;
+}
+
+.landing-root .sakura-quote-container {
+  background: linear-gradient(180deg, #05070a 0%, #0e1319 50%, #05070a 100%) !important;
+  padding: 80px 20px 40px !important;
+}
+
+.landing-root .sakura-kanji {
+  color: #e0231c !important;
+  text-shadow: 0 0 40px rgba(224, 35, 28, 0.6) !important;
+  font-size: clamp(3rem, 6vw, 5rem) !important;
+}
+
+.landing-root .sakura-quote-title {
+  color: #dfe7e0 !important;
+  font-weight: 700 !important;
+}
+
+.landing-root .sakura-quote-sub {
+  color: #8b9b90 !important;
+  letter-spacing: 0.15em !important;
+}
+
+.landing-root .sakura-image-wrapper img {
+  border: 1px solid rgba(223, 231, 224, 0.14) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(224, 35, 28, 0.2) !important;
+  border-radius: 20px !important;
+}
+
+.landing-root .client-ticker-section {
+  background: transparent !important;
+}
+
+.landing-root .ticker-item {
+  color: #dfe7e0 !important;
+  font-weight: 700 !important;
+}
+
+.landing-root #faq .glass {
+  background: rgba(14, 19, 25, 0.75) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(223, 231, 224, 0.1) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+  transition: all 0.25s ease !important;
+}
+
+.landing-root #faq .glass:hover {
+  border-color: rgba(224, 35, 28, 0.35) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(224, 35, 28, 0.15) !important;
+}
+
+.landing-root #faq h3 {
+  color: #dfe7e0 !important;
+}
+
+.landing-root #faq p {
+  color: #8b9b90 !important;
+}
+
+.landing-root .landing-footer {
+  background: #020305 !important;
+  border-top: 1px solid rgba(223, 231, 224, 0.1) !important;
+  color: #dfe7e0 !important;
+}
+
+
