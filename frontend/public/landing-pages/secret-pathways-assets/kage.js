@@ -3255,6 +3255,49 @@ function wireFocus() {
   });
 }
 
+/* ?diag=1 — an on-screen readout, because a sideways pan on a real phone is
+   invisible to every measurement a desktop browser can take: fixed elements
+   contribute nothing to scrollWidth, and a pinch-zoom pan moves the visual
+   viewport while scrollX stays at 0. Showing both side by side says which it
+   is. Inert unless the flag is present. */
+function wireDiag() {
+  if (qs('diag', '0') !== '1') return;
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;max-width:100%;background:rgba(0,0,0,.88);' +
+    'color:#7CFF9B;font:11px/1.45 ui-monospace,Menlo,monospace;padding:8px 10px;white-space:pre;' +
+    'pointer-events:none;border-bottom:1px solid #7CFF9B';
+  document.body.appendChild(box);
+  const se = document.scrollingElement || document.documentElement;
+  const sx = scrollX; scrollTo(400, scrollY);
+  const scriptPannable = scrollX > 0; scrollTo(sx, scrollY);
+  const draw = () => {
+    const vw = se.clientWidth, bad = [];
+    document.querySelectorAll('body *').forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && (r.right > vw + 1 || r.left < -1)) {
+        const cs = getComputedStyle(el);
+        bad.push({ n: el.tagName.toLowerCase() + '.' + String(el.className || '').split(' ')[0],
+                   l: Math.round(r.left), r: Math.round(r.right), p: cs.position, o: cs.overflowX });
+      }
+    });
+    bad.sort((a, b) => (b.r - b.l) - (a.r - a.l));
+    const v = window.visualViewport;
+    box.textContent =
+      'layoutW ' + vw + '  scrollW ' + se.scrollWidth + '  innerW ' + innerWidth + '\n' +
+      'scrollX ' + Math.round(scrollX) + '  scriptPannable ' + scriptPannable + '\n' +
+      (v ? 'visual w ' + Math.round(v.width) + '  offsetLeft ' + v.offsetLeft.toFixed(1) + '  scale ' + v.scale.toFixed(2) + '\n' : '') +
+      'over-edge: ' + bad.length + '\n' +
+      bad.slice(0, 5).map(b => ' ' + b.n.slice(0, 24) + ' ' + b.l + '>' + b.r + ' ' + b.p + '/' + b.o).join('\n');
+  };
+  draw();
+  addEventListener('scroll', draw, { passive: true });
+  if (window.visualViewport) {
+    visualViewport.addEventListener('scroll', draw);
+    visualViewport.addEventListener('resize', draw);
+  }
+  setInterval(draw, 400);
+}
+
 function wireCursor() {
   const dot = $('#cursor');
   if (COARSE) { dot.style.display = 'none'; return; }
@@ -3722,6 +3765,7 @@ const JOBS = [
 function boot() {
   makeGrain();
   wireReveals(); wireForegroundStages(); wireNav(); wireHeroExit(); wireFocus(); wireCursor(); wirePartnerForm();
+  wireDiag();
   document.body.classList.add('is-locked');
   let i = 0;
   let lastProgress = performance.now();

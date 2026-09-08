@@ -53,6 +53,15 @@
   transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Same reasoning as the landing page: name html explicitly and use clip, so a
+   touch device cannot pan sideways onto anything that overhangs the edge.
+   hidden stays first as the fallback for Safari before 16. */
+html {
+  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
@@ -60,6 +69,9 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overflow: visible;
+  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
   padding: 16px;
   -webkit-font-smoothing: antialiased;
 }

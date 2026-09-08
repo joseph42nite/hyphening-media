@@ -27,15 +27,26 @@
   --ease-io:cubic-bezier(.65,0,.35,1);
 }
 *,*::before,*::after{box-sizing:border-box}
-html{ -webkit-text-size-adjust:100%; scroll-behavior:auto; }
+/* overflow-x lived on body alone. With html left visible, body's value is what
+   propagates to the viewport — and hidden propagated that way is the case iOS
+   Safari leaks, letting a finger pan sideways onto overhanging art even though
+   scrollWidth reports no overflow. Naming html explicitly stops the
+   propagation, and clip actually clips instead of making a scroll container it
+   then declines to scroll. hidden stays first for Safari before 16. */
+html{
+  -webkit-text-size-adjust:100%; scroll-behavior:auto;
+  overflow-x:hidden; overflow-x:clip; max-width:100%;
+}
 body{
   margin:0; background:var(--ink); color:var(--bone);
   font-family:'Onest',system-ui,-apple-system,'Helvetica Neue',sans-serif;
   font-weight:300; font-size:16px; line-height:1.6;
   -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-  overflow-x:hidden;
+  overflow-x:hidden; overflow-x:clip; max-width:100%;
 }
-body.is-locked{ overflow:hidden; height:100vh; }
+/* 100vh is the URL-bar-retracted height, so the locked page stood taller than
+   the screen and could be dragged while the preloader was still up. */
+body.is-locked{ overflow:hidden; height:100vh; height:100svh; }
 ::selection{ background:var(--vermilion); color:#fff; }
 img{max-width:100%;display:block}
 a{color:inherit;text-decoration:none}
