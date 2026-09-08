@@ -3282,12 +3282,31 @@ function wireDiag() {
     });
     bad.sort((a, b) => (b.r - b.l) - (a.r - a.l));
     const v = window.visualViewport;
+    /* the JP column specifically — it reported in frame on every emulated
+       width yet clips on a real handset, so print its own numbers */
+    const jp = document.querySelector('.hero-side .v');
+    const side = document.querySelector('.hero-side');
+    let jpLine = 'hero-side: not found\n';
+    if (jp && side) {
+      const rj = jp.getBoundingClientRect(), rs = side.getBoundingClientRect();
+      const cj = getComputedStyle(jp), cs2 = getComputedStyle(side);
+      const host = side.offsetParent;
+      jpLine = 'JP glyph ' + Math.round(rj.left) + '>' + Math.round(rj.right) +
+               '  gap ' + Math.round(vw - rj.right) + '\n' +
+               'JP box   ' + Math.round(rs.left) + '>' + Math.round(rs.right) +
+               '  right:' + cs2.right + '\n' +
+               'JP font  ' + cj.fontSize + '  ' + cj.fontFamily.split(',')[0] +
+               '  wm:' + cj.writingMode + '\n' +
+               'host ' + (host ? host.tagName.toLowerCase() + '.' + String(host.className).split(' ')[0] : 'viewport') +
+               ' w' + (host ? Math.round(host.getBoundingClientRect().width) : vw) + '\n';
+    }
     box.textContent =
       'layoutW ' + vw + '  scrollW ' + se.scrollWidth + '  innerW ' + innerWidth + '\n' +
       'scrollX ' + Math.round(scrollX) + '  scriptPannable ' + scriptPannable + '\n' +
-      (v ? 'visual w ' + Math.round(v.width) + '  offsetLeft ' + v.offsetLeft.toFixed(1) + '  scale ' + v.scale.toFixed(2) + '\n' : '') +
+      (v ? 'visual w ' + Math.round(v.width) + '  offL ' + v.offsetLeft.toFixed(1) + '  scale ' + v.scale.toFixed(2) + '\n' : '') +
+      jpLine +
       'over-edge: ' + bad.length + '\n' +
-      bad.slice(0, 5).map(b => ' ' + b.n.slice(0, 24) + ' ' + b.l + '>' + b.r + ' ' + b.p + '/' + b.o).join('\n');
+      bad.slice(0, 4).map(b => ' ' + b.n.slice(0, 24) + ' ' + b.l + '>' + b.r + ' ' + b.p + '/' + b.o).join('\n');
   };
   draw();
   addEventListener('scroll', draw, { passive: true });

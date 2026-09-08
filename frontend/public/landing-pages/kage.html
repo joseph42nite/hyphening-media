@@ -999,6 +999,12 @@ body[data-layout-hero="b"] .hero-side{
 }
 body[data-layout-hero="b"] .hero-side .v{
   position:static; transform:none;
+  /* .v is a span, and writing-mode is defined not to apply to inline boxes —
+     engines diverge on what they do with it anyway, which is how this column
+     measured in frame everywhere yet clipped on Safari. Give it a real block
+     box so the vertical flow is unambiguous, and let it size to its content
+     rather than inheriting a width from an inline layout. */
+  display:block; width:max-content; margin-left:auto;
   /* The 30px floor meant the column never narrowed below 30px however small
      the screen — or however far the reader had zoomed the page up. */
   font-size:clamp(20px,3.2vw,54px); letter-spacing:.12em; color:rgba(223,231,224,.62);
