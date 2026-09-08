@@ -2813,7 +2813,12 @@ function initPost() {
   POST.comp = new THREE.ShaderMaterial({
     uniforms: {
       tS: { value: null }, tB: { value: null }, uRes: { value: new THREE.Vector2(w, h) },
-      uT: { value: 0 }, uBloom: { value: .34 }, uCA: { value: 1 }, uGrain: { value: .020 },
+      /* The shader's grain is one sample per render-buffer pixel, and the
+         buffer is capped well below a phone's device resolution — so each
+         sample is stretched over two-plus device pixels and re-rolled every
+         frame, which reads as a coarse crawling fizz rather than film. Ask
+         for less of it wherever the buffer is being upscaled. */
+      uT: { value: 0 }, uBloom: { value: .34 }, uCA: { value: 1 }, uGrain: { value: LOW ? .011 : .020 },
       uVig: { value: 1 }, uExp: { value: .62 }, uFade: { value: 1 }, uSat: { value: 1.05 }
     },
     vertexShader: QUAD_VS,
@@ -3438,7 +3443,15 @@ function makeGrain() {
     d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
   }
   x.putImageData(im, 0, 0);
-  $('#grain').style.backgroundImage = 'url(' + c.toDataURL('image/png') + ')';
+  const el = $('#grain');
+  el.style.backgroundImage = 'url(' + c.toDataURL('image/png') + ')';
+  /* The tile is 180 CSS px wide, so on a 3x phone every noise pixel is painted
+     across three device pixels and the result reads as coarse blotches rather
+     than film grain. Shrink the tile by the pixel ratio so one noise pixel
+     lands on one device pixel, the way it already does on a 1x desktop. */
+  const dpr = Math.min(devicePixelRatio || 1, 3);
+  const t = (S / dpr).toFixed(1) + 'px';
+  el.style.backgroundSize = t + ' ' + t;
 }
 
 /* ============================================ 12 · the card viewports */
