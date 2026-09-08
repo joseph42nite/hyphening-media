@@ -335,7 +335,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
 
     // Dynamically inject exact single canonical tag for requested path
     const cleanPath = req.path === '/' ? '/' : req.path.replace(/\/$/, '');
-    const canonicalUrl = `https://hyphening.com${cleanPath}`;
+    const canonicalUrl = `https://hypheningmedia.com${cleanPath}`;
 
     fs.readFile(indexPath, 'utf8', (err, html) => {
       if (err) {

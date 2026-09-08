@@ -113,7 +113,7 @@ function Landing() {
     <div className="landing-root" style={{ width: '100%', overflow: 'hidden', position: 'relative' }}>
       <SEOHead 
         title="Hyphening Media | Creative Operations & Marketing Performance Agency" 
-        canonicalUrl="https://hyphening.com/" 
+        canonicalUrl="https://hypheningmedia.com/" 
       />
 
       {/* ===== Fixed Navigation ===== */}
@@ -135,7 +135,7 @@ function Landing() {
             "@graph": [
               {
                 "@type": "FAQPage",
-                "@id": "https://hyphening.com/#faq",
+                "@id": "https://hypheningmedia.com/#faq",
                 "mainEntity": [
                   {
                     "@type": "Question",
@@ -173,10 +173,10 @@ function Landing() {
               },
               {
                 "@type": "ProfessionalService",
-                "@id": "https://hyphening.com/#organization",
+                "@id": "https://hypheningmedia.com/#organization",
                 "name": "Hyphening Media",
-                "url": "https://hyphening.com",
-                "image": "https://hyphening.com/favicon.png",
+                "url": "https://hypheningmedia.com",
+                "image": "https://hypheningmedia.com/favicon.png",
                 "address": {
                   "@type": "PostalAddress",
                   "addressLocality": "Mumbai",

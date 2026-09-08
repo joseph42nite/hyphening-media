@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const SITE_URL = 'https://hyphening.com';
+const SITE_URL = 'https://hypheningmedia.com';
 
 /**
  * Dynamic SEO Head Component
@@ -12,7 +12,7 @@ export default function SEOHead({
   title = 'Hyphening Media | Creative Operations & Marketing Performance Agency',
   description = 'Hyphening Media is a creative operations and marketing agency scaling D2C, F&B, and healthcare brands. We build high-performance content calendars, videos, web apps, and automated marketing dashboards.',
   canonicalUrl,
-  ogImage = 'https://hyphening.com/favicon.png',
+  ogImage = 'https://hypheningmedia.com/favicon.png',
   ogType = 'website',
   keywords
 }) {

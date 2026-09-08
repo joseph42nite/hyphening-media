@@ -8,4 +8,4 @@ Disallow: /portal/
 Disallow: /login
 Disallow: /api/
 
-Sitemap: https://hyphening.com/sitemap.xml
+Sitemap: https://hypheningmedia.com/sitemap.xml

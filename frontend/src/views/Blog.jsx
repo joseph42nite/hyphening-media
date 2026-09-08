@@ -124,7 +124,7 @@ function BlogListing() {
       <SEOHead 
         title="Blog — Hyphening Media | Social Media Marketing Insights"
         description="Expert insights on social media marketing, content strategy, brand growth, and creative operations from Hyphening Media."
-        canonicalUrl="https://hyphening.com/blog"
+        canonicalUrl="https://hypheningmedia.com/blog"
       />
 
       {/* Navigation */}
@@ -296,10 +296,10 @@ function BlogArticle() {
     "description": post.meta_description || post.excerpt || '',
     "image": post.cover_image_url || '',
     "author": { "@type": "Organization", "name": post.author || 'Hyphening Media' },
-    "publisher": { "@type": "Organization", "name": "Hyphening Media", "url": "https://hyphening.com" },
+    "publisher": { "@type": "Organization", "name": "Hyphening Media", "url": "https://hypheningmedia.com" },
     "datePublished": post.published_at,
     "dateModified": post.updated_at,
-    "mainEntityOfPage": { "@type": "WebPage", "@id": `https://hyphening.com/blog/${post.slug}` }
+    "mainEntityOfPage": { "@type": "WebPage", "@id": `https://hypheningmedia.com/blog/${post.slug}` }
   };
 
   return (
@@ -309,7 +309,7 @@ function BlogArticle() {
         title={`${post.meta_title || post.title} — Hyphening Media`}
         description={post.meta_description || post.excerpt || ''}
         keywords={post.meta_keywords}
-        canonicalUrl={`https://hyphening.com/blog/${post.slug}`}
+        canonicalUrl={`https://hypheningmedia.com/blog/${post.slug}`}
         ogImage={post.cover_image_url}
         ogType="article"
       />
