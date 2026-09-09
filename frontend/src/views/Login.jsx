@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
 import { API_BASE, isNative } from '../api.js';
 import logoImg from '../assets/logo.png';
+import SEOHead from '../components/SEOHead';
 
 export default function Login({ setAuth, showToast }) {
   const [email, setEmail] = useState('');
@@ -10,6 +11,36 @@ export default function Login({ setAuth, showToast }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Ensure body and root take full viewport with pure black background
+  useEffect(() => {
+    const body = document.body;
+    const docEl = document.documentElement;
+    const root = document.getElementById('root');
+    const origBg = body.style.backgroundColor;
+    const origDocBg = docEl.style.backgroundColor;
+    const origColor = body.style.color;
+    const origBodyPad = body.style.padding;
+    const origRootMax = root.style.maxWidth;
+
+    body.style.backgroundColor = '#05070a';
+    docEl.style.backgroundColor = '#05070a';
+    body.style.color = '#dfe7e0';
+    body.style.padding = '0';
+    root.style.maxWidth = 'none';
+    body.classList.add('dark-theme');
+    docEl.classList.add('dark-theme');
+
+    return () => {
+      body.style.backgroundColor = origBg;
+      docEl.style.backgroundColor = origDocBg;
+      body.style.color = origColor;
+      body.style.padding = origBodyPad;
+      root.style.maxWidth = origRootMax;
+      body.classList.remove('dark-theme');
+      docEl.classList.remove('dark-theme');
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,9 +64,7 @@ export default function Login({ setAuth, showToast }) {
       }
 
       showToast('Logged in successfully', 'success');
-      setAuth(data); // data has: { role, name, email }
-      
-      // Save credentials in local state/storage
+      setAuth(data);
       localStorage.setItem('user', JSON.stringify(data));
       navigate('/dashboard');
     } catch (err) {
@@ -46,133 +75,118 @@ export default function Login({ setAuth, showToast }) {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '80vh',
-      padding: '24px'
-    }}>
-      <div className="glass-premium" style={{
-        width: '100%',
-        maxWidth: '420px',
-        padding: '40px',
-        textAlign: 'center',
-        animation: 'fadeIn 0.4s ease-out',
-        position: 'relative'
-      }}>
-        {/* Back Button — hidden on mobile (no landing page) */}
-        {!isNative && <button
+    <div className="landing-root login-view-wrapper">
+      <SEOHead 
+        title="Sign In — Hyphening Media | Ops Command Center" 
+        description="Authorized access for Hyphening Media operational personnel and campaign managers."
+        canonicalUrl="https://hypheningmedia.com/login"
+      />
+
+      {/* Atmospheric Background Lights */}
+      <div className="login-ambient-glow" />
+      <div className="login-vignette" />
+
+      {/* Floating Back Button (hidden on mobile native wrapper) */}
+      {!isNative && (
+        <button
           onClick={() => navigate('/')}
-          style={{
-            position: 'absolute',
-            top: '24px',
-            left: '24px',
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            border: '3px solid #000000',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#ffffff',
-            cursor: 'pointer',
-            boxShadow: '3px 3px 0px #000000',
-            transition: 'all 0.15s ease',
-            padding: 0
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translate(-1px, -1px)';
-            e.currentTarget.style.boxShadow = '4px 4px 0px #000000';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translate(0px, 0px)';
-            e.currentTarget.style.boxShadow = '3px 3px 0px #000000';
-          }}
-          title="Back to Landing Page"
+          className="login-back-btn"
+          title="Return to Home"
+          aria-label="Return to Home"
         >
-          <ArrowLeft size={16} strokeWidth={3} />
-        </button>}
+          <ArrowLeft size={16} />
+          <span>Return Home</span>
+        </button>
+      )}
 
-        <div style={{ marginBottom: '32px', marginTop: '16px' }}>
-          <img 
-            src={logoImg} 
-            alt="Hyphening Media Logo" 
-            style={{ 
-              height: '80px', 
-              width: 'auto', 
-              display: 'block', 
-              margin: '0 auto 12px' 
-            }} 
-          />
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Marketing Ops Command Center
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email Address</label>
-            <input
-              type="email"
-              className="form-control"
-              placeholder="name@hyphening.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+      {/* Center Portal Box */}
+      <div className="login-card-container">
+        <div className="login-glass-card">
+          {/* Eyebrow Pill */}
+          <div className="login-eyebrow">
+            <span className="login-eyebrow-dot" />
+            <span>OPERATIONS COMMAND CENTER</span>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '28px' }}>
-            <label className="form-label">Password</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="form-control"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={{ paddingRight: '48px' }}
+          {/* Logo Header */}
+          <div className="login-header">
+            <Link to="/" className="login-logo-link">
+              <img 
+                src={logoImg} 
+                alt="Hyphening Media Logo" 
+                className="login-logo-img"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '8px',
-                  color: 'var(--text-muted)',
-                  transition: 'color 0.15s ease'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+            </Link>
+            <h1 className="login-title">Sign In</h1>
+            <p className="login-subtitle">
+              Authorized access to internal marketing pipelines & operations
+            </p>
           </div>
 
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            disabled={loading}
-            style={{ width: '100%', padding: '12px', fontSize: '1rem' }}
-          >
-            {loading ? 'Authenticating...' : 'Sign In'}
-          </button>
-        </form>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="login-form">
+            <div className="login-field-group">
+              <label className="login-field-label">Email Address</label>
+              <input
+                type="email"
+                className="login-field-input"
+                placeholder="operator@hyphening.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
 
-        <div style={{ marginTop: '24px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Restricted access. Authorized operational personnel only.
+            <div className="login-field-group">
+              <div className="login-label-row">
+                <label className="login-field-label">Password</label>
+              </div>
+              <div className="login-password-wrapper">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="login-field-input login-password-input"
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="login-eye-toggle"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="login-submit-btn" 
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="login-btn-loading">
+                  <span className="login-spinner" />
+                  Authenticating...
+                </span>
+              ) : (
+                <span className="login-btn-text">
+                  Authenticate <Lock size={15} />
+                </span>
+              )}
+            </button>
+          </form>
+
+          {/* Security Footnote */}
+          <div className="login-security-badge">
+            <span className="login-pulse-dot" />
+            <ShieldCheck size={14} className="login-shield-icon" />
+            <span>256-Bit Encrypted Portal · Authorized Staff Only</span>
+          </div>
         </div>
       </div>
     </div>

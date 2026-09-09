@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, ChevronRight, Menu, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, Search, Sparkles, Share2, Check } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -9,7 +9,7 @@ import logoImg from '../assets/logo.png';
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 /**
- * Simple Markdown-to-HTML renderer.
+ * Enhanced Markdown-to-HTML renderer for dark Kyoto editorial aesthetic.
  * Handles: headings, bold, italic, links, images, code blocks, lists, blockquotes, hr.
  */
 function renderMarkdown(md) {
@@ -17,48 +17,48 @@ function renderMarkdown(md) {
   let html = md
     .replace(/\r/g, '')
     // Code blocks (fenced)
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="blog-code">$2</code></pre>')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="blog-pre"><code class="blog-code blog-lang-$1">$2</code></pre>')
     // Inline code
     .replace(/`([^`]+)`/g, '<code class="blog-inline-code">$1</code>')
     // Images
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="blog-content-img" loading="lazy" />')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<div class="blog-img-frame"><img src="$2" alt="$1" class="blog-content-img" loading="lazy" /><span class="blog-img-caption">$1</span></div>')
     // Links
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="blog-link" target="_blank" rel="noopener noreferrer">$1</a>')
     // Headings
-    .replace(/^#### (.+)$/gm, '<h4><strong>$1</strong></h4>')
-    .replace(/^### (.+)$/gm, '<h3><strong>$1</strong></h3>')
-    .replace(/^## (.+)$/gm, '<h2><strong>$1</strong></h2>')
-    .replace(/^# (.+)$/gm, '<h1><strong>$1</strong></h1>')
+    .replace(/^#### (.+)$/gm, '<h4 class="blog-h4">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 class="blog-h3">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="blog-h2">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="blog-h1">$1</h1>')
     // Bold & Italic
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     // Blockquotes
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^> (.+)$/gm, '<blockquote class="blog-quote">$1</blockquote>')
     // Horizontal rule
-    .replace(/^---$/gm, '<hr />')
+    .replace(/^---$/gm, '<hr class="blog-divider" />')
     // Unordered lists
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^- (.+)$/gm, '<li class="blog-li">$1</li>')
     // Numbered lists
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-    // Wrap consecutive <li> in <ul>
-    .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+    .replace(/^\d+\. (.+)$/gm, '<li class="blog-li-num">$1</li>')
+    // Wrap consecutive <li> in <ul> or <ol>
+    .replace(/(<li class="blog-li">.*<\/li>\n?)+/g, '<ul class="blog-ul">$&</ul>')
+    .replace(/(<li class="blog-li-num">.*<\/li>\n?)+/g, '<ol class="blog-ol">$&</ol>')
     // Paragraphs (double newline)
-    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n\n/g, '</p><p class="blog-p">')
     // Single newlines inside paragraphs
     .replace(/\n/g, '<br />');
 
   // Wrap in paragraph tags
-  html = '<p>' + html + '</p>';
+  html = '<p class="blog-p">' + html + '</p>';
   // Clean up empty paragraphs
-  html = html.replace(/<p><\/p>/g, '').replace(/<p>\s*<\/p>/g, '');
+  html = html.replace(/<p class="blog-p"><\/p>/g, '').replace(/<p class="blog-p">\s*<\/p>/g, '');
   // Fix headings/blockquotes/pre inside paragraphs
-  html = html.replace(/<p>(<h[1-4]>)/g, '$1').replace(/(<\/h[1-4]>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<blockquote>)/g, '$1').replace(/(<\/blockquote>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<pre>)/g, '$1').replace(/(<\/pre>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<ul>)/g, '$1').replace(/(<\/ul>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<hr \/>)/g, '$1').replace(/(<hr \/>)<\/p>/g, '$1');
-  html = html.replace(/<p>(<img )/g, '$1').replace(/(\/\>)<\/p>/g, '$1');
+  html = html.replace(/<p class="blog-p">(<h[1-4])/g, '$1').replace(/(<\/h[1-4]>)<\/p>/g, '$1');
+  html = html.replace(/<p class="blog-p">(<blockquote)/g, '$1').replace(/(<\/blockquote>)<\/p>/g, '$1');
+  html = html.replace(/<p class="blog-p">(<pre)/g, '$1').replace(/(<\/pre>)<\/p>/g, '$1');
+  html = html.replace(/<p class="blog-p">(<ul|<ol)/g, '$1').replace(/(<\/ul>|<\/ol>)<\/p>/g, '$1');
+  html = html.replace(/<p class="blog-p">(<hr \/>|<div class="blog-img-frame")/g, '$1').replace(/(<\/div>)<\/p>/g, '$1');
 
   return html;
 }
@@ -79,10 +79,10 @@ function BlogListing() {
   const [posts, setPosts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchPosts();
@@ -105,116 +105,239 @@ function BlogListing() {
     }
   };
 
-  // Remove body padding
+  // Ensure body and root take full viewport with pure black background
   useEffect(() => {
     const body = document.body;
+    const docEl = document.documentElement;
     const root = document.getElementById('root');
+    const origBg = body.style.backgroundColor;
+    const origDocBg = docEl.style.backgroundColor;
+    const origColor = body.style.color;
     const origBodyPad = body.style.padding;
     const origRootMax = root.style.maxWidth;
+
+    body.style.backgroundColor = '#05070a';
+    docEl.style.backgroundColor = '#05070a';
+    body.style.color = '#dfe7e0';
     body.style.padding = '0';
     root.style.maxWidth = 'none';
+    body.classList.add('dark-theme');
+    docEl.classList.add('dark-theme');
+
     return () => {
+      body.style.backgroundColor = origBg;
+      docEl.style.backgroundColor = origDocBg;
+      body.style.color = origColor;
       body.style.padding = origBodyPad;
       root.style.maxWidth = origRootMax;
+      body.classList.remove('dark-theme');
+      docEl.classList.remove('dark-theme');
     };
   }, []);
 
+  // Filter posts client-side for immediate responsive search
+  const filteredPosts = useMemo(() => {
+    if (!searchQuery.trim()) return posts;
+    const q = searchQuery.toLowerCase();
+    return posts.filter(
+      p =>
+        (p.title && p.title.toLowerCase().includes(q)) ||
+        (p.excerpt && p.excerpt.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q)) ||
+        (p.tags && p.tags.toLowerCase().includes(q))
+    );
+  }, [posts, searchQuery]);
+
   return (
-    <div className="landing-root">
+    <div className="landing-root blog-root">
       <SEOHead 
-        title="Blog — Hyphening Media | Social Media Marketing Insights"
-        description="Expert insights on social media marketing, content strategy, brand growth, and creative operations from Hyphening Media."
+        title="Journal & Insights — Hyphening Media | Marketing & Creative Operations"
+        description="Expert insights on social media marketing, content strategy, video production, and high-performance brand growth from Hyphening Media."
         canonicalUrl="https://hypheningmedia.com/blog"
       />
 
-      {/* Navigation */}
+      {/* Atmospheric Background Lights */}
+      <div className="blog-ambient-mesh" />
+      <div className="blog-vignette" />
+
+      {/* Fixed Navigation */}
       <Navbar />
 
-      {/* Blog Hero */}
-      <section className="blog-hero">
-        <div className="blog-hero-inner">
-          <span className="blog-hero-badge">INSIGHTS & STRATEGIES</span>
-          <h1>The Hyphening Blog</h1>
-          <p>Expert insights on social media marketing, content strategy, brand growth, and creative operations.</p>
-        </div>
-      </section>
+      {/* Hero Section */}
+      <header className="blog-hero-section">
+        <div className="blog-hero-content">
+          <div className="blog-eyebrow">
+            <span className="blog-eyebrow-dot" />
+            <span>INSIGHTS & STRATEGIES</span>
+          </div>
 
-      {/* Category Filter */}
+          <h1 className="blog-display-title">
+            The Hyphen—ing <span className="blog-title-accent">Journal</span>
+          </h1>
+
+          <p className="blog-hero-desc">
+            Where creative craft scales into measurable performance. Deep-dives on video operations,
+            content strategy, and algorithmic distribution for modern brands.
+          </p>
+
+          {/* Search & Filter Bar */}
+          <div className="blog-search-bar-wrap">
+            <div className="blog-search-input-box">
+              <Search size={18} className="blog-search-icon" />
+              <input
+                type="text"
+                placeholder="Search articles by topic, strategy, or keyword..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="blog-search-input"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="blog-search-clear"
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Category Pills Bar */}
       {categories.length > 0 && (
-        <div className="blog-categories">
-          <button
-            className={`blog-cat-btn ${selectedCategory === '' ? 'active' : ''}`}
-            onClick={() => { setSelectedCategory(''); setPage(1); }}
-          >
-            All
-          </button>
-          {categories.map(cat => (
+        <div className="blog-categories-wrapper">
+          <div className="blog-categories-scroll">
             <button
-              key={cat}
-              className={`blog-cat-btn ${selectedCategory === cat ? 'active' : ''}`}
-              onClick={() => { setSelectedCategory(cat); setPage(1); }}
+              className={`blog-pill-btn ${selectedCategory === '' ? 'active' : ''}`}
+              onClick={() => { setSelectedCategory(''); setPage(1); }}
             >
-              {cat}
+              All Topics
             </button>
-          ))}
+            {categories.map(cat => (
+              <button
+                key={cat}
+                className={`blog-pill-btn ${selectedCategory === cat ? 'active' : ''}`}
+                onClick={() => { setSelectedCategory(cat); setPage(1); }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Blog Grid */}
-      <section className="blog-listing-section">
+      {/* Main Content Grid */}
+      <main className="blog-main-section">
         {loading ? (
-          <div className="blog-loading">Loading articles...</div>
-        ) : posts.length === 0 ? (
-          <div className="blog-empty">
+          <div className="blog-state-container">
+            <div className="blog-pulse-spinner" />
+            <div className="blog-loading-text">Loading insights...</div>
+          </div>
+        ) : filteredPosts.length === 0 ? (
+          <div className="blog-state-container blog-empty-state">
+            <div className="blog-empty-icon">⛩️</div>
             <h3>No articles found</h3>
-            <p>Check back soon — new content is on its way!</p>
+            <p>
+              {searchQuery
+                ? `No articles match "${searchQuery}". Try a different keyword or reset filters.`
+                : 'Check back soon — fresh editorial strategies are on the way!'}
+            </p>
+            {searchQuery && (
+              <button 
+                className="blog-pill-btn active"
+                onClick={() => setSearchQuery('')}
+                style={{ marginTop: '16px' }}
+              >
+                Reset Search
+              </button>
+            )}
           </div>
         ) : (
-          <div className="blog-grid">
-            {posts.map(post => (
-              <Link to={`/blog/${post.slug}`} key={post.id} className="blog-card">
-                {post.cover_image_url && (
-                  <div className="blog-card-img" style={{ backgroundImage: `url(${post.cover_image_url})` }} />
-                )}
-                <div className="blog-card-body">
-                  <div className="blog-card-meta">
-                    <span className="blog-card-category">{post.category}</span>
-                    <span className="blog-card-date">
-                      <Calendar size={12} /> {formatDate(post.published_at)}
-                    </span>
+          <div className="blog-cards-grid">
+            {filteredPosts.map((post, idx) => {
+              const readTime = post.read_time || Math.max(1, Math.round((post.content || '').split(/\s+/).length / 200));
+              const isFirst = idx === 0 && page === 1 && !searchQuery && !selectedCategory;
+
+              return (
+                <Link 
+                  to={`/blog/${post.slug}`} 
+                  key={post.id} 
+                  className={`blog-card-item ${isFirst ? 'blog-card-featured' : ''}`}
+                >
+                  <div className="blog-card-img-wrap">
+                    {post.cover_image_url ? (
+                      <div 
+                        className="blog-card-img" 
+                        style={{ backgroundImage: `url(${post.cover_image_url})` }} 
+                      />
+                    ) : (
+                      <div className="blog-card-img blog-card-img-fallback">
+                        <span className="blog-fallback-kanji">影</span>
+                      </div>
+                    )}
+                    <div className="blog-card-img-overlay" />
+                    <span className="blog-card-category-badge">{post.category}</span>
                   </div>
-                  <h3 className="blog-card-title">{post.title}</h3>
-                  <p className="blog-card-excerpt">{post.excerpt || ''}</p>
-                  <div className="blog-card-footer">
-                    <span className="blog-card-read">Read Article <ArrowRight size={14} /></span>
+
+                  <div className="blog-card-content">
+                    <div className="blog-card-meta-row">
+                      <span className="blog-card-date">
+                        <Calendar size={13} /> {formatDate(post.published_at)}
+                      </span>
+                      <span className="blog-card-readtime">
+                        <Clock size={13} /> {readTime} min read
+                      </span>
+                    </div>
+
+                    <h2 className="blog-card-title">{post.title}</h2>
+
+                    <p className="blog-card-excerpt">
+                      {post.excerpt || 'Discover operational frameworks and creative tactics to drive measurable brand growth.'}
+                    </p>
+
+                    <div className="blog-card-footer-row">
+                      <span className="blog-card-action">
+                        Read Analysis <ArrowRight size={14} className="blog-action-arrow" />
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="blog-pagination">
+        {totalPages > 1 && !searchQuery && (
+          <nav className="blog-pagination-nav" aria-label="Blog Pagination">
             <button
-              className="blog-page-btn"
+              className="blog-page-nav-btn"
               disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
+              onClick={() => {
+                setPage(page - 1);
+                window.scrollTo({ top: 400, behavior: 'smooth' });
+              }}
             >
               <ArrowLeft size={14} /> Previous
             </button>
-            <span className="blog-page-info">Page {page} of {totalPages}</span>
+            <span className="blog-page-indicator">
+              Page {page} of {totalPages}
+            </span>
             <button
-              className="blog-page-btn"
+              className="blog-page-nav-btn"
               disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
+              onClick={() => {
+                setPage(page + 1);
+                window.scrollTo({ top: 400, behavior: 'smooth' });
+              }}
             >
               Next <ArrowRight size={14} />
             </button>
-          </div>
+          </nav>
         )}
-      </section>
+      </main>
 
       {/* Footer */}
       <Footer />
@@ -233,7 +356,7 @@ function BlogArticle() {
   const [related, setRelated] = useState([]);
   const [linkedPosts, setLinkedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchPost();
@@ -260,25 +383,51 @@ function BlogArticle() {
     }
   };
 
-  // Remove body padding
+  const handleShare = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Ensure body and root take full viewport with pure black background
   useEffect(() => {
     const body = document.body;
+    const docEl = document.documentElement;
     const root = document.getElementById('root');
+    const origBg = body.style.backgroundColor;
+    const origDocBg = docEl.style.backgroundColor;
+    const origColor = body.style.color;
     const origBodyPad = body.style.padding;
     const origRootMax = root.style.maxWidth;
+
+    body.style.backgroundColor = '#05070a';
+    docEl.style.backgroundColor = '#05070a';
+    body.style.color = '#dfe7e0';
     body.style.padding = '0';
     root.style.maxWidth = 'none';
+    body.classList.add('dark-theme');
+    docEl.classList.add('dark-theme');
+
     return () => {
+      body.style.backgroundColor = origBg;
+      docEl.style.backgroundColor = origDocBg;
+      body.style.color = origColor;
       body.style.padding = origBodyPad;
       root.style.maxWidth = origRootMax;
+      body.classList.remove('dark-theme');
+      docEl.classList.remove('dark-theme');
     };
   }, []);
 
   if (loading) {
     return (
-      <div className="landing-root">
-        <div className="blog-loading" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          Loading article...
+      <div className="landing-root blog-root">
+        <Navbar />
+        <div className="blog-state-container" style={{ minHeight: '80vh' }}>
+          <div className="blog-pulse-spinner" />
+          <div className="blog-loading-text">Summoning article...</div>
         </div>
       </div>
     );
@@ -303,7 +452,7 @@ function BlogArticle() {
   };
 
   return (
-    <div className="landing-root">
+    <div className="landing-root blog-root blog-article-root">
       {/* SEO Meta */}
       <SEOHead 
         title={`${post.meta_title || post.title} — Hyphening Media`}
@@ -315,86 +464,179 @@ function BlogArticle() {
       />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
 
+      {/* Atmospheric Background Lights */}
+      <div className="blog-ambient-mesh" />
+      <div className="blog-vignette" />
+
       {/* Navigation */}
       <Navbar />
 
-      {/* Article Hero */}
-      {post.cover_image_url && (
-        <div className="blog-article-hero" style={{ backgroundImage: `url(${post.cover_image_url})` }}>
-          <div className="blog-article-hero-overlay" />
-        </div>
-      )}
-
-      {/* Article Content */}
-      <article className="blog-article">
-        <div className="blog-article-header">
-          <Link to="/blog" className="blog-back-link">
-            <ArrowLeft size={14} /> Back to Blog
-          </Link>
-          <div className="blog-article-meta">
-            <span className="blog-card-category">{post.category}</span>
-            <span><Calendar size={13} /> {formatDate(post.published_at)}</span>
-            <span><Clock size={13} /> {readTime} min read</span>
-          </div>
-          <h1 className="blog-article-title">{post.title}</h1>
-          {post.excerpt && <p className="blog-article-excerpt">{post.excerpt}</p>}
-          <div className="blog-article-author">By {post.author || 'Hyphening Media'}</div>
-        </div>
-
-        <div className="blog-article-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }} />
-
-        {/* Tags */}
-        {post.tags && (
-          <div className="blog-article-tags">
-            {post.tags.split(',').map(tag => (
-              <Link to={`/blog?tag=${tag.trim()}`} key={tag.trim()} className="blog-tag">
-                <Tag size={12} /> {tag.trim()}
-              </Link>
-            ))}
-          </div>
+      {/* Article Hero Banner (Cinematic Backdrop) */}
+      <div className="blog-article-banner-hero">
+        {post.cover_image_url && (
+          <div 
+            className="blog-article-backdrop-img" 
+            style={{ backgroundImage: `url(${post.cover_image_url})` }} 
+          />
         )}
+        <div className="blog-article-hero-mask" />
+      </div>
 
-        {/* Internal Links */}
+      {/* Reader Container */}
+      <div className="blog-article-wrapper">
+        <article className="blog-article-card">
+          {/* Top Bar / Navigation */}
+          <div className="blog-article-nav-row">
+            <Link to="/blog" className="blog-back-pill">
+              <ArrowLeft size={14} /> Back to Journal
+            </Link>
+
+            <button onClick={handleShare} className="blog-share-pill" title="Copy article link">
+              {copied ? (
+                <>
+                  <Check size={14} color="#10b981" /> Link Copied
+                </>
+              ) : (
+                <>
+                  <Share2 size={14} /> Share Article
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Article Header */}
+          <header className="blog-article-header">
+            <div className="blog-article-meta-tags">
+              <span className="blog-card-category-badge">{post.category}</span>
+              <span className="blog-article-meta-item">
+                <Calendar size={13} /> {formatDate(post.published_at)}
+              </span>
+              <span className="blog-article-meta-item">
+                <Clock size={13} /> {readTime} min read
+              </span>
+            </div>
+
+            <h1 className="blog-article-main-title">{post.title}</h1>
+
+            {post.excerpt && (
+              <p className="blog-article-lead-excerpt">{post.excerpt}</p>
+            )}
+
+            <div className="blog-article-author-row">
+              <div className="blog-author-avatar">
+                <img src={logoImg} alt="Hyphening Media" />
+              </div>
+              <div className="blog-author-info">
+                <span className="blog-author-name">{post.author || 'Hyphening Editorial'}</span>
+                <span className="blog-author-role">Creative Operations Lead · Hyphening Media</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Featured Cover Display (if available) */}
+          {post.cover_image_url && (
+            <div className="blog-article-featured-img-wrap">
+              <img 
+                src={post.cover_image_url} 
+                alt={post.title} 
+                className="blog-article-featured-img" 
+              />
+            </div>
+          )}
+
+          {/* Article Markdown Content Body */}
+          <div 
+            className="blog-article-prose" 
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }} 
+          />
+
+          {/* Tags Section */}
+          {post.tags && (
+            <div className="blog-tags-container">
+              <span className="blog-tags-label">Topics:</span>
+              <div className="blog-tags-list">
+                {post.tags.split(',').map(tag => (
+                  <span key={tag.trim()} className="blog-topic-tag">
+                    <Tag size={12} /> {tag.trim()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Author Footnote Box */}
+          <div className="blog-author-box">
+            <div className="blog-author-box-logo">
+              <img src={logoImg} alt="Hyphening Media" />
+            </div>
+            <div className="blog-author-box-text">
+              <h4>Crafted by Hyphening Media</h4>
+              <p>
+                We design and scale high-performance creative engines for D2C, F&B, and healthcare brands.
+                From daily content operations to custom dashboards and automated growth funnels.
+              </p>
+              <Link to="/#contact" className="blog-author-cta-btn">
+                Work With Us <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </article>
+
+        {/* Internal Linked Reading */}
         {linkedPosts.length > 0 && (
-          <div className="blog-internal-links">
-            <h3>Recommended Reading</h3>
-            <div className="blog-related-grid">
+          <section className="blog-recs-section">
+            <div className="blog-recs-header">
+              <span className="blog-eyebrow-dot" />
+              <h3>Recommended Reading</h3>
+            </div>
+            <div className="blog-recs-grid">
               {linkedPosts.map(lp => (
-                <Link to={`/blog/${lp.slug}`} key={lp.id} className="blog-related-card">
+                <Link to={`/blog/${lp.slug}`} key={lp.id} className="blog-rec-card">
                   {lp.cover_image_url && (
-                    <div className="blog-related-img" style={{ backgroundImage: `url(${lp.cover_image_url})` }} />
+                    <div 
+                      className="blog-rec-img" 
+                      style={{ backgroundImage: `url(${lp.cover_image_url})` }} 
+                    />
                   )}
-                  <div className="blog-related-body">
-                    <span className="blog-card-category">{lp.category}</span>
+                  <div className="blog-rec-body">
+                    <span className="blog-card-category-badge">{lp.category}</span>
                     <h4>{lp.title}</h4>
                   </div>
                 </Link>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Related Posts */}
+        {/* Related Category Posts */}
         {related.length > 0 && (
-          <div className="blog-related-section">
-            <h3>More from {post.category}</h3>
-            <div className="blog-related-grid">
+          <section className="blog-recs-section">
+            <div className="blog-recs-header">
+              <span className="blog-eyebrow-dot" />
+              <h3>More from {post.category}</h3>
+            </div>
+            <div className="blog-recs-grid">
               {related.map(rp => (
-                <Link to={`/blog/${rp.slug}`} key={rp.id} className="blog-related-card">
+                <Link to={`/blog/${rp.slug}`} key={rp.id} className="blog-rec-card">
                   {rp.cover_image_url && (
-                    <div className="blog-related-img" style={{ backgroundImage: `url(${rp.cover_image_url})` }} />
+                    <div 
+                      className="blog-rec-img" 
+                      style={{ backgroundImage: `url(${rp.cover_image_url})` }} 
+                    />
                   )}
-                  <div className="blog-related-body">
-                    <span className="blog-card-category">{rp.category}</span>
+                  <div className="blog-rec-body">
+                    <span className="blog-card-category-badge">{rp.category}</span>
                     <h4>{rp.title}</h4>
-                    <span className="blog-card-date"><Calendar size={11} /> {formatDate(rp.published_at)}</span>
+                    <span className="blog-card-date">
+                      <Calendar size={11} /> {formatDate(rp.published_at)}
+                    </span>
                   </div>
                 </Link>
               ))}
             </div>
-          </div>
+          </section>
         )}
-      </article>
+      </div>
 
       {/* Footer */}
       <Footer />

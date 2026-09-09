@@ -96,16 +96,35 @@ export default function Footer({ showCta = true }) {
 
           {submitted ? (
             <div style={{
-              background: '#ffffff',
-              border: '3px solid #000000',
-              padding: '40px 24px',
-              borderRadius: '16px',
-              boxShadow: '6px 6px 0px #000000',
+              background: 'rgba(10, 14, 18, 0.85)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(223, 231, 224, 0.14)',
+              padding: '44px 28px',
+              borderRadius: '20px',
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(224, 35, 28, 0.15)',
               textAlign: 'center',
               marginTop: '32px'
             }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '1.8rem', fontWeight: 900, textTransform: 'uppercase' }}>Thank You, {formData.name}!</h3>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '1rem', lineHeight: '1.5' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                background: 'rgba(224, 35, 28, 0.15)',
+                border: '1px solid rgba(224, 35, 28, 0.4)',
+                color: '#ff5a3c',
+                fontSize: '0.75rem',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                marginBottom: '16px'
+              }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#e0231c', boxShadow: '0 0 8px #e0231c' }} />
+                Transmission Received
+              </div>
+              <h3 style={{ margin: '0 0 12px', fontSize: '1.8rem', fontWeight: 600, color: '#dfe7e0', letterSpacing: '-0.01em' }}>Thank You, {formData.name}</h3>
+              <p style={{ margin: 0, color: '#aab4ad', fontSize: '0.95rem', lineHeight: '1.6' }}>
                 We have received your details. One of our creative operations leads will reach out to you within 24 hours.
               </p>
             </div>
@@ -113,66 +132,168 @@ export default function Footer({ showCta = true }) {
             <form onSubmit={handleFormSubmit} style={{
               textAlign: 'left',
               marginTop: '32px',
-              background: '#ffffff',
-              border: '3px solid #000000',
-              padding: '32px',
-              borderRadius: '16px',
-              boxShadow: '6px 6px 0px #000000',
+              background: 'rgba(10, 14, 18, 0.85)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(223, 231, 224, 0.14)',
+              padding: '36px 32px',
+              borderRadius: '20px',
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(224, 35, 28, 0.12)',
               display: 'flex',
               flexDirection: 'column',
               gap: '20px'
             }}>
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#000000' }}>Name *</label>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#aab4ad' }}>Name *</label>
                 <input
                   type="text"
-                  className="form-control"
                   placeholder="Enter your name"
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                   required
-                  style={{ border: '3px solid #000000', padding: '12px 16px', borderRadius: '8px', width: '100%' }}
+                  style={{
+                    background: 'rgba(5, 7, 10, 0.75)',
+                    border: '1px solid rgba(223, 231, 224, 0.15)',
+                    color: '#dfe7e0',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    width: '100%',
+                    fontSize: '0.95rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s, box-shadow 0.2s'
+                  }}
+                  onFocus={e => {
+                    e.target.style.borderColor = '#e0231c';
+                    e.target.style.boxShadow = '0 0 12px rgba(224, 35, 28, 0.3)';
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = 'rgba(223, 231, 224, 0.15)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
               </div>
               
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#000000' }}>Email Address *</label>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#aab4ad' }}>Email Address *</label>
                 <input
                   type="email"
-                  className="form-control"
                   placeholder="name@company.com"
                   value={formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
                   required
-                  style={{ border: '3px solid #000000', padding: '12px 16px', borderRadius: '8px', width: '100%' }}
+                  style={{
+                    background: 'rgba(5, 7, 10, 0.75)',
+                    border: '1px solid rgba(223, 231, 224, 0.15)',
+                    color: '#dfe7e0',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    width: '100%',
+                    fontSize: '0.95rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s, box-shadow 0.2s'
+                  }}
+                  onFocus={e => {
+                    e.target.style.borderColor = '#e0231c';
+                    e.target.style.boxShadow = '0 0 12px rgba(224, 35, 28, 0.3)';
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = 'rgba(223, 231, 224, 0.15)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
               </div>
               
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#000000' }}>Company Name / Website</label>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#aab4ad' }}>Company Name / Website</label>
                 <input
                   type="text"
-                  className="form-control"
                   placeholder="e.g. Acme Agency"
                   value={formData.company}
                   onChange={e => setFormData({ ...formData, company: e.target.value })}
-                  style={{ border: '3px solid #000000', padding: '12px 16px', borderRadius: '8px', width: '100%' }}
+                  style={{
+                    background: 'rgba(5, 7, 10, 0.75)',
+                    border: '1px solid rgba(223, 231, 224, 0.15)',
+                    color: '#dfe7e0',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    width: '100%',
+                    fontSize: '0.95rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s, box-shadow 0.2s'
+                  }}
+                  onFocus={e => {
+                    e.target.style.borderColor = '#e0231c';
+                    e.target.style.boxShadow = '0 0 12px rgba(224, 35, 28, 0.3)';
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = 'rgba(223, 231, 224, 0.15)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
               </div>
               
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#000000' }}>What are your goals?</label>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#aab4ad' }}>What are your goals?</label>
                 <textarea
-                  className="form-control"
                   placeholder="What channels are you focused on? Tell us about your creative goals..."
                   value={formData.message}
                   onChange={e => setFormData({ ...formData, message: e.target.value })}
                   rows="4"
-                  style={{ border: '3px solid #000000', padding: '12px 16px', borderRadius: '8px', width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                  style={{
+                    background: 'rgba(5, 7, 10, 0.75)',
+                    border: '1px solid rgba(223, 231, 224, 0.15)',
+                    color: '#dfe7e0',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    width: '100%',
+                    fontSize: '0.95rem',
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    resize: 'vertical',
+                    transition: 'border-color 0.2s, box-shadow 0.2s'
+                  }}
+                  onFocus={e => {
+                    e.target.style.borderColor = '#e0231c';
+                    e.target.style.boxShadow = '0 0 12px rgba(224, 35, 28, 0.3)';
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = 'rgba(223, 231, 224, 0.15)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
               </div>
               
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', justifyContent: 'center', marginTop: '8px', fontSize: '1rem', fontWeight: 800 }}>
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginTop: '8px',
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  background: '#e0231c',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 24px rgba(224, 35, 28, 0.45)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#ff382e';
+                  e.currentTarget.style.boxShadow = '0 0 32px rgba(224, 35, 28, 0.65)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#e0231c';
+                  e.currentTarget.style.boxShadow = '0 0 24px rgba(224, 35, 28, 0.45)';
+                  e.currentTarget.style.transform = 'none';
+                }}
+              >
                 Submit Details <ArrowRight size={16} />
               </button>
             </form>

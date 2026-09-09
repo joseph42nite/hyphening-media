@@ -91,7 +91,7 @@ export default function Navbar() {
           <a href="/#contact" onClick={(e) => { e.preventDefault(); handleNavClick('contact'); }}>Contact</a>
           <Link 
             to="/blog" 
-            style={isBlogPage ? { color: '#000', borderBottom: '2px solid #000' } : {}}
+            style={isBlogPage ? { color: '#e0231c', borderBottom: '2px solid #e0231c', textShadow: '0 0 12px rgba(224, 35, 28, 0.4)' } : {}}
           >
             Blog
           </Link>
@@ -133,7 +133,7 @@ export default function Navbar() {
             <Link 
               to="/blog" 
               onClick={() => setMenuOpen(false)}
-              style={isBlogPage ? { fontWeight: 800, textDecoration: 'underline' } : {}}
+              style={isBlogPage ? { color: '#e0231c', fontWeight: 800, textDecoration: 'underline' } : {}}
             >
               Blog
             </Link>
