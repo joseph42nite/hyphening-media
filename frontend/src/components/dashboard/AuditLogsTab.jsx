@@ -59,7 +59,7 @@ export default function AuditLogsTab({
           </div>
         ) : (
           auditLogs.map(log => (
-            <div key={log.id} className="card" style={{ border: '2px solid #000', padding: '14px', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div key={log.id} className="card" style={{ border: '1px solid rgba(223, 231, 224, 0.12)', background: 'rgba(12, 16, 24, 0.85)', padding: '14px', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px', borderRadius: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>
                   {log.created_at ? formatDateStr(log.created_at.split(' ')[0]) : '-'}
@@ -68,14 +68,14 @@ export default function AuditLogsTab({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                <div style={{ fontWeight: 'bold' }}>👤 {log.actor_email || 'System'}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>👤 {log.actor_email || 'System'}</div>
+                <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.65)' }}>
                   {log.entity_type} #{log.entity_id}
                 </div>
               </div>
 
               {log.diff && (
-                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '8px 10px', fontSize: '0.75rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#1e293b' }}>
+                <div style={{ background: 'rgba(5, 7, 10, 0.7)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '6px', padding: '8px 10px', fontSize: '0.75rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#7dd3fc' }}>
                   {log.diff}
                 </div>
               )}

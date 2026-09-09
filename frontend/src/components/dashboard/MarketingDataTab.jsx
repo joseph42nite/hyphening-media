@@ -517,10 +517,10 @@ export default function MarketingDataTab({
             <table>
               <thead>
                 <tr>
-                  <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5', whiteSpace: 'nowrap', fontWeight: '900' }}>Metadata</th>
-                  <th colSpan="12" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#fee2e2', color: '#991b1b', whiteSpace: 'nowrap', fontWeight: '900' }}>Instagram Metrics</th>
-                  <th colSpan="8" style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#dbeafe', color: '#1e40af', whiteSpace: 'nowrap', fontWeight: '900' }}>YouTube Metrics</th>
-                  <th style={{ borderBottom: '2px solid #000', textAlign: 'center', background: '#f4f4f5', whiteSpace: 'nowrap', fontWeight: '900' }}>Actions</th>
+                  <th colSpan="8" style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: 'rgba(255, 255, 255, 0.04)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Metadata</th>
+                  <th colSpan="12" style={{ borderBottom: '1px solid rgba(224, 35, 28, 0.3)', textAlign: 'center', background: 'rgba(224, 35, 28, 0.12)', color: '#fca5a5', whiteSpace: 'nowrap', fontWeight: '800' }}>Instagram Metrics</th>
+                  <th colSpan="8" style={{ borderBottom: '1px solid rgba(56, 189, 248, 0.3)', textAlign: 'center', background: 'rgba(56, 189, 248, 0.12)', color: '#7dd3fc', whiteSpace: 'nowrap', fontWeight: '800' }}>YouTube Metrics</th>
+                  <th style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: 'rgba(255, 255, 255, 0.04)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Actions</th>
                 </tr>
                 <tr>
                   <th>Date</th>

@@ -115,20 +115,34 @@ function parseReportJson(raw) {
   }
 }
 
-// Short preview shown in the quote box. Always derived from report_json
-// (the exact same content "View Full Report" shows, just truncated) so the
-// preview and the full report can never say different things. summary is
-// only used as a last resort for old audits that predate report_json.
-function getPreviewText(audit) {
+// Extracts the full markdown narrative from report_json or summary
+function getAuditReportMarkdown(audit) {
+  if (!audit) return null;
   const parsed = parseReportJson(audit.report_json);
-  if (parsed != null) {
-    const text = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
-    const trimmed = text.trim();
-    if (trimmed) {
-      return trimmed.length > 280 ? `${trimmed.slice(0, 280).trim()}…` : trimmed;
-    }
+  if (!parsed) return audit.summary || null;
+  if (typeof parsed === 'string') return parsed;
+  if (typeof parsed === 'object') {
+    if (typeof parsed.report_markdown === 'string') return parsed.report_markdown;
+    if (typeof parsed.markdown === 'string') return parsed.markdown;
+    if (typeof parsed.content === 'string') return parsed.content;
+    if (typeof parsed.summary === 'string') return parsed.summary;
   }
-  return audit.summary || null;
+  return null;
+}
+
+// Short preview shown in card or snippets.
+function getPreviewText(audit) {
+  const md = getAuditReportMarkdown(audit);
+  if (md) {
+    const clean = md.replace(/[#*`_~[\]()|]/g, ' ').replace(/\s+/g, ' ').trim();
+    return clean.length > 220 ? `${clean.slice(0, 220).trim()}…` : clean;
+  }
+  const parsed = parseReportJson(audit?.report_json);
+  if (parsed && typeof parsed === 'string') {
+    const trimmed = parsed.trim();
+    return trimmed.length > 220 ? `${trimmed.slice(0, 220).trim()}…` : trimmed;
+  }
+  return audit?.summary || null;
 }
 
 // Inline formatting: **bold**, `code`, [text](url). Applied to already-escaped
@@ -144,17 +158,17 @@ function renderInline(text, keyPrefix = 'i') {
     const tok = m[0];
     const key = `${keyPrefix}-${n++}`;
     if (tok.startsWith('**')) {
-      parts.push(<strong key={key}>{tok.slice(2, -2)}</strong>);
+      parts.push(<strong key={key} style={{ color: '#fff', fontWeight: 700 }}>{tok.slice(2, -2)}</strong>);
     } else if (tok.startsWith('`')) {
       parts.push(
-        <code key={key} style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', fontSize: '0.92em', wordBreak: 'break-all' }}>
+        <code key={key} style={{ background: 'rgba(224, 35, 28, 0.12)', color: '#fca5a5', border: '1px solid rgba(224, 35, 28, 0.25)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.88em', wordBreak: 'break-all' }}>
           {tok.slice(1, -1)}
         </code>
       );
     } else {
       const [, label, href] = tok.match(/\[([^\]]+)\]\(([^)]+)\)/) || [];
       parts.push(
-        <a key={key} href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', wordBreak: 'break-all' }}>
+        <a key={key} href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', textDecoration: 'underline', wordBreak: 'break-all' }}>
           {label}
         </a>
       );
@@ -166,20 +180,10 @@ function renderInline(text, keyPrefix = 'i') {
 }
 
 /**
- * Renders the audit narrative as markdown.
- *
- * The generic key/value walker below turned the whole report into one unbroken
- * string of '#', '**' and '|' characters — a 15KB audit with tables and a
- * twelve-finding structure was unreadable in the dashboard.
- *
- * Deliberately hand-rolled rather than pulling in react-markdown: the server
- * builds the frontend itself and `dist` is not tracked, so a new dependency
- * fails the build if the deploy does not also run `npm install`. Breaking the
- * whole dashboard is too high a price for a formatting improvement. This covers
- * what the skills actually emit — headings, tables, lists, rules and inline
- * formatting.
+ * Renders the audit narrative as rich, high-contrast dark Kyoto markdown.
  */
 function MarkdownBlock({ text }) {
+  if (!text) return null;
   const lines = String(text).split(/\r?\n/);
   const blocks = [];
   let i = 0;
@@ -190,9 +194,9 @@ function MarkdownBlock({ text }) {
 
     if (!line.trim()) { i++; continue; }
 
-    // Horizontal rule, including the box-drawing separator the skills append.
+    // Horizontal rule
     if (/^\s*(---+|___+|\*\*\*+|━+)\s*$/.test(line)) {
-      blocks.push(<hr key={key++} style={{ border: 0, borderTop: '1px solid #e2e8f0', margin: '18px 0' }} />);
+      blocks.push(<hr key={key++} style={{ border: 0, borderTop: '1px solid rgba(223, 231, 224, 0.12)', margin: '22px 0' }} />);
       i++;
       continue;
     }
@@ -200,13 +204,15 @@ function MarkdownBlock({ text }) {
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       const level = heading[1].length;
-      const sizes = { 1: '1.35rem', 2: '1.15rem', 3: '1rem', 4: '0.95rem', 5: '0.9rem', 6: '0.85rem' };
+      const sizes = { 1: '1.38rem', 2: '1.18rem', 3: '1.02rem', 4: '0.95rem', 5: '0.9rem', 6: '0.85rem' };
+      const colors = { 1: '#dfe7e0', 2: '#e0231c', 3: '#dfe7e0', 4: 'rgba(223, 231, 224, 0.95)', 5: 'rgba(223, 231, 224, 0.9)', 6: 'rgba(223, 231, 224, 0.85)' };
       blocks.push(
         <div key={key++} style={{
-          fontSize: sizes[level], fontWeight: 700, marginTop: level <= 2 ? '20px' : '14px',
-          marginBottom: '8px', color: '#0f172a', lineHeight: 1.3,
-          borderBottom: level === 1 ? '2px solid #e2e8f0' : 'none',
-          paddingBottom: level === 1 ? '6px' : 0,
+          fontSize: sizes[level], fontWeight: 700, marginTop: level <= 2 ? '22px' : '16px',
+          marginBottom: '10px', color: colors[level], lineHeight: 1.35,
+          fontFamily: level <= 2 ? 'Space Grotesk, sans-serif' : 'inherit',
+          borderBottom: level === 1 ? '1px solid rgba(223, 231, 224, 0.15)' : 'none',
+          paddingBottom: level === 1 ? '8px' : 0,
         }}>
           {renderInline(heading[2], `h${key}`)}
         </div>
@@ -215,7 +221,7 @@ function MarkdownBlock({ text }) {
       continue;
     }
 
-    // Table: a header row, a separator of dashes, then body rows.
+    // Table
     if (line.trim().startsWith('|') && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] || '')) {
       const cells = (row) => row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
       const header = cells(line);
@@ -226,12 +232,12 @@ function MarkdownBlock({ text }) {
         i++;
       }
       blocks.push(
-        <div key={key++} style={{ overflowX: 'auto', margin: '12px 0' }}>
-          <table style={{ borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '100%' }}>
+        <div key={key++} style={{ overflowX: 'auto', margin: '16px 0', borderRadius: '8px', border: '1px solid rgba(223, 231, 224, 0.12)', background: 'rgba(5, 7, 10, 0.5)' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: '0.84rem', minWidth: '100%' }}>
             <thead>
               <tr>
                 {header.map((h, hi) => (
-                  <th key={hi} style={{ border: '1px solid #e2e8f0', padding: '6px 10px', background: '#f8fafc', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  <th key={hi} style={{ border: '1px solid rgba(223, 231, 224, 0.1)', padding: '8px 12px', background: 'rgba(255, 255, 255, 0.05)', textAlign: 'left', fontWeight: 700, color: '#dfe7e0', whiteSpace: 'nowrap' }}>
                     {renderInline(h, `th${key}-${hi}`)}
                   </th>
                 ))}
@@ -239,9 +245,9 @@ function MarkdownBlock({ text }) {
             </thead>
             <tbody>
               {rows.map((r, ri) => (
-                <tr key={ri}>
+                <tr key={ri} style={{ background: ri % 2 === 1 ? 'rgba(255, 255, 255, 0.02)' : 'transparent' }}>
                   {r.map((c, ci) => (
-                    <td key={ci} style={{ border: '1px solid #e2e8f0', padding: '6px 10px', verticalAlign: 'top', wordBreak: 'break-word' }}>
+                    <td key={ci} style={{ border: '1px solid rgba(223, 231, 224, 0.08)', padding: '8px 12px', verticalAlign: 'top', color: 'rgba(223, 231, 224, 0.88)', wordBreak: 'break-word' }}>
                       {renderInline(c, `td${key}-${ri}-${ci}`)}
                     </td>
                   ))}
@@ -254,7 +260,7 @@ function MarkdownBlock({ text }) {
       continue;
     }
 
-    // Bullet or numbered list.
+    // Bullet or numbered list
     const isBullet = (l) => /^\s*[-*+]\s+/.test(l);
     const isNumber = (l) => /^\s*\d+\.\s+/.test(l);
     if (isBullet(line) || isNumber(line)) {
@@ -266,9 +272,9 @@ function MarkdownBlock({ text }) {
       }
       const List = ordered ? 'ol' : 'ul';
       blocks.push(
-        <List key={key++} style={{ margin: '8px 0', paddingLeft: '22px', lineHeight: 1.6 }}>
+        <List key={key++} style={{ margin: '10px 0', paddingLeft: '24px', lineHeight: 1.65, color: 'rgba(223, 231, 224, 0.9)' }}>
           {items.map((it, ii) => (
-            <li key={ii} style={{ marginBottom: '4px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+            <li key={ii} style={{ marginBottom: '5px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {renderInline(it, `li${key}-${ii}`)}
             </li>
           ))}
@@ -277,7 +283,7 @@ function MarkdownBlock({ text }) {
       continue;
     }
 
-    // Paragraph: consecutive non-blank lines that start no other block.
+    // Paragraph
     const para = [];
     while (
       i < lines.length && lines[i].trim()
@@ -290,25 +296,24 @@ function MarkdownBlock({ text }) {
       i++;
     }
     blocks.push(
-      <p key={key++} style={{ margin: '8px 0', lineHeight: 1.65, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+      <p key={key++} style={{ margin: '10px 0', lineHeight: 1.7, color: 'rgba(223, 231, 224, 0.9)', fontSize: '0.88rem', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
         {renderInline(para.join(' '), `p${key}`)}
       </p>
     );
   }
 
-  return <div style={{ fontSize: '0.88rem', color: '#1e293b' }}>{blocks}</div>;
+  return <div style={{ fontSize: '0.88rem', color: 'rgba(223, 231, 224, 0.9)', lineHeight: 1.7 }}>{blocks}</div>;
 }
 
-// Renders an arbitrary report_json object as readable nested key/value
-// text instead of a raw JSON dump — the report shape varies by skill.
+// Renders an arbitrary report_json object with dark Kyoto styling
 function ReportValue({ value, depth = 0 }) {
   if (value === null || value === undefined) {
-    return <span style={{ color: '#94a3b8' }}>—</span>;
+    return <span style={{ color: 'rgba(223, 231, 224, 0.4)' }}>—</span>;
   }
   if (Array.isArray(value)) {
-    if (value.length === 0) return <span style={{ color: '#94a3b8' }}>none</span>;
+    if (value.length === 0) return <span style={{ color: 'rgba(223, 231, 224, 0.4)' }}>none</span>;
     return (
-      <ul style={{ margin: '4px 0', paddingLeft: '20px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+      <ul style={{ margin: '6px 0', paddingLeft: '20px', wordBreak: 'break-word', overflowWrap: 'anywhere', color: 'rgba(223, 231, 224, 0.88)' }}>
         {value.map((item, i) => (
           <li key={i} style={{ marginBottom: '4px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
             {typeof item === 'object' && item !== null ? <ReportValue value={item} depth={depth + 1} /> : String(item)}
@@ -321,15 +326,12 @@ function ReportValue({ value, depth = 0 }) {
     return (
       <div style={{ marginLeft: depth > 0 ? '14px' : 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
         {Object.entries(value).map(([k, v]) => {
-          // The narrative is markdown and reads as noise through the key/value
-          // walker, so it gets the renderer and drops the "Report markdown:"
-          // label — it is the report, not a field of one.
           if (k === 'report_markdown' && typeof v === 'string') {
             return <MarkdownBlock key={k} text={v} />;
           }
           return (
-            <div key={k} style={{ marginBottom: '6px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-              <strong style={{ textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}:</strong>{' '}
+            <div key={k} style={{ marginBottom: '8px', wordBreak: 'break-word', overflowWrap: 'anywhere', color: 'rgba(223, 231, 224, 0.9)' }}>
+              <strong style={{ textTransform: 'capitalize', color: '#dfe7e0' }}>{k.replace(/_/g, ' ')}:</strong>{' '}
               {typeof v === 'object' && v !== null ? <ReportValue value={v} depth={depth + 1} /> : String(v)}
             </div>
           );
@@ -337,7 +339,7 @@ function ReportValue({ value, depth = 0 }) {
       </div>
     );
   }
-  return <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{String(value)}</span>;
+  return <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', color: 'rgba(223, 231, 224, 0.9)' }}>{String(value)}</span>;
 }
 
 export default function SeoMonitorTab({ auth, clients, showToast }) {
@@ -455,6 +457,9 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
 
   // Full report modal (report_json behind "View Full Report")
   const [showReportModal, setShowReportModal] = useState(false);
+
+  // View mode tab for the selected audit: 'report' (formatted markdown) | 'actions' | 'json'
+  const [reportViewTab, setReportViewTab] = useState('report');
 
   // Assign to SMM modal
   const [freelancers, setFreelancers] = useState([]);
@@ -1053,18 +1058,18 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   return (
     <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
       {/* Dropdown selector panel */}
-      <div className="card glass-premium" style={{ marginBottom: '20px', padding: '16px', border: '2px solid #000' }}>
+      <div className="card glass-premium" style={{ marginBottom: '20px', padding: '18px 20px', border: '1px solid rgba(223, 231, 224, 0.12)', background: 'rgba(12, 16, 24, 0.85)', backdropFilter: 'blur(20px)', borderRadius: '12px' }}>
         <div className="seo-command-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <div>
-            <h3 style={{ margin: 0, fontWeight: 'bold' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
+            <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
+            <p style={{ margin: '4px 0 0', color: 'rgba(223, 231, 224, 0.65)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
           </div>
           <div className="seo-command-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0 }}>Active Client:</span>
+              <span style={{ fontWeight: 600, fontSize: '0.88rem', flexShrink: 0, color: 'var(--text-primary)' }}>Active Client:</span>
               <select
                 className="form-control"
-                style={{ minWidth: '200px', fontWeight: 'bold', border: '2px solid #000', flexGrow: 1 }}
+                style={{ minWidth: '220px', fontWeight: 600, border: '1px solid rgba(223, 231, 224, 0.2)', background: 'rgba(5, 7, 10, 0.8)', color: 'var(--text-primary)', borderRadius: '6px', flexGrow: 1 }}
                 value={selectedClientId}
                 onChange={e => {
                   const newId = e.target.value;
@@ -1075,9 +1080,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   setFocusedAgentType(null);
                   setShowReportModal(false);
                   setTerminalTab('all');
-                  // Card state belongs to the client it was fetched for —
-                  // carrying it over would show the new client's agents as
-                  // running when it's the previous client's job that is live.
                   setActiveRuns({});
                   setPendingApprovals({});
                 }}
@@ -1088,25 +1090,25 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               </select>
             </div>
             {selectedClientId && (
-              <div className="seo-command-buttons" style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
+              <div className="seo-command-buttons" style={{ display: 'flex', gap: '10px', width: '100%', flexWrap: 'wrap' }}>
                 <button
                   onClick={triggerFullAuditMaster}
                   className="btn btn-primary seo-cmd-btn"
-                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--accent)', color: '#fff', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
+                  style={{ border: '1px solid rgba(224, 35, 28, 0.5)', padding: '9px 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'linear-gradient(135deg, #e0231c 0%, #b51a14 100%)', color: '#fff', fontWeight: 700, borderRadius: '8px', boxShadow: '0 0 20px rgba(224, 35, 28, 0.35)', flex: '1 1 180px', minWidth: '0' }}
                 >
                   🚀 Run Full Audit (Master)
                 </button>
                 <button
                   onClick={() => setIsTerminalOpen(prev => !prev)}
                   className={`btn ${isTerminalOpen ? 'btn-primary' : 'btn-secondary'} seo-cmd-btn`}
-                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
+                  style={{ border: '1px solid rgba(223, 231, 224, 0.15)', padding: '9px 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, background: isTerminalOpen ? 'rgba(224, 35, 28, 0.18)' : 'rgba(255, 255, 255, 0.05)', color: isTerminalOpen ? '#fca5a5' : 'var(--text-primary)', borderRadius: '8px', flex: '1 1 180px', minWidth: '0' }}
                 >
                   <Terminal size={16} /> {isTerminalOpen ? 'Hide Console' : 'Live Console'} ({consoleLogs.length})
                 </button>
                 <button
                   onClick={() => setShowCompetitorModal(true)}
                   className="btn btn-secondary seo-cmd-btn"
-                  style={{ border: '2px solid #000', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold', flex: '1 1 180px', minWidth: '0' }}
+                  style={{ border: '1px solid rgba(223, 231, 224, 0.15)', padding: '9px 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', borderRadius: '8px', flex: '1 1 180px', minWidth: '0' }}
                   title="Compare this client's scores against tracked competitors"
                 >
                   <Users size={16} /> Competitors ({competitors.filter(c => c.status === 'approved').length})
@@ -1118,65 +1120,65 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       </div>
 
       {!selectedClientId ? (
-        <div style={{ textAlign: 'center', padding: '40px', background: '#f4f4f5', borderRadius: '4px', border: '2px dashed #000' }}>
-          <p style={{ margin: 0, fontWeight: 'bold', color: 'var(--text-muted)' }}>Choose an active workspace client from the dropdown above to load the agent fleet.</p>
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: 'rgba(12, 16, 24, 0.6)', borderRadius: '12px', border: '1px dashed rgba(223, 231, 224, 0.15)' }}>
+          <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-muted)' }}>Choose an active workspace client from the dropdown above to load the agent fleet.</p>
         </div>
       ) : (
         <div>
           
           {/* Main Workspace Area */}
           <div>
-            {/* 25-Agent Bento Grid */}
+            {/* Bento Grid Setup Gaps Banner */}
             {setupGaps.length > 0 && (
               <div style={{
-                border: '2px solid #000',
-                borderLeft: `6px solid ${setupGaps.some(g => g.severity === 'blocking') ? '#ef4444' : '#eab308'}`,
-                borderRadius: '4px',
-                padding: '12px 14px',
-                marginBottom: '16px',
-                background: '#fffbeb',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+                borderLeft: `5px solid ${setupGaps.some(g => g.severity === 'blocking') ? '#ef4444' : '#eab308'}`,
+                borderRadius: '8px',
+                padding: '14px 16px',
+                marginBottom: '18px',
+                background: 'rgba(234, 179, 8, 0.07)',
+                color: 'rgba(223, 231, 224, 0.9)'
               }}>
-                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '8px', color: '#fbbf24' }}>
                   Setup incomplete for {selectedClient?.name} — {setupGaps.length} data source{setupGaps.length === 1 ? '' : 's'} not connected
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {setupGaps.map(gap => (
-                    <div key={gap.field} style={{ fontSize: '0.8rem', lineHeight: 1.45 }}>
+                    <div key={gap.field} style={{ fontSize: '0.82rem', lineHeight: 1.45 }}>
                       <span style={{
                         display: 'inline-block',
-                        background: gap.severity === 'blocking' ? '#fee2e2' : '#fef3c7',
-                        color: gap.severity === 'blocking' ? '#991b1b' : '#92400e',
-                        border: '1px solid #000',
-                        borderRadius: '3px',
+                        background: gap.severity === 'blocking' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(234, 179, 8, 0.2)',
+                        color: gap.severity === 'blocking' ? '#fca5a5' : '#fde047',
+                        border: `1px solid ${gap.severity === 'blocking' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(234, 179, 8, 0.4)'}`,
+                        borderRadius: '4px',
                         padding: '1px 6px',
                         fontSize: '0.65rem',
-                        fontWeight: 'bold',
+                        fontWeight: 700,
                         marginRight: '6px',
                       }}>
                         {gap.severity === 'blocking' ? 'BLOCKING' : 'LIMITS DATA'}
                       </span>
-                      <strong>{gap.label}</strong>
+                      <strong style={{ color: 'var(--text-primary)' }}>{gap.label}</strong>
                       {' — '}
-                      <span style={{ color: 'var(--text-muted)' }}>{gap.detail}</span>
+                      <span style={{ color: 'rgba(223, 231, 224, 0.7)' }}>{gap.detail}</span>
                     </div>
                   ))}
                 </div>
-                <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'rgba(223, 231, 224, 0.55)' }}>
                   Audits still run without these, but the affected sections report the source as
                   unavailable rather than guessing at the numbers.
                 </div>
               </div>
             )}
 
-            <h3 style={{ marginBottom: '12px', fontWeight: 'bold' }}>Agent Fleet Matrix ({getFilteredAgents().length} active)</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            <h3 style={{ marginBottom: '14px', fontWeight: 700, fontSize: '1.15rem', color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
+              Agent Fleet Matrix ({getFilteredAgents().length} active)
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px', marginBottom: '28px' }}>
               {getFilteredAgents().map(agent => {
                 const run = activeRuns[agent.agentType];
                 const isRunning = !!run;
                 const isPending = !run && !!pendingApprovals[agent.agentType];
-                // `agent.unavailableReason` is the server's verdict, which knows
-                // what the worker can actually reach. `undefined` means the
-                // response predates the field, so fall back to the local map.
                 const unavailableReason = (agent.unavailableReason !== undefined
                   ? agent.unavailableReason
                   : UNAVAILABLE_SKILLS.get(agent.agentType))
@@ -1189,66 +1191,67 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                     className="card"
                     onClick={() => { if (!isUnavailable) focusCardAudits(agent.agentType); }}
                     style={{
-                      border: focusedAgentType === agent.agentType ? '2px solid #7c3aed' : '2px solid #000',
-                      borderTop: `6px solid ${getFreshnessColor(agent.freshness)}`,
-                      padding: '12px',
+                      border: focusedAgentType === agent.agentType ? '1px solid #e0231c' : '1px solid rgba(223, 231, 224, 0.1)',
+                      borderTop: `4px solid ${getFreshnessColor(agent.freshness)}`,
+                      padding: '14px',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
-                      background: activeConsoleAgent === agent.agentType ? '#faf5ff' : (focusedAgentType === agent.agentType ? '#f5f3ff' : '#fff'),
+                      background: activeConsoleAgent === agent.agentType 
+                        ? 'rgba(224, 35, 28, 0.14)' 
+                        : (focusedAgentType === agent.agentType ? 'rgba(224, 35, 28, 0.08)' : 'rgba(12, 16, 24, 0.85)'),
+                      backdropFilter: 'blur(16px)',
+                      borderRadius: '10px',
+                      boxShadow: focusedAgentType === agent.agentType 
+                        ? '0 0 20px rgba(224, 35, 28, 0.25)' 
+                        : '0 8px 24px rgba(0, 0, 0, 0.35)',
                       position: 'relative',
-                      transition: 'opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease',
-                      opacity: isUnavailable ? 0.5 : 1,
+                      transition: 'all 0.2s ease',
+                      opacity: isUnavailable ? 0.55 : 1,
                       cursor: isUnavailable ? 'not-allowed' : 'pointer'
                     }}
                     title={unavailableReason || 'Click to view this agent\'s audit history'}
                   >
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '0.85rem', wordBreak: 'break-word', minWidth: 0 }}>{agent.agentType}</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.88rem', wordBreak: 'break-word', minWidth: 0, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                          {agent.agentType}
+                        </span>
                         <span 
                           className="badge" 
                           style={{ 
-                            background: getFreshnessColor(agent.freshness), 
-                            color: '#fff', 
+                            background: `${getFreshnessColor(agent.freshness)}1a`, 
+                            border: `1px solid ${getFreshnessColor(agent.freshness)}66`,
+                            color: getFreshnessColor(agent.freshness), 
                             fontSize: '0.65rem',
-                            fontWeight: 'bold',
-                            padding: '2px 6px',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
                             flexShrink: 0,
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'nowrap',
+                            textTransform: 'uppercase'
                           }}
                         >
                           {agent.freshness.replace('_', ' ')}
                         </span>
                       </div>
                       
-                      <div style={{ margin: '8px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        <div>Cadence: {agent.staleAfterDays} days</div>
-                        <div>Last Run: {agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleDateString() : 'Never'}</div>
-                        {/* A run that completed without its data source reads as
-                            stale, which on its own looks like ordinary expiry.
-                            Saying why stops the obvious response — re-running it
-                            — from producing the same empty report again. */}
+                      <div style={{ margin: '10px 0', fontSize: '0.78rem', color: 'rgba(223, 231, 224, 0.65)', lineHeight: 1.5 }}>
+                        <div>Cadence: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.staleAfterDays} days</span></div>
+                        <div>Last Run: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleDateString() : 'Never'}</span></div>
                         {agent.dataGap && (
-                          <div style={{ marginTop: '4px', color: '#b45309', fontWeight: 600, lineHeight: 1.35 }}>
+                          <div style={{ marginTop: '6px', color: '#fbbf24', fontWeight: 600, lineHeight: 1.35, background: 'rgba(234, 179, 8, 0.1)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(234, 179, 8, 0.25)' }}>
                             ⚠ {agent.dataGap}
                           </div>
                         )}
-                        {/* backlink_gap is the only card that needs a second
-                            target. The list is approved competitors only,
-                            matching what the trigger route will accept — an
-                            option here that the server rejects is worse than no
-                            option, because the cost of finding out is a click
-                            and a red toast. No default is selected: running a
-                            comparison against whoever happened to sort first is
-                            a real DataForSEO spend on a question nobody asked. */}
                         {agent.agentType === 'backlink_gap' && !isUnavailable && (
-                          <div onClick={e => e.stopPropagation()} style={{ marginTop: '6px' }}>
+                          <div onClick={e => e.stopPropagation()} style={{ marginTop: '8px' }}>
                             <select
                               value={gapCompetitor}
                               onChange={e => setGapCompetitor(e.target.value)}
                               disabled={isRunning}
-                              style={{ width: '100%', padding: '4px 6px', border: '2px solid #000', borderRadius: '4px', fontSize: '0.7rem', background: '#fff' }}
+                              style={{ width: '100%', padding: '4px 8px', border: '1px solid rgba(223, 231, 224, 0.18)', borderRadius: '6px', fontSize: '0.72rem', background: 'rgba(5, 7, 10, 0.85)', color: 'var(--text-primary)' }}
                               title="Which tracked competitor to compare referring domains against"
                             >
                               <option value="">compare vs…</option>
@@ -1261,8 +1264,8 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(223, 231, 224, 0.08)' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.2rem', color: agent.score !== null ? (agent.score >= 80 ? '#22c55e' : agent.score >= 60 ? '#38bdf8' : '#e0231c') : 'var(--text-muted)' }}>
                         {agent.score !== null ? `${agent.score}%` : '--'}
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
@@ -1272,22 +1275,11 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                             setActiveConsoleAgent(agent.agentType);
                             setIsTerminalOpen(true);
 
-                            // Open the run this card is about, not the merged
-                            // stream. Previously this only considered a live
-                            // run, so the moment one finished the button fell
-                            // back to 'all' and showed every agent's output.
-                            // (It also used to push a bare string into
-                            // consoleLogs and wipe the history — every entry is
-                            // a {type,data,timestamp} object.)
                             const latest = run || [...queue.active, ...queue.recent]
                               .filter(r => r.agent_type === agent.agentType
                                 && String(r.client_id) === String(selectedClientId))
                               .sort((a, b) => b.id - a.id)[0];
 
-                            // Runner output is streamed over SSE and never
-                            // stored, so a run from before this page loaded has
-                            // no logs to show. Say so rather than silently
-                            // swapping to the merged view.
                             const hasLogs = latest && consoleLogs.some(l => String(l.runId) === String(latest.id));
                             setTerminalTab(hasLogs ? String(latest.id) : 'all');
 
@@ -1305,10 +1297,10 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                             }]);
                           }}
                           className="btn btn-secondary"
-                          style={{ padding: '4px 6px', border: '1px solid #000' }}
+                          style={{ padding: '5px 8px', border: '1px solid rgba(223, 231, 224, 0.15)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', borderRadius: '6px' }}
                           title="Open logs terminal drawer"
                         >
-                          <Terminal size={14} />
+                          <Terminal size={13} />
                         </button>
 
                         {isRunning ? (
@@ -1321,7 +1313,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                                 setIsTerminalOpen(true);
                               }}
                               title={`Run #${run.id} — ${run.status}. Click to open this job's log tab.`}
-                              style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '2px solid #000', background: '#fbbf24', color: '#000', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' }}
+                              style={{ padding: '5px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px', border: '1px solid rgba(234, 179, 8, 0.4)', background: 'rgba(234, 179, 8, 0.2)', color: '#fbbf24', fontWeight: 700, borderRadius: '6px', cursor: 'pointer' }}
                             >
                               <Loader2 size={12} className="animate-spin" />
                               {run.status === 'queued' ? 'Queued' : 'Running'} {formatElapsed(run.startedAt || run.createdAt, now)}
@@ -1329,25 +1321,25 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                             <button
                               onClick={(e) => { e.stopPropagation(); cancelRun(run.id, agent.agentType); }}
                               disabled={cancellingRunIds.includes(run.id)}
-                              title="Free the slot so this agent can be triggered again. Does NOT stop the run on the worker or save any tokens — it keeps going until it finishes on its own."
-                              style={{ padding: '4px 6px', border: '2px solid #000', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              title="Free slot"
+                              style={{ padding: '5px 7px', border: '1px solid rgba(224, 35, 28, 0.4)', background: 'rgba(224, 35, 28, 0.15)', color: '#f87171', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                             >
                               <XCircle size={13} />
                             </button>
                           </>
                         ) : isPending ? (
-                          <div style={{ background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title="Waiting for admin approval">
+                          <div style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#fbbf24', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '5px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700 }}>
                             Pending
                           </div>
                         ) : isUnavailable ? (
-                          <div style={{ background: '#e5e7eb', color: '#6b7280', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }} title={unavailableReason}>
+                          <div style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'rgba(223, 231, 224, 0.4)', border: '1px solid rgba(223, 231, 224, 0.08)', padding: '5px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600 }} title={unavailableReason}>
                             Unavailable
                           </div>
                         ) : (
                           <button
                             onClick={(e) => { e.stopPropagation(); triggerAgent(agent.agentType); }}
                             className="btn btn-primary"
-                            style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '2px solid #000' }}
+                            style={{ padding: '5px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #e0231c 0%, #b51a14 100%)', border: '1px solid rgba(224, 35, 28, 0.4)', color: '#fff', borderRadius: '6px', fontWeight: 700 }}
                           >
                             <Play size={12} fill="currentColor" /> Run
                           </button>
@@ -1360,73 +1352,79 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
             </div>
 
             {/* Recommendations & Audit logs */}
-            <div className="card" style={{ border: '2px solid #000', padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div className="card glass-premium" style={{ border: '1px solid rgba(223, 231, 224, 0.12)', background: 'rgba(12, 16, 24, 0.85)', backdropFilter: 'blur(20px)', padding: '20px', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', flexWrap: 'wrap', gap: '14px' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontWeight: 'bold' }}>Audit Recommendations &amp; Findings</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.2rem', color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                      Audit Recommendations &amp; Findings
+                    </h3>
+                    {currentAudit && (
+                      <span className="badge" style={{ background: 'rgba(224, 35, 28, 0.15)', border: '1px solid rgba(224, 35, 28, 0.35)', color: '#fca5a5', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', padding: '3px 8px', borderRadius: '6px' }}>
+                        {currentAudit.audit_type}
+                      </span>
+                    )}
+                  </div>
+
                   {currentAudit && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      <strong>Audited URL Tree:</strong> <a href={currentAudit.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{currentAudit.url}</a>
+                    <div style={{ fontSize: '0.82rem', color: 'rgba(223, 231, 224, 0.7)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span>
+                        <strong style={{ color: 'var(--text-primary)' }}>Audited URL Tree:</strong>{' '}
+                        <a href={currentAudit.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: '#38bdf8' }}>{currentAudit.url}</a>
+                      </span>
                       {currentAudit.page_url && currentAudit.page_url !== currentAudit.url && (
-                        <span> — <strong>Page:</strong> <a href={currentAudit.page_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)' }}>{currentAudit.page_url}</a></span>
+                        <span>
+                          — <strong style={{ color: 'var(--text-primary)' }}>Page:</strong>{' '}
+                          <a href={currentAudit.page_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: '#38bdf8' }}>{currentAudit.page_url}</a>
+                        </span>
                       )}
-                    </div>
-                  )}
-                  {currentAudit && (getPreviewText(currentAudit) || currentAudit.report_json) && (
-                    <div style={{
-                      fontSize: '0.82rem',
-                      color: '#334155',
-                      marginTop: '8px',
-                      padding: '8px 10px',
-                      background: '#f8fafc',
-                      borderLeft: '3px solid #7c3aed',
-                      borderRadius: '2px',
-                      maxWidth: '100%',
-                      wordBreak: 'break-word',
-                      overflowWrap: 'anywhere',
-                      boxSizing: 'border-box'
-                    }}>
-                      {getPreviewText(currentAudit)}
-                      {currentAudit.report_json && (
-                        <div style={{ marginTop: '6px' }}>
-                          <button
-                            onClick={() => setShowReportModal(true)}
-                            style={{ background: 'none', border: 'none', color: '#7c3aed', fontWeight: 'bold', fontSize: '0.78rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                          >
-                            View Full Report →
-                          </button>
-                        </div>
-                      )}
+                      <span style={{ color: 'rgba(223, 231, 224, 0.4)' }}>•</span>
+                      <span>{new Date(currentAudit.created_at).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                   {currentAudit && (
                     <div 
                       style={{ 
-                        border: '2px solid #000', 
-                        background: '#f8fafc', 
-                        padding: '4px 8px', 
-                        borderRadius: '4px', 
+                        border: '1px solid rgba(223, 231, 224, 0.15)', 
+                        background: 'rgba(5, 7, 10, 0.6)', 
+                        padding: '6px 14px', 
+                        borderRadius: '8px', 
                         display: 'flex', 
                         alignItems: 'center',
-                        gap: '6px',
-                        height: '32px'
+                        gap: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                       }}
                     >
-                      <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--text-muted)' }}>Score:</span>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#22c55e' }}>
+                      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>Score:</span>
+                      <span style={{ 
+                        fontSize: '1.15rem', 
+                        fontWeight: 800, 
+                        color: getAuditScore(currentAudit) >= 80 ? '#22c55e' : getAuditScore(currentAudit) >= 60 ? '#38bdf8' : '#e0231c',
+                        fontFamily: 'var(--font-mono)' 
+                      }}>
                         {getAuditScore(currentAudit) ?? '--'}%
                       </span>
                     </div>
                   )}
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
-                      View Audit{focusedAgentType ? ` (${focusedAgentType})` : ''}:
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'rgba(223, 231, 224, 0.8)' }}>
+                      Audit{focusedAgentType ? ` (${focusedAgentType})` : ''}:
                     </span>
                     <select
                       className="form-control"
-                      style={{ border: '2px solid #000', padding: '4px 8px', fontSize: '0.85rem', height: '32px' }}
+                      style={{ 
+                        border: '1px solid rgba(223, 231, 224, 0.2)', 
+                        background: 'rgba(5, 7, 10, 0.8)', 
+                        color: 'var(--text-primary)', 
+                        padding: '5px 10px', 
+                        fontSize: '0.82rem', 
+                        height: '34px',
+                        borderRadius: '6px'
+                      }}
                       value={selectedAuditId}
                       onChange={e => setSelectedAuditId(e.target.value)}
                       disabled={dropdownAudits.length === 0}
@@ -1443,7 +1441,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         }
                         return (
                           <option key={a.id} value={a.id}>
-                            {new Date(a.created_at).toLocaleString()} - {a.audit_type}{pagePath ? ` - ${pagePath}` : ''}
+                            {new Date(a.created_at).toLocaleDateString()} {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {a.audit_type}{pagePath ? ` - ${pagePath}` : ''}
                           </option>
                         );
                       })}
@@ -1452,7 +1450,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       <button
                         onClick={() => setFocusedAgentType(null)}
                         className="btn btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: '0.75rem', border: '1px solid #000' }}
+                        style={{ padding: '5px 10px', fontSize: '0.75rem', border: '1px solid rgba(223, 231, 224, 0.15)', borderRadius: '6px' }}
                         title="Show audits from every agent again"
                       >
                         Show All
@@ -1462,80 +1460,237 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                 </div>
               </div>
 
-              {/* Focusing an agent with no audits used to blank this whole
-                  panel: dropdownAudits emptied, selectedAuditId stopped
-                  resolving, and every currentAudit-guarded section rendered
-                  nothing at all — reading as a broken page rather than an
-                  agent that has not run. */}
-              {focusedAgentType && dropdownAudits.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', border: '2px solid #000', borderRadius: '4px' }}>
-                  <p style={{ margin: 0, fontWeight: 'bold', fontSize: '0.9rem' }}>No '{focusedAgentType}' audits yet.</p>
-                  <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    Run this agent to generate one, or choose Show All to see audits from every agent.
-                  </p>
-                </div>
-              ) : recommendations.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: '4px' }}>
-                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>No recommendations loaded. Run an agent audit above to populate recommendations.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {recommendations.map(rec => (
-                    <div 
-                      key={rec.id} 
-                      className="recommendation-card" 
-                      style={{ 
-                        border: '2px solid #000', 
-                        padding: '14px', 
-                        borderRadius: '4px',
-                        background: rec.priority === 'Critical' ? '#fff1f2' : rec.priority === 'High' ? '#fffbeb' : '#fff'
+              {/* View Mode Navigation Tabs */}
+              {currentAudit && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(223, 231, 224, 0.12)', paddingBottom: '10px', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => setReportViewTab('report')}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        border: reportViewTab === 'report' ? '1px solid rgba(224, 35, 28, 0.5)' : '1px solid transparent',
+                        background: reportViewTab === 'report' ? 'rgba(224, 35, 28, 0.15)' : 'transparent',
+                        color: reportViewTab === 'report' ? '#fff' : 'rgba(223, 231, 224, 0.65)',
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className={`badge badge-${rec.priority === 'Critical' ? 'danger' : rec.priority === 'High' ? 'warning' : 'info'}`} style={{ border: '1px solid #000' }}>
-                            {rec.priority}
-                          </span>
-                          <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{rec.metric}</span>
-                        </div>
-                        <span className="badge" style={{ background: '#f1f5f9', border: '1px solid #000', textTransform: 'capitalize' }}>
-                          Status: {rec.status}
-                        </span>
-                      </div>
-                      
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'left', wordBreak: 'break-all' }}>
-                        <strong>Target URL Path:</strong> <a href={rec.page_url || currentAudit?.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--accent)', wordBreak: 'break-all' }}>{rec.page_url || currentAudit?.url}</a>
-                      </div>
-                      
-                      <div style={{ fontSize: '0.85rem', marginBottom: '8px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        <strong>Issue:</strong> {rec.issue}
-                      </div>
-                      <div style={{ fontSize: '0.85rem', marginBottom: '12px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        <strong>Required Action:</strong> {rec.action_required}
-                      </div>
+                      📄 Formatted Narrative Report
+                    </button>
+                    <button
+                      onClick={() => setReportViewTab('actions')}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        border: reportViewTab === 'actions' ? '1px solid rgba(224, 35, 28, 0.5)' : '1px solid transparent',
+                        background: reportViewTab === 'actions' ? 'rgba(224, 35, 28, 0.15)' : 'transparent',
+                        color: reportViewTab === 'actions' ? '#fff' : 'rgba(223, 231, 224, 0.65)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      📋 Action Items ({recommendations.length})
+                    </button>
+                    <button
+                      onClick={() => setReportViewTab('json')}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        border: reportViewTab === 'json' ? '1px solid rgba(224, 35, 28, 0.5)' : '1px solid transparent',
+                        background: reportViewTab === 'json' ? 'rgba(224, 35, 28, 0.15)' : 'transparent',
+                        color: reportViewTab === 'json' ? '#fff' : 'rgba(223, 231, 224, 0.65)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      🔍 Raw Payload
+                    </button>
+                  </div>
 
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                        <button
-                          onClick={() => toggleRecStatus(rec.id, rec.status)}
-                          className="btn"
-                          style={{
-                            padding: '4px 12px',
-                            fontSize: '0.75rem',
-                            border: '2px solid #000',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            width: 'fit-content',
-                            background: rec.status === 'completed' ? '#f1f5f9' : '#22c55e',
-                            color: rec.status === 'completed' ? '#000' : '#fff',
-                            fontWeight: 'bold'
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    className="btn btn-secondary"
+                    style={{
+                      padding: '5px 12px',
+                      fontSize: '0.78rem',
+                      border: '1px solid rgba(223, 231, 224, 0.15)',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: 'var(--text-primary)',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>Open Modal View ↗</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Tab Views Content */}
+              {focusedAgentType && dropdownAudits.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '36px 20px', background: 'rgba(5, 7, 10, 0.4)', border: '1px dashed rgba(223, 231, 224, 0.15)', borderRadius: '8px' }}>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>No '{focusedAgentType}' audits yet.</p>
+                  <p style={{ margin: '8px 0 0', color: 'rgba(223, 231, 224, 0.65)', fontSize: '0.85rem' }}>
+                    Run this agent from the matrix above to generate an audit report, or choose Show All to view audits from every agent.
+                  </p>
+                </div>
+              ) : !currentAudit ? (
+                <div style={{ textAlign: 'center', padding: '36px 20px', background: 'rgba(5, 7, 10, 0.4)', borderRadius: '8px', border: '1px dashed rgba(223, 231, 224, 0.12)' }}>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>No audit selected. Run an agent audit above to populate recommendations and report findings.</p>
+                </div>
+              ) : reportViewTab === 'report' ? (
+                <div>
+                  {(() => {
+                    const md = getAuditReportMarkdown(currentAudit);
+                    if (md) {
+                      return (
+                        <div style={{
+                          background: 'rgba(5, 7, 10, 0.65)',
+                          border: '1px solid rgba(223, 231, 224, 0.1)',
+                          borderRadius: '10px',
+                          padding: '24px',
+                          maxHeight: '680px',
+                          overflowY: 'auto',
+                          boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'anywhere'
+                        }}>
+                          <MarkdownBlock text={md} />
+                        </div>
+                      );
+                    }
+                    const parsed = parseReportJson(currentAudit.report_json);
+                    if (parsed) {
+                      return (
+                        <div style={{
+                          background: 'rgba(5, 7, 10, 0.65)',
+                          border: '1px solid rgba(223, 231, 224, 0.1)',
+                          borderRadius: '10px',
+                          padding: '24px',
+                          maxHeight: '680px',
+                          overflowY: 'auto',
+                          boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'anywhere'
+                        }}>
+                          {typeof parsed === 'string'
+                            ? <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(223, 231, 224, 0.9)', lineHeight: 1.7 }}>{parsed}</div>
+                            : <ReportValue value={parsed} />}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ textAlign: 'center', padding: '32px', background: 'rgba(5, 7, 10, 0.4)', borderRadius: '8px' }}>
+                        <p style={{ margin: 0, color: 'var(--text-muted)' }}>No narrative report text recorded for this audit run.</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : reportViewTab === 'actions' ? (
+                <div>
+                  {recommendations.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '36px 20px', background: 'rgba(5, 7, 10, 0.4)', border: '1px dashed rgba(223, 231, 224, 0.15)', borderRadius: '8px' }}>
+                      <p style={{ margin: 0, color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem' }}>No individual action items registered in the database for this run.</p>
+                      <p style={{ margin: '8px 0 0', color: 'rgba(223, 231, 224, 0.65)', fontSize: '0.85rem' }}>
+                        All analysis, findings, and technical recommendations are available directly in the <strong>Formatted Narrative Report</strong> tab.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {recommendations.map(rec => (
+                        <div 
+                          key={rec.id} 
+                          className="recommendation-card" 
+                          style={{ 
+                            border: rec.priority === 'Critical' 
+                              ? '1px solid rgba(224, 35, 28, 0.45)' 
+                              : rec.priority === 'High' 
+                                ? '1px solid rgba(234, 179, 8, 0.45)' 
+                                : '1px solid rgba(223, 231, 224, 0.12)', 
+                            padding: '16px', 
+                            borderRadius: '8px',
+                            background: rec.priority === 'Critical' 
+                              ? 'rgba(224, 35, 28, 0.08)' 
+                              : rec.priority === 'High' 
+                                ? 'rgba(234, 179, 8, 0.08)' 
+                                : 'rgba(12, 16, 24, 0.8)',
+                            backdropFilter: 'blur(12px)'
                           }}
                         >
-                          {rec.status === 'completed' ? '↩ Mark as Not Done' : '✅ Mark as Done'}
-                        </button>
-                      </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span className={`badge badge-${rec.priority === 'Critical' ? 'danger' : rec.priority === 'High' ? 'warning' : 'info'}`}>
+                                {rec.priority}
+                              </span>
+                              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{rec.metric}</span>
+                            </div>
+                            <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.12)', color: 'rgba(223, 231, 224, 0.85)', textTransform: 'capitalize' }}>
+                              Status: {rec.status}
+                            </span>
+                          </div>
+                          
+                          <div style={{ fontSize: '0.82rem', color: 'rgba(223, 231, 224, 0.65)', marginBottom: '8px', textAlign: 'left', wordBreak: 'break-all' }}>
+                            <strong style={{ color: 'var(--text-primary)' }}>Target URL Path:</strong> <a href={rec.page_url || currentAudit?.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: '#38bdf8' }}>{rec.page_url || currentAudit?.url}</a>
+                          </div>
+                          
+                          <div style={{ fontSize: '0.88rem', marginBottom: '8px', color: 'var(--text-primary)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                            <strong style={{ color: 'rgba(223, 231, 224, 0.7)' }}>Issue:</strong> {rec.issue}
+                          </div>
+                          <div style={{ fontSize: '0.88rem', marginBottom: '14px', color: 'rgba(223, 231, 224, 0.9)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                            <strong style={{ color: 'rgba(223, 231, 224, 0.7)' }}>Required Action:</strong> {rec.action_required}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                            <button
+                              onClick={() => toggleRecStatus(rec.id, rec.status)}
+                              className="btn"
+                              style={{
+                                padding: '5px 14px',
+                                fontSize: '0.78rem',
+                                border: '1px solid rgba(223, 231, 224, 0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                width: 'fit-content',
+                                borderRadius: '6px',
+                                background: rec.status === 'completed' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(34, 197, 94, 0.2)',
+                                color: rec.status === 'completed' ? 'rgba(223, 231, 224, 0.8)' : '#4ade80',
+                                fontWeight: 700
+                              }}
+                            >
+                              {rec.status === 'completed' ? '↩ Mark as Not Done' : '✅ Mark as Done'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <pre style={{
+                    background: 'rgba(5, 7, 10, 0.85)',
+                    border: '1px solid rgba(223, 231, 224, 0.1)',
+                    borderRadius: '8px',
+                    padding: '18px',
+                    fontSize: '0.78rem',
+                    fontFamily: 'var(--font-mono)',
+                    color: '#7dd3fc',
+                    overflowX: 'auto',
+                    maxHeight: '550px',
+                    margin: 0,
+                    lineHeight: 1.5
+                  }}>
+                    {JSON.stringify(parseReportJson(currentAudit?.report_json), null, 2)}
+                  </pre>
                 </div>
               )}
             </div>
@@ -1764,37 +1919,37 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
           <div
             className="modal-content glass-premium"
             onClick={e => e.stopPropagation()}
-            style={{ border: '2px solid #000', maxWidth: '900px', width: '95%', maxHeight: '88vh', overflowY: 'auto', boxSizing: 'border-box' }}
+            style={{ border: '1px solid rgba(223, 231, 224, 0.18)', background: 'rgba(10, 14, 20, 0.96)', backdropFilter: 'blur(24px)', maxWidth: '900px', width: '95%', maxHeight: '88vh', overflowY: 'auto', boxSizing: 'border-box', padding: '24px', borderRadius: '12px' }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <h3 style={{ margin: 0, fontWeight: 'bold' }}>Competitors — {selectedClient?.name}</h3>
-              <button onClick={() => setShowCompetitorModal(false)} className="btn btn-secondary" style={{ border: '2px solid #000', padding: '4px 10px' }}>Close</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>Competitors — {selectedClient?.name}</h3>
+              <button onClick={() => setShowCompetitorModal(false)} className="btn btn-secondary" style={{ border: '1px solid rgba(223, 231, 224, 0.15)', padding: '5px 12px', borderRadius: '6px' }}>Close</button>
             </div>
-            <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            <p style={{ margin: '0 0 16px', fontSize: '0.82rem', color: 'rgba(223, 231, 224, 0.65)' }}>
               Auditing a competitor runs the same skills against their site. Search Console and GA4 are
               unavailable for domains you don't own, so the <code>google</code> skill is not offered here.
             </p>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
               <input
                 value={newCompetitorUrl}
                 onChange={e => setNewCompetitorUrl(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addCompetitor(); }}
                 placeholder="competitor.com"
-                style={{ flex: '1 1 240px', padding: '8px 10px', border: '2px solid #000', borderRadius: '4px', fontSize: '0.85rem' }}
+                style={{ flex: '1 1 240px', padding: '8px 12px', border: '1px solid rgba(223, 231, 224, 0.18)', background: 'rgba(5, 7, 10, 0.8)', color: 'var(--text-primary)', borderRadius: '6px', fontSize: '0.85rem' }}
               />
               <button
                 onClick={addCompetitor}
                 disabled={competitorBusy === 'add' || !newCompetitorUrl.trim()}
                 className="btn btn-primary"
-                style={{ border: '2px solid #000', padding: '8px 16px', fontWeight: 'bold' }}
+                style={{ border: '1px solid rgba(224, 35, 28, 0.4)', background: 'linear-gradient(135deg, #e0231c 0%, #b51a14 100%)', padding: '8px 18px', fontWeight: 700, borderRadius: '6px' }}
               >
-                {competitorBusy === 'add' ? 'Adding…' : 'Add'}
+                {competitorBusy === 'add' ? 'Adding…' : 'Add Competitor'}
               </button>
             </div>
 
             {competitors.length === 0 ? (
-              <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
+              <div style={{ padding: '24px', background: 'rgba(5, 7, 10, 0.4)', borderRadius: '8px', textAlign: 'center', border: '1px dashed rgba(223, 231, 224, 0.15)' }}>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                   No competitors tracked yet. Add one above.
                 </p>
@@ -1805,28 +1960,26 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                   const isApproved = comp.status === 'approved';
                   const isRejected = comp.status === 'rejected';
                   const busy = competitorBusy === comp.id;
-                  // Only skills with a score to compare are worth showing side by
-                  // side; the rest produce findings, not numbers.
                   const comparable = Object.keys(ownScores).filter(t => t !== 'google');
 
                   return (
                     <div
                       key={comp.id}
                       style={{
-                        border: '2px solid #000',
-                        borderLeft: `6px solid ${isApproved ? '#22c55e' : isRejected ? '#94a3b8' : '#eab308'}`,
-                        borderRadius: '4px',
-                        padding: '12px',
-                        background: isRejected ? '#f8fafc' : '#fff',
+                        border: '1px solid rgba(223, 231, 224, 0.12)',
+                        borderLeft: `5px solid ${isApproved ? '#22c55e' : isRejected ? '#64748b' : '#eab308'}`,
+                        borderRadius: '8px',
+                        padding: '14px',
+                        background: 'rgba(12, 16, 24, 0.75)',
                         opacity: isRejected ? 0.6 : 1,
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', wordBreak: 'break-all' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', wordBreak: 'break-all', color: 'var(--text-primary)' }}>
                             {comp.label || comp.domain}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'rgba(223, 231, 224, 0.6)' }}>
                             {comp.domain}
                             {comp.discovered_for_query && (
                               <> · found at #{comp.discovered_position ?? '?'} for “{comp.discovered_for_query}”</>
@@ -1835,22 +1988,24 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                         </div>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <span className="badge" style={{
-                            background: isApproved ? '#22c55e' : isRejected ? '#94a3b8' : '#eab308',
-                            color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 8px', border: '1px solid #000',
+                            background: isApproved ? 'rgba(34, 197, 94, 0.2)' : isRejected ? 'rgba(100, 116, 139, 0.2)' : 'rgba(234, 179, 8, 0.2)',
+                            color: isApproved ? '#4ade80' : isRejected ? '#94a3b8' : '#fbbf24',
+                            fontSize: '0.68rem', fontWeight: 700, padding: '3px 10px', borderRadius: '9999px',
+                            border: `1px solid ${isApproved ? 'rgba(34, 197, 94, 0.4)' : isRejected ? 'rgba(100, 116, 139, 0.4)' : 'rgba(234, 179, 8, 0.4)'}`
                           }}>
                             {comp.status}
                           </span>
                           {!isApproved && (
                             <button onClick={() => setCompetitorStatus(comp.id, 'approved')} disabled={busy}
                               className="btn" title="Approve — allows auditing"
-                              style={{ padding: '3px 8px', border: '2px solid #000', background: '#22c55e', color: '#fff', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              style={{ padding: '4px 8px', border: '1px solid rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                               <Check size={13} />
                             </button>
                           )}
                           {!isRejected && (
                             <button onClick={() => setCompetitorStatus(comp.id, 'rejected')} disabled={busy}
                               className="btn" title="Reject — keeps discovery from re-proposing it"
-                              style={{ padding: '3px 8px', border: '2px solid #000', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              style={{ padding: '4px 8px', border: '1px solid rgba(224, 35, 28, 0.4)', background: 'rgba(224, 35, 28, 0.2)', color: '#f87171', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                               <X size={13} />
                             </button>
                           )}
@@ -1858,15 +2013,15 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                       </div>
 
                       {isApproved && (
-                        <div style={{ marginTop: '12px', overflowX: 'auto' }}>
-                          <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: '100%' }}>
+                        <div style={{ marginTop: '14px', overflowX: 'auto', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
+                          <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: '100%', background: 'rgba(5, 7, 10, 0.4)' }}>
                             <thead>
                               <tr>
-                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc', textAlign: 'left' }}>Skill</th>
-                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}>Them</th>
-                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}>You</th>
-                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}>Gap</th>
-                                <th style={{ border: '1px solid #e2e8f0', padding: '5px 8px', background: '#f8fafc' }}></th>
+                                <th style={{ border: '1px solid rgba(223, 231, 224, 0.1)', padding: '6px 10px', background: 'rgba(255, 255, 255, 0.04)', color: '#dfe7e0', textAlign: 'left' }}>Skill</th>
+                                <th style={{ border: '1px solid rgba(223, 231, 224, 0.1)', padding: '6px 10px', background: 'rgba(255, 255, 255, 0.04)', color: '#dfe7e0', textAlign: 'center' }}>Them</th>
+                                <th style={{ border: '1px solid rgba(223, 231, 224, 0.1)', padding: '6px 10px', background: 'rgba(255, 255, 255, 0.04)', color: '#dfe7e0', textAlign: 'center' }}>You</th>
+                                <th style={{ border: '1px solid rgba(223, 231, 224, 0.1)', padding: '6px 10px', background: 'rgba(255, 255, 255, 0.04)', color: '#dfe7e0', textAlign: 'center' }}>Gap</th>
+                                <th style={{ border: '1px solid rgba(223, 231, 224, 0.1)', padding: '6px 10px', background: 'rgba(255, 255, 255, 0.04)' }}></th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1876,25 +2031,25 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                                 const gap = (theirs !== null && mine !== null) ? mine - theirs : null;
                                 return (
                                   <tr key={type}>
-                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', fontWeight: 600 }}>{type}</td>
-                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center' }}>
+                                    <td style={{ border: '1px solid rgba(223, 231, 224, 0.08)', padding: '6px 10px', fontWeight: 600, color: 'var(--text-primary)' }}>{type}</td>
+                                    <td style={{ border: '1px solid rgba(223, 231, 224, 0.08)', padding: '6px 10px', textAlign: 'center', color: 'rgba(223, 231, 224, 0.85)' }}>
                                       {theirs ?? '—'}
                                     </td>
-                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center' }}>
+                                    <td style={{ border: '1px solid rgba(223, 231, 224, 0.08)', padding: '6px 10px', textAlign: 'center', color: 'rgba(223, 231, 224, 0.85)' }}>
                                       {mine ?? '—'}
                                     </td>
                                     <td style={{
-                                      border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center', fontWeight: 'bold',
-                                      color: gap === null ? '#94a3b8' : gap >= 0 ? '#15803d' : '#b91c1c',
+                                      border: '1px solid rgba(223, 231, 224, 0.08)', padding: '6px 10px', textAlign: 'center', fontWeight: 700,
+                                      color: gap === null ? 'var(--text-muted)' : gap >= 0 ? '#4ade80' : '#f87171',
                                     }}>
                                       {gap === null ? '—' : gap > 0 ? `+${gap}` : gap}
                                     </td>
-                                    <td style={{ border: '1px solid #e2e8f0', padding: '5px 8px', textAlign: 'center' }}>
+                                    <td style={{ border: '1px solid rgba(223, 231, 224, 0.08)', padding: '6px 10px', textAlign: 'center' }}>
                                       <button
                                         onClick={() => auditCompetitor(comp.id, type)}
                                         disabled={busy}
                                         className="btn btn-secondary"
-                                        style={{ padding: '2px 8px', fontSize: '0.7rem', border: '1px solid #000' }}
+                                        style={{ padding: '3px 10px', fontSize: '0.72rem', border: '1px solid rgba(223, 231, 224, 0.15)', borderRadius: '4px' }}
                                         title={`Run '${type}' against ${comp.domain}`}
                                       >
                                         {theirs === null ? 'Run' : 'Re-run'}
@@ -1905,11 +2060,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
                               })}
                             </tbody>
                           </table>
-                          {comparable.length === 0 && (
-                            <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                              Run some audits on this client first — there is nothing to compare against yet.
-                            </p>
-                          )}
                         </div>
                       )}
                     </div>
@@ -1923,26 +2073,28 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
 
       {showReportModal && currentAudit?.report_json && (
         <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '700px', width: '90%', maxHeight: '85vh', overflowY: 'auto', wordBreak: 'break-word', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-              <h3 style={{ margin: 0, fontWeight: 'bold' }}>Full Audit Report</h3>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '1px solid rgba(223, 231, 224, 0.18)', background: 'rgba(10, 14, 20, 0.96)', backdropFilter: 'blur(24px)', maxWidth: '850px', width: '92%', maxHeight: '88vh', overflowY: 'auto', wordBreak: 'break-word', overflowWrap: 'anywhere', boxSizing: 'border-box', padding: '24px', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', borderBottom: '1px solid rgba(223, 231, 224, 0.1)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>Full Audit Report</h3>
+                <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.65)', marginTop: '4px', wordBreak: 'break-all' }}>
+                  <span style={{ color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase' }}>{currentAudit.audit_type}</span> — {currentAudit.page_url || currentAudit.url}
+                </div>
+              </div>
               <button
                 onClick={() => setShowReportModal(false)}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.4rem', fontWeight: 'bold', padding: 0, lineHeight: 1 }}
+                style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', padding: '4px 10px', borderRadius: '6px', lineHeight: 1 }}
               >
                 &times;
               </button>
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px', wordBreak: 'break-all' }}>
-              {currentAudit.audit_type} — {currentAudit.page_url || currentAudit.url}
-            </div>
-            <div style={{ fontSize: '0.85rem', lineHeight: '1.6', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+            <div style={{ fontSize: '0.9rem', lineHeight: '1.7', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {(() => {
+                const md = getAuditReportMarkdown(currentAudit);
+                if (md) return <MarkdownBlock text={md} />;
                 const parsed = parseReportJson(currentAudit.report_json);
-                // A plain-text report renders with line breaks preserved rather
-                // than collapsing onto one line via the object/array renderer.
                 return typeof parsed === 'string'
-                  ? <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{parsed}</div>
+                  ? <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere', color: 'rgba(223, 231, 224, 0.9)', lineHeight: 1.7 }}>{parsed}</div>
                   : <ReportValue value={parsed} />;
               })()}
             </div>
@@ -1953,18 +2105,19 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
       {/* Freshness Confirmation Warning Dialog */}
       {showFreshModal && (
         <div className="modal-overlay" onClick={() => setShowFreshModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '2px solid #000', maxWidth: '450px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', color: 'var(--accent)' }}>
-              <AlertTriangle size={20} />
-              <h3 style={{ margin: 0, fontWeight: 'bold' }}>Agent Audit Still Fresh</h3>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ border: '1px solid rgba(223, 231, 224, 0.18)', background: 'rgba(10, 14, 20, 0.96)', backdropFilter: 'blur(24px)', maxWidth: '450px', padding: '24px', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', color: 'var(--accent)' }}>
+              <AlertTriangle size={22} />
+              <h3 style={{ margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>Agent Audit Still Fresh</h3>
             </div>
-            <p style={{ fontSize: '0.9rem', lineHeight: '1.4', margin: '0 0 20px' }}>
+            <p style={{ fontSize: '0.88rem', lineHeight: '1.5', margin: '0 0 20px', color: 'rgba(223, 231, 224, 0.8)' }}>
               This check was run recently and has not exceeded its stale limit period. Running it again will consume API tokens unnecessarily. Do you still want to proceed?
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button 
                 type="button" 
                 className="btn btn-secondary" 
+                style={{ border: '1px solid rgba(223, 231, 224, 0.15)', borderRadius: '6px' }}
                 onClick={() => setShowFreshModal(false)}
               >
                 Cancel
@@ -1972,7 +2125,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
               <button 
                 type="button" 
                 className="btn btn-primary" 
-                style={{ border: '2px solid #000' }}
+                style={{ background: 'linear-gradient(135deg, #e0231c 0%, #b51a14 100%)', border: '1px solid rgba(224, 35, 28, 0.4)', borderRadius: '6px' }}
                 onClick={() => {
                   triggerAgent(freshModalAgent, true);
                   setShowFreshModal(false);
