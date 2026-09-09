@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { 
   TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink,
-  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus
+  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus, ArrowLeft
 } from 'lucide-react';
 
 import { API_BASE } from '../api.js';
+import logoImg from '../assets/logo.png';
+import SEOHead from '../components/SEOHead.jsx';
 
 const PRESET_REASON_OPTIONS = [
   'Out of Budget',
@@ -16,53 +18,79 @@ const PRESET_REASON_OPTIONS = [
 ];
 
 const PORTAL_STYLES = `
-/* Neo-Brutalist Bento Design System for Client Portal */
+/* =========================================================
+   Kyoto Dark Luxury Aesthetic for Client Intelligence Portal
+   ========================================================= */
+
 .client-portal-wrapper {
-  --bg-primary: #f0f0f2;
-  --bg-card: #ffffff;
-  --text-primary: #000000;
-  --text-secondary: #18181b;
-  --text-muted: #52525b;
-  --border-color: #000000;
-  --border-width: 3px;
-  
-  --shadow-sm: 2px 2px 0px #000000;
-  --shadow-md: 5px 5px 0px #000000;
-  --shadow-lg: 8px 8px 0px #000000;
-  
+  --bg-primary: #05070a;
+  --bg-card: rgba(10, 14, 18, 0.86);
+  --text-primary: #dfe7e0;
+  --text-secondary: #aab4ad;
+  --text-muted: #8b9b90;
+  --border-color: rgba(223, 231, 224, 0.12);
+  --border-width: 1px;
+
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.88);
+
   --radius-md: 20px;
-  --radius-sm: 8px;
-  
-  --accent-purple: #a855f7;
-  --accent-cyan: #06b6d4;
-  --accent-rose: #f43f5e;
-  --accent-blue: #3b82f6;
-  
+  --radius-sm: 10px;
+
   box-sizing: border-box;
-  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
-  color: var(--text-primary);
+  font-family: 'Onest', 'Inter', system-ui, -apple-system, sans-serif;
+  color: #dfe7e0;
   min-height: 100vh;
-  padding: 32px 16px;
-  background-color: var(--bg-primary);
+  padding: 36px 20px 80px;
+  background-color: #05070a;
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  overflow-x: clip;
 }
 
 body.portal-active {
-  background-color: #f0f0f2 !important;
+  background-color: #05070a !important;
+  color: #dfe7e0 !important;
   padding: 0 !important;
   margin: 0 !important;
 }
 
-.portal-container {
-  width: 100%;
-  max-width: 1200px;
-  animation: fadeIn 0.3s ease-out;
+/* Atmospheric background elements */
+.portal-ambient-glow {
+  position: fixed;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90vw;
+  max-width: 1400px;
+  height: 520px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(224, 35, 28, 0.14) 0%, rgba(201, 162, 74, 0.04) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(55px);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
+.portal-vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(130% 100% at 50% 50%, transparent 40%, rgba(2, 4, 6, 0.88) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.portal-container {
+  width: 100%;
+  max-width: 1240px;
+  position: relative;
+  z-index: 10;
+  animation: portalFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes portalFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -72,67 +100,106 @@ body.portal-active {
 
 /* Bento Card styling */
 .portal-bento-card {
-  background: var(--bg-card);
-  border: var(--border-width) solid var(--border-color) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-md) !important;
+  background: rgba(10, 14, 18, 0.86) !important;
+  backdrop-filter: blur(28px) !important;
+  -webkit-backdrop-filter: blur(28px) !important;
+  border: 1px solid rgba(223, 231, 224, 0.12) !important;
+  border-top: 1px solid rgba(223, 231, 224, 0.22) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 35px rgba(224, 35, 28, 0.03) !important;
   padding: 24px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
   position: relative;
   overflow: hidden;
   text-align: left;
   margin-bottom: 24px;
+  color: #dfe7e0;
 }
 
 .portal-bento-card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: var(--shadow-lg) !important;
+  transform: translateY(-2px);
+  border-color: rgba(224, 35, 28, 0.3) !important;
+  box-shadow: 0 26px 65px rgba(0, 0, 0, 0.9), 0 0 40px rgba(224, 35, 28, 0.1) !important;
 }
 
 /* Header Banner */
 .portal-header-banner {
-  background: #ffffff;
-  border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  padding: 28px;
-  margin-bottom: 24px;
+  background: rgba(10, 14, 18, 0.88);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(223, 231, 224, 0.13);
+  border-top: 1px solid rgba(223, 231, 224, 0.25);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 45px rgba(224, 35, 28, 0.05);
+  padding: 30px 36px;
+  margin-bottom: 28px;
   text-align: left;
+  position: relative;
+  transition: border-color 0.25s ease;
+}
+
+.portal-header-banner:hover {
+  border-color: rgba(224, 35, 28, 0.25);
+}
+
+.portal-header-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(223, 231, 224, 0.08);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .portal-header-tag {
-  display: inline-block;
-  font-size: 0.8rem;
-  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: #000000;
-  color: #ffffff;
-  padding: 4px 10px;
-  border-radius: 4px;
-  margin-bottom: 12px;
+  letter-spacing: 0.14em;
+  background: rgba(224, 35, 28, 0.1);
+  border: 1px solid rgba(224, 35, 28, 0.3);
+  color: #aab4ad;
+  padding: 5px 14px;
+  border-radius: 9999px;
+}
+
+.portal-header-tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e0231c;
+  box-shadow: 0 0 8px #e0231c, 0 0 4px #ff5a3c;
 }
 
 .portal-header-title {
-  font-size: 2.2rem;
-  font-weight: 900;
+  font-family: 'Onest', sans-serif;
+  font-size: 2.35rem;
+  font-weight: 600;
   text-transform: uppercase;
-  margin: 0;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  color: #dfe7e0;
+  margin: 6px 0;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
 }
 
-/* Tabs segment - clean pill outline */
+/* Tabs segment - frosted pill outline */
 .portal-tabs-container {
   display: flex;
-  background: #ffffff;
-  border: var(--border-width) solid var(--border-color);
+  background: rgba(10, 14, 18, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(223, 231, 224, 0.12);
   border-radius: 9999px;
   padding: 6px;
   margin-bottom: 28px;
   width: 100%;
   gap: 6px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -147,33 +214,37 @@ body.portal-active {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 20px;
-  font-weight: 800;
-  font-size: 0.85rem;
+  padding: 12px 22px;
+  font-weight: 600;
+  font-size: 0.82rem;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
   border-radius: 9999px;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   background: transparent;
-  color: #000000;
-  transition: all 0.15s ease;
+  color: #aab4ad;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
 }
 
 .portal-tab-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.04);
+  color: #dfe7e0;
 }
 
 .portal-tab-btn.active {
-  background: #000000;
-  color: #ffffff;
+  background: rgba(224, 35, 28, 0.15) !important;
+  border-color: #e0231c !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 18px rgba(224, 35, 28, 0.25) !important;
 }
 
 /* Metrics Bento Grid */
 .portal-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
   width: 100%;
   margin-bottom: 24px;
 }
@@ -183,75 +254,86 @@ body.portal-active {
   flex-direction: column;
   justify-content: space-between;
   min-height: 120px;
-  background: #ffffff;
-  border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  background: rgba(12, 17, 22, 0.82) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(223, 231, 224, 0.12) !important;
+  border-top: 1px solid rgba(223, 231, 224, 0.22) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55) !important;
   padding: 20px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .portal-metric-card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  border-color: rgba(224, 35, 28, 0.35) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 24px rgba(224, 35, 28, 0.1) !important;
 }
 
 .portal-metric-value {
-  font-size: 2.5rem;
-  font-weight: 900;
+  font-size: 2.2rem;
+  font-weight: 700;
   margin: 8px 0 0 0;
-  line-height: 1;
-  font-family: 'Outfit', sans-serif;
+  line-height: 1.05;
+  font-family: 'Outfit', 'Onest', sans-serif;
   letter-spacing: -0.02em;
+  color: #dfe7e0;
 }
 
 .portal-metric-label {
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8b9b90;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
 /* Badges */
 .portal-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
+  gap: 5px;
+  padding: 5px 12px;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 600;
   border-radius: 9999px;
   text-transform: uppercase;
-  border: 2px solid #000000;
-  background: #ffffff;
-  color: #000000;
-  letter-spacing: 0.03em;
-  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(223, 231, 224, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #aab4ad;
+  letter-spacing: 0.05em;
 }
 
-.portal-badge-success { background: #d1fae5; color: #065f46; }
-.portal-badge-warning { background: #fef3c7; color: #92400e; }
-.portal-badge-danger { background: #fee2e2; color: #991b1b; }
-.portal-badge-info { background: #dbeafe; color: #1e40af; }
-.portal-badge-muted { background: #f4f4f5; color: #52525b; }
+.portal-badge-success { background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.35); color: #34d399; }
+.portal-badge-warning { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.35); color: #fbbf24; }
+.portal-badge-danger { background: rgba(224, 35, 28, 0.14); border-color: rgba(224, 35, 28, 0.4); color: #f87171; }
+.portal-badge-info { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.35); color: #60a5fa; }
+.portal-badge-muted { background: rgba(255, 255, 255, 0.04); border-color: rgba(223, 231, 224, 0.1); color: #8b9b90; }
 
 /* Form Controls & Buttons */
 .portal-control {
-  background: #ffffff;
-  border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 14px 18px;
-  color: #000000;
+  background: rgba(5, 7, 10, 0.85);
+  border: 1px solid rgba(223, 231, 224, 0.14);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #dfe7e0;
   font-family: inherit;
-  font-weight: 700;
-  transition: box-shadow 0.15s ease;
+  font-weight: 500;
+  font-size: 0.88rem;
+  transition: all 0.2s ease;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .portal-control:focus {
   outline: none;
-  box-shadow: var(--shadow-sm);
+  border-color: #e0231c;
+  box-shadow: 0 0 16px rgba(224, 35, 28, 0.35);
+}
+
+.portal-control::placeholder {
+  color: #525d57;
 }
 
 .portal-btn {
@@ -259,52 +341,73 @@ body.portal-active {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 24px;
-  font-weight: 800;
-  font-size: 0.85rem;
+  padding: 10px 22px;
+  font-weight: 600;
+  font-size: 0.82rem;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
   border-radius: 9999px;
-  border: var(--border-width) solid var(--border-color);
+  border: 1px solid rgba(223, 231, 224, 0.14);
   cursor: pointer;
-  background: #ffffff;
-  color: #000000;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: rgba(14, 19, 25, 0.85);
+  color: #dfe7e0;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   text-decoration: none;
 }
 
 .portal-btn:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+  border-color: rgba(224, 35, 28, 0.45);
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), 0 0 16px rgba(224, 35, 28, 0.15);
 }
 
 .portal-btn:active {
-  transform: translate(1px, 1px);
-  box-shadow: none;
+  transform: translateY(0);
 }
 
 .portal-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
   transform: none !important;
   box-shadow: none !important;
 }
 
 .portal-btn-primary {
-  background: #000000;
-  color: #ffffff;
+  background: #e0231c !important;
+  border-color: #e0231c !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(224, 35, 28, 0.35) !important;
 }
 
 .portal-btn-primary:hover {
-  background: #ffffff;
-  color: #000000;
+  background: #f12c24 !important;
+  border-color: #f12c24 !important;
+  box-shadow: 0 12px 30px rgba(224, 35, 28, 0.5) !important;
 }
 
-.portal-btn-success { background: #ffffff; color: #000000; }
-.portal-btn-success:hover { background: #10b981; color: #ffffff; }
+.portal-btn-success {
+  background: rgba(16, 185, 129, 0.14) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #34d399 !important;
+}
+.portal-btn-success:hover {
+  background: #10b981 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4) !important;
+}
 
-.portal-btn-danger { background: #ffffff; color: #000000; }
-.portal-btn-danger:hover { background: #ef4444; color: #ffffff; }
+.portal-btn-danger {
+  background: rgba(224, 35, 28, 0.14) !important;
+  border-color: rgba(224, 35, 28, 0.4) !important;
+  color: #f87171 !important;
+}
+.portal-btn-danger:hover {
+  background: #e0231c !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(224, 35, 28, 0.4) !important;
+}
 
 /* Grid Layouts */
 .portal-grid-half {
@@ -316,10 +419,13 @@ body.portal-active {
 /* Tables */
 .portal-table-container {
   overflow-x: auto;
-  border-radius: var(--radius-md);
-  border: var(--border-width) solid var(--border-color);
-  background: #ffffff;
-  box-shadow: var(--shadow-md);
+  border-radius: 20px;
+  border: 1px solid rgba(223, 231, 224, 0.12);
+  border-top: 1px solid rgba(223, 231, 224, 0.22);
+  background: rgba(10, 14, 18, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
   width: 100%;
   max-width: 100%;
   padding: 0 !important;
@@ -337,33 +443,25 @@ body.portal-active {
 }
 
 .portal-table th {
-  background: #f4f4f5;
+  background: rgba(14, 19, 25, 0.96);
   padding: 14px 18px;
-  font-weight: 800;
-  color: #000000;
-  border-bottom: var(--border-width) solid var(--border-color);
-  font-size: 0.78rem;
+  font-weight: 600;
+  color: #aab4ad;
+  border-bottom: 1px solid rgba(223, 231, 224, 0.12);
+  font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-.portal-table th:first-child {
-  border-top-left-radius: calc(var(--radius-md) - 3px);
-}
-
-.portal-table th:last-child {
-  border-top-right-radius: calc(var(--radius-md) - 3px);
-}
-
 .portal-table td {
   padding: 14px 18px;
-  border-bottom: 2px solid var(--border-color);
-  color: var(--text-secondary);
-  font-weight: 600;
+  border-bottom: 1px solid rgba(223, 231, 224, 0.06);
+  color: #dfe7e0;
+  font-weight: 400;
   font-size: 0.85rem;
   white-space: nowrap;
 }
@@ -373,7 +471,7 @@ body.portal-active {
 }
 
 .portal-table tr:hover td {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(224, 35, 28, 0.03);
 }
 
 /* Modal styling */
@@ -383,9 +481,9 @@ body.portal-active {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  background: rgba(2, 4, 6, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -408,45 +506,49 @@ body.portal-active {
 }
 
 .portal-month-tab {
-  padding: 10px 20px;
+  padding: 9px 18px;
   border-radius: 9999px;
-  font-size: 0.85rem;
-  font-weight: 800;
+  font-size: 0.8rem;
+  font-weight: 600;
   text-transform: uppercase;
-  background: #ffffff;
-  border: var(--border-width) solid var(--border-color);
-  color: #000000;
+  letter-spacing: 0.06em;
+  background: rgba(14, 19, 25, 0.8);
+  border: 1px solid rgba(223, 231, 224, 0.14);
+  color: #aab4ad;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
 }
 
 .portal-month-tab:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+  color: #dfe7e0;
+  border-color: rgba(224, 35, 28, 0.35);
 }
 
 .portal-month-tab.active {
-  background: #000000;
-  color: #ffffff;
+  background: rgba(224, 35, 28, 0.15) !important;
+  border-color: #e0231c !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(224, 35, 28, 0.25) !important;
 }
 
 /* Script Box */
 .portal-script-box {
-  background: #f4f4f5;
-  border: var(--border-width) solid var(--border-color);
-  padding: 16px 20px;
-  border-radius: var(--radius-sm);
+  background: rgba(6, 9, 13, 0.9);
+  border: 1px solid rgba(223, 231, 224, 0.12);
+  padding: 20px 24px;
+  border-radius: 12px;
   font-family: var(--font-sans);
   font-size: 0.92rem;
-  line-height: 1.5;
-  color: #000000;
+  line-height: 1.65;
+  color: #dfe7e0;
   white-space: pre-wrap;
   position: relative;
   overflow: hidden;
   margin-bottom: 16px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .portal-form-group {
@@ -455,42 +557,49 @@ body.portal-active {
 
 .portal-label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 600;
   margin-bottom: 8px;
-  color: #000000;
+  color: #aab4ad;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
-/* Select Dropdown & Input Reason */
+/* Select Dropdown */
 .portal-select {
-  background: #ffffff;
-  border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 6px 12px;
-  color: #000000;
+  background: rgba(10, 14, 18, 0.9);
+  border: 1px solid rgba(223, 231, 224, 0.16);
+  border-radius: 10px;
+  padding: 8px 14px;
+  color: #dfe7e0;
   font-family: inherit;
-  font-weight: 700;
-  transition: box-shadow 0.15s ease;
+  font-weight: 600;
+  font-size: 0.82rem;
+  transition: all 0.2s ease;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
+
 .portal-select:focus {
   outline: none;
-  box-shadow: var(--shadow-sm);
+  border-color: #e0231c;
+  box-shadow: 0 0 16px rgba(224, 35, 28, 0.35);
+}
+
+.portal-select option {
+  background: #0a0e12;
+  color: #dfe7e0;
 }
 
 .portal-code-block {
-  background: #1e1e24;
-  color: #a9b1d6;
-  border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius-sm);
+  background: #020305;
+  color: #dfe7e0;
+  border: 1px solid rgba(223, 231, 224, 0.12);
+  border-radius: 10px;
   padding: 16px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 0.85rem;
   white-space: pre-wrap;
-  box-shadow: var(--shadow-sm);
   margin-top: 12px;
 }
 
@@ -501,42 +610,33 @@ body.portal-active {
   .portal-tabs-container {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 10px !important;
-    gap: 10px !important;
+    border-radius: 16px !important;
+    padding: 8px !important;
+    gap: 8px !important;
   }
   .portal-tab-btn {
-    border: var(--border-width) solid var(--border-color) !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: 10px !important;
     padding: 10px 12px !important;
-    font-size: 0.8rem !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    box-shadow: var(--shadow-sm) !important;
+    font-size: 0.78rem !important;
     width: 100% !important;
     justify-content: center !important;
-  }
-  .portal-tab-btn.active {
-    background: #000000 !important;
-    color: #ffffff !important;
-    box-shadow: none !important;
-    transform: translate(1px, 1px) !important;
   }
   .portal-tabs-container button:last-child:nth-child(odd) {
     grid-column: span 2 !important;
   }
   .portal-header-banner {
-    padding: 16px;
+    padding: 22px 18px;
+    border-radius: 18px;
   }
   .portal-header-title {
-    font-size: 1.5rem;
+    font-size: 1.65rem;
   }
   .portal-metrics-grid {
     grid-template-columns: 1fr;
   }
   .portal-table th, .portal-table td {
     padding: 10px 12px;
-    font-size: 0.75rem;
+    font-size: 0.78rem;
   }
   .portal-code-block {
     font-size: 0.75rem;
@@ -572,9 +672,10 @@ body.portal-active {
   .portal-content-mobile-list {
     display: flex !important;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 }
+
 .portal-content-mobile-list {
   display: none;
 }
@@ -587,8 +688,8 @@ function PlatformDistributionDonut({ breakdown }) {
   if (!breakdown || breakdown.length === 0) {
     return (
       <div className="portal-bento-card" style={{ padding: '24px' }}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Platform Share</h3>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>No distribution data available yet.</div>
+        <h3 style={{ fontSize: '0.95rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Platform Share</h3>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>No distribution data available yet.</div>
       </div>
     );
   }
@@ -596,9 +697,9 @@ function PlatformDistributionDonut({ breakdown }) {
   const total = breakdown.reduce((sum, item) => sum + item.count, 0);
   let accumulatedPercent = 0;
   const platformColors = {
-    instagram: '#dc2626',
-    youtube: '#18181b',
-    facebook: '#2563eb',
+    instagram: '#e0231c',
+    youtube: '#ff5a3c',
+    facebook: '#3b82f6',
     linkedin: '#0284c7'
   };
 
@@ -606,7 +707,7 @@ function PlatformDistributionDonut({ breakdown }) {
 
   return (
     <div className="portal-bento-card" style={{ padding: '24px' }}>
-      <h3 style={{ fontSize: '1rem', marginBottom: '20px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Platform Share</h3>
+      <h3 style={{ fontSize: '0.95rem', marginBottom: '20px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Platform Share</h3>
       <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap', justifyContent: 'center' }}>
         <div 
           onMouseEnter={() => setIsChartHovered(true)}
@@ -615,13 +716,13 @@ function PlatformDistributionDonut({ breakdown }) {
             position: 'relative',
             width: '160px',
             height: '160px',
-            transform: isChartHovered ? 'scale(1.06)' : 'scale(1)',
+            transform: isChartHovered ? 'scale(1.05)' : 'scale(1)',
             transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
             cursor: 'pointer'
           }}
         >
           <svg width="160" height="160" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
-            <circle cx="50" cy="50" r="38" fill="#ffffff" stroke="#18181b" strokeWidth="2"></circle>
+            <circle cx="50" cy="50" r="38" fill="#0a0e12" stroke="rgba(223, 231, 224, 0.16)" strokeWidth="1.5"></circle>
             {breakdown.map((item, idx) => {
               const percent = (item.count / total) * 100;
               const sliceLength = (percent / 100) * C;
@@ -660,13 +761,13 @@ function PlatformDistributionDonut({ breakdown }) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justify: 'center',
+            justifyContent: 'center',
             pointerEvents: 'none',
             width: '100px',
             textAlign: 'center'
           }}>
-            <span style={{ fontSize: '1.6rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total}</span>
-            <span style={{ fontSize: '0.65rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px' }}>POSTS</span>
+            <span style={{ fontSize: '1.6rem', fontWeight: '700', color: '#dfe7e0', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{total}</span>
+            <span style={{ fontSize: '0.62rem', fontWeight: '600', color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px' }}>POSTS</span>
           </div>
         </div>
 
@@ -683,21 +784,21 @@ function PlatformDistributionDonut({ breakdown }) {
                 style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
-                  justify: 'space-between', 
+                  justifyContent: 'space-between', 
                   fontSize: '0.85rem', 
-                  fontWeight: '800',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  background: isHighlighted ? 'rgba(0,0,0,0.04)' : 'transparent',
+                  fontWeight: '600',
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  background: isHighlighted ? 'rgba(224, 35, 28, 0.12)' : 'transparent',
                   transition: 'background 0.2s ease',
                   cursor: 'pointer'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block', border: '1px solid #18181b' }} />
-                  <span style={{ textTransform: 'capitalize' }}>{item.platform}:</span>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block', border: '1px solid rgba(223, 231, 224, 0.25)' }} />
+                  <span style={{ textTransform: 'capitalize', color: '#dfe7e0' }}>{item.platform}:</span>
                 </div>
-                <span style={{ color: '#64748b' }}>{item.count} ({percent}%)</span>
+                <span style={{ color: '#8b9b90' }}>{item.count} ({percent}%)</span>
               </div>
             );
           })}
@@ -719,10 +820,10 @@ function EngagementBreakdownDonut({ stats }) {
   const total = likes + comments + shares + saves;
 
   const items = [
-    { label: 'Likes', count: likes, color: '#dc2626' },
-    { label: 'Comments', count: comments, color: '#18181b' },
-    { label: 'Shares', count: shares, color: '#059669' },
-    { label: 'Saves', count: saves, color: '#d97706' }
+    { label: 'Likes', count: likes, color: '#e0231c' },
+    { label: 'Comments', count: comments, color: '#ff5a3c' },
+    { label: 'Shares', count: shares, color: '#10b981' },
+    { label: 'Saves', count: saves, color: '#c9a24a' }
   ];
 
   let accumulatedPercent = 0;
@@ -730,9 +831,9 @@ function EngagementBreakdownDonut({ stats }) {
 
   return (
     <div className="portal-bento-card" style={{ padding: '24px' }}>
-      <h3 style={{ fontSize: '1rem', marginBottom: '20px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Engagement Mix</h3>
+      <h3 style={{ fontSize: '0.95rem', marginBottom: '20px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Engagement Mix</h3>
       {total === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>No engagement data available yet.</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>No engagement data available yet.</div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <div 
@@ -742,13 +843,13 @@ function EngagementBreakdownDonut({ stats }) {
               position: 'relative',
               width: '160px',
               height: '160px',
-              transform: isChartHovered ? 'scale(1.06)' : 'scale(1)',
+              transform: isChartHovered ? 'scale(1.05)' : 'scale(1)',
               transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
               cursor: 'pointer'
             }}
           >
             <svg width="160" height="160" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
-              <circle cx="50" cy="50" r="38" fill="#ffffff" stroke="#18181b" strokeWidth="2"></circle>
+              <circle cx="50" cy="50" r="38" fill="#0a0e12" stroke="rgba(223, 231, 224, 0.16)" strokeWidth="1.5"></circle>
               {items.map((item, idx) => {
                 if (item.count === 0) return null;
                 const percent = (item.count / total) * 100;
@@ -787,13 +888,13 @@ function EngagementBreakdownDonut({ stats }) {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              justify: 'center',
+              justifyContent: 'center',
               pointerEvents: 'none',
               width: '100px',
               textAlign: 'center'
             }}>
-              <span style={{ fontSize: '1.4rem', fontWeight: '900', color: '#09090b', lineHeight: 1 }}>{total.toLocaleString()}</span>
-              <span style={{ fontSize: '0.62rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px' }}>INTERACTIONS</span>
+              <span style={{ fontSize: '1.4rem', fontWeight: '700', color: '#dfe7e0', lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{total.toLocaleString()}</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: '600', color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px' }}>INTERACTIONS</span>
             </div>
           </div>
 
@@ -809,21 +910,21 @@ function EngagementBreakdownDonut({ stats }) {
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    justify: 'space-between', 
+                    justifyContent: 'space-between', 
                     fontSize: '0.85rem', 
-                    fontWeight: '800',
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    background: isHighlighted ? 'rgba(0,0,0,0.04)' : 'transparent',
+                    fontWeight: '600',
+                    padding: '5px 10px',
+                    borderRadius: '8px',
+                    background: isHighlighted ? 'rgba(224, 35, 28, 0.12)' : 'transparent',
                     transition: 'background 0.2s ease',
                     cursor: 'pointer'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, display: 'inline-block', border: '1px solid #18181b' }} />
-                    <span>{item.label}:</span>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, display: 'inline-block', border: '1px solid rgba(223, 231, 224, 0.25)' }} />
+                    <span style={{ color: '#dfe7e0' }}>{item.label}:</span>
                   </div>
-                  <span style={{ color: '#64748b' }}>{item.count.toLocaleString()} ({percent}%)</span>
+                  <span style={{ color: '#8b9b90' }}>{item.count.toLocaleString()} ({percent}%)</span>
                 </div>
               );
             })}
@@ -839,7 +940,7 @@ function PerformanceTrendChart({ data }) {
   
   if (!data || data.length === 0) {
     return (
-      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px', textAlign: 'center', fontWeight: '700' }}>
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px', textAlign: 'center', fontWeight: '500' }}>
         No trend data available yet.
       </div>
     );
@@ -900,20 +1001,23 @@ function PerformanceTrendChart({ data }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <h3 style={{ fontSize: '1rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Content Performance Trend</h3>
-        <div style={{ display: 'flex', border: '2px solid #18181b', borderRadius: '9999px', overflow: 'hidden', boxShadow: '2px 2px 0px #18181b' }}>
+        <h3 style={{ fontSize: '0.95rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Content Performance Trend</h3>
+        <div style={{ display: 'flex', border: '1px solid rgba(223, 231, 224, 0.14)', borderRadius: '9999px', overflow: 'hidden', background: 'rgba(5, 7, 10, 0.85)', padding: '2px' }}>
           <button 
             onClick={() => setMetric('views')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               border: 'none',
-              fontWeight: '800',
+              fontWeight: '600',
               fontSize: '0.75rem',
               textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              borderRadius: '9999px',
               cursor: 'pointer',
-              background: isViews ? '#18181b' : '#ffffff',
-              color: isViews ? '#ffffff' : '#18181b',
-              transition: 'all 0.15s ease'
+              background: isViews ? '#e0231c' : 'transparent',
+              color: isViews ? '#ffffff' : '#aab4ad',
+              boxShadow: isViews ? '0 0 14px rgba(224, 35, 28, 0.35)' : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
             Video Views
@@ -921,15 +1025,18 @@ function PerformanceTrendChart({ data }) {
           <button 
             onClick={() => setMetric('engagement')}
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               border: 'none',
-              fontWeight: '800',
+              fontWeight: '600',
               fontSize: '0.75rem',
               textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              borderRadius: '9999px',
               cursor: 'pointer',
-              background: !isViews ? '#18181b' : '#ffffff',
-              color: !isViews ? '#ffffff' : '#18181b',
-              transition: 'all 0.15s ease'
+              background: !isViews ? '#e0231c' : 'transparent',
+              color: !isViews ? '#ffffff' : '#aab4ad',
+              boxShadow: !isViews ? '0 0 14px rgba(224, 35, 28, 0.35)' : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
             Engagement %
@@ -937,12 +1044,12 @@ function PerformanceTrendChart({ data }) {
         </div>
       </div>
 
-      <div style={{ width: '100%', background: '#ffffff', border: '2px solid #18181b', borderRadius: '12px', padding: '16px', boxShadow: '3px 3px 0px #18181b', boxSizing: 'border-box' }}>
+      <div style={{ width: '100%', background: 'rgba(10, 14, 18, 0.88)', border: '1px solid rgba(223, 231, 224, 0.12)', borderTop: '1px solid rgba(223, 231, 224, 0.22)', borderRadius: '18px', padding: '20px', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.75)', boxSizing: 'border-box' }}>
         <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="auto" style={{ overflow: 'visible' }}>
           <defs>
             <linearGradient id="sakuraTrendGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#dc2626" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="#dc2626" stopOpacity="0.0" />
+              <stop offset="0%" stopColor="#e0231c" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#e0231c" stopOpacity="0.0" />
             </linearGradient>
           </defs>
           {/* Grid lines */}
@@ -956,16 +1063,16 @@ function PerformanceTrendChart({ data }) {
                   y1={y} 
                   x2={width - paddingRight} 
                   y2={y} 
-                  stroke="#e4e4e7" 
-                  strokeWidth="1.5"
+                  stroke="rgba(223, 231, 224, 0.08)" 
+                  strokeWidth="1"
                   strokeDasharray={idx === 0 ? "0" : "4 4"}
                 />
                 <text 
                   x={paddingLeft - 8} 
                   y={y + 4} 
                   textAnchor="end" 
-                  fill="#18181b" 
-                  style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: '800' }}
+                  fill="#8b9b90" 
+                  style={{ fontSize: '10px', fontFamily: "'JetBrains Mono', monospace", fontWeight: '500' }}
                 >
                   {formatNumberAbbr(gridVal)}
                 </text>
@@ -986,7 +1093,7 @@ function PerformanceTrendChart({ data }) {
             <path 
               d={pathD} 
               fill="none" 
-              stroke="#dc2626" 
+              stroke="#e0231c" 
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -999,11 +1106,11 @@ function PerformanceTrendChart({ data }) {
               <circle 
                 cx={p.x} 
                 cy={p.y} 
-                r="5" 
-                fill="#dc2626" 
-                stroke="#ffffff" 
+                r="4.5" 
+                fill="#e0231c" 
+                stroke="#0a0e12" 
                 strokeWidth="2"
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', filter: 'drop-shadow(0 0 6px rgba(224, 35, 28, 0.6))' }}
               >
                 <title>{`${p.title || 'Post'}\n${isViews ? 'Views' : 'Engagement'}: ${isViews ? p.val.toLocaleString() : p.val.toFixed(2) + '%'}\nDate: ${p.date}`}</title>
               </circle>
@@ -1012,8 +1119,8 @@ function PerformanceTrendChart({ data }) {
                 x={p.x} 
                 y={paddingTop + chartHeight + 18} 
                 textAnchor="middle" 
-                fill="#18181b" 
-                style={{ fontSize: '9px', fontFamily: 'var(--font-sans)', fontWeight: '800' }}
+                fill="#aab4ad" 
+                style={{ fontSize: '9px', fontFamily: "'Onest', sans-serif", fontWeight: '500' }}
               >
                 {shortDate(p.date)}
               </text>
@@ -1852,32 +1959,54 @@ export default function ClientPortal({ showToast }) {
 
   if (pinRequired) {
     return (
-      <div className="client-portal-wrapper">
+      <div className="client-portal-wrapper" style={{ justifyContent: 'center' }}>
         <style dangerouslySetInnerHTML={{ __html: PORTAL_STYLES }} />
-        <div className="portal-bento-card" style={{ width: '100%', maxWidth: '420px', padding: '32px', textAlign: 'center', marginTop: '10vh' }}>
-          <div style={{ display: 'inline-flex', padding: '12px', background: '#000000', color: '#ffffff', border: '3px solid #000000', borderRadius: '50%', marginBottom: '16px', boxShadow: '2px 2px 0px #000000' }}>
-            <Lock size={32} />
+        <SEOHead 
+          title="Security Verification — Hyphening Media Client Portal" 
+          description="Enter your Client PIN to access the secure performance intelligence dashboard."
+        />
+        <div className="portal-ambient-glow" />
+        <div className="portal-vignette" />
+
+        <div className="portal-bento-card" style={{ width: '100%', maxWidth: '440px', padding: '40px 36px', textAlign: 'center', margin: 'auto 0', zIndex: 10 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '5px 14px', background: 'rgba(224, 35, 28, 0.1)', border: '1px solid rgba(224, 35, 28, 0.3)', borderRadius: '9999px', marginBottom: '24px' }}>
+            <span className="portal-header-tag-dot" />
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#aab4ad' }}>SECURITY VERIFICATION</span>
           </div>
-          <h2 style={{ marginBottom: '8px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '-0.02em' }}>Security Verification</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px', fontWeight: 700 }}>
-            Please enter your Client PIN to access the performance dashboard and approval portal.
-          </p>
-          <form onSubmit={verifyPin}>
-            <div className="portal-form-group">
+
+          <div style={{ marginBottom: '24px' }}>
+            <Link to="/" style={{ display: 'inline-block', marginBottom: '16px' }} title="Return Home">
+              <img src={logoImg} alt="Hyphening Media" style={{ height: '64px', width: 'auto', margin: '0 auto' }} />
+            </Link>
+            <div style={{ display: 'inline-flex', padding: '14px', background: 'rgba(224, 35, 28, 0.12)', color: '#e0231c', border: '1px solid rgba(224, 35, 28, 0.3)', borderRadius: '50%', marginBottom: '16px', boxShadow: '0 0 24px rgba(224, 35, 28, 0.25)' }}>
+              <Lock size={28} />
+            </div>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 600, color: '#dfe7e0', margin: '0 0 8px', letterSpacing: '-0.015em' }}>Client Portal Access</h2>
+            <p style={{ color: '#8b9b90', fontSize: '0.88rem', margin: 0, lineHeight: 1.5, fontWeight: 300 }}>
+              Please enter your Client PIN to access the performance dashboard and approval portal.
+            </p>
+          </div>
+
+          <form onSubmit={verifyPin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div className="portal-form-group" style={{ margin: 0 }}>
               <input
                 type="password"
                 className="portal-control"
-                placeholder="Enter PIN"
+                placeholder="••••"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                style={{ textAlign: 'center', fontSize: '1.25rem', letterSpacing: '0.2em' }}
+                style={{ textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.3em', padding: '14px' }}
                 required
+                autoFocus
               />
             </div>
-            <button type="submit" className="portal-btn portal-btn-primary" style={{ width: '100%', padding: '12px', marginTop: '16px' }}>
+            <button type="submit" className="portal-btn portal-btn-primary" style={{ width: '100%', padding: '14px', fontSize: '0.85rem' }}>
               Verify Access
             </button>
           </form>
+          <div style={{ marginTop: '20px', fontSize: '0.72rem', color: '#6b7770', letterSpacing: '0.04em' }}>
+            🔒 256-Bit Encrypted Client Portal · Hyphening Media
+          </div>
         </div>
       </div>
     );
@@ -1887,9 +2016,11 @@ export default function ClientPortal({ showToast }) {
     return (
       <div className="client-portal-wrapper" style={{ justifyContent: 'center' }}>
         <style dangerouslySetInnerHTML={{ __html: PORTAL_STYLES }} />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ border: '3px solid #000000', borderTop: '3px solid #a855f7', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }}></div>
-          <p style={{ color: '#000000', fontWeight: '800', textTransform: 'uppercase', fontSize: '0.9rem' }}>Verifying secure token access...</p>
+        <div className="portal-ambient-glow" />
+        <div className="portal-vignette" />
+        <div style={{ textAlign: 'center', position: 'relative', zIndex: 10 }}>
+          <div style={{ border: '3px solid rgba(224, 35, 28, 0.15)', borderTop: '3px solid #e0231c', borderRadius: '50%', width: '44px', height: '44px', animation: 'spin 0.9s linear infinite', margin: '0 auto 20px', boxShadow: '0 0 20px rgba(224, 35, 28, 0.3)' }}></div>
+          <p style={{ color: '#dfe7e0', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.12em', fontSize: '0.82rem' }}>Verifying secure token access...</p>
         </div>
       </div>
     );
@@ -1898,28 +2029,45 @@ export default function ClientPortal({ showToast }) {
   return (
     <div className="client-portal-wrapper">
       <style dangerouslySetInnerHTML={{ __html: PORTAL_STYLES }} />
+      <SEOHead 
+        title={`${clientName ? `${clientName} — Client Portal` : 'Client Intelligence Portal'} | Hyphening Media`}
+        description="Secure real-time marketing performance analytics, monthly reports, and content approval pipeline."
+      />
+      <div className="portal-ambient-glow" />
+      <div className="portal-vignette" />
       
       <div className="portal-container">
         
         {/* Portal Header */}
         <header className="portal-header-banner">
+          <div className="portal-header-brand-row">
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} title="Hyphening Media">
+              <img src={logoImg} alt="Hyphening Media" style={{ height: '64px', maxHeight: '72px', width: 'auto', objectFit: 'contain' }} />
+            </Link>
+            <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span className="portal-header-tag">
+                <span className="portal-header-tag-dot" />
+                <span>CLIENT INTELLIGENCE PORTAL</span>
+              </span>
+              {overview.pending_approvals > 0 && (
+                <span className="portal-badge portal-badge-warning" style={{ fontSize: '0.72rem', padding: '4px 10px' }}>
+                  {overview.pending_approvals} Approval Pending
+                </span>
+              )}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
             {/* Left side text block */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 300px' }}>
-              <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span className="portal-header-tag" style={{ margin: 0 }}>
-                  Client Portal
-                </span>
-                {overview.pending_approvals > 0 && (
-                  <span className="portal-badge portal-badge-warning" style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px', margin: 0 }}>
-                    {overview.pending_approvals} Approval Pending
-                  </span>
-                )}
-              </div>
               <h1 className="portal-header-title">{clientName}</h1>
               {overview.sister_companies && overview.sister_companies.length > 0 && (
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: '800' }}>
-                  Group Locations: <strong style={{ color: '#000000' }}>{clientName}</strong>, {overview.sister_companies.join(', ')}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Group Locations:</span>
+                  <span className="portal-badge portal-badge-info" style={{ textTransform: 'none', fontWeight: 600 }}>{clientName}</span>
+                  {overview.sister_companies.map((s, idx) => (
+                    <span key={idx} className="portal-badge portal-badge-muted" style={{ textTransform: 'none', fontWeight: 500 }}>{s}</span>
+                  ))}
                 </div>
               )}
             </div>
@@ -1931,8 +2079,8 @@ export default function ClientPortal({ showToast }) {
                   onClick={notificationPermission === 'default' ? handleRequestPermission : toggleLeadAlerts}
                   className={`portal-btn ${leadAlertsEnabled && notificationPermission === 'granted' ? 'portal-btn-primary' : ''}`}
                   style={{ 
-                    padding: '10px 18px', 
-                    fontSize: '0.85rem',
+                    padding: '10px 20px', 
+                    fontSize: '0.82rem',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
@@ -1946,17 +2094,17 @@ export default function ClientPortal({ showToast }) {
                 >
                   {notificationPermission === 'default' ? (
                     <>
-                      <Bell size={16} />
+                      <Bell size={15} />
                       <span>Alert ON</span>
                     </>
                   ) : leadAlertsEnabled ? (
                     <>
-                      <Bell size={16} style={{ color: '#ffffff' }} />
+                      <Bell size={15} style={{ color: '#ffffff' }} />
                       <span>Alert ON</span>
                     </>
                   ) : (
                     <>
-                      <BellOff size={16} style={{ color: 'var(--text-muted)' }} />
+                      <BellOff size={15} style={{ color: 'var(--text-muted)' }} />
                       <span>Alerts Muted</span>
                     </>
                   )}
@@ -1974,35 +2122,35 @@ export default function ClientPortal({ showToast }) {
                 onClick={() => setActiveTab('overview')} 
                 className={`portal-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
               >
-                <BarChart2 size={16} /> Overview
+                <BarChart2 size={15} /> Overview
               </button>
               <button 
                 onClick={() => setActiveTab('reports')} 
                 className={`portal-tab-btn ${activeTab === 'reports' ? 'active' : ''}`}
               >
-                <TrendingUp size={16} /> Reports
+                <TrendingUp size={15} /> Reports
               </button>
               <button 
                 onClick={() => setActiveTab('content')} 
                 className={`portal-tab-btn ${activeTab === 'content' ? 'active' : ''}`}
                 style={{ position: 'relative' }}
               >
-                <Calendar size={16} /> Content
+                <Calendar size={15} /> Content
                 {activeTab !== 'content' && overview?.pending_approvals > 0 && (
-                  <span style={{ position: 'absolute', top: '8px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }} />
+                  <span style={{ position: 'absolute', top: '10px', right: '14px', width: '7px', height: '7px', borderRadius: '50%', background: '#e0231c', boxShadow: '0 0 8px #e0231c' }} />
                 )}
               </button>
               <button 
                 onClick={() => setActiveTab('leads')} 
                 className={`portal-tab-btn ${activeTab === 'leads' ? 'active' : ''}`}
               >
-                <Users size={16} /> Leads
+                <Users size={15} /> Leads
               </button>
               <button 
                 onClick={() => setActiveTab('integrations')} 
                 className={`portal-tab-btn ${activeTab === 'integrations' ? 'active' : ''}`}
               >
-                <Share2 size={16} /> Integrations
+                <Share2 size={15} /> Integrations
               </button>
             </>
           )}
@@ -2012,7 +2160,7 @@ export default function ClientPortal({ showToast }) {
               onClick={() => setActiveTab('bookings')} 
               className={`portal-tab-btn ${activeTab === 'bookings' ? 'active' : ''}`}
             >
-              <TrendingUp size={16} /> Artist Bookings
+              <TrendingUp size={15} /> Artist Bookings
             </button>
           )}
         </div>
@@ -2022,20 +2170,18 @@ export default function ClientPortal({ showToast }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Performance Summary</h2>
-                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Real-time marketing metrics and social performance overview</p>
+                <h2 style={{ fontSize: '1.2rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>Performance Summary</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#8b9b90', fontWeight: 400 }}>Real-time marketing metrics and social performance overview</p>
               </div>
 
               {availablePortalMonths.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Select Month:</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Month:</span>
                   <select
-                    className="form-control"
-                    style={{ width: 'auto', padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold', borderRadius: '8px', border: '2px solid #18181b' }}
+                    className="portal-select"
+                    style={{ width: 'auto', padding: '7px 14px', fontSize: '0.82rem' }}
                     value={selectedPortalMonth || 'all'}
                     onChange={(e) => {
-                      // 'all' is sent through as-is: an empty month means "let the server pick
-                      // the latest month", which is not the same thing as an all-time total.
                       const val = e.target.value;
                       setSelectedPortalMonth(val);
                       checkPortalAuth(val);
@@ -2054,37 +2200,37 @@ export default function ClientPortal({ showToast }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
               {overview.content && (
                 <>
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Total Video Views</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Total Video Views</span>
+                    <span className="portal-metric-value">
                       {overview.content.total_views?.toLocaleString() || 0}
                     </span>
                   </div>
 
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Avg Engagement</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#dc2626', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Avg Engagement</span>
+                    <span className="portal-metric-value" style={{ color: '#e0231c' }}>
                       {overview.content.avg_engagement_rate || 0}%
                     </span>
                   </div>
 
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Avg Watch Time</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#059669', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Avg Watch Time</span>
+                    <span className="portal-metric-value" style={{ color: '#10b981' }}>
                       {overview.content.avg_watch_time ? `${overview.content.avg_watch_time}s` : '-'}
                     </span>
                   </div>
 
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Avg Skip Rate</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: overview.content.avg_skip_rate <= 30 ? '#059669' : '#dc2626', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Avg Skip Rate</span>
+                    <span className="portal-metric-value" style={{ color: overview.content.avg_skip_rate <= 30 ? '#10b981' : '#e0231c' }}>
                       {overview.content.avg_skip_rate ? `${overview.content.avg_skip_rate}%` : '-'}
                     </span>
                   </div>
 
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Quality Score</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#09090b', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Quality Score</span>
+                    <span className="portal-metric-value">
                       {overview.content.avg_content_score || 0}
                     </span>
                   </div>
@@ -2093,23 +2239,23 @@ export default function ClientPortal({ showToast }) {
 
               {overview.ads && (
                 <>
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Leads Captured</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#0284c7', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Leads Captured</span>
+                    <span className="portal-metric-value" style={{ color: '#38bdf8' }}>
                       {overview.ads.total_leads || 0}
                     </span>
                   </div>
 
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Qualified Leads</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#16a34a', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Qualified Leads</span>
+                    <span className="portal-metric-value" style={{ color: '#34d399' }}>
                       {overview.ads.qualified_leads || 0}
                     </span>
                   </div>
 
-                  <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                    <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>Confirmed Bookings</span>
-                    <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#2563eb', display: 'block', marginTop: '4px' }}>
+                  <div className="portal-metric-card">
+                    <span className="portal-metric-label">Confirmed Bookings</span>
+                    <span className="portal-metric-value" style={{ color: '#60a5fa' }}>
                       {overview.ads.appointments_booked || 0}
                     </span>
                   </div>
@@ -2131,30 +2277,30 @@ export default function ClientPortal({ showToast }) {
 
             {/* Ad Campaigns & Conversion Performance */}
             {overview.ads_breakdown && overview.ads_breakdown.length > 0 && (
-              <div className="portal-bento-card" style={{ padding: '20px' }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Ad Campaign Breakdown</h3>
+              <div className="portal-bento-card" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '0.95rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Ad Campaign Breakdown</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
-                    <h4 style={{ fontSize: '0.78rem', marginBottom: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leads & Conversion Performance By Campaign</h4>
+                    <h4 style={{ fontSize: '0.76rem', marginBottom: '12px', color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Leads & Conversion Performance By Campaign</h4>
                     <div style={{ overflowX: 'auto' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                         <thead>
-                          <tr style={{ borderBottom: '2px solid #18181b', textAlign: 'left' }}>
-                            <th style={{ padding: '8px', color: '#64748b' }}>Platform</th>
-                            <th style={{ padding: '8px', color: '#64748b' }}>Campaign Name</th>
-                            <th style={{ padding: '8px', color: '#64748b' }}>Captured Leads</th>
-                            <th style={{ padding: '8px', color: '#16a34a' }}>Qualified Leads</th>
-                            <th style={{ padding: '8px', color: '#2563eb' }}>Confirmed Bookings</th>
+                          <tr style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.12)', textAlign: 'left' }}>
+                            <th style={{ padding: '10px 12px', color: '#aab4ad', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Platform</th>
+                            <th style={{ padding: '10px 12px', color: '#aab4ad', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Campaign Name</th>
+                            <th style={{ padding: '10px 12px', color: '#aab4ad', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Captured Leads</th>
+                            <th style={{ padding: '10px 12px', color: '#34d399', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Qualified Leads</th>
+                            <th style={{ padding: '10px 12px', color: '#60a5fa', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Confirmed Bookings</th>
                           </tr>
                         </thead>
                         <tbody>
                           {overview.ads_breakdown.map((item, idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid #e4e4e7' }}>
-                              <td style={{ padding: '8px', fontWeight: '800' }}>{item.platform}</td>
-                              <td style={{ padding: '8px', fontWeight: '600' }}>{item.campaign_name}</td>
-                              <td style={{ padding: '8px', fontWeight: '700' }}>{item.leads || 0}</td>
-                              <td style={{ padding: '8px', fontWeight: '800', color: '#16a34a' }}>{item.qualified_leads || 0}</td>
-                              <td style={{ padding: '8px', fontWeight: '800', color: '#2563eb' }}>{item.confirmed_bookings || 0}</td>
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.06)' }}>
+                              <td style={{ padding: '12px', fontWeight: 600, color: '#dfe7e0' }}>{item.platform}</td>
+                              <td style={{ padding: '12px', fontWeight: 400, color: '#dfe7e0' }}>{item.campaign_name}</td>
+                              <td style={{ padding: '12px', fontWeight: 600, color: '#dfe7e0' }}>{item.leads || 0}</td>
+                              <td style={{ padding: '12px', fontWeight: 600, color: '#34d399' }}>{item.qualified_leads || 0}</td>
+                              <td style={{ padding: '12px', fontWeight: 600, color: '#60a5fa' }}>{item.confirmed_bookings || 0}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2166,9 +2312,9 @@ export default function ClientPortal({ showToast }) {
             )}
 
             {/* Assist Feedback form */}
-            <div className="portal-bento-card" style={{ padding: '24px', marginTop: '12px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', marginBottom: '8px', textTransform: 'uppercase' }}>Need assistance or request changes?</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 600 }}>
+            <div className="portal-bento-card" style={{ padding: '28px', marginTop: '12px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#dfe7e0' }}>Need assistance or request changes?</h3>
+              <p style={{ color: '#8b9b90', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 400 }}>
                 Drop a note directly to our operations team. We will be notified instantly.
               </p>
               <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', gap: '12px' }}>
@@ -2181,8 +2327,8 @@ export default function ClientPortal({ showToast }) {
                   style={{ flexGrow: 1 }}
                   required
                 />
-                <button type="submit" className="portal-btn portal-btn-primary" disabled={submittingFeedback} style={{ padding: '12px 20px' }}>
-                  <Send size={16} />
+                <button type="submit" className="portal-btn portal-btn-primary" disabled={submittingFeedback} style={{ padding: '10px 22px' }}>
+                  <Send size={15} />
                 </button>
               </form>
             </div>
@@ -2195,9 +2341,9 @@ export default function ClientPortal({ showToast }) {
             
             {/* SEO Reports Table */}
             <div>
-              <h2 style={{ fontSize: '1.25rem', margin: '4px 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>SEO Monthly Reports</h2>
+              <h2 style={{ fontSize: '1.05rem', margin: '4px 0 14px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>SEO Monthly Reports</h2>
               {seoReports.length === 0 ? (
-                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: '#8b9b90', fontWeight: 500 }}>
                   No SEO reports found yet.
                 </div>
               ) : (
@@ -2222,7 +2368,7 @@ export default function ClientPortal({ showToast }) {
                       <tbody>
                         {seoReports.slice((seoPage - 1) * ITEMS_PER_PAGE_SEO, seoPage * ITEMS_PER_PAGE_SEO).map(r => (
                           <tr key={r.id}>
-                            <td style={{ fontWeight: '800', color: '#000000', whiteSpace: 'nowrap' }}>{formatMonthName(r.month)}</td>
+                            <td style={{ fontWeight: 600, color: '#dfe7e0', whiteSpace: 'nowrap' }}>{formatMonthName(r.month)}</td>
                             <td>{r.website_traffic?.toLocaleString() || '-'}</td>
                             <td>{r.website_clicks || '-'}</td>
                             <td>{r.map_views?.toLocaleString() || '-'}</td>
@@ -2249,9 +2395,9 @@ export default function ClientPortal({ showToast }) {
 
             {/* Content Tracker Table */}
             <div>
-              <h2 style={{ fontSize: '1.25rem', margin: '4px 0 12px 0', textTransform: 'uppercase', fontWeight: 800 }}>Tracked Content Performance</h2>
+              <h2 style={{ fontSize: '1.05rem', margin: '4px 0 14px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Tracked Content Performance</h2>
               {contentList.length === 0 ? (
-                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: '#8b9b90', fontWeight: 500 }}>
                   No tracked posts found yet.
                 </div>
               ) : (
@@ -2286,7 +2432,7 @@ export default function ClientPortal({ showToast }) {
                               </span>
                             </td>
                             <td style={{ textTransform: 'capitalize' }}>{item.post_type}</td>
-                            <td style={{ fontWeight: '800', color: '#000000' }}>{item.title || 'Untitled Post'}</td>
+                            <td style={{ fontWeight: 600, color: '#dfe7e0' }}>{item.title || 'Untitled Post'}</td>
                             <td>
                               {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
                             </td>
@@ -2296,14 +2442,14 @@ export default function ClientPortal({ showToast }) {
                             <td>{item.saves?.toLocaleString() || 0}</td>
                             <td>{item.avg_watch_time_pct ? `${item.avg_watch_time_pct}%` : '-'}</td>
                             <td>{item.skip_rate_pct ? `${item.skip_rate_pct}%` : '-'}</td>
-                            <td>
+                            <td style={{ fontWeight: 600, color: item.engagement_rate_pct >= 5 ? '#34d399' : '#dfe7e0' }}>
                               {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
                             </td>
-                            <td>{item.content_score || 0}</td>
+                            <td style={{ fontWeight: 600, color: '#dfe7e0' }}>{item.content_score || 0}</td>
                             <td style={{ whiteSpace: 'nowrap' }}>{formatDateStr(item.date)}</td>
                             <td>
                               {item.link ? (
-                                <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#000000', fontWeight: '800' }}>
+                                <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#dfe7e0', fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,231,224,0.16)' }}>
                                   <ExternalLink size={12} />
                                 </a>
                               ) : '-'}
@@ -2328,38 +2474,38 @@ export default function ClientPortal({ showToast }) {
                                 {item.post_type}
                               </span>
                             </div>
-                            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: '#000000', wordBreak: 'break-word' }}>
+                            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#dfe7e0', wordBreak: 'break-word' }}>
                               {item.title || 'Untitled Post'}
                             </h4>
                           </div>
                           {item.link && (
-                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#000000', fontWeight: '800', flexShrink: 0 }}>
+                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#dfe7e0', fontWeight: 600, flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,231,224,0.16)' }}>
                               <ExternalLink size={12} />
                             </a>
                           )}
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: '#f4f4f5', padding: '10px', borderRadius: '8px', border: '1.5px solid #000000' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
                           <div>
-                            <div style={{ fontSize: '0.65rem', color: '#52525b', textTransform: 'uppercase', fontWeight: '800' }}>Views</div>
-                            <div style={{ fontWeight: '800', fontSize: '0.88rem' }}>
+                            <div style={{ fontSize: '0.68rem', color: '#8b9b90', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>Views</div>
+                            <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#dfe7e0', marginTop: '2px' }}>
                               {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
                             </div>
                           </div>
                           <div>
-                            <div style={{ fontSize: '0.65rem', color: '#52525b', textTransform: 'uppercase', fontWeight: '800' }}>Likes</div>
-                            <div style={{ fontWeight: '800', fontSize: '0.88rem' }}>{item.likes?.toLocaleString() || 0}</div>
+                            <div style={{ fontSize: '0.68rem', color: '#8b9b90', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>Likes</div>
+                            <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#dfe7e0', marginTop: '2px' }}>{item.likes?.toLocaleString() || 0}</div>
                           </div>
                           <div>
-                            <div style={{ fontSize: '0.65rem', color: '#52525b', textTransform: 'uppercase', fontWeight: '800' }}>Engagement</div>
-                            <div style={{ fontWeight: '800', fontSize: '0.88rem', color: item.engagement_rate_pct >= 5 ? '#065f46' : '#000000' }}>
+                            <div style={{ fontSize: '0.68rem', color: '#8b9b90', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>Engagement</div>
+                            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginTop: '2px', color: item.engagement_rate_pct >= 5 ? '#34d399' : '#dfe7e0' }}>
                               {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
                             </div>
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#52525b', fontWeight: '700' }}>
-                          <span>Score: <strong style={{ color: '#000000' }}>{item.content_score || 0}</strong></span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500 }}>
+                          <span>Score: <strong style={{ color: '#dfe7e0' }}>{item.content_score || 0}</strong></span>
                           <span>Date: {formatDateStr(item.date)}</span>
                         </div>
                       </div>
@@ -2377,13 +2523,13 @@ export default function ClientPortal({ showToast }) {
         {/* Content Tab (3rd Tab) */}
         {activeTab === 'content' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Monthly Content Plans</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
+            <h2 style={{ fontSize: '1.05rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Monthly Content Plans</h2>
+            <p style={{ color: '#8b9b90', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 400 }}>
               Read the finalized scripts and concepts prepared for your brand. Approve items or request changes with a comment.
             </p>
 
             {uniqueMonths.length === 0 ? (
-              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: '#8b9b90', fontWeight: 500 }}>
                 No scripts uploaded yet.
               </div>
             ) : (
@@ -2399,7 +2545,6 @@ export default function ClientPortal({ showToast }) {
                         setContentCommentText('');
                       }}
                       className={`portal-month-tab ${selectedMonth === m ? 'active' : ''}`}
-                      style={{ padding: '8px 16px', borderRadius: '20px', border: '2px solid #000000', cursor: 'pointer', background: selectedMonth === m ? '#000000' : '#ffffff', color: selectedMonth === m ? '#ffffff' : '#000000', fontWeight: '800' }}
                     >
                       {formatMonthName(m)}
                     </button>
@@ -2411,7 +2556,7 @@ export default function ClientPortal({ showToast }) {
 
                   if (filteredScripts.length === 0) {
                     return (
-                      <div className="portal-bento-card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                      <div className="portal-bento-card" style={{ padding: '30px', textAlign: 'center', color: '#8b9b90', fontWeight: 500 }}>
                         No scripts found for this month.
                       </div>
                     );
@@ -2426,7 +2571,7 @@ export default function ClientPortal({ showToast }) {
                   return (
                     <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       {/* Pagination Controls */}
-                      <div className="portal-content-pagination-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000000', paddingBottom: '16px' }}>
+                      <div className="portal-content-pagination-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(223, 231, 224, 0.12)', paddingBottom: '16px' }}>
                         <button 
                           className="portal-btn"
                           disabled={index === 0}
@@ -2438,7 +2583,7 @@ export default function ClientPortal({ showToast }) {
                         >
                           &larr; Previous
                         </button>
-                        <span style={{ fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#dfe7e0' }}>
                           Script {index + 1} of {filteredScripts.length}
                         </span>
                         <button 
@@ -2456,9 +2601,9 @@ export default function ClientPortal({ showToast }) {
 
                       {/* Content Item Details */}
                       <div>
-                        <div className="portal-content-item-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                          <div>
-                            <span className="portal-badge portal-badge-info" style={{ marginRight: '6px', textTransform: 'uppercase' }}>
+                        <div className="portal-content-item-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <span className="portal-badge portal-badge-info" style={{ textTransform: 'uppercase' }}>
                               {item.format === 'long_format' ? 'Long Format' : 'Reel'}
                             </span>
                             {item.content_status ? (
@@ -2475,15 +2620,15 @@ export default function ClientPortal({ showToast }) {
                               </span>
                             )}
                           </div>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>
+                          <span style={{ fontSize: '0.78rem', color: '#8b9b90', fontWeight: 500 }}>
                             Last updated: {formatDateStr(item.updated_at?.split('T')[0] || '')}
                           </span>
                         </div>
 
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '12px', textTransform: 'uppercase' }}>{item.title}</h3>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#dfe7e0' }}>{item.title}</h3>
 
                         {/* Script details */}
-                        <div className="portal-script-box" style={{ maxHeight: 'none', background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', whiteSpace: 'pre-wrap' }}>
+                        <div className="portal-script-box" style={{ maxHeight: 'none', background: 'rgba(5, 7, 10, 0.65)', padding: '18px', borderRadius: '12px', border: '1px solid rgba(223, 231, 224, 0.12)', color: '#dfe7e0', lineHeight: 1.65, whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>
                           {item.script_text || 'No script text provided.'}
                         </div>
 
@@ -2517,16 +2662,16 @@ export default function ClientPortal({ showToast }) {
                       </div>
 
                       {/* Comment & Actions Form or Status Message */}
-                      <div style={{ borderTop: '2px solid #000000', paddingTop: '20px' }}>
+                      <div style={{ borderTop: '1px solid rgba(223, 231, 224, 0.12)', paddingTop: '20px' }}>
                         {!isApproved ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             {item.content_status === 'Client Rejected' && item.client_comments && (
-                              <div style={{ background: '#fffbeb', border: '2px solid #fbbf24', borderRadius: '6px', padding: '10px 14px', color: '#92400e', fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>
+                              <div style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', padding: '10px 14px', color: '#fbbf24', fontSize: '0.85rem', fontWeight: 500 }}>
                                 <strong>Previous Revision Request:</strong> "{item.client_comments}"
                               </div>
                             )}
                             <div className="portal-form-group" style={{ margin: 0 }}>
-                              <label className="portal-label" style={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', marginBottom: '6px', display: 'block' }}>
+                              <label className="portal-label" style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.06em', color: '#aab4ad', marginBottom: '8px', display: 'block' }}>
                                 Comments / Feedback for Revisions
                               </label>
                               <textarea
@@ -2534,11 +2679,12 @@ export default function ClientPortal({ showToast }) {
                                 rows={3}
                                 value={contentCommentText}
                                 onChange={(e) => setContentCommentText(e.target.value)}
-                                style={{ resize: 'vertical', width: '100%', background: '#ffffff', border: '2px solid #000000', borderRadius: '6px', padding: '10px' }}
+                                placeholder="Describe changes needed on hook, tone, CTA, or visual assets..."
+                                style={{ resize: 'vertical', width: '100%' }}
                               />
                             </div>
 
-                            <div className="portal-action-btns-row" style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                            <div className="portal-action-btns-row" style={{ display: 'flex', gap: '14px', marginTop: '4px' }}>
                               <button 
                                 onClick={() => handleReject(item.id, contentCommentText, item.content_id)}
                                 className="portal-btn portal-btn-danger" 
@@ -2559,13 +2705,13 @@ export default function ClientPortal({ showToast }) {
                           </div>
                         ) : (
                           <div style={{
-                            background: '#d1fae5',
-                            border: '2px solid #059669',
-                            borderRadius: '8px',
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            borderRadius: '10px',
                             padding: '16px',
-                            color: '#065f46',
+                            color: '#34d399',
                             fontSize: '0.9rem',
-                            fontWeight: '600'
+                            fontWeight: 500
                           }}>
                             {item.content_status === 'Posted' ? (
                               <div>🎉 Approved and posted live!</div>
@@ -2586,13 +2732,13 @@ export default function ClientPortal({ showToast }) {
         {/* Bookings Tab */}
         {activeTab === 'bookings' && (clientType === 'artist_curation' || clientType === 'both') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>Booked Artists & Performances</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 600 }}>
+            <h2 style={{ fontSize: '1.05rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Booked Artists & Performances</h2>
+            <p style={{ color: '#8b9b90', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 400 }}>
               List of artists scheduled for your venues and their payment status.
             </p>
 
             {bookings.length === 0 ? (
-              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+              <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: '#8b9b90', fontWeight: 500 }}>
                 No bookings scheduled yet.
               </div>
             ) : (
@@ -2611,13 +2757,13 @@ export default function ClientPortal({ showToast }) {
                     <tbody>
                       {bookings.slice((bookingsPage - 1) * ITEMS_PER_PAGE_BOOKINGS, bookingsPage * ITEMS_PER_PAGE_BOOKINGS).map(b => (
                         <tr key={b.id}>
-                          <td style={{ fontWeight: 'bold', color: '#000000' }}>
-                            {b.artist_name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>({b.artist_code})</span>
+                          <td style={{ fontWeight: 600, color: '#dfe7e0' }}>
+                            {b.artist_name} <span style={{ fontSize: '0.75rem', color: '#8b9b90', fontFamily: 'monospace' }}>({b.artist_code})</span>
                           </td>
-                          <td>{formatDateStr(b.gig_date)}</td>
+                          <td style={{ color: '#dfe7e0' }}>{formatDateStr(b.gig_date)}</td>
                           <td>
-                            <div style={{ fontWeight: 'bold', color: '#000000' }}>{b.client_name}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{b.venue_name || '-'}</div>
+                            <div style={{ fontWeight: 600, color: '#dfe7e0' }}>{b.client_name}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#8b9b90' }}>{b.venue_name || '-'}</div>
                           </td>
                           <td>
                             <span className={`portal-badge ${
@@ -2637,16 +2783,17 @@ export default function ClientPortal({ showToast }) {
                                   rel="noopener noreferrer" 
                                   className="portal-badge"
                                   style={{ 
-                                    background: '#fc8019', 
-                                    color: '#ffffff', 
-                                    border: '2px solid #000000', 
+                                    background: 'rgba(252, 128, 25, 0.15)', 
+                                    color: '#ff9d42', 
+                                    border: '1px solid rgba(252, 128, 25, 0.35)', 
                                     display: 'inline-flex', 
                                     alignItems: 'center', 
                                     gap: '4px', 
                                     textDecoration: 'none',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 800,
-                                    boxShadow: '1px 1px 0px #000000'
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    borderRadius: '9999px',
+                                    padding: '3px 9px'
                                   }}
                                 >
                                   Swiggy <ExternalLink size={10} />
@@ -2659,22 +2806,23 @@ export default function ClientPortal({ showToast }) {
                                   rel="noopener noreferrer" 
                                   className="portal-badge"
                                   style={{ 
-                                    background: '#cb202d', 
-                                    color: '#ffffff', 
-                                    border: '2px solid #000000', 
+                                    background: 'rgba(224, 35, 28, 0.15)', 
+                                    color: '#ff6259', 
+                                    border: '1px solid rgba(224, 35, 28, 0.35)', 
                                     display: 'inline-flex', 
                                     alignItems: 'center', 
                                     gap: '4px', 
                                     textDecoration: 'none',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 800,
-                                    boxShadow: '1px 1px 0px #000000'
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    borderRadius: '9999px',
+                                    padding: '3px 9px'
                                   }}
                                 >
                                   Zomato <ExternalLink size={10} />
                                 </a>
                               )}
-                              {!b.swiggy_link && !b.zomato_link && <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                              {!b.swiggy_link && !b.zomato_link && <span style={{ color: '#8b9b90' }}>-</span>}
                             </div>
                           </td>
                         </tr>
@@ -2695,17 +2843,17 @@ export default function ClientPortal({ showToast }) {
             {/* Header / Subtitle */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
+                <h2 style={{ fontSize: '1.05rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>
                   Social Integrations & Connections
                 </h2>
-                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0', fontWeight: 600 }}>
+                <p style={{ color: '#8b9b90', fontSize: '0.85rem', margin: '4px 0 0', fontWeight: 400 }}>
                   Connect brand social channels to enable automated 1080p publishing, live metric sync, and comment replies.
                 </p>
               </div>
               <button 
                 onClick={() => { fetchIntegrations(); fetchComments(); showToast('Refreshing integrations status...', 'info'); }}
                 className="portal-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 800 }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600 }}
                 disabled={integrationsLoading}
               >
                 <RefreshCw size={14} className={integrationsLoading ? 'spin' : ''} /> Refresh Statuses
@@ -2727,25 +2875,21 @@ export default function ClientPortal({ showToast }) {
                 return (
                   <div 
                     key={app.key} 
+                    className="portal-bento-card"
                     style={{ 
                       display: 'flex', 
                       flexDirection: 'column', 
-                      justify: 'space-between', 
-                      gap: '12px', 
-                      padding: '16px', 
-                      background: '#ffffff', 
-                      border: '2px solid #18181b', 
-                      borderRadius: '12px',
-                      boxShadow: '3px 3px 0px #18181b',
-                      transition: 'transform 0.2s ease, boxShadow 0.2s ease'
+                      justifyContent: 'space-between', 
+                      gap: '14px', 
+                      padding: '18px'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '1.4rem' }}>{app.icon}</span>
                         <div>
-                          <h3 style={{ fontSize: '0.88rem', margin: 0, fontWeight: 900, color: '#09090b', lineHeight: 1.2 }}>{app.name}</h3>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px', fontWeight: 600 }}>{app.desc}</span>
+                          <h3 style={{ fontSize: '0.9rem', margin: 0, fontWeight: 600, color: '#dfe7e0', lineHeight: 1.2 }}>{app.name}</h3>
+                          <span style={{ fontSize: '0.72rem', color: '#8b9b90', display: 'block', marginTop: '3px', fontWeight: 400 }}>{app.desc}</span>
                         </div>
                       </div>
                       <span 
@@ -2753,10 +2897,10 @@ export default function ClientPortal({ showToast }) {
                           fontSize: '0.65rem', 
                           padding: '3px 8px', 
                           borderRadius: '9999px', 
-                          fontWeight: 800,
-                          backgroundColor: isConn ? '#d1fae5' : '#f4f4f5',
-                          color: isConn ? '#065f46' : '#64748b',
-                          border: '1px solid #18181b'
+                          fontWeight: 600,
+                          backgroundColor: isConn ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          color: isConn ? '#34d399' : '#8b9b90',
+                          border: isConn ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(223, 231, 224, 0.12)'
                         }}
                       >
                         {isConn ? 'Connected' : 'Unlinked'}
@@ -2765,24 +2909,25 @@ export default function ClientPortal({ showToast }) {
 
                     {isConn && info.accountName && (
                       <div style={{
-                        fontSize: '0.72rem',
-                        background: '#f8fafc',
+                        fontSize: '0.74rem',
+                        background: 'rgba(5, 7, 10, 0.65)',
                         padding: '6px 10px',
                         borderRadius: '6px',
-                        border: '1px solid #e4e4e7',
-                        color: '#09090b',
-                        fontWeight: 700,
+                        border: '1px solid rgba(223, 231, 224, 0.12)',
+                        color: '#dfe7e0',
+                        fontWeight: 500,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
                       }} title={`@${info.accountName.replace(/^@/, '')}`}>
-                        Account: <strong style={{ color: '#059669' }}>@{info.accountName.replace(/^@/, '')}</strong>
+                        Account: <strong style={{ color: '#34d399' }}>@{info.accountName.replace(/^@/, '')}</strong>
                       </div>
                     )}
 
                     <button
                       onClick={() => handleConnectApp(app.key)}
                       disabled={connectingApp === app.key}
+                      className={isConn ? 'portal-btn' : 'portal-btn portal-btn-primary'}
                       style={{
                         width: '100%',
                         display: 'flex',
@@ -2790,23 +2935,15 @@ export default function ClientPortal({ showToast }) {
                         justifyContent: 'center',
                         gap: '6px',
                         fontSize: '0.78rem',
-                        fontWeight: 800,
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        background: isConn ? '#ffffff' : '#18181b',
-                        color: isConn ? '#18181b' : '#ffffff',
-                        border: '1.5px solid #18181b',
-                        boxShadow: '2px 2px 0px #18181b',
-                        transition: 'all 0.15s ease'
+                        padding: '8px 12px'
                       }}
                     >
                       {connectingApp === app.key ? (
                         <>Connecting...</>
                       ) : isConn ? (
-                        <><CheckCircle size={13} color="#059669" /> Switch Account</>
+                        <><CheckCircle size={13} color="#34d399" /> Switch Account</>
                       ) : (
-                        <><Zap size={13} color="#dc2626" /> Connect {app.name.split(' ')[0]}</>
+                        <><Zap size={13} color="#e0231c" /> Connect {app.name.split(' ')[0]}</>
                       )}
                     </button>
                   </div>
@@ -2818,10 +2955,10 @@ export default function ClientPortal({ showToast }) {
             <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.05rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>
+                  <h3 style={{ fontSize: '1.05rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>
                     💬 Community & Live Comment Inbox
                   </h3>
-                  <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0', fontWeight: 600 }}>
+                  <p style={{ color: '#8b9b90', fontSize: '0.82rem', margin: '4px 0 0', fontWeight: 400 }}>
                     View and reply to incoming comments across Instagram Reels & YouTube Shorts in real-time.
                   </p>
                 </div>
@@ -2829,7 +2966,7 @@ export default function ClientPortal({ showToast }) {
                   <button 
                     onClick={handleSyncComments}
                     className="portal-btn portal-btn-primary"
-                    style={{ fontSize: '0.8rem', padding: '6px 14px', fontWeight: 800 }}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
                     disabled={syncingComments}
                   >
                     {syncingComments ? '⏳ Syncing...' : '🔄 Sync Comments'}
@@ -2837,7 +2974,7 @@ export default function ClientPortal({ showToast }) {
                   <button 
                     onClick={fetchComments}
                     className="portal-btn"
-                    style={{ fontSize: '0.8rem', padding: '6px 14px', fontWeight: 800 }}
+                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
                   >
                     Refresh
                   </button>
@@ -2845,14 +2982,14 @@ export default function ClientPortal({ showToast }) {
               </div>
 
               {commentsLoading ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '0.85rem' }}>
+                <div style={{ padding: '24px', textAlign: 'center', color: '#8b9b90', fontWeight: 500, fontSize: '0.85rem' }}>
                   Loading social comments...
                 </div>
               ) : comments.length === 0 ? (
-                <div style={{ padding: '36px', textAlign: 'center', background: '#fafafa', borderRadius: '12px', border: '2px dashed #e4e4e7', color: '#64748b' }}>
+                <div style={{ padding: '36px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px dashed rgba(223, 231, 224, 0.16)', color: '#8b9b90' }}>
                   <MessageSquare size={32} style={{ opacity: 0.4, marginBottom: '8px' }} />
-                  <div style={{ fontWeight: 800, color: '#09090b', fontSize: '0.95rem' }}>No Ingested Comments Yet</div>
-                  <div style={{ fontSize: '0.8rem', marginTop: '4px', fontWeight: 600 }}>
+                  <div style={{ fontWeight: 600, color: '#dfe7e0', fontSize: '0.95rem' }}>No Ingested Comments Yet</div>
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px', fontWeight: 400 }}>
                     Comments are automatically synced every night at 2:00 AM UTC once social accounts are connected.
                   </div>
                 </div>
@@ -2862,44 +2999,32 @@ export default function ClientPortal({ showToast }) {
                     <div 
                       key={comm.id || comm.comment_id} 
                       style={{ 
-                        background: '#ffffff', 
-                        border: '1.5px solid #18181b', 
-                        borderRadius: '10px', 
+                        background: 'rgba(5, 7, 10, 0.65)', 
+                        border: '1px solid rgba(223, 231, 224, 0.12)', 
+                        borderRadius: '12px', 
                         padding: '16px', 
                         display: 'flex', 
                         flexDirection: 'column', 
-                        gap: '12px',
-                        boxShadow: '2px 2px 0px #18181b'
+                        gap: '12px'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span 
-                            style={{ 
-                              fontSize: '0.68rem', 
-                              padding: '2px 8px', 
-                              borderRadius: '9999px', 
-                              fontWeight: 800,
-                              background: '#f4f4f5', 
-                              color: '#18181b', 
-                              border: '1px solid #18181b',
-                              textTransform: 'capitalize' 
-                            }}
-                          >
+                          <span className="portal-badge portal-badge-muted" style={{ textTransform: 'capitalize' }}>
                             {comm.platform || 'Instagram'}
                           </span>
-                          <strong style={{ color: '#09090b', fontSize: '0.9rem' }}>
+                          <strong style={{ color: '#dfe7e0', fontSize: '0.88rem' }}>
                             {(comm.commenter_name && comm.commenter_name !== 'User' && comm.commenter_name !== 'Social User')
                               ? `@${comm.commenter_name.replace(/^@/, '')}`
                               : `${comm.platform === 'youtube' ? 'YouTube User' : 'Instagram User'}`}
                           </strong>
                         </div>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
+                        <span style={{ fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500 }}>
                           {comm.post_title ? `Post: ${comm.post_title}` : `Post ID: #${comm.content_id}`}
                         </span>
                       </div>
 
-                      <div style={{ fontSize: '0.88rem', color: '#18181b', fontWeight: 600, paddingLeft: '4px', borderLeft: '3px solid #dc2626' }}>
+                      <div style={{ fontSize: '0.88rem', color: '#dfe7e0', fontWeight: 400, padding: '8px 12px', borderLeft: '3px solid var(--accent)', background: 'rgba(224, 35, 28, 0.05)', borderRadius: '0 8px 8px 0' }}>
                         "{comm.comment_text}"
                       </div>
 
@@ -2913,10 +3038,7 @@ export default function ClientPortal({ showToast }) {
                           style={{
                             flexGrow: 1,
                             padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: '1.5px solid #18181b',
-                            fontSize: '0.82rem',
-                            outline: 'none'
+                            fontSize: '0.82rem'
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleSendCommentReply(comm.comment_id, comm.platform);
@@ -2926,7 +3048,7 @@ export default function ClientPortal({ showToast }) {
                           onClick={() => handleSendCommentReply(comm.comment_id, comm.platform)}
                           className="portal-btn portal-btn-primary"
                           disabled={replyingId === comm.comment_id}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap', padding: '8px 16px', fontWeight: 800 }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', whiteSpace: 'nowrap', padding: '8px 16px' }}
                         >
                           <Send size={14} /> {replyingId === comm.comment_id ? 'Posting...' : 'Reply'}
                         </button>
@@ -2939,31 +3061,28 @@ export default function ClientPortal({ showToast }) {
 
             {/* Section C: Live Metrics Direct Refresh */}
             <div 
+              className="portal-bento-card"
               style={{ 
-                background: '#ffffff', 
-                border: '2px solid #18181b', 
-                borderRadius: '12px',
                 padding: '20px 24px',
-                boxShadow: '3px 3px 0px #18181b',
                 display: 'flex', 
-                justify: 'space-between', 
+                justifyContent: 'space-between', 
                 alignItems: 'center', 
                 flexWrap: 'wrap', 
                 gap: '16px' 
               }}
             >
               <div>
-                <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#09090b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', color: '#dfe7e0', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   ⚡ High-Velocity Metric Sync
                 </h4>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#8b9b90', fontWeight: 400 }}>
                   Portal analytics automatically sync post insights continuously. Trigger a manual live refresh anytime.
                 </p>
               </div>
               <button
                 onClick={() => { fetchData(); showToast('✓ Live metrics synced from cache', 'success'); }}
                 className="portal-btn portal-btn-primary"
-                style={{ fontSize: '0.82rem', padding: '8px 18px', fontWeight: 800 }}
+                style={{ fontSize: '0.82rem', padding: '8px 18px' }}
               >
                 Sync Live Metrics Now
               </button>
@@ -2979,25 +3098,20 @@ export default function ClientPortal({ showToast }) {
             {/* Header / Subtitle */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 800 }}>
+                <h2 style={{ fontSize: '1.05rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>
                   Campaign Leads & Conversions
                 </h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, fontWeight: 600 }}>
+                <p style={{ color: '#8b9b90', fontSize: '0.85rem', margin: 0, fontWeight: 400 }}>
                   Review leads captured from forms and calls. Confirm booking appointments or record rejection details.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                {/* Same month control as the overview, so the table and the
-                    contact cards cover one period rather than all time.
-                    Filtered here rather than re-fetched: the full list is
-                    already loaded, and every other filter on this tab works
-                    the same way. */}
                 {availablePortalMonths.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Select Month:</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#8b9b90' }}>Select Month:</span>
                     <select
-                      className="form-control"
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '0.85rem', fontWeight: 'bold', borderRadius: '8px', border: '2px solid #18181b' }}
+                      className="portal-select"
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600 }}
                       value={leadsMonth}
                       onChange={(e) => { setLeadsMonth(e.target.value); setLeadsPage(1); }}
                     >
@@ -3011,14 +3125,14 @@ export default function ClientPortal({ showToast }) {
                 <button 
                   onClick={() => setShowAddLeadModal(true)}
                   className="portal-btn portal-btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                 >
                   <UserPlus size={16} /> Add Lead Manually
                 </button>
                 <button 
                   onClick={() => { fetchData(); showToast('Refreshing leads list...', 'info'); }}
                   className="portal-btn"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
                   disabled={leadsLoading}
                 >
                   <RefreshCw size={14} className={leadsLoading ? 'spin' : ''} /> Refresh Leads
@@ -3028,9 +3142,6 @@ export default function ClientPortal({ showToast }) {
 
             {/* Leads Table Container */}
             {(() => {
-              // Everything on this tab — the table, the filter counts and the
-              // contact cards — reads off the selected month, so they can never
-              // describe different periods.
               const monthLeads = leadsMonth === 'all'
                 ? leads
                 : leads.filter(l => (l.created_at || '').slice(0, 7) === leadsMonth);
@@ -3068,54 +3179,44 @@ export default function ClientPortal({ showToast }) {
                 Disqualified: monthLeads.filter(l => l.qualification_status === 'Disqualified').length,
               };
 
-              // Scoped by when the tap happened, unlike everything else on this
-              // tab, which is scoped by when the lead was captured.
               const landingBuckets = leadsMonth === 'all'
                 ? landingClicks
                 : landingClicks.filter(b => b.month === leadsMonth);
               const landingCalls = landingBuckets.reduce((sum, b) => sum + (b.call_clicks || 0), 0);
               const landingWhatsapp = landingBuckets.reduce((sum, b) => sum + (b.whatsapp_clicks || 0), 0);
 
-              // Deliberately not month-scoped: an overdue follow-up is about
-              // today, and hiding it because it was captured in another month
-              // is exactly how it gets missed.
               const dueLeads = leads.filter(l => followUpState(l));
               const overdueCount = dueLeads.filter(l => followUpState(l) === 'overdue').length;
 
               return (
                 <div>
-                  {/* Taps on the landing page's own Call and WhatsApp buttons.
-                      Visitor interest, with no name attached — which is why it
-                      is a count here rather than a row in the log below.
-                      Capped rather than stretched, so two cards do not span the
-                      full width and read as banners. */}
+                  {/* Taps on landing page Call & WhatsApp buttons */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px', maxWidth: '760px' }}>
-                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>📞 Landing Page Call Taps</span>
-                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#2563eb', display: 'block', marginTop: '4px' }}>
+                    <div className="portal-metric-card" style={{ padding: '16px' }}>
+                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.04em' }}>📞 Landing Page Call Taps</span>
+                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: 600, color: '#60a5fa', display: 'block', marginTop: '4px' }}>
                         {landingCalls.toLocaleString()}
                       </span>
                     </div>
 
-                    <div className="portal-metric-card" style={{ border: '2px solid #18181b', borderRadius: '12px', padding: '16px', background: '#ffffff', boxShadow: '3px 3px 0px #18181b' }}>
-                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>💬 Landing Page WhatsApp Taps</span>
-                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: '900', color: '#16a34a', display: 'block', marginTop: '4px' }}>
+                    <div className="portal-metric-card" style={{ padding: '16px' }}>
+                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.04em' }}>💬 Landing Page WhatsApp Taps</span>
+                      <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: 600, color: '#34d399', display: 'block', marginTop: '4px' }}>
                         {landingWhatsapp.toLocaleString()}
                       </span>
                     </div>
                   </div>
 
-                  {/* The reminder has to be visible without opening a lead row,
-                      or a follow-up date is just something nobody sees again. */}
+                  {/* Overdue / Due reminder banner */}
                   {dueLeads.length > 0 && (
                     <div
                       onClick={() => { setAppointmentFilter('Follow Up'); setQualificationFilter('all'); setLeadsMonth('all'); setLeadsPage(1); }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
-                        marginBottom: '14px', padding: '10px 14px', borderRadius: '10px',
-                        border: '2px solid #000',
-                        background: overdueCount > 0 ? '#fee2e2' : '#fef3c7',
-                        color: overdueCount > 0 ? '#991b1b' : '#92400e', fontWeight: 800, fontSize: '0.85rem'
+                        marginBottom: '16px', padding: '12px 16px', borderRadius: '12px',
+                        border: overdueCount > 0 ? '1px solid rgba(224, 35, 28, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)',
+                        background: overdueCount > 0 ? 'rgba(224, 35, 28, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                        color: overdueCount > 0 ? '#ff6e67' : '#fbbf24', fontWeight: 600, fontSize: '0.85rem'
                       }}
                       title="Show the leads awaiting follow-up"
                     >
@@ -3125,32 +3226,28 @@ export default function ClientPortal({ showToast }) {
                         {overdueCount > 0 && dueLeads.length > overdueCount && ' · '}
                         {dueLeads.length > overdueCount && `${dueLeads.length - overdueCount} due today`}
                       </span>
-                      <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 700, opacity: 0.75 }}>
+                      <span style={{ marginLeft: 'auto', fontSize: '0.74rem', fontWeight: 500, color: '#dfe7e0', opacity: 0.85 }}>
                         {dueLeads.slice(0, 3).map(l => l.name).filter(Boolean).join(', ')}
                         {dueLeads.length > 3 ? ` +${dueLeads.length - 3} more` : ''}
                       </span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <div>
-                      <h3 style={{ fontSize: '1.1rem', margin: 0, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Captured Leads Log</h3>
-                      <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Track captured leads, update call status, and record booking or rejection details.</p>
+                      <h3 style={{ fontSize: '1.05rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>Captured Leads Log</h3>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#8b9b90', fontWeight: 400 }}>Track captured leads, update call status, and record booking or rejection details.</p>
                     </div>
                   </div>
 
                   {/* Clean Bento Filter Bar Above Table */}
-                  <div style={{
+                  <div className="portal-bento-card" style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justify: 'space-between',
+                    justifyContent: 'space-between',
                     gap: '12px',
                     flexWrap: 'wrap',
                     marginBottom: '16px',
-                    background: '#ffffff',
-                    border: '2px solid #18181b',
-                    borderRadius: '12px',
-                    padding: '12px 16px',
-                    boxShadow: '3px 3px 0px #18181b'
+                    padding: '14px 18px'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flexGrow: 1 }}>
                       {/* Search Box */}
@@ -3164,10 +3261,7 @@ export default function ClientPortal({ showToast }) {
                           style={{
                             padding: '8px 14px',
                             fontSize: '0.82rem',
-                            border: '1.5px solid #18181b',
-                            borderRadius: '8px',
-                            width: '100%',
-                            background: leadSearchQuery ? '#fffbe6' : '#ffffff'
+                            width: '100%'
                           }}
                         />
                       </div>
@@ -3180,17 +3274,13 @@ export default function ClientPortal({ showToast }) {
                         style={{
                           padding: '8px 14px',
                           fontSize: '0.82rem',
-                          fontWeight: '800',
-                          border: '1.5px solid #18181b',
-                          borderRadius: '8px',
-                          background: qualificationFilter !== 'all' ? '#10b981' : '#ffffff',
-                          color: qualificationFilter !== 'all' ? '#ffffff' : '#18181b'
+                          fontWeight: 600
                         }}
                       >
-                        <option value="all" style={{ background: '#ffffff', color: '#000000' }}>All Qualifications ({qualCounts.all})</option>
-                        <option value="Pending" style={{ background: '#ffffff', color: '#000000' }}>⌛ Pending ({qualCounts.Pending})</option>
-                        <option value="Qualified" style={{ background: '#ffffff', color: '#000000' }}>✅ Qualified ({qualCounts.Qualified})</option>
-                        <option value="Disqualified" style={{ background: '#ffffff', color: '#000000' }}>❌ Disqualified ({qualCounts.Disqualified})</option>
+                        <option value="all">All Qualifications ({qualCounts.all})</option>
+                        <option value="Pending">⌛ Pending ({qualCounts.Pending})</option>
+                        <option value="Qualified">✅ Qualified ({qualCounts.Qualified})</option>
+                        <option value="Disqualified">❌ Disqualified ({qualCounts.Disqualified})</option>
                       </select>
 
                       {/* Appointment Filter */}
@@ -3201,17 +3291,13 @@ export default function ClientPortal({ showToast }) {
                         style={{
                           padding: '8px 14px',
                           fontSize: '0.82rem',
-                          fontWeight: '800',
-                          border: '1.5px solid #18181b',
-                          borderRadius: '8px',
-                          background: appointmentFilter !== 'all' ? '#2563eb' : '#ffffff',
-                          color: appointmentFilter !== 'all' ? '#ffffff' : '#18181b'
+                          fontWeight: 600
                         }}
                       >
-                        <option value="all" style={{ background: '#ffffff', color: '#000000' }}>All Appointments ({apptCounts.all})</option>
-                        <option value="Booked" style={{ background: '#ffffff', color: '#000000' }}>📅 Booked ({apptCounts.Booked})</option>
-                        <option value="Follow Up" style={{ background: '#ffffff', color: '#000000' }}>📞 Follow Up ({apptCounts['Follow Up']})</option>
-                        <option value="Not Booked" style={{ background: '#ffffff', color: '#000000' }}>🚫 Not Booked ({apptCounts['Not Booked']})</option>
+                        <option value="all">All Appointments ({apptCounts.all})</option>
+                        <option value="Booked">📅 Booked ({apptCounts.Booked})</option>
+                        <option value="Follow Up">📞 Follow Up ({apptCounts['Follow Up']})</option>
+                        <option value="Not Booked">🚫 Not Booked ({apptCounts['Not Booked']})</option>
                       </select>
                     </div>
 
@@ -3219,7 +3305,7 @@ export default function ClientPortal({ showToast }) {
                       <button
                         onClick={() => { setAppointmentFilter('all'); setQualificationFilter('all'); setLeadSearchQuery(''); setLeadsMonth('all'); setLeadsPage(1); }}
                         className="portal-btn"
-                        style={{ padding: '6px 14px', fontSize: '0.78rem', fontWeight: 800 }}
+                        style={{ padding: '6px 14px', fontSize: '0.78rem', fontWeight: 600 }}
                       >
                         Reset Filters
                       </button>
@@ -3227,11 +3313,11 @@ export default function ClientPortal({ showToast }) {
                   </div>
 
                   {leads.length === 0 ? (
-                    <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                    <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: '#8b9b90', fontWeight: 500 }}>
                       No leads captured yet.
                     </div>
                   ) : filteredLeads.length === 0 ? (
-                    <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 800 }}>
+                    <div className="portal-bento-card" style={{ padding: '40px', textAlign: 'center', color: '#8b9b90', fontWeight: 500 }}>
                       No leads match the selected filter criteria.
                       <div style={{ marginTop: '12px' }}>
                         <button
@@ -3272,9 +3358,9 @@ export default function ClientPortal({ showToast }) {
                                 <tr key={lead.id}>
                                   <td>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <span style={{ fontWeight: '800', color: '#09090b', fontSize: '0.88rem' }}>{cleanName}</span>
-                                      {cleanEmail && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{cleanEmail}</span>}
-                                      <span style={{ fontSize: '0.75rem', color: '#09090b', fontWeight: '800' }}>{lead.phone}</span>
+                                      <span style={{ fontWeight: 600, color: '#dfe7e0', fontSize: '0.88rem' }}>{cleanName}</span>
+                                      {cleanEmail && <span style={{ fontSize: '0.75rem', color: '#8b9b90' }}>{cleanEmail}</span>}
+                                      <span style={{ fontSize: '0.75rem', color: '#dfe7e0', fontWeight: 600 }}>{lead.phone}</span>
                                       {lead.phone && (
                                         <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                                           <button
@@ -3284,8 +3370,8 @@ export default function ClientPortal({ showToast }) {
                                             style={{
                                               display: 'flex', alignItems: 'center', gap: '4px',
                                               padding: '3px 9px', borderRadius: '9999px',
-                                              border: '1.5px solid #18181b', background: '#dbeafe', color: '#1e40af',
-                                              fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer'
+                                              border: '1px solid rgba(59, 130, 246, 0.35)', background: 'rgba(59, 130, 246, 0.15)', color: '#93c5fd',
+                                              fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer'
                                             }}
                                           >
                                             📞 Call{lead.call_clicks ? ` · ${lead.call_clicks}` : ''}
@@ -3297,8 +3383,8 @@ export default function ClientPortal({ showToast }) {
                                             style={{
                                               display: 'flex', alignItems: 'center', gap: '4px',
                                               padding: '3px 9px', borderRadius: '9999px',
-                                              border: '1.5px solid #18181b', background: '#dcfce7', color: '#166534',
-                                              fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer'
+                                              border: '1px solid rgba(16, 185, 129, 0.35)', background: 'rgba(16, 185, 129, 0.15)', color: '#6ee7b7',
+                                              fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer'
                                             }}
                                           >
                                             💬 WhatsApp{lead.whatsapp_clicks ? ` · ${lead.whatsapp_clicks}` : ''}
@@ -3311,11 +3397,11 @@ export default function ClientPortal({ showToast }) {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                         <span className={`portal-badge ${platformBadge}`}>{lead.platform}</span>
-                                        <span className="portal-badge" style={{ background: '#f3e8ff', color: '#6b21a8', border: '1.5px solid #18181b' }}>
+                                        <span className="portal-badge" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
                                           {lead.source === 'call' ? `📞 Call (${lead.call_duration_seconds || 0}s)` : '📝 Form'}
                                         </span>
                                       </div>
-                                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '800' }}>
+                                      <span style={{ fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500 }}>
                                         🎯 {(lead.campaign_name || 'Direct / Organic').replace(/^=/, '').trim()}
                                       </span>
                                       {lead.treatment_type ? (
@@ -3327,7 +3413,7 @@ export default function ClientPortal({ showToast }) {
                                               handleUpdateLead(lead.id, { treatment_type: val.trim() });
                                             }
                                           }}
-                                          style={{ background: '#dcfce7', color: '#166534', border: '1.5px solid #18181b', fontWeight: '800', width: 'fit-content', cursor: 'pointer' }}
+                                          style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600, width: 'fit-content', cursor: 'pointer' }}
                                           title="Click to edit treatment type"
                                         >
                                           🩺 {lead.treatment_type}
@@ -3342,13 +3428,13 @@ export default function ClientPortal({ showToast }) {
                                             }
                                           }}
                                           style={{
-                                            background: '#f8fafc',
-                                            border: '1.5px dashed #94a3b8',
+                                            background: 'rgba(255, 255, 255, 0.04)',
+                                            border: '1px dashed rgba(223, 231, 224, 0.2)',
                                             borderRadius: '9999px',
                                             padding: '2px 8px',
                                             fontSize: '0.72rem',
-                                            fontWeight: '700',
-                                            color: '#64748b',
+                                            fontWeight: 500,
+                                            color: '#8b9b90',
                                             cursor: 'pointer',
                                             width: 'fit-content'
                                           }}
@@ -3359,7 +3445,7 @@ export default function ClientPortal({ showToast }) {
                                       )}
                                     </div>
                                   </td>
-                                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', fontWeight: '700' }}>
+                                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', fontWeight: 500, color: '#8b9b90' }}>
                                     <div 
                                       onClick={() => {
                                         const currentDate = (lead.created_at || '').slice(0, 10);
@@ -3380,18 +3466,20 @@ export default function ClientPortal({ showToast }) {
                                       onChange={(e) => handleUpdateLead(lead.id, { call_outcome: e.target.value })}
                                       className="portal-select"
                                       style={{ 
-                                        padding: '6px 24px 6px 10px',
-                                        fontSize: '0.78rem',
-                                        fontWeight: '800',
+                                        padding: '6px 22px 6px 10px',
+                                        fontSize: '0.76rem',
+                                        fontWeight: 600,
                                         borderRadius: '9999px',
-                                        border: '1.5px solid #18181b',
                                         cursor: 'pointer',
                                         backgroundColor:
-                                          lead.call_outcome === 'Picked Up' ? '#d1fae5' :
-                                          lead.call_outcome === 'No Answer' ? '#fef3c7' : '#f4f4f5',
+                                          lead.call_outcome === 'Picked Up' ? 'rgba(16, 185, 129, 0.15)' :
+                                          lead.call_outcome === 'No Answer' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.05)',
                                         color:
-                                          lead.call_outcome === 'Picked Up' ? '#065f46' :
-                                          lead.call_outcome === 'No Answer' ? '#92400e' : '#18181b'
+                                          lead.call_outcome === 'Picked Up' ? '#34d399' :
+                                          lead.call_outcome === 'No Answer' ? '#fbbf24' : '#dfe7e0',
+                                        border:
+                                          lead.call_outcome === 'Picked Up' ? '1px solid rgba(16, 185, 129, 0.3)' :
+                                          lead.call_outcome === 'No Answer' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(223, 231, 224, 0.16)'
                                       }}
                                     >
                                       <option value="Pending">⌛ Pending</option>
@@ -3399,14 +3487,11 @@ export default function ClientPortal({ showToast }) {
                                       <option value="No Answer">🔇 No Answer</option>
                                       <option value="Other">❓ Other</option>
                                     </select>
-                                    {/* Test entries are fired to check the pipeline, so the
-                                        useful thing to do with one is get rid of it. Deleting
-                                        cannot be undone, hence the confirmation. */}
                                     <button
                                       type="button"
                                       title="Delete this lead — use it to clear out test entries"
                                       onClick={() => handleDeleteLead(lead)}
-                                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px', padding: 0, border: 'none', background: 'none', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer', color: lead.is_test ? '#b91c1c' : 'var(--text-muted)' }}
+                                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px', padding: 0, border: 'none', background: 'none', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer', color: lead.is_test ? '#ff6e67' : '#8b9b90' }}
                                     >
                                       🗑 {lead.is_test ? 'TEST — DELETE' : 'Test'}
                                     </button>
@@ -3417,18 +3502,20 @@ export default function ClientPortal({ showToast }) {
                                       onChange={(e) => handleUpdateLead(lead.id, { qualification_status: e.target.value })}
                                       className="portal-select"
                                       style={{ 
-                                        padding: '6px 24px 6px 10px',
-                                        fontSize: '0.78rem',
-                                        fontWeight: '800',
+                                        padding: '6px 22px 6px 10px',
+                                        fontSize: '0.76rem',
+                                        fontWeight: 600,
                                         borderRadius: '9999px',
-                                        border: '1.5px solid #18181b',
                                         cursor: 'pointer',
                                         backgroundColor:
-                                          lead.qualification_status === 'Qualified' ? '#d1fae5' :
-                                          lead.qualification_status === 'Disqualified' ? '#fee2e2' : '#f4f4f5',
+                                          lead.qualification_status === 'Qualified' ? 'rgba(16, 185, 129, 0.15)' :
+                                          lead.qualification_status === 'Disqualified' ? 'rgba(224, 35, 28, 0.15)' : 'rgba(255, 255, 255, 0.05)',
                                         color:
-                                          lead.qualification_status === 'Qualified' ? '#065f46' :
-                                          lead.qualification_status === 'Disqualified' ? '#991b1b' : '#18181b'
+                                          lead.qualification_status === 'Qualified' ? '#34d399' :
+                                          lead.qualification_status === 'Disqualified' ? '#ff6e67' : '#dfe7e0',
+                                        border:
+                                          lead.qualification_status === 'Qualified' ? '1px solid rgba(16, 185, 129, 0.3)' :
+                                          lead.qualification_status === 'Disqualified' ? '1px solid rgba(224, 35, 28, 0.3)' : '1px solid rgba(223, 231, 224, 0.16)'
                                       }}
                                     >
                                       <option value="Pending">⌛ Pending</option>
@@ -3437,24 +3524,26 @@ export default function ClientPortal({ showToast }) {
                                     </select>
                                   </td>
                                   <td>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '140px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '140px' }}>
                                       <select 
                                         value={lead.appointment_status || 'Follow Up'}
                                         onChange={(e) => handleUpdateLead(lead.id, { appointment_status: e.target.value })}
                                         className="portal-select"
                                         style={{ 
-                                          padding: '6px 24px 6px 10px',
-                                          fontSize: '0.78rem',
-                                          fontWeight: '800',
+                                          padding: '6px 22px 6px 10px',
+                                          fontSize: '0.76rem',
+                                          fontWeight: 600,
                                           borderRadius: '9999px',
-                                          border: '1.5px solid #18181b',
                                           cursor: 'pointer',
                                           backgroundColor:
-                                            lead.appointment_status === 'Booked' ? '#dbeafe' :
-                                            lead.appointment_status === 'Not Booked' ? '#fee2e2' : '#f4f4f5',
+                                            lead.appointment_status === 'Booked' ? 'rgba(59, 130, 246, 0.15)' :
+                                            lead.appointment_status === 'Not Booked' ? 'rgba(224, 35, 28, 0.15)' : 'rgba(255, 255, 255, 0.05)',
                                           color:
-                                            lead.appointment_status === 'Booked' ? '#1e40af' :
-                                            lead.appointment_status === 'Not Booked' ? '#991b1b' : '#18181b'
+                                            lead.appointment_status === 'Booked' ? '#93c5fd' :
+                                            lead.appointment_status === 'Not Booked' ? '#ff6e67' : '#dfe7e0',
+                                          border:
+                                            lead.appointment_status === 'Booked' ? '1px solid rgba(59, 130, 246, 0.3)' :
+                                            lead.appointment_status === 'Not Booked' ? '1px solid rgba(224, 35, 28, 0.3)' : '1px solid rgba(223, 231, 224, 0.16)'
                                         }}
                                       >
                                         <option value="Follow Up">📞 Follow Up</option>
@@ -3466,12 +3555,11 @@ export default function ClientPortal({ showToast }) {
                                           type="datetime-local" 
                                           value={lead.appointment_date ? lead.appointment_date.slice(0, 16) : ''}
                                           onChange={(e) => handleUpdateLead(lead.id, { appointment_date: e.target.value })}
-                                          className="portal-select"
+                                          className="portal-control"
                                           style={{ 
-                                            padding: '4px 6px',
-                                            fontSize: '0.75rem',
+                                            padding: '4px 8px',
+                                            fontSize: '0.74rem',
                                             borderRadius: '6px',
-                                            border: '1.5px solid #18181b',
                                             width: '100%'
                                           }}
                                         />
@@ -3482,19 +3570,19 @@ export default function ClientPortal({ showToast }) {
                                             type="date"
                                             value={lead.follow_up_date || ''}
                                             onChange={(e) => handleUpdateLead(lead.id, { follow_up_date: e.target.value })}
-                                            className="portal-select"
+                                            className="portal-control"
                                             title="When should this lead be contacted again?"
                                             style={{
-                                              padding: '4px 6px',
-                                              fontSize: '0.75rem',
+                                              padding: '4px 8px',
+                                              fontSize: '0.74rem',
                                               borderRadius: '6px',
-                                              border: followUpState(lead) ? '1.5px solid #b91c1c' : '1.5px solid #18181b',
-                                              background: followUpState(lead) === 'overdue' ? '#fee2e2' : followUpState(lead) === 'due' ? '#fef3c7' : undefined,
+                                              border: followUpState(lead) ? '1px solid #ef4444' : '1px solid rgba(223, 231, 224, 0.16)',
+                                              background: followUpState(lead) === 'overdue' ? 'rgba(224, 35, 28, 0.12)' : followUpState(lead) === 'due' ? 'rgba(245, 158, 11, 0.12)' : undefined,
                                               width: '100%'
                                             }}
                                           />
                                           {followUpState(lead) && (
-                                            <div style={{ marginTop: '3px', fontSize: '0.66rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3px', color: followUpState(lead) === 'overdue' ? '#991b1b' : '#92400e' }}>
+                                            <div style={{ marginTop: '3px', fontSize: '0.66rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', color: followUpState(lead) === 'overdue' ? '#ff6e67' : '#fbbf24' }}>
                                               {followUpState(lead) === 'overdue'
                                                 ? `⏰ Overdue by ${daysBetween(lead.follow_up_date)} day${daysBetween(lead.follow_up_date) === 1 ? '' : 's'}`
                                                 : '⏰ Follow up today'}
@@ -3511,19 +3599,19 @@ export default function ClientPortal({ showToast }) {
                                         const selectVal = isPreset ? (lead.rejection_reason || 'Out of Budget') : 'Other';
                                         const showTextInput = !isPreset || lead.rejection_reason === 'Other';
                                         return (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '140px' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '140px' }}>
                                             <select 
                                               value={selectVal}
                                               onChange={(e) => handleUpdateLead(lead.id, { rejection_reason: e.target.value })}
                                               className="portal-select"
                                               style={{ 
-                                                padding: '6px 24px 6px 10px',
-                                                fontSize: '0.78rem',
-                                                fontWeight: '800',
+                                                padding: '6px 22px 6px 10px',
+                                                fontSize: '0.76rem',
+                                                fontWeight: 600,
                                                 borderRadius: '9999px',
-                                                border: '1.5px solid #18181b',
-                                                backgroundColor: '#fee2e2',
-                                                color: '#991b1b',
+                                                border: '1px solid rgba(224, 35, 28, 0.35)',
+                                                backgroundColor: 'rgba(224, 35, 28, 0.15)',
+                                                color: '#ff8580',
                                                 width: '100%'
                                               }}
                                             >
@@ -3554,9 +3642,9 @@ export default function ClientPortal({ showToast }) {
                                                 className="portal-control"
                                                 style={{ 
                                                   padding: '4px 8px',
-                                                  fontSize: '0.75rem',
+                                                  fontSize: '0.74rem',
                                                   borderRadius: '6px',
-                                                  border: '1.5px solid #ef4444',
+                                                  border: '1px solid rgba(224, 35, 28, 0.4)',
                                                   width: '100%'
                                                 }}
                                               />
@@ -3565,7 +3653,7 @@ export default function ClientPortal({ showToast }) {
                                         );
                                       })()
                                     ) : (
-                                      <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>-</span>
+                                      <span style={{ color: '#8b9b90', fontSize: '0.8rem' }}>-</span>
                                     )}
                                   </td>
                                 </tr>
@@ -3596,24 +3684,27 @@ export default function ClientPortal({ showToast }) {
                 overflowY: 'auto',
                 padding: '28px', 
                 margin: 0,
-                boxShadow: 'var(--shadow-lg)'
+                background: 'rgba(10, 14, 18, 0.96)',
+                border: '1px solid rgba(223, 231, 224, 0.16)',
+                backdropFilter: 'blur(32px)',
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #000000', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(223, 231, 224, 0.12)', paddingBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ display: 'inline-flex', padding: '8px', background: '#000000', color: '#ffffff', borderRadius: '8px' }}>
-                    <UserPlus size={20} />
+                  <div style={{ display: 'inline-flex', padding: '8px', background: 'rgba(224, 35, 28, 0.15)', color: '#ff6259', border: '1px solid rgba(224, 35, 28, 0.3)', borderRadius: '8px' }}>
+                    <UserPlus size={18} />
                   </div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', textTransform: 'uppercase', fontWeight: 800 }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>
                     Add Lead Manually
                   </h3>
                 </div>
                 <button 
                   type="button"
                   onClick={() => setShowAddLeadModal(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#8b9b90' }}
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
@@ -3621,7 +3712,7 @@ export default function ClientPortal({ showToast }) {
                 {/* Name & Phone */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Full Name *</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Full Name *</label>
                     <input 
                       type="text" 
                       className="portal-control"
@@ -3632,7 +3723,7 @@ export default function ClientPortal({ showToast }) {
                     />
                   </div>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Phone Number *</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Phone Number *</label>
                     <input 
                       type="tel" 
                       className="portal-control"
@@ -3647,7 +3738,7 @@ export default function ClientPortal({ showToast }) {
                 {/* Email, Campaign & Treatment */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Email Address</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Email Address</label>
                     <input 
                       type="email" 
                       className="portal-control"
@@ -3657,7 +3748,7 @@ export default function ClientPortal({ showToast }) {
                     />
                   </div>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Campaign / Source Tag</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Campaign / Source Tag</label>
                     <input 
                       type="text" 
                       className="portal-control"
@@ -3670,17 +3761,17 @@ export default function ClientPortal({ showToast }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Type of Treatment / Service</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Type of Treatment / Service</label>
                     <input 
                       type="text" 
                       className="portal-control"
-                      placeholder="e.g. Root Canal, Hair Transplant, Invisalign"
+                      placeholder="e.g. Root Canal, Hair Transplant"
                       value={newLeadData.treatment_type || ''}
                       onChange={(e) => setNewLeadData(prev => ({ ...prev, treatment_type: e.target.value }))}
                     />
                   </div>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Lead Date (Defaults to Today)</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Lead Date</label>
                     <input 
                       type="date" 
                       className="portal-control"
@@ -3693,10 +3784,10 @@ export default function ClientPortal({ showToast }) {
                 {/* Platform & Source */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Platform</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Platform</label>
                     <select 
                       className="portal-select"
-                      style={{ width: '100%', padding: '12px 14px' }}
+                      style={{ width: '100%', padding: '10px 14px' }}
                       value={newLeadData.platform}
                       onChange={(e) => setNewLeadData(prev => ({ ...prev, platform: e.target.value }))}
                     >
@@ -3707,10 +3798,10 @@ export default function ClientPortal({ showToast }) {
                     </select>
                   </div>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Lead Type</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Lead Type</label>
                     <select 
                       className="portal-select"
-                      style={{ width: '100%', padding: '12px 14px' }}
+                      style={{ width: '100%', padding: '10px 14px' }}
                       value={newLeadData.source}
                       onChange={(e) => setNewLeadData(prev => ({ ...prev, source: e.target.value }))}
                     >
@@ -3723,10 +3814,10 @@ export default function ClientPortal({ showToast }) {
                 {/* Qualification & Call Outcome */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Qualification Status</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Qualification Status</label>
                     <select 
                       className="portal-select"
-                      style={{ width: '100%', padding: '12px 14px' }}
+                      style={{ width: '100%', padding: '10px 14px' }}
                       value={newLeadData.qualification_status}
                       onChange={(e) => setNewLeadData(prev => ({ ...prev, qualification_status: e.target.value }))}
                     >
@@ -3736,10 +3827,10 @@ export default function ClientPortal({ showToast }) {
                     </select>
                   </div>
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Call Outcome</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Call Outcome</label>
                     <select 
                       className="portal-select"
-                      style={{ width: '100%', padding: '12px 14px' }}
+                      style={{ width: '100%', padding: '10px 14px' }}
                       value={newLeadData.call_outcome}
                       onChange={(e) => setNewLeadData(prev => ({ ...prev, call_outcome: e.target.value }))}
                     >
@@ -3753,10 +3844,10 @@ export default function ClientPortal({ showToast }) {
 
                 {/* Appointment Status */}
                 <div className="portal-form-group" style={{ margin: 0 }}>
-                  <label className="portal-label">Appointment Status</label>
+                  <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Appointment Status</label>
                   <select 
                     className="portal-select"
-                    style={{ width: '100%', padding: '12px 14px' }}
+                    style={{ width: '100%', padding: '10px 14px' }}
                     value={newLeadData.appointment_status}
                     onChange={(e) => setNewLeadData(prev => ({ ...prev, appointment_status: e.target.value }))}
                   >
@@ -3769,7 +3860,7 @@ export default function ClientPortal({ showToast }) {
                 {/* Conditional Appointment Date */}
                 {newLeadData.appointment_status === 'Booked' && (
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Appointment Date & Time</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Appointment Date & Time</label>
                     <input 
                       type="datetime-local" 
                       className="portal-control"
@@ -3782,10 +3873,10 @@ export default function ClientPortal({ showToast }) {
                 {/* Conditional Rejection Reason */}
                 {(newLeadData.qualification_status === 'Disqualified' || newLeadData.appointment_status === 'Not Booked') && (
                   <div className="portal-form-group" style={{ margin: 0 }}>
-                    <label className="portal-label">Rejection / Disqualification Reason</label>
+                    <label className="portal-label" style={{ color: '#aab4ad', fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.05em' }}>Rejection / Disqualification Reason</label>
                     <select 
                       className="portal-select"
-                      style={{ width: '100%', padding: '12px 14px' }}
+                      style={{ width: '100%', padding: '10px 14px' }}
                       value={PRESET_REASON_OPTIONS.includes(newLeadData.rejection_reason) ? newLeadData.rejection_reason : 'Other'}
                       onChange={(e) => {
                         const val = e.target.value;

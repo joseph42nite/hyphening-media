@@ -4800,5 +4800,15 @@ html.dark-theme {
   color: #6b7770 !important;
 }
 
+/* Kyoto Dark Theme for Client Portal */
+body:has(.client-portal-wrapper),
+body.portal-active {
+  background-color: #05070a !important;
+  color: #dfe7e0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
 
-
+html:has(.client-portal-wrapper) {
+  background-color: #05070a !important;
+}
