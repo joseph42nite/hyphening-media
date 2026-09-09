@@ -45,19 +45,19 @@ function TabBadge({ count }) {
       position: 'absolute',
       top: '-6px',
       right: '-4px',
-      background: 'var(--warning)',
-      color: '#000',
-      border: '2px solid #000',
-      borderRadius: '10px',
+      background: 'var(--accent)',
+      color: '#ffffff',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+      borderRadius: '9999px',
       minWidth: '18px',
       height: '18px',
       padding: '0 5px',
       fontSize: '0.65rem',
-      fontWeight: 'bold',
+      fontWeight: '800',
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      boxShadow: '1px 1px 0px #000',
+      boxShadow: '0 2px 8px rgba(224, 35, 28, 0.5)',
       zIndex: 20,
       pointerEvents: 'none',
       whiteSpace: 'nowrap'
@@ -1106,8 +1106,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   };
 
   return (
-    <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-      
+    <div className="dashboard-wrapper">
+      {/* Kyoto Ambient Atmospheric Layers */}
+      <div className="dashboard-ambient-glow" />
+      <div className="dashboard-vignette" />
 
       {/* Top Navbar */}
       <header className="dashboard-header">
@@ -1119,9 +1121,15 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             >
               <img src={logoImg} alt="Hyphening Media" style={{ height: '80px', width: 'auto' }} />
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: sseConnected ? 'var(--success)' : 'var(--danger)' }} />
-              {sseConnected ? 'SSE Connected' : 'SSE Disconnected'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <span style={{ 
+                width: '8px', 
+                height: '8px', 
+                borderRadius: '50%', 
+                background: sseConnected ? 'var(--success)' : 'var(--danger)',
+                boxShadow: sseConnected ? '0 0 10px rgba(16, 185, 129, 0.7)' : '0 0 10px rgba(224, 35, 28, 0.7)'
+              }} />
+              <span style={{ fontWeight: 700, letterSpacing: '0.04em' }}>{sseConnected ? 'LIVE SYNC' : 'OFFLINE'}</span>
             </div>
           </div>
 
@@ -1131,14 +1139,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
               onClick={notificationPermission === 'default' ? handleRequestPermission : toggleSound}
               className={`btn ${soundEnabled && notificationPermission === 'granted' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ 
-                padding: '8px 12px', 
+                padding: '8px 14px', 
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '6px', 
                 cursor: 'pointer',
-                border: 'var(--border-width) solid var(--border-color)',
-                boxShadow: 'var(--shadow-sm)',
-                fontSize: '0.85rem'
+                fontSize: '0.82rem'
               }}
               title={
                 notificationPermission === 'default' 
@@ -1235,7 +1241,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             <button 
               onClick={handleLogout} 
               className="btn btn-secondary" 
-              style={{ width: '100%', justifyContent: 'center', background: '#fee2e2', color: '#991b1b', borderColor: '#ef4444', fontWeight: 'bold', height: '40px' }}
+              style={{ width: '100%', justifyContent: 'center', background: 'rgba(224, 35, 28, 0.15)', color: '#ff6b6b', borderColor: 'rgba(224, 35, 28, 0.4)', fontWeight: 'bold', height: '40px' }}
             >
               <LogOut size={16} /> Logout
             </button>

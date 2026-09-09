@@ -576,7 +576,7 @@ export default function TasksTab({
                 className="form-control"
                 value={calendarClientFilter}
                 onChange={(e) => setCalendarClientFilter(e.target.value)}
-                style={{ width: '100%', flexGrow: 1, fontWeight: 'bold', border: '2px solid #000' }}
+                style={{ width: '100%', flexGrow: 1, fontWeight: 'bold' }}
               >
                 <option value="">All Clients</option>
                 {clients.map(c => (
@@ -693,9 +693,9 @@ export default function TasksTab({
                       key={eIdx}
                       style={{
                         padding: '12px',
-                        border: '2px solid #000',
-                        borderRadius: '8px',
-                        background: '#fff',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        background: 'rgba(14, 18, 26, 0.9)',
                         boxShadow: 'var(--shadow-sm)',
                         textAlign: 'left'
                       }}

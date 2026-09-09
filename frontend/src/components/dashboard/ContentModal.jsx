@@ -242,22 +242,22 @@ export default function ContentModal({
               style={{
                 width: '100%',
                 padding: '12px 16px',
-                background: 'var(--bg-secondary, #f4f4f5)',
+                background: 'rgba(255, 255, 255, 0.04)',
                 border: 'none',
                 display: 'flex',
-                justify: 'space-between',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 cursor: 'pointer',
                 fontWeight: '600',
                 fontSize: '0.85rem',
-                color: 'var(--text-main, #18181b)'
+                color: 'var(--text-primary)'
               }}
             >
               <span>🔗 Auto-Extracted Details (Links, Time, Caption & IDs)</span>
               <ChevronDown size={16} style={{ transform: showAutoDetails ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
             </button>
             {showAutoDetails && (
-              <div style={{ padding: '16px', background: 'var(--bg-primary, #ffffff)', borderTop: '1px solid var(--border-color, #e4e4e7)' }}>
+              <div style={{ padding: '16px', background: 'var(--bg-card)', borderTop: '1px solid var(--border-color)' }}>
                 <div className="form-grid-time-caption" style={{ marginBottom: '12px' }}>
                   <div className="form-group">
                     <label className="form-label">Posting Time</label>
@@ -386,22 +386,22 @@ export default function ContentModal({
               style={{
                 width: '100%',
                 padding: '12px 16px',
-                background: 'var(--bg-secondary, #f4f4f5)',
+                background: 'rgba(255, 255, 255, 0.04)',
                 border: 'none',
                 display: 'flex',
-                justify: 'space-between',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 cursor: 'pointer',
                 fontWeight: '600',
                 fontSize: '0.85rem',
-                color: 'var(--text-main, #18181b)'
+                color: 'var(--text-primary)'
               }}
             >
               <span>📊 Auto-Synced Metrics & Manual Overrides</span>
               <ChevronDown size={16} style={{ transform: showMetrics ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
             </button>
             {showMetrics && (
-              <div style={{ padding: '16px', background: 'var(--bg-primary, #ffffff)', borderTop: '1px solid var(--border-color, #e4e4e7)' }}>
+              <div style={{ padding: '16px', background: 'var(--bg-card)', borderTop: '1px solid var(--border-color)' }}>
                 {contentFormData.platform === 'instagram' ? (
                   <div>
                     <h4 style={{ margin: '0 0 12px', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)' }}>Instagram Metrics</h4>

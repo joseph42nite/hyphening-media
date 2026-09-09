@@ -22,7 +22,7 @@ export default function AllClientsMarketingDashboard({
     <select
       value={selectedMonth}
       onChange={e => onMonthChange(e.target.value)}
-      style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: 800, border: '2px solid #000', borderRadius: '6px', cursor: 'pointer', background: '#fff' }}
+      style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: 800, border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
       title="Scope every figure on this dashboard to one month"
     >
       <option value="">All time</option>
@@ -40,9 +40,9 @@ export default function AllClientsMarketingDashboard({
         {monthPicker && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>{monthPicker}</div>
         )}
-        <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)' }}>
-          <BarChart3 size={48} style={{ color: '#000000', marginBottom: '12px', opacity: 0.5 }} />
-          <h4 style={{ margin: '0 0 8px 0', color: '#000000', fontWeight: 900, textTransform: 'uppercase' }}>No Marketing Data Found</h4>
+        <div style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }}>
+          <BarChart3 size={48} style={{ color: 'var(--accent)', marginBottom: '12px', opacity: 0.8 }} />
+          <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)', fontWeight: 900, textTransform: 'uppercase' }}>No Marketing Data Found</h4>
           <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>
             {selectedMonth
               ? `No recorded activity for ${formatMonthLabel(selectedMonth)}. Try another month.`
@@ -83,7 +83,7 @@ export default function AllClientsMarketingDashboard({
           figure on this page, so the period is stated above the cards it governs
           rather than leaving them to read as all-time totals. */}
       {selectedMonth && (
-        <div style={{ display: 'inline-block', marginBottom: '12px', padding: '4px 12px', background: '#fef3c7', border: '2px solid #000', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div style={{ display: 'inline-block', marginBottom: '12px', padding: '4px 12px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.35)', color: '#fbbf24', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Showing {formatMonthLabel(selectedMonth)}
         </div>
       )}
@@ -92,12 +92,12 @@ export default function AllClientsMarketingDashboard({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         
         {/* Ad Spend Card */}
-        <div style={{ background: '#ffffff', padding: '18px', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#000000', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Ad Spend</span>
-            <div style={{ background: '#dbeafe', color: '#000000', padding: '6px', borderRadius: '8px', border: '2px solid #000000' }}><DollarSign size={16} /></div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Ad Spend</span>
+            <div style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '6px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.3)' }}><DollarSign size={16} /></div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#000000', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
             ₹{totalSpend.toLocaleString()}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginTop: '4px' }}>
@@ -106,29 +106,29 @@ export default function AllClientsMarketingDashboard({
         </div>
 
         {/* Total Leads Card */}
-        <div style={{ background: '#ffffff', padding: '18px', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#000000', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Leads</span>
-            <div style={{ background: '#d1fae5', color: '#000000', padding: '6px', borderRadius: '8px', border: '2px solid #000000' }}><Users size={16} /></div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Leads</span>
+            <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '6px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.3)' }}><Users size={16} /></div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#059669', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#34d399', fontFamily: 'var(--font-heading)' }}>
             {totalLeads.toLocaleString()}
           </div>
           <div style={{ fontSize: '0.75rem', marginTop: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span style={{ color: '#047857', fontWeight: 800, background: '#d1fae5', padding: '2px 8px', borderRadius: '9999px', border: '1px solid #000' }}>🎯 {totalQualified} Qual.</span>
-            <span style={{ color: '#2563eb', fontWeight: 800, background: '#dbeafe', padding: '2px 8px', borderRadius: '9999px', border: '1px solid #000' }}>📅 {totalBookings} Booked</span>
+            <span style={{ color: '#34d399', fontWeight: 800, background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '9999px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>🎯 {totalQualified} Qual.</span>
+            <span style={{ color: '#38bdf8', fontWeight: 800, background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '9999px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>📅 {totalBookings} Booked</span>
           </div>
         </div>
 
         {/* Avg CPL & ROAS Card */}
-        <div style={{ background: '#ffffff', padding: '18px', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#000000', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg CPL & ROAS</span>
-            <div style={{ background: '#fef3c7', color: '#000000', padding: '6px', borderRadius: '8px', border: '2px solid #000000' }}><TrendingUp size={16} /></div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg CPL & ROAS</span>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '6px', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)' }}><TrendingUp size={16} /></div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: '#000000', fontFamily: 'var(--font-heading)' }}>₹{avgCpl}</span>
-            <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#000000', background: '#fef3c7', padding: '2px 8px', borderRadius: '9999px', border: '1px solid #000' }}>{avgRoas}x ROAS</span>
+            <span style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>₹{avgCpl}</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '9999px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>{avgRoas}x ROAS</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginTop: '4px' }}>
             Average acquisition efficiency
@@ -136,12 +136,12 @@ export default function AllClientsMarketingDashboard({
         </div>
 
         {/* Social Reach Card */}
-        <div style={{ background: '#ffffff', padding: '18px', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#000000', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Social Content Reach</span>
-            <div style={{ background: '#fee2e2', color: '#000000', padding: '6px', borderRadius: '8px', border: '2px solid #000000' }}><Eye size={16} /></div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Social Content Reach</span>
+            <div style={{ background: 'rgba(224, 35, 28, 0.15)', color: '#ff6b6b', padding: '6px', borderRadius: '8px', border: '1px solid rgba(224, 35, 28, 0.3)' }}><Eye size={16} /></div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#dc2626', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#ff6b6b', fontFamily: 'var(--font-heading)' }}>
             {formatCompact(totalContentViews)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginTop: '4px' }}>
@@ -150,12 +150,12 @@ export default function AllClientsMarketingDashboard({
         </div>
 
         {/* SEO & GMB Card */}
-        <div style={{ background: '#ffffff', padding: '18px', borderRadius: '16px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '18px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', backdropFilter: 'blur(20px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#000000', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>SEO & GMB Traffic</span>
-            <div style={{ background: '#e0e7ff', color: '#000000', padding: '6px', borderRadius: '8px', border: '2px solid #000000' }}><Globe size={16} /></div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>SEO & GMB Traffic</span>
+            <div style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', padding: '6px', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.3)' }}><Globe size={16} /></div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#4f46e5', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#818cf8', fontFamily: 'var(--font-heading)' }}>
             {formatCompact(totalWebTraffic + totalGmbViews)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, marginTop: '4px' }}>
@@ -165,18 +165,18 @@ export default function AllClientsMarketingDashboard({
       </div>
 
       {/* 2. Interactive Bar Chart Container */}
-      <div style={{ background: '#ffffff', padding: '24px', borderRadius: '18px', border: '3px solid #000000', boxShadow: 'var(--shadow-md)', marginBottom: '32px' }}>
+      <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '18px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', backdropFilter: 'blur(20px)', marginBottom: '32px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '-0.02em' }}>
-              <BarChart3 size={22} color="#000000" />
+              <BarChart3 size={22} color="var(--accent)" />
               Client Performance Comparison
             </h3>
             <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>Comparative metrics across all active client accounts</span>
           </div>
 
           {/* Metric Selector Pill Tabs */}
-          <div style={{ display: 'flex', background: '#f4f4f5', padding: '4px', borderRadius: '9999px', border: '2px solid #000000', gap: '4px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.04)', padding: '4px', borderRadius: '9999px', border: '1px solid var(--border-color)', gap: '4px', flexWrap: 'wrap' }}>
             <button
               onClick={() => setActiveChartTab('ad_leads')}
               style={{
@@ -184,11 +184,11 @@ export default function AllClientsMarketingDashboard({
                 fontSize: '0.8rem',
                 fontWeight: 800,
                 borderRadius: '9999px',
-                border: activeChartTab === 'ad_leads' ? '2px solid #000000' : '2px solid transparent',
+                border: activeChartTab === 'ad_leads' ? '1px solid #ff3b30' : '1px solid transparent',
                 cursor: 'pointer',
-                background: activeChartTab === 'ad_leads' ? '#000000' : 'transparent',
-                color: activeChartTab === 'ad_leads' ? '#ffffff' : '#000000',
-                boxShadow: activeChartTab === 'ad_leads' ? '2px 2px 0px #000000' : 'none',
+                background: activeChartTab === 'ad_leads' ? 'var(--accent)' : 'transparent',
+                color: activeChartTab === 'ad_leads' ? '#ffffff' : 'var(--text-secondary)',
+                boxShadow: activeChartTab === 'ad_leads' ? '0 2px 10px rgba(224, 35, 28, 0.4)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -201,11 +201,11 @@ export default function AllClientsMarketingDashboard({
                 fontSize: '0.8rem',
                 fontWeight: 800,
                 borderRadius: '9999px',
-                border: activeChartTab === 'efficiency' ? '2px solid #000000' : '2px solid transparent',
+                border: activeChartTab === 'efficiency' ? '1px solid #ff3b30' : '1px solid transparent',
                 cursor: 'pointer',
-                background: activeChartTab === 'efficiency' ? '#000000' : 'transparent',
-                color: activeChartTab === 'efficiency' ? '#ffffff' : '#000000',
-                boxShadow: activeChartTab === 'efficiency' ? '2px 2px 0px #000000' : 'none',
+                background: activeChartTab === 'efficiency' ? 'var(--accent)' : 'transparent',
+                color: activeChartTab === 'efficiency' ? '#ffffff' : 'var(--text-secondary)',
+                boxShadow: activeChartTab === 'efficiency' ? '0 2px 10px rgba(224, 35, 28, 0.4)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -218,11 +218,11 @@ export default function AllClientsMarketingDashboard({
                 fontSize: '0.8rem',
                 fontWeight: 800,
                 borderRadius: '9999px',
-                border: activeChartTab === 'content_views' ? '2px solid #000000' : '2px solid transparent',
+                border: activeChartTab === 'content_views' ? '1px solid #ff3b30' : '1px solid transparent',
                 cursor: 'pointer',
-                background: activeChartTab === 'content_views' ? '#000000' : 'transparent',
-                color: activeChartTab === 'content_views' ? '#ffffff' : '#000000',
-                boxShadow: activeChartTab === 'content_views' ? '2px 2px 0px #000000' : 'none',
+                background: activeChartTab === 'content_views' ? 'var(--accent)' : 'transparent',
+                color: activeChartTab === 'content_views' ? '#ffffff' : 'var(--text-secondary)',
+                boxShadow: activeChartTab === 'content_views' ? '0 2px 10px rgba(224, 35, 28, 0.4)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -235,11 +235,11 @@ export default function AllClientsMarketingDashboard({
                 fontSize: '0.8rem',
                 fontWeight: 800,
                 borderRadius: '9999px',
-                border: activeChartTab === 'seo_traffic' ? '2px solid #000000' : '2px solid transparent',
+                border: activeChartTab === 'seo_traffic' ? '1px solid #ff3b30' : '1px solid transparent',
                 cursor: 'pointer',
-                background: activeChartTab === 'seo_traffic' ? '#000000' : 'transparent',
-                color: activeChartTab === 'seo_traffic' ? '#ffffff' : '#000000',
-                boxShadow: activeChartTab === 'seo_traffic' ? '2px 2px 0px #000000' : 'none',
+                background: activeChartTab === 'seo_traffic' ? 'var(--accent)' : 'transparent',
+                color: activeChartTab === 'seo_traffic' ? '#ffffff' : 'var(--text-secondary)',
+                boxShadow: activeChartTab === 'seo_traffic' ? '0 2px 10px rgba(224, 35, 28, 0.4)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -355,7 +355,7 @@ export default function AllClientsMarketingDashboard({
                   <td style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--text-muted)' }}>
                     {index + 1}
                   </td>
-                  <td style={{ fontWeight: 800, color: '#000000' }}>
+                  <td style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
                     {displayName}
                   </td>
                   <td style={{ fontWeight: 800 }}>
@@ -378,7 +378,7 @@ export default function AllClientsMarketingDashboard({
                       ? `₹${client.ad_metrics.cost_per_booking_inr.toLocaleString()}`
                       : '-'}
                   </td>
-                  <td style={{ fontWeight: 800, color: (client.ad_metrics?.roas || 0) >= 2 ? '#059669' : '#000000' }}>
+                  <td style={{ fontWeight: 800, color: (client.ad_metrics?.roas || 0) >= 2 ? '#34d399' : 'var(--text-primary)' }}>
                     {client.ad_metrics?.roas ? `${client.ad_metrics.roas}x` : '-'}
                     {client.ad_metrics?.roas_is_estimated && (
                       <span title="Estimated from procedure prices — no actual revenue entered"
@@ -405,7 +405,7 @@ export default function AllClientsMarketingDashboard({
                         padding: '4px 12px',
                         fontSize: '0.75rem',
                         fontWeight: 800,
-                        border: '2px solid #000000',
+                        border: '1px solid var(--border-color)',
                         boxShadow: 'var(--shadow-sm)',
                         borderRadius: '9999px',
                         display: 'inline-flex',
@@ -477,11 +477,11 @@ function ClientBarGraph({
             </div>
           ) : (
             <div style={{
-              background: '#f4f4f5',
+              background: 'rgba(255, 255, 255, 0.03)',
               color: 'var(--text-muted)',
               padding: '8px 16px',
               borderRadius: '10px',
-              border: '2px dashed #000000',
+              border: '1px dashed var(--border-color)',
               fontSize: '0.8rem',
               fontWeight: 700,
               display: 'flex',
@@ -493,15 +493,15 @@ function ClientBarGraph({
           )}
         </div>
 
-        {/* Neo-Brutalist Legend */}
+        {/* Legend */}
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', border: '2px solid #000000', borderRadius: '8px', background: '#ffffff', boxShadow: '2px 2px 0px #000000' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: primaryColor, border: '1px solid #000000' }} />
-            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#000000' }}>{primaryLabel}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.04)' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: primaryColor }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>{primaryLabel}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', border: '2px solid #000000', borderRadius: '8px', background: '#ffffff', boxShadow: '2px 2px 0px #000000' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: secondaryColor, border: '1px solid #000000' }} />
-            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#000000' }}>{secondaryLabel}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.04)' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: secondaryColor }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>{secondaryLabel}</span>
           </div>
         </div>
       </div>
@@ -515,7 +515,7 @@ function ClientBarGraph({
         paddingBottom: '16px',
         minHeight: '260px',
         alignItems: 'flex-end',
-        borderBottom: '3px solid #000000',
+        borderBottom: '1px solid var(--border-color)',
         position: 'relative'
       }}>
         {data.map((c, idx) => {
@@ -556,14 +556,13 @@ function ClientBarGraph({
                       fontSize: '0.68rem',
                       fontWeight: 900,
                       marginBottom: '4px',
-                      color: '#000000',
-                      background: isHovered ? primaryColor : '#ffffff',
-                      color: isHovered ? '#ffffff' : '#000000',
-                      border: '1px solid #000000',
+                      background: isHovered ? primaryColor : 'rgba(12, 16, 22, 0.95)',
+                      color: '#ffffff',
+                      border: '1px solid var(--border-color)',
                       borderRadius: '4px',
                       padding: '1px 5px',
                       whiteSpace: 'nowrap',
-                      boxShadow: '1px 1px 0px #000000',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -574,9 +573,9 @@ function ClientBarGraph({
                       width: '100%',
                       height: `${heightPctPrimary}%`,
                       background: primaryColor,
-                      border: '2px solid #000000',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
                       borderRadius: '6px 6px 0 0',
-                      boxShadow: isHovered ? '3px 3px 0px #000000' : 'none',
+                      boxShadow: isHovered ? `0 4px 16px ${primaryColor}88` : 'none',
                       transition: 'height 0.3s ease, transform 0.15s ease',
                       transform: isHovered ? 'translateY(-2px)' : 'none'
                     }}
@@ -585,20 +584,19 @@ function ClientBarGraph({
 
                 {/* Secondary Bar */}
                 <div style={{ width: '32px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  {/* Clean Neo-Brutalist Value Pill above bar */}
+                  {/* Clean Value Pill above bar */}
                   <div
                     style={{
                       fontSize: '0.68rem',
                       fontWeight: 900,
                       marginBottom: '4px',
-                      color: '#000000',
-                      background: isHovered ? secondaryColor : '#ffffff',
-                      color: isHovered ? '#ffffff' : '#000000',
-                      border: '1px solid #000000',
+                      background: isHovered ? secondaryColor : 'rgba(12, 16, 22, 0.95)',
+                      color: '#ffffff',
+                      border: '1px solid var(--border-color)',
                       borderRadius: '4px',
                       padding: '1px 5px',
                       whiteSpace: 'nowrap',
-                      boxShadow: '1px 1px 0px #000000',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
                       transition: 'all 0.15s ease'
                     }}
                   >
@@ -609,9 +607,9 @@ function ClientBarGraph({
                       width: '100%',
                       height: `${heightPctSecondary}%`,
                       background: secondaryColor,
-                      border: '2px solid #000000',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
                       borderRadius: '6px 6px 0 0',
-                      boxShadow: isHovered ? '3px 3px 0px #000000' : 'none',
+                      boxShadow: isHovered ? `0 4px 16px ${secondaryColor}88` : 'none',
                       transition: 'height 0.3s ease, transform 0.15s ease',
                       transform: isHovered ? 'translateY(-2px)' : 'none'
                     }}
@@ -625,17 +623,17 @@ function ClientBarGraph({
                 style={{
                   fontSize: '0.78rem',
                   fontWeight: 900,
-                  color: isHovered ? '#000000' : 'var(--text-primary)',
+                  color: isHovered ? 'var(--accent)' : 'var(--text-primary)',
                   textAlign: 'center',
                   textOverflow: 'ellipsis',
                   overflow: 'hidden',
                   whiteSpace: 'nowrap',
                   maxWidth: '110px',
-                  background: isHovered ? '#ffffff' : 'transparent',
-                  border: isHovered ? '1px solid #000000' : '1px solid transparent',
+                  background: isHovered ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  border: isHovered ? '1px solid var(--border-color)' : '1px solid transparent',
                   padding: '2px 6px',
                   borderRadius: '4px',
-                  boxShadow: isHovered ? '1px 1px 0px #000000' : 'none'
+                  boxShadow: isHovered ? 'var(--shadow-sm)' : 'none'
                 }}
                 title={clientName}
               >

@@ -297,7 +297,7 @@ export default function ChatTab({
     <div className="workspace-layout">
       {/* Left Bento: Client selector */}
       <div className="glass" style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: 'fit-content' }}>
-        <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '8px' }}>Clients</h3>
+        <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>Clients</h3>
         <div className="workspace-client-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {chatClients.map(c => (
             <div
@@ -309,10 +309,11 @@ export default function ChatTab({
               style={{
                 padding: '12px 16px',
                 borderRadius: 'var(--radius-sm)',
-                border: '2px solid #000',
+                border: '1px solid var(--border-color)',
                 cursor: 'pointer',
-                background: selectedChatClient?.id === c.id ? '#000' : '#fff',
-                color: selectedChatClient?.id === c.id ? '#fff' : '#000',
+                background: selectedChatClient?.id === c.id ? 'var(--accent)' : 'rgba(255, 255, 255, 0.04)',
+                color: selectedChatClient?.id === c.id ? '#fff' : 'var(--text-primary)',
+                boxShadow: selectedChatClient?.id === c.id ? '0 4px 18px rgba(224, 35, 28, 0.4)' : 'none',
                 fontWeight: 'bold',
                 transition: 'all 0.15s ease',
                 position: 'relative',
@@ -336,9 +337,9 @@ export default function ChatTab({
                       position: 'absolute',
                       top: '-10px',
                       right: '-10px',
-                      background: 'var(--warning)',
-                      color: '#000',
-                      border: '2px solid #000',
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
                       borderRadius: '50%',
                       minWidth: '22px',
                       height: '22px',
@@ -348,7 +349,7 @@ export default function ChatTab({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '1px 1px 0px #000',
+                      boxShadow: '0 2px 8px rgba(224, 35, 28, 0.5)',
                       zIndex: 10
                     }}>
                       {totalUnseen}
@@ -367,12 +368,12 @@ export default function ChatTab({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Right Top Bento: Chat */}
           <div className="glass workspace-chat-box" style={{ display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '12px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>
               Internal Chat — {selectedChatClient.name}
             </h3>
 
             {/* Messages container */}
-            <div ref={chatContainerRef} style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: '#f4f4f5', borderRadius: '8px', border: '2px solid #000', marginBottom: '12px' }}>
+            <div ref={chatContainerRef} style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px', background: 'rgba(5, 7, 10, 0.65)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '12px' }}>
               {chatMessages.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '100px' }}>
                   No internal chat messages yet. Start the conversation!
@@ -467,14 +468,15 @@ export default function ChatTab({
                     width: '280px',
                     maxHeight: '200px',
                     overflowY: 'auto',
-                    background: '#fff',
-                    border: '2px solid #000',
-                    boxShadow: '3px 3px 0px #000',
-                    borderRadius: '4px',
+                    background: 'rgba(12, 16, 22, 0.98)',
+                    border: '1px solid var(--border-color)',
+                    boxShadow: 'var(--shadow-lg)',
+                    borderRadius: '8px',
                     zIndex: 1000,
                     display: 'flex',
                     flexDirection: 'column',
-                    padding: '4px 0'
+                    padding: '4px 0',
+                    backdropFilter: 'blur(20px)'
                   }}
                 >
                   <div style={{ padding: '6px 12px', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)', marginBottom: '4px' }}>
@@ -490,8 +492,8 @@ export default function ChatTab({
                         style={{
                           padding: '8px 12px',
                           cursor: 'pointer',
-                          background: isActive ? '#000' : 'transparent',
-                          color: isActive ? '#fff' : '#000',
+                          background: isActive ? 'var(--accent)' : 'transparent',
+                          color: isActive ? '#fff' : 'var(--text-primary)',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '2px',
@@ -514,11 +516,11 @@ export default function ChatTab({
                   gap: '10px',
                   padding: '8px 10px',
                   marginBottom: '8px',
-                  background: '#f4f4f5',
-                  border: '2px solid #000',
-                  borderRadius: '6px'
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px'
                 }}>
-                  <div style={{ borderLeft: '3px solid #000', paddingLeft: '8px', flexGrow: 1, minWidth: 0 }}>
+                  <div style={{ borderLeft: '3px solid var(--accent)', paddingLeft: '8px', flexGrow: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                       Replying to {replyingTo.sender_name}
                     </div>
@@ -566,7 +568,7 @@ export default function ChatTab({
 
           {/* Right Bottom Bento: Assignments */}
           <div className="glass">
-            <h3 style={{ borderBottom: '2px solid #000', paddingBottom: '8px', marginBottom: '12px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '12px' }}>
               Job Assignments — {selectedChatClient.name}
             </h3>
 
@@ -675,7 +677,7 @@ export default function ChatTab({
             {(() => {
               if (clientTasks.length === 0) return null;
               return (
-                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderTop: '2px solid #000', paddingTop: '16px' }}>
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
                   <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
                     Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((assignmentsPage - 1) * assignmentsLimit + 1, clientTasks.length)}</span> to{' '}
                     <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(assignmentsPage * assignmentsLimit, clientTasks.length)}</span> of{' '}
