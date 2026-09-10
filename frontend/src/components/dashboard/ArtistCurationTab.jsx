@@ -387,67 +387,80 @@ export default function ArtistCurationTab({
     <div style={{ textAlign: 'left' }}>
       
       {/* Quick Artist Message Templates Strip */}
-      <div className="card glass-premium" style={{ marginBottom: '20px', padding: '14px 18px', border: '2px solid #000', borderRadius: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MessageSquare size={18} style={{ color: 'var(--primary-color)' }} /> Quick Artist Message Templates
+      <div
+        className="glass-card glass-premium"
+        style={{
+          marginBottom: '24px',
+          padding: '16px 20px',
+          border: '1px solid rgba(223, 231, 224, 0.12)',
+          borderRadius: '12px',
+          background: 'rgba(12, 16, 24, 0.85)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.4)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', letterSpacing: '0.01em' }}>
+            <MessageSquare size={18} style={{ color: 'var(--accent)' }} /> Quick Artist Message Templates
           </h4>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>1-CLICK COPY & EDIT</span>
+          <span style={{ fontSize: '0.68rem', color: 'rgba(223, 231, 224, 0.75)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(223, 231, 224, 0.05)', padding: '3px 9px', borderRadius: '4px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
+            1-CLICK COPY & EDIT
+          </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
           {/* Onboarding Template */}
-          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '6px', padding: '10px 12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span className="badge badge-info" style={{ fontSize: '0.65rem', textTransform: 'uppercase', padding: '2px 6px' }}>
+          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#7dd3fc' }}>
                 1. Onboarding Message
               </span>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button
                   onClick={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
                   className="btn btn-primary"
-                  style={{ padding: '3px 10px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
                 >
                   <Copy size={12} /> Copy
                 </button>
                 <button
                   onClick={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
                   className="btn btn-secondary"
-                  style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
                 >
                   <Edit3 size={12} /> Edit
                 </button>
               </div>
             </div>
-            <div style={{ fontSize: '0.78rem', color: '#334155', whiteSpace: 'pre-wrap', maxHeight: '68px', overflowY: 'auto', background: '#ffffff', padding: '6px 10px', borderRadius: '4px', border: '1px solid #e2e8f0', fontFamily: 'sans-serif', lineHeight: '1.4' }}>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
               {onboardingMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
             </div>
           </div>
 
           {/* Confirmation Template */}
-          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '6px', padding: '10px 12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span className="badge badge-success" style={{ fontSize: '0.65rem', textTransform: 'uppercase', padding: '2px 6px' }}>
+          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#4ade80' }}>
                 2. Confirmation Message
               </span>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button
                   onClick={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
                   className="btn btn-primary"
-                  style={{ padding: '3px 10px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
                 >
                   <Copy size={12} /> Copy
                 </button>
                 <button
                   onClick={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
                   className="btn btn-secondary"
-                  style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
                 >
                   <Edit3 size={12} /> Edit
                 </button>
               </div>
             </div>
-            <div style={{ fontSize: '0.78rem', color: '#334155', whiteSpace: 'pre-wrap', maxHeight: '68px', overflowY: 'auto', background: '#ffffff', padding: '6px 10px', borderRadius: '4px', border: '1px solid #e2e8f0', fontFamily: 'sans-serif', lineHeight: '1.4' }}>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
               {confirmationMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
             </div>
           </div>
@@ -457,12 +470,25 @@ export default function ArtistCurationTab({
       {/* Edit Template Modal */}
       {editingMsgType && (
         <div className="modal-overlay" onClick={() => setEditingMsgType(null)}>
-          <div className="modal-content glass" onClick={e => e.stopPropagation()} style={{ maxWidth: '540px', width: '90%', padding: '24px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '1.1rem', fontWeight: 800 }}>
+          <div
+            className="modal-content glass-premium"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '560px',
+              width: '92%',
+              padding: '24px',
+              background: 'rgba(10, 14, 20, 0.96)',
+              border: '1px solid rgba(223, 231, 224, 0.18)',
+              borderRadius: '14px',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.85)',
+              backdropFilter: 'blur(32px)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 14px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
               Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : 'Confirmation Message'} Template
             </h3>
-            <div style={{ marginBottom: '16px' }}>
-              <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px', display: 'block' }}>
+            <div style={{ marginBottom: '18px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>
                 Template Text
               </label>
               <textarea
@@ -471,22 +497,65 @@ export default function ArtistCurationTab({
                 placeholder="Type or paste your custom message template here..."
                 value={tempMsgText}
                 onChange={(e) => setTempMsgText(e.target.value)}
-                style={{ width: '100%', padding: '10px', fontSize: '0.85rem', fontFamily: 'sans-serif', lineHeight: '1.4' }}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  fontSize: '0.85rem',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.5',
+                  background: 'rgba(5, 7, 10, 0.85)',
+                  border: '1px solid rgba(223, 231, 224, 0.18)',
+                  color: 'var(--text-primary)',
+                  borderRadius: '8px'
+                }}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
               <button
                 onClick={() => handleClearTemplate(editingMsgType)}
                 className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#dc3545' }}
+                style={{
+                  fontSize: '0.8rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: '#f87171',
+                  background: 'rgba(224, 35, 28, 0.1)',
+                  border: '1px solid rgba(224, 35, 28, 0.3)',
+                  borderRadius: '6px',
+                  padding: '6px 12px'
+                }}
               >
                 Clear Text
               </button>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setEditingMsgType(null)} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
+                <button
+                  onClick={() => setEditingMsgType(null)}
+                  className="btn btn-secondary"
+                  style={{
+                    fontSize: '0.8rem',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(223, 231, 224, 0.15)',
+                    color: 'var(--text-primary)',
+                    borderRadius: '6px',
+                    padding: '6px 14px'
+                  }}
+                >
                   Cancel
                 </button>
-                <button onClick={() => handleSaveTemplate(editingMsgType)} className="btn btn-primary" style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <button
+                  onClick={() => handleSaveTemplate(editingMsgType)}
+                  className="btn btn-primary"
+                  style={{
+                    fontSize: '0.8rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderRadius: '6px',
+                    padding: '6px 16px',
+                    fontWeight: 700
+                  }}
+                >
                   <Check size={14} /> Save Template
                 </button>
               </div>
@@ -591,7 +660,7 @@ export default function ArtistCurationTab({
                   setGigsLimit(parseInt(e.target.value));
                   setGigsPage(1);
                 }}
-                style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '2px', cursor: 'pointer' }}
+                style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '1px', borderRadius: '6px', cursor: 'pointer' }}
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -602,8 +671,8 @@ export default function ArtistCurationTab({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={gigsPage === 1} onClick={() => setGigsPage(1)}>First</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={gigsPage === 1} onClick={() => setGigsPage(gigsPage - 1)}>Prev</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage === 1} onClick={() => setGigsPage(1)}>First</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage === 1} onClick={() => setGigsPage(gigsPage - 1)}>Prev</button>
 
               {(() => {
                 const totalPages = Math.ceil(gigs.length / gigsLimit);
@@ -612,7 +681,7 @@ export default function ArtistCurationTab({
                 const endPage = Math.min(totalPages, gigsPage + 2);
                 for (let i = startPage; i <= endPage; i++) {
                   buttons.push(
-                    <button key={i} className={`btn ${gigsPage === i ? 'btn-primary' : ''}`} style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: gigsPage === i ? 'none' : '2px 2px 0px #000', minWidth: '32px' }} onClick={() => setGigsPage(i)}>
+                    <button key={i} className={`btn ${gigsPage === i ? 'btn-primary' : ''}`} style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px', minWidth: '32px' }} onClick={() => setGigsPage(i)}>
                       {i}
                     </button>
                   );
@@ -620,8 +689,8 @@ export default function ArtistCurationTab({
                 return buttons;
               })()}
 
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)} onClick={() => setGigsPage(gigsPage + 1)}>Next</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)} onClick={() => setGigsPage(Math.ceil(gigs.length / gigsLimit))}>Last</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)} onClick={() => setGigsPage(gigsPage + 1)}>Next</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)} onClick={() => setGigsPage(Math.ceil(gigs.length / gigsLimit))}>Last</button>
             </div>
           </div>
         </div>
@@ -762,7 +831,7 @@ export default function ArtistCurationTab({
                   setArtistsLimit(parseInt(e.target.value));
                   setArtistsPage(1);
                 }}
-                style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '2px', cursor: 'pointer' }}
+                style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '1px', borderRadius: '6px', cursor: 'pointer' }}
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -773,8 +842,8 @@ export default function ArtistCurationTab({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage === 1} onClick={() => setArtistsPage(1)}>First</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage === 1} onClick={() => setArtistsPage(artistsPage - 1)}>Prev</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage === 1} onClick={() => setArtistsPage(1)}>First</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage === 1} onClick={() => setArtistsPage(artistsPage - 1)}>Prev</button>
 
               {(() => {
                 const totalPages = Math.ceil(filteredArtists.length / artistsLimit);
@@ -783,7 +852,7 @@ export default function ArtistCurationTab({
                 const endPage = Math.min(totalPages, artistsPage + 2);
                 for (let i = startPage; i <= endPage; i++) {
                   buttons.push(
-                    <button key={i} className={`btn ${artistsPage === i ? 'btn-primary' : ''}`} style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: artistsPage === i ? 'none' : '2px 2px 0px #000', minWidth: '32px' }} onClick={() => setArtistsPage(i)}>
+                    <button key={i} className={`btn ${artistsPage === i ? 'btn-primary' : ''}`} style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px', minWidth: '32px' }} onClick={() => setArtistsPage(i)}>
                       {i}
                     </button>
                   );
@@ -791,8 +860,8 @@ export default function ArtistCurationTab({
                 return buttons;
               })()}
 
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(artistsPage + 1)}>Next</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '2px', boxShadow: '2px 2px 0px #000' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(Math.ceil(filteredArtists.length / artistsLimit))}>Last</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(artistsPage + 1)}>Next</button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(Math.ceil(filteredArtists.length / artistsLimit))}>Last</button>
             </div>
           </div>
         </div>
@@ -1171,13 +1240,14 @@ export default function ArtistCurationTab({
                       left: 0,
                       right: 0,
                       zIndex: 1000,
-                      background: '#fff',
-                      border: '3px solid #000',
+                      background: 'rgba(12, 16, 24, 0.96)',
+                      border: '1px solid rgba(223, 231, 224, 0.18)',
                       borderRadius: '8px',
-                      boxShadow: '4px 4px 0 #000',
+                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75)',
                       maxHeight: '200px',
                       overflowY: 'auto',
-                      marginTop: '4px'
+                      marginTop: '4px',
+                      backdropFilter: 'blur(16px)'
                     }}>
                       {(() => {
                         const filtered = artists.filter(a =>
@@ -1185,7 +1255,7 @@ export default function ArtistCurationTab({
                           (a.category && a.category.toLowerCase().includes(artistSearch.toLowerCase()))
                         );
                         if (filtered.length === 0) {
-                          return <div style={{ padding: '8px 12px', color: '#888', fontWeight: 'bold' }}>No artists found</div>;
+                          return <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 'bold' }}>No artists found</div>;
                         }
                         return filtered.map(a => (
                           <div
@@ -1200,8 +1270,9 @@ export default function ArtistCurationTab({
                             style={{
                               padding: '8px 12px',
                               cursor: 'pointer',
-                              fontWeight: 'bold',
-                              borderBottom: '1px solid #eee'
+                              fontWeight: '600',
+                              borderBottom: '1px solid rgba(223, 231, 224, 0.08)',
+                              color: 'var(--text-primary)'
                             }}
                           >
                             {a.name} ({a.category || 'No Category'})
@@ -1240,20 +1311,21 @@ export default function ArtistCurationTab({
                       left: 0,
                       right: 0,
                       zIndex: 1000,
-                      background: '#fff',
-                      border: '3px solid #000',
+                      background: 'rgba(12, 16, 24, 0.96)',
+                      border: '1px solid rgba(223, 231, 224, 0.18)',
                       borderRadius: '8px',
-                      boxShadow: '4px 4px 0 #000',
+                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75)',
                       maxHeight: '200px',
                       overflowY: 'auto',
-                      marginTop: '4px'
+                      marginTop: '4px',
+                      backdropFilter: 'blur(16px)'
                     }}>
                       {(() => {
                         const filtered = venues.filter(v =>
                           v.name.toLowerCase().includes(venueSearch.toLowerCase())
                         );
                         if (filtered.length === 0) {
-                          return <div style={{ padding: '8px 12px', color: '#888', fontWeight: 'bold' }}>No venues found</div>;
+                          return <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 'bold' }}>No venues found</div>;
                         }
                         return filtered.map(v => (
                           <div
@@ -1268,8 +1340,9 @@ export default function ArtistCurationTab({
                             style={{
                               padding: '8px 12px',
                               cursor: 'pointer',
-                              fontWeight: 'bold',
-                              borderBottom: '1px solid #eee'
+                              fontWeight: '600',
+                              borderBottom: '1px solid rgba(223, 231, 224, 0.08)',
+                              color: 'var(--text-primary)'
                             }}
                           >
                             {v.name}
