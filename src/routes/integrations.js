@@ -72,7 +72,7 @@ router.get('/clients/:id/integrations/status', async (req, res) => {
  * On-demand batch refresh for posted content metrics.
  * Body: { clientId } — optional; omit to sweep every client.
  */
-router.post('/marketing/content/sync-all-metrics', authorize('admin', 'ops_social_media_manager'), async (req, res) => {
+router.post('/marketing/content/sync-all-metrics', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), async (req, res) => {
   try {
     const raw = req.body?.clientId;
     const clientId = raw === undefined || raw === null || raw === '' || raw === 'all'

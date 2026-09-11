@@ -729,28 +729,28 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         const cData = await cRes.json();
         setMarketingContent(cData.content || []);
       }
-      // Video editors only have access to content — skip ads, monthly, scripts
+      const adUrl = `/api/clients/${clientId}/marketing/ads${monthFilter ? `?month=${monthFilter}` : ''}`;
+      const adRes = await authFetch(adUrl);
+      if (adRes.ok) {
+        const adData = await adRes.json();
+        setAdCampaigns(adData.ads || []);
+        setAdLeadTotals(adData.lead_totals || null);
+        if (adData.available_months && adData.available_months.length > 0) {
+          setAvailableAdMonths(adData.available_months);
+        }
+        // Always mirror the month the server actually applied, so the selector label
+        // can never claim a month the numbers below it don't belong to.
+        if (adData.selected_month) {
+          setSelectedAdMonth(adData.selected_month);
+        }
+      }
+      const rRes = await authFetch(`/api/clients/${clientId}/marketing/monthly`);
+      if (rRes.ok) {
+        const rData = await rRes.json();
+        setMonthlyReports(rData.reports || []);
+      }
+      // Scripts stay closed to video editors.
       if (!isVideoEditor) {
-        const adUrl = `/api/clients/${clientId}/marketing/ads${monthFilter ? `?month=${monthFilter}` : ''}`;
-        const adRes = await authFetch(adUrl);
-        if (adRes.ok) {
-          const adData = await adRes.json();
-          setAdCampaigns(adData.ads || []);
-          setAdLeadTotals(adData.lead_totals || null);
-          if (adData.available_months && adData.available_months.length > 0) {
-            setAvailableAdMonths(adData.available_months);
-          }
-          // Always mirror the month the server actually applied, so the selector label
-          // can never claim a month the numbers below it don't belong to.
-          if (adData.selected_month) {
-            setSelectedAdMonth(adData.selected_month);
-          }
-        }
-        const rRes = await authFetch(`/api/clients/${clientId}/marketing/monthly`);
-        if (rRes.ok) {
-          const rData = await rRes.json();
-          setMonthlyReports(rData.reports || []);
-        }
         const sRes = await authFetch(`/api/clients/${clientId}/marketing/scripts`);
         if (sRes.ok) {
           const sData = await sRes.json();

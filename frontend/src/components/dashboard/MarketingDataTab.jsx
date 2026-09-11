@@ -33,6 +33,7 @@ export default function MarketingDataTab({
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSMM = auth?.role === 'ops_social_media_manager';
   const isVideoEditor = auth?.role === 'ops_video_editor';
+  const canEdit = isAdmin || isSMM || isVideoEditor;
 
   // Content Tracker Pagination State
   const [contentPage, setContentPage] = useState(1);
@@ -430,9 +431,7 @@ export default function MarketingDataTab({
     }
   };
 
-  // Video editors get the tab read-only: every add/edit/delete control below
-  // is gated on (isAdmin || isSMM), and the API refuses them the writes too.
-  if (!isAdmin && !isSMM && !isVideoEditor) return null;
+  if (!canEdit) return null;
 
   return (
     <div style={{ textAlign: 'left' }}>
@@ -490,7 +489,7 @@ export default function MarketingDataTab({
                 <option value="instagram">Instagram only</option>
                 <option value="youtube">YouTube only</option>
               </select>
-              {(isAdmin || isSMM) && (
+              {canEdit && (
                 <>
                   {lastSync?.finishedAt && !isSyncing && (
                     <span style={{ fontSize: '0.75rem', color: '#71717a', whiteSpace: 'nowrap' }}>
@@ -506,7 +505,7 @@ export default function MarketingDataTab({
                   </button>
                 </>
               )}
-              {(isAdmin || isSMM) && (
+              {canEdit && (
                 <button onClick={() => openContentModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
                   <Plus size={14} style={{ marginRight: '4px' }} /> Add Content Row
                 </button>
@@ -712,7 +711,7 @@ export default function MarketingDataTab({
                       </td>
 
                       <td>
-                        {(isAdmin || isSMM) && (
+                        {canEdit && (
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button
                               onClick={() => openContentModal(item)}
@@ -824,7 +823,7 @@ export default function MarketingDataTab({
                 ))}
               </select>
 
-              {(isAdmin || isSMM) && (
+              {canEdit && (
                 <>
                   <button onClick={openPriceModal} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }} title="Set what each procedure is worth, used for estimated revenue">
                     ₹ Procedure Prices
@@ -979,7 +978,7 @@ export default function MarketingDataTab({
                         )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        {(isAdmin || isSMM) && (
+                        {canEdit && (
                           String(ad.id).startsWith('synth-') ? (
                             // This row was assembled from leads — there is no campaign
                             // record behind it to edit. Opening the form pre-filled with
@@ -1008,7 +1007,7 @@ export default function MarketingDataTab({
           {/* SEO Monthly Reports Table */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', marginTop: '32px' }}>
             <h3 style={{ margin: 0 }}>SEO & GMB Monthly Reports</h3>
-            {(isAdmin || isSMM) && (
+            {canEdit && (
               <button onClick={() => openMonthlyModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
                 <Plus size={14} style={{ marginRight: '4px' }} /> Add Monthly Report
               </button>
@@ -1084,7 +1083,7 @@ export default function MarketingDataTab({
                         </span>
                       </td>
                       <td>
-                        {(isAdmin || isSMM) && (
+                        {canEdit && (
                           <button
                             onClick={() => openMonthlyModal(item)}
                             className="btn btn-secondary"

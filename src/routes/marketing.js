@@ -247,13 +247,27 @@ router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manage
   }
 });
 
+// Video editors only see video rows, and only on clients they hold a video task
+// for (see the content list above). Their writes are held to the same rows.
+const VIDEO_POST_TYPES = ['reel', 'youtube', 'short'];
+
+function videoEditorContentDenial(req, postType) {
+  if (req.user.role !== 'ops_video_editor') return null;
+  const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+  if (!hasTask) return 'Access denied: you have no video assignments for this client';
+  if (!VIDEO_POST_TYPES.includes(String(postType || '').toLowerCase())) {
+    return 'Video editors can only add or edit Reel, YouTube and Short rows';
+  }
+  return null;
+}
+
 /**
  * POST /api/clients/:id/marketing/content
  * Create draft content plan.
  */
 
 
-router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const clientId = req.params.id;
     const {
@@ -265,6 +279,9 @@ router.post('/:id/marketing/content', authorize('admin', 'ops_social_media_manag
       instagram_link, youtube_link, facebook_link, linkedin_link,
       assigned_to, freelancer_id
     } = req.body;
+
+    const denial = videoEditorContentDenial(req, post_type);
+    if (denial) return res.status(403).json({ error: denial });
 
     let finalTitle = title;
     let finalScriptText = script;
@@ -443,11 +460,16 @@ router.get('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_m
  * PATCH /api/clients/:id/marketing/content/:contentId
  * Update content fields and recalculate derived metrics.
  */
-router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const content = db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ?')
       .get(req.params.contentId, req.params.id);
     if (!content) return res.status(404).json({ error: 'Content not found' });
+
+    // A row can't be moved out of the video types either.
+    const denial = videoEditorContentDenial(req, content.post_type)
+      || (req.body.post_type !== undefined ? videoEditorContentDenial(req, req.body.post_type) : null);
+    if (denial) return res.status(403).json({ error: denial });
 
     const allowedFields = [
       'platform', 'date', 'post_type', 'title', 'script', 'status',
@@ -587,7 +609,7 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
  * DELETE /api/clients/:id/marketing/content/:contentId
  * Delete a content tracker item.
  */
-router.delete('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.delete('/:id/marketing/content/:contentId', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const { id, contentId } = req.params;
     const content = db.prepare('SELECT * FROM marketing_content_tracker WHERE id = ? AND client_id = ?').get(contentId, id);
@@ -595,6 +617,9 @@ router.delete('/:id/marketing/content/:contentId', authorize('admin', 'ops_socia
     if (!content) {
       return res.status(404).json({ error: 'Content item not found' });
     }
+
+    const denial = videoEditorContentDenial(req, content.post_type);
+    if (denial) return res.status(403).json({ error: denial });
 
     // 1. Remove script relation
     db.prepare('DELETE FROM marketing_content_script_relation WHERE content_id = ?').run(contentId);
@@ -768,7 +793,7 @@ const getAdWithLeads = (adId) => {
  * mention. treatment_type is free text from the CRM, so offering the values
  * already in use stops the list being populated with names that never match.
  */
-router.get('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.get('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const clientId = req.params.id;
 
@@ -824,7 +849,7 @@ router.get('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
  * PUT /api/clients/:id/treatment-prices
  * Body: { prices: [{ treatment_type, price_inr }], default_booking_value_inr }
  */
-router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const clientId = req.params.id;
     const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(clientId);
@@ -894,7 +919,7 @@ router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
  * GET /api/clients/:id/marketing/ads
  * Accepts optional ?month=YYYY-MM parameter
  */
-router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const { month } = req.query;
     const clientId = req.params.id;
@@ -1107,7 +1132,7 @@ router.get('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'),
 /**
  * POST /api/clients/:id/marketing/ads
  */
-router.post('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.post('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const { platform, ad_campaign_name, leads, total_ad_spend_inr, impressions, clicks, revenue_generated, month } = req.body;
     const targetMonth = month || new Date().toISOString().slice(0, 7);
@@ -1151,7 +1176,7 @@ router.post('/:id/marketing/ads', authorize('admin', 'ops_social_media_manager')
 /**
  * PATCH /api/clients/:id/marketing/ads/:adId
  */
-router.patch('/:id/marketing/ads/:adId', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.patch('/:id/marketing/ads/:adId', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const ad = db.prepare('SELECT * FROM marketing_ad_campaigns WHERE id = ? AND client_id = ?')
       .get(req.params.adId, req.params.id);
@@ -1195,7 +1220,7 @@ router.patch('/:id/marketing/ads/:adId', authorize('admin', 'ops_social_media_ma
 /**
  * GET /api/clients/:id/marketing/monthly
  */
-router.get('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.get('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const reports = db.prepare('SELECT * FROM marketing_monthly_report WHERE client_id = ? ORDER BY month DESC')
       .all(req.params.id);
@@ -1210,7 +1235,7 @@ router.get('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manage
  * POST /api/clients/:id/marketing/monthly
  * Create/update monthly report with auto-computed MoM growth.
  */
-router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
     const { 
       month, website_clicks, website_traffic, gmb_views, map_views, gmb_clicks,

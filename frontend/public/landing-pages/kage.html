@@ -628,102 +628,264 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
     width: 100% !important;
   }
 }
+/* — CLIENT TICKER (LUXURY INTERACTIVE MARQUEE) — */
 .client-ticker-block{
   width:100%;
-  padding:clamp(16px, 2.5vh, 32px) 0;
+  padding:clamp(24px, 3.8vh, 48px) 0;
+  position:relative;
   overflow:hidden;
+}
+.client-ticker-block::before{
+  content:'';
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%, -50%);
+  width:85%; height:260px;
+  background:radial-gradient(ellipse at 32% 45%, rgba(56,189,248,0.06) 0%, transparent 60%),
+              radial-gradient(ellipse at 68% 55%, rgba(245,158,11,0.06) 0%, transparent 60%);
+  pointer-events:none;
+  filter:blur(40px);
+  z-index:0;
+}
+.ticker-header, .ticker-row-wrap{
+  position:relative;
+  z-index:1;
 }
 .ticker-header{
   display:flex;
   justify-content:center;
-  margin-bottom:28px;
+  margin-bottom:26px;
 }
 .ticker-title-pill{
   display:inline-flex;
   align-items:center;
-  gap:8px;
+  gap:10px;
   font-size:11px;
   font-weight:600;
-  letter-spacing:.2em;
+  letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--bone);
-  padding:6px 18px;
+  padding:7px 22px;
   border-radius:100px;
   border:1px solid rgba(223,231,224,0.18);
-  background:rgba(6,9,13,0.75);
-  backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px);
+  background:rgba(6,9,13,0.85);
+  box-shadow:0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
 }
-.ticker-title-pill svg{
+.live-pulse-dot{
+  position:relative;
+  width:7px;
+  height:7px;
+  background:#10b981;
+  border-radius:50%;
+  box-shadow:0 0 10px #10b981;
+  flex-shrink:0;
+}
+.live-pulse-dot::after{
+  content:'';
+  position:absolute;
+  inset:-4px;
+  border-radius:50%;
+  border:1.5px solid rgba(16, 185, 129, 0.6);
+  animation:radarRipple 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+@keyframes radarRipple{
+  0%{ transform:scale(0.6); opacity:1; }
+  100%{ transform:scale(2.4); opacity:0; }
+}
+.ticker-title-pill .ticker-kanji{
   color:var(--vermilion);
+  font-size:11px;
+  font-weight:400;
+  letter-spacing:.08em;
+  margin-left:4px;
 }
 .ticker-row-wrap{
-  margin-bottom:24px;
+  margin-bottom:20px;
 }
 .ticker-row-wrap:last-child{
   margin-bottom:0;
 }
 .ticker-category-label{
   display:flex;
+  align-items:center;
   justify-content:center;
-  margin-bottom:12px;
+  gap:10px;
+  margin-bottom:14px;
+}
+.ticker-category-label::before,
+.ticker-category-label::after{
+  content:'';
+  height:1px;
+  width:clamp(20px, 6vw, 70px);
+  background:linear-gradient(90deg, transparent, rgba(223,231,224,0.18), transparent);
+}
+.ticker-cat-health .cat-icon{
+  color:#38bdf8;
+  display:flex;
+  align-items:center;
+}
+.ticker-cat-fnb .cat-icon{
+  color:#f59e0b;
+  display:flex;
+  align-items:center;
 }
 .ticker-category-label span{
-  font-size:10.5px;
+  font-size:11px;
+  font-weight:600;
   letter-spacing:.18em;
   text-transform:uppercase;
-  color:#7e8b83;
+  color:#94a39b;
+}
+.ticker-category-label .cat-jp{
+  font-size:10px;
+  letter-spacing:.1em;
+  opacity:0.65;
 }
 .ticker-marquee-track{
   display:flex;
   overflow:hidden;
   user-select:none;
-  mask-image:linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, transparent 100%);
-  -webkit-mask-image:linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, transparent 100%);
+  padding:6px 0;
+  mask-image:linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 8%, rgba(0,0,0,1) 92%, transparent 100%);
+  -webkit-mask-image:linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 8%, rgba(0,0,0,1) 92%, transparent 100%);
 }
 .ticker-marquee-inner{
   display:flex;
   width:max-content;
   align-items:center;
-  animation:tickerMarquee 30s linear infinite;
+  animation:tickerMarquee 34s linear infinite;
 }
 .ticker-marquee-inner:hover{
   animation-play-state:paused;
 }
 .ticker-marquee-reverse{
   animation-direction:reverse;
-  animation-duration:32s;
+  animation-duration:36s;
 }
-.ticker-item{
+.ticker-card{
   display:inline-flex;
   align-items:center;
-  gap:9px;
+  gap:10px;
   white-space:nowrap;
-  padding:0 clamp(20px, 2.8vw, 36px);
-  font-size:clamp(15px, 1.4vw, 21px);
-  font-weight:600;
-  letter-spacing:-.01em;
-  text-transform:uppercase;
-  color:#b0bcb4;
-  transition:color .3s ease;
-  cursor:default;
+  padding:8px 18px 8px 14px;
+  margin:0 8px;
+  border-radius:100px;
+  background:rgba(10,15,20,0.78);
+  border:1px solid rgba(223,231,224,0.13);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  box-shadow:0 4px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+  transition:transform .32s cubic-bezier(0.16, 1, 0.3, 1), border-color .32s ease, background .32s ease, box-shadow .32s ease;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
 }
-.ticker-item:hover{
-  color:var(--bone);
+.ticker-card::before{
+  content:'';
+  position:absolute;
+  top:0; left:-120%;
+  width:60%; height:100%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
+  transform:skewX(-22deg);
+  transition:left .65s ease;
+  pointer-events:none;
 }
-.ticker-dot{
-  width:6px;
-  height:6px;
+.ticker-card:hover::before{
+  left:150%;
+}
+.ticker-card:hover{
+  transform:translateY(-3px) scale(1.03);
+}
+.card-health:hover{
+  border-color:rgba(56,189,248,0.55);
+  background:rgba(12,22,32,0.92);
+  box-shadow:0 8px 28px rgba(56,189,248,0.22), 0 0 16px rgba(56,189,248,0.12), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+.card-health:hover .card-brand{
+  color:#ffffff;
+}
+.card-health:hover .tag-health{
+  background:rgba(56,189,248,0.22);
+  border-color:rgba(56,189,248,0.55);
+  color:#f0f9ff;
+}
+.card-fnb:hover{
+  border-color:rgba(245,158,11,0.55);
+  background:rgba(24,18,10,0.92);
+  box-shadow:0 8px 28px rgba(245,158,11,0.22), 0 0 16px rgba(245,158,11,0.12), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+.card-fnb:hover .card-brand{
+  color:#ffffff;
+}
+.card-fnb:hover .tag-fnb{
+  background:rgba(245,158,11,0.22);
+  border-color:rgba(245,158,11,0.55);
+  color:#fffbeb;
+}
+.card-beacon{
+  width:7px;
+  height:7px;
   border-radius:50%;
+  position:relative;
   flex-shrink:0;
 }
-.dot-blue{
-  background:#3b82f6;
-  box-shadow:0 0 10px rgba(59,130,246,0.7);
+.beacon-blue{
+  background:#38bdf8;
+  box-shadow:0 0 10px rgba(56,189,248,0.85);
 }
-.dot-gold{
-  background:#eab308;
-  box-shadow:0 0 10px rgba(234,179,8,0.7);
+.beacon-blue::after{
+  content:'';
+  position:absolute;
+  inset:-3px;
+  border-radius:50%;
+  border:1px solid rgba(56,189,248,0.45);
+  animation:beaconPulse 2.4s infinite ease-out;
+}
+.beacon-gold{
+  background:#f59e0b;
+  box-shadow:0 0 10px rgba(245,158,11,0.85);
+}
+.beacon-gold::after{
+  content:'';
+  position:absolute;
+  inset:-3px;
+  border-radius:50%;
+  border:1px solid rgba(245,158,11,0.45);
+  animation:beaconPulse 2.4s infinite ease-out 1.2s;
+}
+@keyframes beaconPulse{
+  0%{ transform:scale(0.8); opacity:1; }
+  100%{ transform:scale(2.2); opacity:0; }
+}
+.card-brand{
+  font-size:clamp(14px, 1.2vw, 16.5px);
+  font-weight:600;
+  letter-spacing:-.01em;
+  color:#e2ebe4;
+  white-space:nowrap;
+  transition:color .25s ease;
+}
+.card-tag{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  padding:3px 8px;
+  border-radius:100px;
+  white-space:nowrap;
+  transition:all .25s ease;
+}
+.tag-health{
+  background:rgba(56,189,248,0.10);
+  color:#7dd3fc;
+  border:1px solid rgba(56,189,248,0.22);
+}
+.tag-fnb{
+  background:rgba(245,158,11,0.10);
+  color:#fcd34d;
+  border:1px solid rgba(245,158,11,0.22);
 }
 @keyframes tickerMarquee{
   0%{ transform:translateX(0); }
@@ -1917,59 +2079,238 @@ html.in-iframe #nav{
   <div class="client-ticker-block" data-rv="fade">
     <div class="ticker-header">
       <div class="ticker-title-pill">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        <span>Trusted By Brands Like</span>
+        <span class="live-pulse-dot"></span>
+        <span>Trusted Growth Partners · Client Roster</span>
+        <span class="ticker-kanji jp">実績一覧</span>
       </div>
     </div>
 
     <!-- Healthcare Row -->
     <div class="ticker-row-wrap">
-      <div class="ticker-category-label">
-        <span>Healthcare & Life Sciences</span>
+      <div class="ticker-category-label ticker-cat-health">
+        <span class="cat-icon">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M2 12h20"/></svg>
+        </span>
+        <span>Healthcare & Clinical Excellence</span>
+        <span class="cat-jp jp">医療・ウェルネス</span>
       </div>
       <div class="ticker-marquee-track">
         <div class="ticker-marquee-inner">
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>VoltHealth</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>Aegis Med</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>Sano Care</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>Pulse Therapeutics</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>BioMedica</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>CareCore</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>WellPath Clinic</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>VoltHealth</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>Aegis Med</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>Sano Care</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>Pulse Therapeutics</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>BioMedica</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>CareCore</span>
-          <span class="ticker-item"><span class="ticker-dot dot-blue"></span>WellPath Clinic</span>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Dr Divya Sharma MD</span>
+            <span class="card-tag tag-health">Dermatology MD</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Janya Fertility</span>
+            <span class="card-tag tag-health">HSR & JP</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">DentAlchemy Dental Clinic</span>
+            <span class="card-tag tag-health">Aesthetic Dental</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Inspiron Psychological Centre</span>
+            <span class="card-tag tag-health">Mental Well-Being</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Aurea Skin Clinic</span>
+            <span class="card-tag tag-health">Clinical Aesthetics</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Dr Divya Sharma MD</span>
+            <span class="card-tag tag-health">Dermatology MD</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Janya Fertility</span>
+            <span class="card-tag tag-health">HSR & JP</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">DentAlchemy Dental Clinic</span>
+            <span class="card-tag tag-health">Aesthetic Dental</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Inspiron Psychological Centre</span>
+            <span class="card-tag tag-health">Mental Well-Being</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Aurea Skin Clinic</span>
+            <span class="card-tag tag-health">Clinical Aesthetics</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Dr Divya Sharma MD</span>
+            <span class="card-tag tag-health">Dermatology MD</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Janya Fertility</span>
+            <span class="card-tag tag-health">HSR & JP</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">DentAlchemy Dental Clinic</span>
+            <span class="card-tag tag-health">Aesthetic Dental</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Inspiron Psychological Centre</span>
+            <span class="card-tag tag-health">Mental Well-Being</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Aurea Skin Clinic</span>
+            <span class="card-tag tag-health">Clinical Aesthetics</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Dr Divya Sharma MD</span>
+            <span class="card-tag tag-health">Dermatology MD</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Janya Fertility</span>
+            <span class="card-tag tag-health">HSR & JP</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">DentAlchemy Dental Clinic</span>
+            <span class="card-tag tag-health">Aesthetic Dental</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Inspiron Psychological Centre</span>
+            <span class="card-tag tag-health">Mental Well-Being</span>
+          </div>
+          <div class="ticker-card card-health">
+            <span class="card-beacon beacon-blue"></span>
+            <span class="card-brand">Aurea Skin Clinic</span>
+            <span class="card-tag tag-health">Clinical Aesthetics</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Food & Beverage Row -->
     <div class="ticker-row-wrap">
-      <div class="ticker-category-label">
-        <span>Food & Beverage (FnB)</span>
+      <div class="ticker-category-label ticker-cat-fnb">
+        <span class="cat-icon">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </span>
+        <span>Food & Beverage · Hospitality & Lifestyle</span>
+        <span class="cat-jp jp">飲食・空間</span>
       </div>
       <div class="ticker-marquee-track">
         <div class="ticker-marquee-inner ticker-marquee-reverse">
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>NovaBrew</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Candor Coffee</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Zenith Eats</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Sage & Co</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Basecamp Nutrition</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Brio Bites</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Gusto Bistro</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Sip & Co</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>NovaBrew</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Candor Coffee</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Zenith Eats</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Sage & Co</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Basecamp Nutrition</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Brio Bites</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Gusto Bistro</span>
-          <span class="ticker-item"><span class="ticker-dot dot-gold"></span>Sip & Co</span>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">HSR Layout</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">Kadubesanahalli</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Zaffran Fine Dine</span>
+            <span class="card-tag tag-fnb">Culinary Craft</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Vesparo</span>
+            <span class="card-tag tag-fnb">Cocktail Lounge</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">I Do!</span>
+            <span class="card-tag tag-fnb">Wedding & Event</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">HSR Layout</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">Kadubesanahalli</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Zaffran Fine Dine</span>
+            <span class="card-tag tag-fnb">Culinary Craft</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Vesparo</span>
+            <span class="card-tag tag-fnb">Cocktail Lounge</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">I Do!</span>
+            <span class="card-tag tag-fnb">Wedding & Event</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">HSR Layout</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">Kadubesanahalli</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Zaffran Fine Dine</span>
+            <span class="card-tag tag-fnb">Culinary Craft</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Vesparo</span>
+            <span class="card-tag tag-fnb">Cocktail Lounge</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">I Do!</span>
+            <span class="card-tag tag-fnb">Wedding & Event</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">HSR Layout</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">TBC</span>
+            <span class="card-tag tag-fnb">Kadubesanahalli</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Zaffran Fine Dine</span>
+            <span class="card-tag tag-fnb">Culinary Craft</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">Vesparo</span>
+            <span class="card-tag tag-fnb">Cocktail Lounge</span>
+          </div>
+          <div class="ticker-card card-fnb">
+            <span class="card-beacon beacon-gold"></span>
+            <span class="card-brand">I Do!</span>
+            <span class="card-tag tag-fnb">Wedding & Event</span>
+          </div>
         </div>
       </div>
     </div>
@@ -2106,10 +2447,16 @@ html.in-iframe #nav{
       <li><a href="#faq" data-cursor>FAQ</a></li>
     </ul></div>
     <div><h4>Clients</h4><ul>
-      <li><span style="color:#8b9b90">VoltHealth</span></li>
-      <li><span style="color:#8b9b90">Aegis Med</span></li>
-      <li><span style="color:#8b9b90">NovaBrew</span></li>
-      <li><span style="color:#8b9b90">Candor Coffee</span></li>
+      <li><span style="color:#8b9b90">Dr Divya Sharma MD</span></li>
+      <li><span style="color:#8b9b90">Janya Fertility HSR & JP</span></li>
+      <li><span style="color:#8b9b90">DentAlchemy Dental</span></li>
+      <li><span style="color:#8b9b90">Inspiron Well-being</span></li>
+      <li><span style="color:#8b9b90">Aurea Skin Clinic</span></li>
+      <li><span style="color:#8b9b90">TBC HSR Layout</span></li>
+      <li><span style="color:#8b9b90">TBC Kadubesanahalli</span></li>
+      <li><span style="color:#8b9b90">Zaffran Fine Dine</span></li>
+      <li><span style="color:#8b9b90">Vesparo</span></li>
+      <li><span style="color:#8b9b90">I Do! Wedding & Event</span></li>
     </ul></div>
     <div><h4>Connect</h4><ul>
       <li><a href="https://www.instagram.com/hypheningmedia/" target="_blank" rel="noopener noreferrer" data-cursor>Instagram</a></li>
