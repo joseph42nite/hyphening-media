@@ -135,6 +135,98 @@ router.put('/:id/payments/:month', authorize('admin'), (req, res) => {
 });
 
 /**
+ * GET /api/freelancers/:id/monthly-breakdown
+ * Retrieves all months where videos were posted or assigned for this freelancer,
+ * along with payments recorded against each month and balance due.
+ */
+router.get('/:id/monthly-breakdown', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const freelancer = db.prepare('SELECT * FROM freelancers WHERE id = ?').get(id);
+    if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
+
+    // Find all distinct months where the freelancer has content or payment records
+    const monthsRows = db.prepare(`
+      SELECT DISTINCT substr(date, 1, 7) AS month
+      FROM marketing_content_tracker
+      WHERE freelancer_id = ? AND date IS NOT NULL
+      UNION
+      SELECT month
+      FROM freelancer_monthly_payments
+      WHERE freelancer_id = ?
+      ORDER BY month DESC
+    `).all(id, id);
+
+    const rate = freelancer.rate_per_video || 0;
+
+    const breakdown = monthsRows.map(m => {
+      const monthStr = m.month;
+
+      // Posted videos in that month
+      const postedVideos = db.prepare(`
+        SELECT id, client_id, title, platform, post_type, date, status, link
+        FROM marketing_content_tracker
+        WHERE freelancer_id = ? AND status = 'Posted' AND substr(date, 1, 7) = ?
+        ORDER BY date DESC
+      `).all(id, monthStr);
+
+      const postedCount = postedVideos.length;
+
+      // Total assigned in that month (whether posted or still in progress)
+      const assignedCount = db.prepare(`
+        SELECT COUNT(*) AS cnt
+        FROM marketing_content_tracker
+        WHERE freelancer_id = ? AND substr(date, 1, 7) = ?
+      `).get(id, monthStr)?.cnt || 0;
+
+      // Payment recorded for that month
+      const paymentRow = db.prepare(`
+        SELECT videos_paid, updated_at
+        FROM freelancer_monthly_payments
+        WHERE freelancer_id = ? AND month = ?
+      `).get(id, monthStr);
+
+      const videosPaid = paymentRow?.videos_paid || 0;
+      const unpaidVideos = Math.max(0, postedCount - videosPaid);
+      const earnedAmount = postedCount * rate;
+      const paidAmount = videosPaid * rate;
+      const balanceDue = unpaidVideos * rate;
+
+      return {
+        month: monthStr,
+        posted_videos: postedCount,
+        assigned_videos: assignedCount,
+        videos_paid: videosPaid,
+        unpaid_videos: unpaidVideos,
+        rate_per_video: rate,
+        earned_amount: earnedAmount,
+        paid_amount: paidAmount,
+        balance_due: balanceDue,
+        videos: postedVideos,
+        last_payment_update: paymentRow?.updated_at || null
+      };
+    });
+
+    const lifetimeStats = {
+      total_posted: breakdown.reduce((sum, b) => sum + b.posted_videos, 0),
+      total_paid: breakdown.reduce((sum, b) => sum + b.videos_paid, 0),
+      total_earned: breakdown.reduce((sum, b) => sum + b.earned_amount, 0),
+      total_balance_due: breakdown.reduce((sum, b) => sum + b.balance_due, 0),
+      months_with_dues: breakdown.filter(b => b.balance_due > 0).length
+    };
+
+    res.json({
+      freelancer,
+      breakdown,
+      summary: lifetimeStats
+    });
+  } catch (err) {
+    console.error('[FREELANCERS] Monthly breakdown error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/freelancers/:id
  */
 router.get('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_manager'), (req, res) => {
