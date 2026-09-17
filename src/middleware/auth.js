@@ -8,6 +8,14 @@ import db from '../../database.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 
+// Cinematographers can only read client scripts. Enforced here rather than per
+// route because many routes authenticate without an authorize() check.
+const CINEMATOGRAPHER_ALLOWED = new Set([
+  'GET /api/auth/me',
+  'POST /api/auth/logout',
+  'GET /api/clients/marketing/scripts-library',
+]);
+
 /**
  * Authenticate — verify access JWT from cookie, attach req.user
  */
@@ -34,6 +42,10 @@ export function authenticate(req, res, next) {
       name: user.name,
       role: user.role,
     };
+
+    if (user.role === 'cinematographer' && !CINEMATOGRAPHER_ALLOWED.has(`${req.method} ${req.baseUrl}${req.path}`)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
 
     next();
   } catch (err) {

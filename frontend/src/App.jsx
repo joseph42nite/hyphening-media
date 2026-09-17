@@ -3,6 +3,7 @@ import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router
 import { isNative, API_BASE } from './api.js';
 import Login from './views/Login.jsx';
 import Dashboard from './views/Dashboard.jsx';
+import CinematographerScripts from './views/CinematographerScripts.jsx';
 import ClientPortal from './views/ClientPortal.jsx';
 import Toast from './components/Toast.jsx';
 
@@ -107,7 +108,10 @@ function App() {
           <Route 
             path="/dashboard" 
             element={
-              auth ? <Dashboard auth={auth} setAuth={setAuth} showToast={showToast} /> : <Navigate to="/login" replace />
+              !auth ? <Navigate to="/login" replace />
+                : auth.role === 'cinematographer'
+                  ? <CinematographerScripts auth={auth} setAuth={setAuth} showToast={showToast} />
+                  : <Dashboard auth={auth} setAuth={setAuth} showToast={showToast} />
             } 
           />
 

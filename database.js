@@ -76,18 +76,32 @@ function runMigrations() {
 
     console.log(`[DB] Running migration: ${filename}`);
 
+    // PRAGMA foreign_keys is a no-op inside a transaction, so table rebuilds that
+    // declare it OFF get it disabled here instead — otherwise dropping a parent
+    // table cascades into its children. Integrity is checked before commit.
+    const disableForeignKeys = /PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(sql);
+
     const runMigration = db.transaction(() => {
       // Split on semicolons and run each statement (better-sqlite3 exec handles multi-statement)
       db.exec(sql);
+      if (disableForeignKeys) {
+        const violations = db.pragma('foreign_key_check');
+        if (violations.length > 0) {
+          throw new Error(`Foreign key violations after migration: ${JSON.stringify(violations.slice(0, 5))}`);
+        }
+      }
       insertMigration.run(filename);
     });
 
+    if (disableForeignKeys) db.pragma('foreign_keys = OFF');
     try {
       runMigration();
       console.log(`[DB] ✓ Applied: ${filename}`);
     } catch (err) {
       console.error(`[DB] ✗ Failed: ${filename}`, err.message);
       throw err; // Halt on migration failure
+    } finally {
+      if (disableForeignKeys) db.pragma('foreign_keys = ON');
     }
   }
 }

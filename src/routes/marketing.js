@@ -1380,6 +1380,31 @@ const setScriptStatusAndComments = (db, clientId, scriptId, status, clientCommen
 };
 
 /**
+ * GET /api/clients/marketing/scripts-library
+ * Read-only list of every client's scripts, for the cinematographer login.
+ */
+router.get('/marketing/scripts-library', authorize('admin', 'cinematographer'), (req, res) => {
+  try {
+    const scripts = db.prepare(`
+      SELECT s.id, s.client_id, c.name AS client_name, s.month, s.title, s.script_text, s.format,
+             s.reference_video_link, s.reaction_video_link, s.updated_at,
+             COALESCE(t.status, s.status) AS content_status
+      FROM marketing_scripts s
+      JOIN crm_clients c ON s.client_id = c.id
+      LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
+      LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
+      WHERE c.client_type != 'artist_curation'
+      GROUP BY s.id
+      ORDER BY s.month DESC, c.name ASC, s.created_at DESC
+    `).all();
+    res.json({ scripts });
+  } catch (err) {
+    console.error('[MARKETING] Scripts library error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/clients/:id/marketing/scripts
  * List scripts for a client, optionally filtered by month.
  */
