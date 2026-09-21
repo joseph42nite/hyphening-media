@@ -56,6 +56,37 @@ export async function syncClient(clientId, { dryRun = false, monthsBack = 3, tri
     };
   }
 
+  // Two clients pointed at one ad account is almost always a typo, and the
+  // consequence is the worst kind: one client's spend imported into another's
+  // records, then into their report, with every number plausible. Found in
+  // production — Janya carried DentAlchemy's customer ID, and an unguarded
+  // sync would have filed five dental campaigns and ₹143,000 under a
+  // fertility clinic.
+  //
+  // Compared on digits so 928-944-9109 and 9289449109 are recognised as the
+  // same account rather than slipping past as different strings.
+  const sameAccount = db.prepare(`
+    SELECT id, name FROM crm_clients
+    WHERE id != ?
+      AND REPLACE(REPLACE(COALESCE(google_ads_customer_id, ''), '-', ''), ' ', '') =
+          REPLACE(REPLACE(?, '-', ''), ' ', '')
+      AND TRIM(COALESCE(google_ads_customer_id, '')) != ''
+  `).all(clientId, client.google_ads_customer_id);
+
+  if (sameAccount.length) {
+    const others = sameAccount.map(c => c.name).join(', ');
+    return {
+      ok: false,
+      error: 'duplicate_customer_id',
+      message:
+        `Customer ID ${client.google_ads_customer_id} is also set on ${others}. ` +
+        'Two clients cannot share one Google Ads account without one of them receiving the ' +
+        "other's campaigns and spend. Correct the customer ID on whichever client is wrong " +
+        'before syncing.',
+      conflictsWith: sameAccount,
+    };
+  }
+
   const months = recentMonths(monthsBack);
   const { since, until } = rangeFor(months);
   const customerId = client.google_ads_customer_id;
