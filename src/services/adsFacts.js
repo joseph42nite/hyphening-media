@@ -176,16 +176,17 @@ function spendSection(clientId, month) {
            (
              SELECT COUNT(l.id) FROM campaign_leads l
              WHERE l.client_id = a.client_id
-               AND (
-                 (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != ''
-                   AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
-                 OR
-                 -- A lead with no campaign name falls back to its platform, which
-                 -- is how manually logged and phone leads are attributed.
-                 ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = ''
-                   OR LOWER(TRIM(l.campaign_name)) = 'manual entry')
-                   AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
-               )
+               -- Name match ONLY. The platform fallback that used to live here
+               -- assigned every unattributed lead to every campaign on that
+               -- platform: correct while a client had one campaign per platform,
+               -- and silently multiplying the moment they had two. Verified on
+               -- DentAlchemy's real Google account, which runs four campaigns —
+               -- one lead was counted as two, halving cost per lead.
+               --
+               -- Leads that carry no campaign name are counted once per
+               -- platform in unattributedLeads() below, never per campaign.
+               AND l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != ''
+               AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name))
                AND ${countableLeadSql('l')}
                AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
            ) AS actual_leads
@@ -213,6 +214,34 @@ function spendSection(clientId, month) {
   // between them is published as `lead_capture_pct` — because a 96% capture
   // failure is not a footnote about data quality, it is the most expensive
   // thing wrong with the account and nothing else in this system reports it.
+  // Leads whose platform is known but whose campaign is not — 'Manual Entry',
+  // blank, or a name matching no campaign row. Counted once per platform-month
+  // and never pushed down to a campaign, because attributing them to one would
+  // be a guess and attributing them to all is the bug above.
+  //
+  // Their existence is itself a finding: a landing page that does not pass the
+  // campaign through leaves every campaign-level cost figure unattributable.
+  const unattributedRows = db.prepare(`
+    SELECT strftime('%Y-%m', l.created_at) AS month, l.platform, COUNT(*) AS n
+    FROM campaign_leads l
+    WHERE l.client_id = ? AND ${countableLeadSql('l')}
+      AND (
+        l.campaign_name IS NULL OR TRIM(l.campaign_name) = ''
+        OR LOWER(TRIM(l.campaign_name)) = 'manual entry'
+        OR NOT EXISTS (
+          SELECT 1 FROM marketing_ad_campaigns a
+          WHERE a.client_id = l.client_id
+            AND LOWER(TRIM(a.ad_campaign_name)) = LOWER(TRIM(l.campaign_name))
+        )
+      )
+    GROUP BY month, l.platform
+  `).all(clientId);
+
+  const unattributed = new Map(unattributedRows.map(r => [`${r.month}|${r.platform}`, r.n]));
+  const unattributedFor = (month, platform = null) => (platform
+    ? (unattributed.get(`${month}|${platform}`) || 0)
+    : unattributedRows.filter(r => r.month === month).reduce((n, r) => n + r.n, 0));
+
   for (const row of rows) {
     const reported = row.leads || 0;
     const captured = row.actual_leads || 0;
@@ -245,10 +274,15 @@ function spendSection(clientId, month) {
     const priorRs = inPrior.filter(r => r.platform === platform);
     const now = totalise(rs);
     const before = priorRs.length ? totalise(priorRs) : null;
+    const orphan = unattributedFor(focus, platform);
     return {
       platform,
       campaigns: rs.length,
       ...now,
+      // Added at platform level only, so the total is right without any
+      // campaign claiming a lead it cannot prove.
+      leads_captured: now.leads_captured + orphan,
+      leads_unattributed: orphan,
       share_of_spend_pct: pct(now.spend_inr, focusTotals.spend_inr),
       mom: before && {
         spend_pct: delta(now.spend_inr, before.spend_inr),
@@ -274,9 +308,15 @@ function spendSection(clientId, month) {
     // Every outcome rate in the `leads` section is measured against the
     // captured fraction, so a report quoting a qualification rate without this
     // number beside it is describing a sample and calling it the account.
-    lead_capture_pct: focusTotals.lead_capture_pct,
+    lead_capture_pct: focusTotals.leads_reported > 0
+      ? pct(focusTotals.leads_captured + unattributedFor(focus), focusTotals.leads_reported)
+      : null,
     account: {
       ...focusTotals,
+      leads_captured: focusTotals.leads_captured + unattributedFor(focus),
+      // Leads the spend bought whose campaign is unknown. Distinct from the
+      // capture gap: these DID reach the CRM, they just cannot be costed.
+      leads_unattributed: unattributedFor(focus),
       mom: priorTotals && {
         spend_pct: delta(focusTotals.spend_inr, priorTotals.spend_inr),
         leads_pct: delta(focusTotals.leads, priorTotals.leads),

@@ -43,6 +43,22 @@ of the leads that spend bought never reached anyone who could call them — whic
 is almost always the most expensive thing wrong with an account, and nothing
 else in this system reports it. Lead it with, at Critical, whenever it is low.
 
+### Unattributed leads
+
+`leads_unattributed` (platform and account level only) counts leads that reached
+the CRM carrying no campaign name — 'Manual Entry', blank, or a name matching no
+campaign. They are counted **once** at platform level and never pushed down to a
+campaign: attributing them to one would be a guess, and attributing them to all
+multiplies them.
+
+So per-campaign `leads_captured` will not sum to the platform total. That is
+correct, not a rounding error, and the difference is exactly
+`leads_unattributed`.
+
+A high share is a finding: it means the landing page is not passing the campaign
+through, so no campaign-level cost per lead can be trusted. Say so before
+quoting one.
+
 **Trap:** every rate in the `leads` section is measured against the *captured*
 leads. Quoting a qualification rate without `lead_capture_pct` beside it
 describes a sample and calls it the account.
