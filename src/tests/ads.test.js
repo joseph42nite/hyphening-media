@@ -110,8 +110,8 @@ describe('requirement gating', () => {
     const { withSpend } = pickClients();
     if (!withSpend) return;
     const { available } = buildFactPack(withSpend.id);
-    const performance = configs.find(c => c.agent_type === 'performance');
-    expect(checkRequirements(performance, available).ok).toBe(true);
+    const audit = configs.find(c => c.agent_type === 'audit');
+    expect(checkRequirements(audit, available).ok).toBe(true);
   });
 
   it('blocks rather than allows when `requires` is unreadable', () => {
@@ -127,8 +127,8 @@ describe('per-agent pack trimming', () => {
     const { withSpend } = pickClients();
     if (!withSpend) return;
     const { pack } = buildFactPack(withSpend.id);
-    const pacing = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'creative'`).get();
-    const trimmed = packForAgent(pack, pacing);
+    const creative = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'creative'`).get();
+    const trimmed = packForAgent(pack, creative);
     expect(trimmed.sections.spend).toBeUndefined();
     expect(Object.keys(trimmed.sections).length).toBeLessThanOrEqual(Object.keys(pack.sections).length);
   });
@@ -137,8 +137,49 @@ describe('per-agent pack trimming', () => {
     const { withSpend } = pickClients();
     if (!withSpend) return;
     const { pack } = buildFactPack(withSpend.id);
-    const full = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'full'`).get();
+    const full = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'audit'`).get();
     expect(Object.keys(packForAgent(pack, full).sections).sort())
       .toEqual(Object.keys(pack.sections).sort());
+  });
+});
+
+describe('claude-ads fleet wiring', () => {
+  const configs = db.prepare('SELECT * FROM ads_agent_config').all();
+
+  it('gives every card a claude-ads skill to run', () => {
+    expect(configs.length).toBeGreaterThan(20);
+    for (const conf of configs) {
+      expect(conf.skill_name).toMatch(/^ads-/);
+    }
+  });
+
+  it('names a skill that is actually installed, or says why it cannot run', () => {
+    // A card pointing at a skill the plugin does not ship would queue, run, and
+    // come back as an answer from training knowledge — the exact failure the
+    // SEO fleet's skill-inventory check exists to catch.
+    const shipped = new Set([
+      'ads-amazon', 'ads-apple', 'ads-attribution', 'ads-audit', 'ads-budget',
+      'ads-competitor', 'ads-create', 'ads-creative', 'ads-dna', 'ads-generate',
+      'ads-google', 'ads-landing', 'ads-launch', 'ads-linkedin', 'ads-math',
+      'ads-meta', 'ads-microsoft', 'ads-monitor', 'ads-optimize', 'ads-photoshoot',
+      'ads-pinterest', 'ads-plan', 'ads-reddit', 'ads-report', 'ads-research',
+      'ads-server-side-tracking', 'ads-setup', 'ads-snapchat', 'ads-test',
+      'ads-tiktok', 'ads-validate', 'ads-x', 'ads-youtube',
+    ]);
+    for (const conf of configs) expect(shipped.has(conf.skill_name)).toBe(true);
+  });
+
+  it('keeps both account-changing skills blocked', () => {
+    // ads-launch applies campaign launches and ads-optimize can apply changes.
+    // Neither may become runnable by accident.
+    const launch = configs.find(c => c.agent_type === 'launch');
+    expect(launch.static_block).toBeTruthy();
+    expect(launch.static_block).toMatch(/mutation|adapter/i);
+  });
+
+  it('blocks every platform the agency does not run', () => {
+    const unrun = configs.filter(c => c.platform && !['Google', 'Meta', 'YouTube'].includes(c.platform));
+    expect(unrun.length).toBeGreaterThan(0);
+    for (const conf of unrun) expect(conf.static_block).toBeTruthy();
   });
 });

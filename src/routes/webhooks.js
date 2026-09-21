@@ -1984,8 +1984,15 @@ function handleClaimAdsRuns(payload) {
       client_id: run.client_id,
       client_name: run.client_name,
       agent_type: run.agent_type,
+      // The claude-ads skill that serves this card. The worker invokes this by
+      // name rather than deriving it: claude-ads calls the full audit
+      // 'ads-audit' while our card is 'audit', and every scheme that derives a
+      // skill name from an agent type has needed a special case for exactly
+      // that pair.
+      skill_name: conf.skill_name,
       agent_label: conf.label,
       agent_brief: conf.description,
+      platform: conf.platform || null,
       period_month: built.pack.focus_month,
       model: run.model,
       requested_by: run.requested_by,

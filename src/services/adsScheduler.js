@@ -9,9 +9,9 @@
  *
  * So the policy is deliberately narrow:
  *
- *   Daily   — the anomaly watch, and only for clients with enough history for
- *             it to mean anything. It exists to answer "did something break
- *             overnight", which is the only question worth asking every day.
+ *   Daily   — the account monitor (claude-ads' `ads-monitor`), and only for
+ *             clients whose data supports it. It answers "did something break
+ *             overnight", the only question worth asking every day.
  *   Weekly  — a sweep of agents that are genuinely stale, capped per client.
  *             The cap is what stops a client who was ignored for a month from
  *             queueing forty runs the moment someone notices.
@@ -40,6 +40,9 @@ function adsClients() {
  */
 function maybeQueue(client, conf, available, activeRuns) {
   if (activeRuns.has(conf.agent_type)) return { skipped: 'in_flight' };
+  // A statically blocked card can never become runnable by waiting, so the
+  // sweep must not keep reconsidering it every week.
+  if (conf.static_block) return { skipped: 'not_configured' };
   if (!checkRequirements(conf, available).ok) return { skipped: 'missing_data' };
 
   const last = db.prepare(
@@ -65,14 +68,15 @@ function maybeQueue(client, conf, available, activeRuns) {
 }
 
 /**
- * Daily anomaly watch.
+ * Daily account monitor — claude-ads' `ads-monitor`: pacing, delivery, creative
+ * fatigue, tracking and policy.
  *
- * Skipped for clients without multiple months of spend. Run against a single
- * month the agent has nothing to compare and produces a confident report about
- * one data point, which is the failure mode this whole design avoids.
+ * Skipped for clients whose fact pack cannot support it. Run against a single
+ * month it has nothing to compare and produces a confident report about one
+ * data point, which is the failure mode this whole design avoids.
  */
 export function runDailyAdsWatch() {
-  const conf = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'anomaly'`).get();
+  const conf = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'monitor'`).get();
   if (!conf) return { queued: 0 };
 
   let queued = 0;
@@ -85,11 +89,11 @@ export function runDailyAdsWatch() {
       if (result.run) queued++;
       else skipped.push(`${client.name}:${result.skipped}`);
     } catch (err) {
-      console.error(`[ADS SCHEDULER] Anomaly watch failed for ${client.name}:`, err.message);
+      console.error(`[ADS SCHEDULER] Account monitor failed for ${client.name}:`, err.message);
     }
   }
 
-  console.log(`[ADS SCHEDULER] Daily anomaly watch: ${queued} queued${skipped.length ? `, skipped ${skipped.join(', ')}` : ''}.`);
+  console.log(`[ADS SCHEDULER] Daily account monitor: ${queued} queued${skipped.length ? `, skipped ${skipped.join(', ')}` : ''}.`);
   return { queued, skipped };
 }
 
@@ -102,7 +106,9 @@ export function runDailyAdsWatch() {
  */
 export function runWeeklyAdsSweep() {
   const configs = db.prepare(`
-    SELECT * FROM ads_agent_config WHERE agent_type != 'anomaly' ORDER BY sort_order ASC
+    SELECT * FROM ads_agent_config
+    WHERE agent_type != 'monitor' AND static_block IS NULL
+    ORDER BY sort_order ASC
   `).all();
 
   let queued = 0;

@@ -22,30 +22,30 @@ score a measure of your priors rather than of the account. An account with a
 | 30-49 | Money is being lost at a measurable rate right now. |
 | 0-29 | The account is not functioning: no leads, runaway cost, or tracking broken. |
 
-## Per agent
+## Per card
 
-- **performance / budget / platform_split** → `efficiency_score`: cost per
-  qualified lead and its direction. Weight the direction: a bad number moving
-  the right way outscores a good number moving the wrong way.
-- **lead_quality** → `lead_quality_score`: qualification rate and its trend,
-  discounted by how much of the volume is still pending.
-- **funnel** → `funnel_score`: the size of the largest single-stage drop-off.
-- **roas** → `roas_score`: return against spend, **capped by
-  `revenue.coverage_pct`** — you cannot score what you could not price. Below
-  60% coverage, omit the score rather than publishing a partial one as whole.
+The Ops Center stores one score column per card. Fill the one your card owns.
+
+- **audit**, **monitor** → `health_score`: the account overall. Not an average
+  of the other cards — a single critical failure outweighs four healthy areas,
+  because that is how it will be experienced.
+- **math**, **budget**, **optimize**, **google**, **meta**, **youtube** →
+  `efficiency_score`: cost per qualified lead and its direction. Weight the
+  direction: a bad number moving the right way outscores a good number moving
+  the wrong way.
+- **attribution**, **server_side_tracking** → `lead_quality_score`: how much of
+  the outcome data can actually be trusted and tied back to a campaign.
+- **landing** → `landing_score`. Remember there is no conversion rate available
+  here; score on contact-click volume against paid clicks and on unresolved
+  findings from the page's SEO audits.
 - **creative** → `creative_score`: spread between best and median performance,
   and how much of the winning material has been used in ads.
-- **landing** → `landing_score`: contact-click volume relative to paid clicks,
-  plus unresolved findings from the page's SEO audits.
-- **pacing** → `pacing_score`: projected month-end against the prior-month
-  average. **Do not score before day 7** — say the month is too young instead.
-- **anomaly** → `audit_score`: 100 when nothing broke, falling with the size and
-  count of breaks. A quiet month scoring 100 is the correct result, not a
-  useless one.
-- **full** → `health_score`: the account overall. Not an average of the others —
-  a single critical failure outweighs four healthy areas, because that is how it
-  will be experienced.
-- **report** → no score. It reports the others.
+- **plan** → `pacing_score`: how well the current split and spend match the
+  stated strategy.
+- **report** → `roas_score` where revenue coverage supports one, otherwise omit.
+- Everything else (**create**, **dna**, **competitor**, **test**, **setup**,
+  **validate**, **research**) → `audit_score`, or omit it. These produce
+  artefacts rather than verdicts, and a number on them is decoration.
 
 ## Omitting a score
 

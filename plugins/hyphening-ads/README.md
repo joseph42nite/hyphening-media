@@ -1,72 +1,22 @@
 # Ads Monitor
 
-The paid-media counterpart to the SEO Monitor. Twelve agents analyse a client's
-campaign, lead and revenue data on a schedule; you read the actions they
-produce.
+The paid-media counterpart to the SEO Monitor. Thirty-three cards, each backed
+by a skill from [AgriciDaniel/claude-ads](https://github.com/AgriciDaniel/claude-ads)
+— the same author as the `claude-seo` plugin already serving the SEO Monitor, so
+both fleets now work the same way end to end.
 
-## Why this is not `claude-ads`
-
-[AgriciDaniel/claude-ads](https://github.com/AgriciDaniel/claude-ads) (9.4k
-stars, MIT, actively maintained) is the best paid-media plugin on GitHub and
-this is modelled on it. It is not installed here for one reason: it audits
-twelve ad platforms **through their APIs**, and this installation has
-credentials for none of them.
-
-That is not a small gap. The SEO fleet already learned what happens when a
-skill runs without its data source — it does not fail, it writes a plausible
-audit from training knowledge, and a fabricated Critical recommendation is
-indistinguishable from a real one until someone acts on it. Running a
-platform-API plugin with no platform APIs would do that twelve times over.
-
-What this installation does have is the data those APIs cannot see: which leads
-qualified, which booked an appointment, what a booked treatment is worth. So
-the fleet is scoped to questions first-party data can actually answer, and each
-agent declares the data it needs.
-
-If Google Ads or Meta API access is added later, `claude-ads` becomes worth
-installing alongside this — they answer different questions.
-
-## How a run works
-
-```
-Dashboard / scheduler
-  └─ POST /api/clients/:id/ads/trigger/:agentType
-       └─ row in ads_agent_runs (status: queued)   ← the dedupe slot
-            └─ worker: claim_ads_runs  ────────────→ fact pack delivered
-                 └─ claude CLI runs the ads-* skill
-                      └─ create_ads_audit  ────────→ ads_audits + ads_recommendations
-                           └─ SSE → the dashboard card flips
-```
-
-The worker pulls; the Ops Center never reaches into it. A worker that was off
-all morning collects its backlog when it wakes.
-
-## The fact pack
-
-`src/services/adsFacts.js` computes every figure — CTR, CPC, CPL, cost per
-qualified lead, ROAS, pacing — in SQL and JS, and hands it to the agent already
-calculated. The agent interprets; it never derives. Three things follow:
-
-- **One database pass per run.** No tool round-trips, so a run is a single
-  model call.
-- **Numbers that match the dashboard**, because both render the same pack.
-- **No fabrication surface.** A section that cannot be built is absent and named
-  in `gaps`; an agent whose required section is missing is refused before it is
-  queued, not handed an empty pack.
-
-`GET /api/clients/:id/ads/facts` returns the pack for a human. Every figure in
-every ads report traces back to it.
+This directory is **not** a plugin. It is the bridge between claude-ads and the
+Ops Center: the fact pack that feeds it, the reply contract that gets results
+back, and the worker that runs it.
 
 ## Install
 
-On the machine that will run the analyses:
-
 ```bash
-claude plugin marketplace add /path/to/hyphening/plugins/hyphening-ads
-claude plugin install hyphening-ads@hyphening-ads
+claude plugin marketplace add agricidaniel/claude-ads
+claude plugin install claude-ads@ai-marketing-hub-claude-ads
 ```
 
-Then the worker:
+Then the worker, on the machine that will run the analyses:
 
 ```bash
 export HYPHENING_API_URL=https://hypheningmedia.com
@@ -83,43 +33,91 @@ Under pm2, alongside the SEO worker:
 pm2 start plugins/hyphening-ads/scripts/ads_worker.mjs --name ads-worker
 ```
 
+## How a run works
+
+```
+Dashboard / scheduler
+  └─ POST /api/clients/:id/ads/trigger/:agentType
+       └─ row in ads_agent_runs (status: queued)   ← the dedupe slot
+            └─ worker: claim_ads_runs  ────────────→ skill name + fact pack
+                 └─ claude CLI runs the claude-ads skill
+                      └─ create_ads_audit  ────────→ ads_audits + ads_recommendations
+                           └─ SSE → the dashboard card flips
+```
+
+The worker pulls; the Ops Center never reaches into it. A worker that was off
+all morning collects its backlog when it wakes.
+
+## The fact pack
+
+claude-ads is source-grounded: it audits exports and authorised account reads,
+and refuses to invent account context. This installation has no ad-platform API
+credentials, so `src/services/adsFacts.js` supplies the source instead — and it
+supplies something the platform APIs cannot see anyway: which leads qualified,
+which booked an appointment, and what a booked treatment is worth.
+
+Every figure is computed in SQL and JS before the skill sees it — CTR, CPC, CPL,
+cost per qualified lead, ROAS, pacing. Three things follow:
+
+- **One database pass per run.** No tool round-trips, so a run is a single model
+  call. A claim payload measures around 3 KB.
+- **Numbers that match the dashboard**, because both render the same pack.
+- **No fabrication surface.** A section that cannot be built is absent and named
+  in `gaps`; a card whose required section is missing is refused before it is
+  queued rather than handed an empty pack.
+
+`GET /api/clients/:id/ads/facts` returns the pack for a human. Every figure in
+every ads report traces back to it.
+
+## Blocked cards
+
+All thirty-three are listed. Fourteen are blocked for one of three reasons, and
+the card says which:
+
+| Kind | Cards | What would unblock it |
+|---|---|---|
+| **Missing data** | `youtube`, `landing` | Record spend on that platform, or landing-page contact clicks |
+| **Not configured** | `generate`, `photoshoot` | Set `ADS_IMAGE_PROVIDER` and its API key |
+| **Deliberately off** | `launch`, and the applying half of `optimize` | A platform API adapter and a mutation gate — a decision, not a default |
+| **Platform not run** | `linkedin`, `tiktok`, `microsoft`, `apple`, `amazon`, `pinterest`, `reddit`, `snapchat`, `x` | `marketing_ad_campaigns.platform` accepts Google, Meta and YouTube only; this needs a schema change first |
+
 ## The schedule
 
 | When | What |
 |---|---|
-| Daily 06:30 | Anomaly watch, for clients with more than one month of spend |
-| Monday 07:00 | Sweep of stale agents, capped at `ADS_WEEKLY_CAP` (default 3) per client |
+| Daily 06:30 | `ads-monitor` — pacing, delivery, creative fatigue, tracking, policy |
+| Monday 07:00 | Sweep of stale cards, capped at `ADS_WEEKLY_CAP` (default 3) per client |
 
-Everything else is manual. The cap is deliberate: a client ignored for a month
-catches up over the next month rather than queueing forty runs in one night.
-
-## The agents
-
-| Agent | Answers | Needs |
-|---|---|---|
-| `full` | Is the account healthy, and what is the one thing to fix first? | campaigns |
-| `performance` | Is it getting more or less for its money, and which campaign changed? | campaigns |
-| `lead_quality` | Were the leads real, and what did a real one cost? | campaigns + leads |
-| `funnel` | Where do people stop between arriving and booking? | leads |
-| `roas` | What did the spend actually return? | campaigns + leads + prices |
-| `budget` | Where should the next rupee go, and how many? | campaigns |
-| `platform_split` | Is each platform doing its job? | 2+ platforms |
-| `pacing` | Where does this month land at the current rate? | current-month spend |
-| `anomaly` | Did anything break since last month? | 2+ months |
-| `creative` | What angles work that the ads have not tried? | posted content |
-| `landing` | What happens after the click? | contact clicks or SEO audits |
-| `report` | The month, written for the client. | campaigns |
+Statically blocked cards are skipped by the sweep: waiting cannot unblock them.
 
 ## What it will not do
 
-- **Change anything in an ad account.** There is no write path to any platform,
-  by design. Every output is a recommendation a person actions.
-- **Quote an industry benchmark.** Nothing in the pack contains one. Agents
+- **Change anything in an ad account.** `ads-launch` and applying optimisations
+  are blocked at the Ops Center, and no platform adapter is configured. Every
+  output is a recommendation a person actions.
+- **Quote an industry benchmark.** Nothing in the pack contains one. Cards
   compare against the account's own history and say so.
 - **Pace against a budget.** No monthly budget is stored anywhere in this
   system. Pacing compares to the account's own prior-month average.
 - **Report lifetime value.** Revenue is the first booked treatment, priced off
   the client's own list, and every report says so.
-- **Report a landing page conversion rate.** There is no sessions figure in
-  this system, so contact clicks have no denominator. Any such percentage would
-  be invented.
+- **Report a landing page conversion rate.** There is no sessions figure in this
+  system, so contact clicks have no denominator.
+
+## Security
+
+Both plugins were audited before use (2026-09-21):
+
+- **claude-ads** ships no hooks — nothing runs on your machine automatically. No
+  telemetry, no author callback, no dynamic code execution, no access to `.ssh`,
+  `.aws`, `.netrc` or the keychain. Its skills explicitly treat supplied exports
+  and pages as untrusted data and refuse instructions embedded in them.
+- **claude-seo** ships one `PostToolUse` hook that validates JSON-LD locally
+  with no network access. It reads only the API credentials you provide, and
+  every outbound host is a named API: Moz, Bing Webmaster, DataForSEO, Common
+  Crawl, Google (PageSpeed, CrUX, GSC, GA4, NLP), IndexNow.
+
+Both ship SSRF and DNS-rebinding defences that block cloud metadata endpoints
+and encoded loopback addresses.
+
+Re-audit on plugin update: a marketplace refresh pulls new code.

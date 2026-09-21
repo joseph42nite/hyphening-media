@@ -290,7 +290,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
   /** Queues every agent that can actually run, skipping the blocked ones so the
    *  server is not asked for something it is about to refuse. */
   const runAll = async () => {
-    const runnable = agents.filter(a => !a.blockedReason && a.agentType !== 'full' && !activeRuns[a.agentType]);
+    const runnable = agents.filter(a => !a.blockedReason && a.agentType !== 'audit' && !activeRuns[a.agentType]);
     if (!runnable.length) {
       showToast?.('Nothing to run — every agent is either blocked or already in flight.', 'info');
       return;
@@ -541,10 +541,19 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                   }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>{agent.label}</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {agent.label}
+                        {agent.platform && <Pill tone="muted">{agent.platform}</Pill>}
+                      </div>
                       <div style={{ fontSize: '0.68rem', color: 'rgba(223, 231, 224, 0.4)', marginTop: 2 }}>
                         {agent.freshness === 'never_run' ? 'never run'
                           : `${agent.ageDays}d ago${agent.periodMonth ? ` · ${agent.periodMonth}` : ''}`}
+                        {/* The skill name, not just the card name. When a run
+                            fails, "ads-google did not report" is something you
+                            can go and check; "google failed" is not. */}
+                        {agent.skillName && (
+                          <span style={{ color: 'rgba(223, 231, 224, 0.28)' }}> · {agent.skillName}</span>
+                        )}
                       </div>
                     </div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1, color: scoreColor(agent.score), fontFamily: 'Space Grotesk, sans-serif' }}>
@@ -557,7 +566,14 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                   </p>
 
                   {blocked && (
-                    <div style={{ fontSize: '0.7rem', color: '#fbbf24', display: 'flex', gap: 5, lineHeight: 1.4 }}>
+                    // Two different colours for two different asks. Amber means
+                    // "add some data and this starts working"; grey means
+                    // "someone has to configure something on purpose". Painting
+                    // both amber sends people off to fix the wrong thing.
+                    <div style={{
+                      fontSize: '0.7rem', display: 'flex', gap: 5, lineHeight: 1.4,
+                      color: agent.blockedPermanently ? 'rgba(223, 231, 224, 0.45)' : '#fbbf24',
+                    }}>
                       <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 2 }} />
                       <span>{agent.blockedReason}</span>
                     </div>

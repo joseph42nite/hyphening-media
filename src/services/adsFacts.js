@@ -604,9 +604,11 @@ export function packForAgent(pack, agentConfig) {
   let required;
   try { required = JSON.parse(agentConfig.requires); } catch { required = []; }
 
-  // 'full' reads everything by definition; every other agent gets its own
-  // sections plus the two joins that are meaningless to compute twice.
-  const keys = agentConfig.agent_type === 'full'
+  // The full audit reads everything by definition; every other card gets its
+  // own sections plus the two joins that are meaningless to compute twice.
+  // 'full' is kept alongside 'audit' so a pack built before migration 076
+  // renamed the card still trims the same way.
+  const keys = (agentConfig.agent_type === 'audit' || agentConfig.agent_type === 'full')
     ? Object.keys(pack.sections)
     : [...new Set([
         ...required.map(k => k.replace(/^spend_.*/, 'spend')),

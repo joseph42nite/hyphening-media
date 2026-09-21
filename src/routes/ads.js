@@ -24,16 +24,20 @@ import {
 // the SEO route's map, and for the same reason: a creative score and a pacing
 // score must not compete for one cell.
 const SCORE_COLUMN_BY_TYPE = {
-  full: 'health_score',
-  performance: 'efficiency_score',
+  audit: 'health_score',
+  monitor: 'health_score',
+  math: 'efficiency_score',
   budget: 'efficiency_score',
-  platform_split: 'efficiency_score',
-  lead_quality: 'lead_quality_score',
-  funnel: 'funnel_score',
-  creative: 'creative_score',
+  optimize: 'efficiency_score',
+  google: 'efficiency_score',
+  meta: 'efficiency_score',
+  youtube: 'efficiency_score',
+  attribution: 'lead_quality_score',
+  server_side_tracking: 'lead_quality_score',
   landing: 'landing_score',
-  pacing: 'pacing_score',
-  roas: 'roas_score',
+  creative: 'creative_score',
+  plan: 'pacing_score',
+  report: 'roas_score',
 };
 
 const ALL_SCORE_COLUMNS = [
@@ -61,6 +65,39 @@ function blockedMessage(missing, gaps) {
   return [...new Set(reasons)].join(' ');
 }
 
+/** Every ad platform this client has ever recorded spend on.
+ *
+ *  Ever, not this month. A Google card should not blink out because last month
+ *  happened to be Meta-only — the account has Google history to audit either
+ *  way, and a card that appears and disappears with the calendar teaches people
+ *  to distrust the fleet. */
+function platformsEverRun(clientId) {
+  const rows = db.prepare(
+    'SELECT DISTINCT platform FROM marketing_ad_campaigns WHERE client_id = ? AND platform IS NOT NULL'
+  ).all(clientId);
+  return new Set(rows.map(r => r.platform));
+}
+
+/**
+ * Why this card cannot run, or null if it can. The single place both the
+ * trigger route and the dashboard ask.
+ *
+ * Ordered cheapest and most permanent first: a capability this installation
+ * does not have outranks data it happens to be missing this month, because the
+ * second can fix itself and the first cannot. Reporting the data gap on a
+ * statically blocked card would send someone off to add campaign rows that
+ * would change nothing.
+ */
+function blockReason(conf, available, gaps, platforms) {
+  if (conf.static_block) return conf.static_block;
+  if (conf.platform && !platforms.has(conf.platform)) {
+    return `No ${conf.platform} spend has ever been recorded for this client.`;
+  }
+  const requirement = checkRequirements(conf, available);
+  if (!requirement.ok) return blockedMessage(requirement.missing, gaps);
+  return null;
+}
+
 const router = Router({ mergeParams: true });
 router.use(authenticate);
 
@@ -83,6 +120,7 @@ router.get('/:id/ads/agents/status', (req, res) => {
     const { pack, available, gaps } = built;
     const configs = db.prepare('SELECT * FROM ads_agent_config ORDER BY sort_order ASC').all();
     const activeRuns = getActiveRunsForClient(clientId);
+    const platforms = platformsEverRun(clientId);
 
     const lastAuditStmt = db.prepare(`
       SELECT id, created_at, agent_type, period_month, data_gaps, ${ALL_SCORE_COLUMNS.join(', ')}
@@ -98,7 +136,7 @@ router.get('/:id/ads/agents/status', (req, res) => {
 
     const agents = configs.map(conf => {
       const last = lastAuditStmt.get(clientId, conf.agent_type);
-      const requirement = checkRequirements(conf, available);
+      const blocked = blockReason(conf, available, gaps, platforms);
 
       let freshness = 'never_run';
       let ageDays = null;
@@ -109,6 +147,11 @@ router.get('/:id/ads/agents/status', (req, res) => {
 
       return {
         agentType: conf.agent_type,
+        // The claude-ads skill that serves this card. Sent so the dashboard can
+        // name it in a tooltip: when a run fails, "ads-google did not report"
+        // is something you can go and check, and "google failed" is not.
+        skillName: conf.skill_name,
+        platform: conf.platform,
         label: conf.label,
         description: conf.description,
         staleAfterDays: conf.stale_after_days,
@@ -123,8 +166,10 @@ router.get('/:id/ads/agents/status', (req, res) => {
         // Decided here and sent, never re-derived in the browser. The SEO
         // dashboard kept its own copy of this rule and it drifted: a skill sat
         // greyed out for weeks after the thing it needed was connected.
-        blockedReason: requirement.ok ? null : blockedMessage(requirement.missing, gaps),
-        missingData: requirement.ok ? [] : requirement.missing,
+        blockedReason: blocked,
+        // Distinguishes "add some data" from "configure something, deliberately".
+        blockedPermanently: !!conf.static_block,
+        missingData: blocked && !conf.static_block ? checkRequirements(conf, available).missing : [],
         activeRun: activeRuns.get(conf.agent_type) ? {
           id: activeRuns.get(conf.agent_type).id,
           status: activeRuns.get(conf.agent_type).status,
@@ -205,17 +250,17 @@ router.post('/:id/ads/trigger/:agentType', (req, res) => {
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
     const built = buildFactPack(clientId, { month: req.body?.month || null });
-    const requirement = checkRequirements(conf, built.available);
-    if (!requirement.ok) {
+    const blocked = blockReason(conf, built.available, built.gaps, platformsEverRun(clientId));
+    if (blocked) {
       // A blocked agent is refused rather than run on an empty pack. This is
       // the whole reason the requirements exist: an agent handed no data does
       // not fail, it answers from training knowledge, and a fabricated
       // "reallocate ₹40,000 to Google" is indistinguishable from a real one.
       return res.status(400).json({
-        error: 'missing_data',
+        error: conf.static_block ? 'not_configured' : 'missing_data',
         agentType,
-        missing: requirement.missing,
-        message: blockedMessage(requirement.missing, built.gaps),
+        skillName: conf.skill_name,
+        message: blocked,
       });
     }
 
@@ -490,8 +535,9 @@ queueRouter.get('/overview', (req, res) => {
 
       let due = 0;
       let blocked = 0;
+      const platforms = platformsEverRun(client.id);
       for (const conf of configs) {
-        if (!checkRequirements(conf, built.available).ok) { blocked++; continue; }
+        if (blockReason(conf, built.available, built.gaps, platforms)) { blocked++; continue; }
         const last = db.prepare(
           'SELECT created_at FROM ads_audits WHERE client_id = ? AND agent_type = ? ORDER BY created_at DESC LIMIT 1'
         ).get(client.id, conf.agent_type);
