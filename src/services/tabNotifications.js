@@ -167,6 +167,30 @@ function countDraftPosts(since) {
 }
 
 /**
+ * Ads actions waiting to be dealt with.
+ *
+ * Counted on the recommendation, not on the audit. A finished ads run is not
+ * itself work — it is work only if it found something, and an agent that
+ * correctly reports a healthy month should leave the badge at zero rather than
+ * training the eye to dismiss it.
+ *
+ * Keyed on created_at, so the number restarts at 1 the next time an agent finds
+ * something new and does not re-raise for actions already seen and left open
+ * deliberately. Ignored and completed rows drop out by not being `open`.
+ */
+function countOpenAdsActions(since) {
+  try {
+    const row = db.prepare(`
+      SELECT COUNT(*) AS n FROM ads_recommendations
+      WHERE status = 'open' AND ${NORM('created_at')} > ?
+    `).get(since);
+    return row.n;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * One count per tab id, matching the ids Dashboard.jsx uses for setActiveTab.
  *
  * A failing count returns 0 rather than throwing: a badge is an affordance, and
@@ -174,6 +198,7 @@ function countDraftPosts(since) {
  */
 const COUNTERS = {
   seo: countDueAudits,
+  ads: countOpenAdsActions,
   scripts: countScriptResponses,
   tasks: countOverdueTasks,
   blog: countDraftPosts,

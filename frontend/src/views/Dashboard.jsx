@@ -6,7 +6,7 @@ import {
   Users, Folder, Calendar, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
   Search, Share2, FileDown, Eye, HelpCircle, Check, X,
-  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu, Menu
+  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu
 } from 'lucide-react';
 
 import TasksTab from '../components/dashboard/TasksTab.jsx';
@@ -20,13 +20,14 @@ import ContentModal from '../components/dashboard/ContentModal.jsx';
 import BlogTab from '../components/dashboard/BlogTab.jsx';
 import ClientsTab from '../components/dashboard/ClientsTab.jsx';
 import SeoMonitorTab from '../components/dashboard/SeoMonitorTab.jsx';
+import AdsMonitorTab from '../components/dashboard/AdsMonitorTab.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from '../components/dashboard/contentFormHelper.js';
 
 let isRefreshing = false;
 let refreshPromise = null;
 
 /** Tabs the server keeps a count for — mirrors BADGED_TABS in tabNotifications.js. */
-const BADGED_TABS = ['seo', 'scripts', 'tasks', 'blog'];
+const BADGED_TABS = ['seo', 'ads', 'scripts', 'tasks', 'blog'];
 
 /**
  * Count badge on a nav tab.
@@ -1282,6 +1283,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
+        {/* Ads Monitor */}
+        {(isAdmin || isSMM) && (
+          <button onClick={() => handleTabClick('ads')} className={`btn ${activeTab === 'ads' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.ads ? `${tabCounts.ads} ads action(s) waiting` : undefined}>
+            <Megaphone size={16} /> Ads Monitor
+            <TabBadge count={getTabBadgeCount('ads', tabCounts.ads)} />
+          </button>
+        )}
+
         {/* 4. Scripts */}
         {(isAdmin || isSMM) && (
           <button onClick={() => handleTabClick('scripts')} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.scripts ? `${tabCounts.scripts} script change(s) pending review` : undefined}>
@@ -1470,6 +1479,15 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* SEO MONITOR TAB */}
         {activeTab === 'seo' && (isAdmin || isSMM) && (
           <SeoMonitorTab
+            auth={auth}
+            clients={clients}
+            showToast={showToast}
+          />
+        )}
+
+        {/* ADS MONITOR TAB */}
+        {activeTab === 'ads' && (isAdmin || isSMM) && (
+          <AdsMonitorTab
             auth={auth}
             clients={clients}
             showToast={showToast}

@@ -1237,3 +1237,62 @@ Remaining use: inspecting staff-submitted requests that are awaiting admin appro
 
 ---
 
+
+---
+
+## 3.6. Ads Monitor events
+
+Three events serve the paid-media fleet. They mirror the SEO worker's contract
+with one structural difference: **an ads run is handed its data**. An SEO run
+receives a URL and goes and gathers what it needs; an ads run receives the
+whole fact pack in the claim response, so it is a single model call with no
+tool round-trips back to this server.
+
+The full agent contract, fact-pack section shapes and scoring rubric live in
+`plugins/hyphening-ads/references/`.
+
+### `claim_ads_runs`
+
+Pulls queued runs. Nothing is pushed to the worker.
+
+```json
+{ "event_type": "claim_ads_runs", "payload": { "worker_id": "mac-mini", "limit": 3 } }
+```
+
+Each returned run carries `run_id`, `client_id`, `agent_type`, `period_month`,
+`agent_label`, `agent_brief`, `facts_hash`, and `facts` — the fact pack trimmed
+to the sections that agent needs. Claiming marks the run `running` and arms its
+timeout; a run whose data has disappeared between queueing and claiming is
+failed rather than handed over with an empty pack.
+
+### `ads_run_log`
+
+```json
+{ "event_type": "ads_run_log", "payload": { "run_id": 12, "log": "[SYSTEM] Analysing…" } }
+```
+
+Relayed live to the dashboard console over SSE.
+
+### `create_ads_audit`
+
+Submits the result and closes the run.
+
+| Field | Required | Notes |
+| :--- | :--- | :--- |
+| `run_id` | No, but send it | Exact correlation. Without it the result is matched by client + agent type. |
+| `client_id` | ✅ | |
+| `agent_type` | ✅ | One of `ads_agent_config.agent_type`. |
+| `period_month` | No | `YYYY-MM`. Defaults to the run's own. |
+| `facts_hash` | No, but send it | Checked against the pack the agent was given. |
+| `<agent>_score` | No | 0–100. Outside that range it is discarded. |
+| `summary`, `report_json` | No | |
+| `recommendations` | No | Rows missing `metric`, `issue` or `action_required` are dropped. |
+| `data_gaps`, `token_usage` | No | |
+| `status` | No | `error` or `failed` marks the run failed and stores the reason. |
+
+Two integrity guards fail the run while still storing the work — the tokens are
+spent either way, and a report that is real work but wrongly attributed should
+not leave its card reading as freshly audited:
+
+1. A run that requested one agent and received another.
+2. An agent reporting on a different `period_month` than the pack it was given.

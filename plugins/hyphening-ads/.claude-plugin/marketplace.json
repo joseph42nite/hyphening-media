@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "hyphening-ads",
+  "owner": { "name": "Hyphening Media" },
+  "metadata": {
+    "description": "Ads Monitor agent fleet for the Hyphening Marketing Ops Center."
+  },
+  "plugins": [
+    {
+      "name": "hyphening-ads",
+      "source": "./",
+      "category": "marketing",
+      "description": "Twelve paid-media agents that analyse a pre-computed fact pack of first-party campaign, lead and revenue data and post structured results back to the Ops Center.",
+      "author": { "name": "Hyphening Media" }
+    }
+  ]
+}

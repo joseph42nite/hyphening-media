@@ -43,6 +43,7 @@ import blogRoutes from './src/routes/blog.js';
 import integrationsRoutes from './src/routes/integrations.js';
 import { publicGigConfirmRoute } from './src/routes/artists.js';
 import seoRoutes, { queueRouter as seoQueueRoutes } from './src/routes/seo.js';
+import adsRoutes, { queueRouter as adsQueueRoutes } from './src/routes/ads.js';
 import approvalRoutes from './src/routes/approval.js';
 import usageRoutes from './src/routes/usage.js';
 import notificationRoutes from './src/routes/notifications.js';
@@ -227,6 +228,11 @@ app.use('/api/openclaw', webhookRoutes);
 // SEO & Audit integration routes
 app.use('/api/clients', seoRoutes);
 app.use('/api/seo', seoQueueRoutes);
+
+// Ads Monitor — the paid-media fleet. Same two mount points as SEO: the
+// per-client routes hang off /api/clients, the queue is client-agnostic.
+app.use('/api/clients', adsRoutes);
+app.use('/api/ads', adsQueueRoutes);
 app.use('/api/approval', approvalRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -395,6 +401,11 @@ app.listen(PORT, () => {
   import('./src/services/agentRuns.js')
     .then(({ recoverInFlightRuns }) => recoverInFlightRuns())
     .catch(err => console.error('[SERVER] SEO run recovery failed:', err));
+
+  // Same hazard, same fix, separate table.
+  import('./src/services/adsRuns.js')
+    .then(({ recoverInFlightRuns }) => recoverInFlightRuns())
+    .catch(err => console.error('[SERVER] Ads run recovery failed:', err));
 });
 
 export default app;

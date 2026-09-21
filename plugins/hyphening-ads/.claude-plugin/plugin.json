@@ -1,0 +1,12 @@
+{
+  "name": "hyphening-ads",
+  "version": "1.0.0",
+  "description": "Paid-media analysis fleet for the Hyphening Marketing Ops Center. Twelve agents over first-party campaign, lead and revenue data: efficiency, lead quality, funnel drop-off, true ROAS, budget reallocation, platform split, pacing, anomaly watch, creative signal, landing conversion and the client report. Every number is pre-computed by the Ops Center and handed to the agent as a fact pack; the agent interprets, it never calculates.",
+  "author": { "name": "Hyphening Media" },
+  "license": "MIT",
+  "keywords": [
+    "ads", "paid-media", "google-ads", "meta-ads", "youtube-ads",
+    "cpl", "roas", "lead-quality", "funnel", "budget-allocation",
+    "pacing", "anomaly-detection", "first-party-data"
+  ]
+}
