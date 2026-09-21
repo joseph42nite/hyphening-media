@@ -153,6 +153,29 @@ function totalise(rows) {
   };
 }
 
+/**
+ * Folds platform-level leads that no campaign claimed back into a total.
+ *
+ * Per-campaign CPL is deliberately null when a campaign has no attributable
+ * leads — we cannot say the spend on THAT campaign bought them. But the account
+ * did buy them, so an account total that ignores them reports no cost per lead
+ * at all while the money and the leads both plainly exist.
+ *
+ * That is exactly what happened on DentAlchemy: ₹143,000 of synced spend and 17
+ * landing-page leads, and a blank CPL, because every lead named a campaign that
+ * no Google campaign is called.
+ */
+function withOrphans(totals, orphanLeads) {
+  const leads = totals.leads + orphanLeads;
+  return {
+    ...totals,
+    leads,
+    leads_captured: totals.leads_captured + orphanLeads,
+    leads_unattributed: orphanLeads,
+    cpl_inr: ratio(totals.spend_inr, leads),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Sections
 //
@@ -291,12 +314,9 @@ function spendSection(clientId, month) {
     return {
       platform,
       campaigns: rs.length,
-      ...now,
-      // Added at platform level only, so the total is right without any
-      // campaign claiming a lead it cannot prove. Walk-ins are deliberately
-      // NOT added: no ad bought them.
-      leads_captured: now.leads_captured + orphan,
-      leads_unattributed: orphan,
+      // Unattributed leads are folded in here, never into a campaign. Walk-ins
+      // are deliberately left out entirely: no ad bought them.
+      ...withOrphans(now, orphan),
       walk_in_leads: walkInFor(focus, platform),
       share_of_spend_pct: pct(now.spend_inr, focusTotals.spend_inr),
       mom: before && {
@@ -311,8 +331,8 @@ function spendSection(clientId, month) {
   // A per-month account series so trend questions ("is CPL drifting up?") are
   // answered from the series rather than from two points the model picked.
   const series = months.map(m => {
-    const t = totalise(rows.filter(r => r.month === m));
-    return { month: m, spend_inr: t.spend_inr, leads: t.leads, cpl_inr: t.cpl_inr, ctr_pct: t.ctr_pct, cpc_inr: t.cpc_inr, lead_capture_pct: t.lead_capture_pct };
+    const t = withOrphans(totalise(rows.filter(r => r.month === m)), unattributedFor(m));
+    return { month: m, spend_inr: t.spend_inr, leads: t.leads, cpl_inr: t.cpl_inr, ctr_pct: t.ctr_pct, cpc_inr: t.cpc_inr, leads_unattributed: t.leads_unattributed };
   }).reverse();
 
   return {
@@ -326,20 +346,25 @@ function spendSection(clientId, month) {
     lead_capture_pct: focusTotals.leads_reported > 0
       ? pct(focusTotals.leads_captured + unattributedFor(focus), focusTotals.leads_reported)
       : null,
+    walk_in_leads: walkInFor(focus),
     account: {
-      ...focusTotals,
-      leads_captured: focusTotals.leads_captured + unattributedFor(focus),
-      // Leads the spend bought whose campaign is unknown. Distinct from the
-      // capture gap: these DID reach the CRM, they just cannot be costed.
-      leads_unattributed: unattributedFor(focus),
+      // Leads the spend bought whose campaign is unknown are counted here and
+      // included in cost per lead: the account paid for them either way.
+      ...withOrphans(focusTotals, unattributedFor(focus)),
       // Walk-ins and direct calls the client logged by hand. Excluded from
       // every figure above and from cost per lead — reported because they are
       // real business, but they are not what the ads bought.
       walk_in_leads: walkInFor(focus),
       mom: priorTotals && {
         spend_pct: delta(focusTotals.spend_inr, priorTotals.spend_inr),
-        leads_pct: delta(focusTotals.leads, priorTotals.leads),
-        cpl_pct: delta(focusTotals.cpl_inr, priorTotals.cpl_inr),
+        // Compared like against like: both sides include their own month's
+        // unattributed leads, so a month where attribution improved does not
+        // read as a collapse in volume.
+        leads_pct: delta(focusTotals.leads + unattributedFor(focus), priorTotals.leads + unattributedFor(prior)),
+        cpl_pct: delta(
+          ratio(focusTotals.spend_inr, focusTotals.leads + unattributedFor(focus)),
+          ratio(priorTotals.spend_inr, priorTotals.leads + unattributedFor(prior)),
+        ),
         ctr_pct: delta(focusTotals.ctr_pct, priorTotals.ctr_pct),
         cpc_pct: delta(focusTotals.cpc_inr, priorTotals.cpc_inr),
       },
