@@ -607,12 +607,23 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                 Setup for {selectedClient?.name}
               </div>
 
+              {/* Since Google Ads syncs, "type them in" is the wrong instruction
+                  for a client whose account is connected — it sends someone to
+                  copy numbers a button would fetch. The advice now depends on
+                  whether this client has a customer ID. */}
               {dataGaps.some(g => g.section === 'spend') && (
                 <div style={{ fontSize: '0.82rem', lineHeight: 1.55, color: 'rgba(223, 231, 224, 0.85)', marginBottom: 10 }}>
                   <strong style={{ color: '#93c5fd' }}>No campaign rows yet.</strong>{' '}
-                  Add them under <strong>Marketing Data → Ad Campaigns Performance</strong> — one row per
-                  campaign per month, with spend, impressions and clicks from the ad account. Most of
-                  the fleet unblocks on the first one.
+                  {googleAds?.configured ? (
+                    <>Press <strong>Sync Google Ads</strong> above — it imports this account's campaigns,
+                    spend and ad groups. Meta is still entered by hand under{' '}
+                    <strong>Marketing Data → Ad Campaigns Performance</strong>.</>
+                  ) : (
+                    <>Add the <strong>Google Ads Customer ID</strong> on the client record and the Sync
+                    button appears — it imports everything automatically. Failing that, enter rows by
+                    hand under <strong>Marketing Data → Ad Campaigns Performance</strong>.</>
+                  )}
+                  {' '}Most of the fleet unblocks on the first campaign.
                 </div>
               )}
 

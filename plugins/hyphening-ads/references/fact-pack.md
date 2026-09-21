@@ -59,6 +59,17 @@ A high share is a finding: it means the landing page is not passing the campaign
 through, so no campaign-level cost per lead can be trusted. Say so before
 quoting one.
 
+### Walk-ins are not ad leads
+
+`walk_in_leads` counts leads the client logged by hand in their portal —
+walk-ins and direct calls. **No ad bought them.** They are excluded from every
+lead count, cost figure and rate in the `spend` and `leads` sections, and
+reported separately so the clinic's own conversion on them is still visible.
+
+Never fold them into cost per lead. Crediting ad spend with a customer who
+walked in flatters every figure downstream, and the flattery grows with how
+well the clinic does offline — which is exactly backwards.
+
 **Trap:** every rate in the `leads` section is measured against the *captured*
 leads. Quoting a qualification rate without `lead_capture_pct` beside it
 describes a sample and calls it the account.

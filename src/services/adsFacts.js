@@ -214,15 +214,26 @@ function spendSection(clientId, month) {
   // between them is published as `lead_capture_pct` — because a 96% capture
   // failure is not a footnote about data quality, it is the most expensive
   // thing wrong with the account and nothing else in this system reports it.
-  // Leads whose platform is known but whose campaign is not — 'Manual Entry',
-  // blank, or a name matching no campaign row. Counted once per platform-month
-  // and never pushed down to a campaign, because attributing them to one would
-  // be a guess and attributing them to all is the bug above.
+  // Leads that reached the CRM but name no campaign split into two kinds, and
+  // the difference decides whether ad spend bought them.
   //
-  // Their existence is itself a finding: a landing page that does not pass the
-  // campaign through leaves every campaign-level cost figure unattributable.
-  const unattributedRows = db.prepare(`
-    SELECT strftime('%Y-%m', l.created_at) AS month, l.platform, COUNT(*) AS n
+  //   campaign_name = 'Manual Entry'  — the portal writes this when the CLIENT
+  //     adds a lead by hand (routes/portal.js). A walk-in or a direct call.
+  //     No ad bought it, so it must not appear in any ad lead count: including
+  //     it credits spend with a customer who arrived on their own and makes
+  //     cost per lead look better than it is.
+  //
+  //   campaign_name IS NULL           — the public landing-page capture writes
+  //     this when the page posts no campaign. Ad-driven, but which campaign is
+  //     unknown, so it counts at platform level and never at campaign level.
+  //
+  // A name matching no campaign row is treated as the second kind: something
+  // sent a campaign through, we just have no row for it.
+  const leadOrigin = db.prepare(`
+    SELECT strftime('%Y-%m', l.created_at) AS month, l.platform,
+           CASE WHEN LOWER(TRIM(COALESCE(l.campaign_name, ''))) = 'manual entry'
+                THEN 'walk_in' ELSE 'unattributed' END AS kind,
+           COUNT(*) AS n
     FROM campaign_leads l
     WHERE l.client_id = ? AND ${countableLeadSql('l')}
       AND (
@@ -234,13 +245,15 @@ function spendSection(clientId, month) {
             AND LOWER(TRIM(a.ad_campaign_name)) = LOWER(TRIM(l.campaign_name))
         )
       )
-    GROUP BY month, l.platform
+    GROUP BY month, l.platform, kind
   `).all(clientId);
 
-  const unattributed = new Map(unattributedRows.map(r => [`${r.month}|${r.platform}`, r.n]));
-  const unattributedFor = (month, platform = null) => (platform
-    ? (unattributed.get(`${month}|${platform}`) || 0)
-    : unattributedRows.filter(r => r.month === month).reduce((n, r) => n + r.n, 0));
+  const countOf = (kind) => (month, platform = null) => leadOrigin
+    .filter(r => r.kind === kind && r.month === month && (!platform || r.platform === platform))
+    .reduce((n, r) => n + r.n, 0);
+
+  const unattributedFor = countOf('unattributed');
+  const walkInFor = countOf('walk_in');
 
   for (const row of rows) {
     const reported = row.leads || 0;
@@ -280,9 +293,11 @@ function spendSection(clientId, month) {
       campaigns: rs.length,
       ...now,
       // Added at platform level only, so the total is right without any
-      // campaign claiming a lead it cannot prove.
+      // campaign claiming a lead it cannot prove. Walk-ins are deliberately
+      // NOT added: no ad bought them.
       leads_captured: now.leads_captured + orphan,
       leads_unattributed: orphan,
+      walk_in_leads: walkInFor(focus, platform),
       share_of_spend_pct: pct(now.spend_inr, focusTotals.spend_inr),
       mom: before && {
         spend_pct: delta(now.spend_inr, before.spend_inr),
@@ -317,6 +332,10 @@ function spendSection(clientId, month) {
       // Leads the spend bought whose campaign is unknown. Distinct from the
       // capture gap: these DID reach the CRM, they just cannot be costed.
       leads_unattributed: unattributedFor(focus),
+      // Walk-ins and direct calls the client logged by hand. Excluded from
+      // every figure above and from cost per lead — reported because they are
+      // real business, but they are not what the ads bought.
+      walk_in_leads: walkInFor(focus),
       mom: priorTotals && {
         spend_pct: delta(focusTotals.spend_inr, priorTotals.spend_inr),
         leads_pct: delta(focusTotals.leads, priorTotals.leads),
@@ -346,14 +365,21 @@ function leadsSection(clientId, month) {
   const rows = db.prepare(`
     SELECT platform, campaign_name, qualification_status, lead_status, call_outcome,
            appointment_status, treatment_type, rejection_reason,
-           strftime('%Y-%m', created_at) AS month
+           strftime('%Y-%m', created_at) AS month,
+           CASE WHEN LOWER(TRIM(COALESCE(campaign_name, ''))) = 'manual entry'
+                THEN 1 ELSE 0 END AS is_walk_in
     FROM campaign_leads
     WHERE client_id = ? AND is_test = 0
   `).all(clientId);
 
   const months = [...new Set(rows.map(r => r.month).filter(Boolean))].sort().reverse();
   const focus = month && months.includes(month) ? month : months[0];
-  const inFocus = rows.filter(r => r.month === focus);
+  // Walk-ins are held apart from every ad figure. They qualify and book like
+  // any other patient — worth reporting — but crediting ad spend with someone
+  // who walked in or phoned directly flatters every cost figure downstream.
+  const allInFocus = rows.filter(r => r.month === focus);
+  const inFocus = allInFocus.filter(r => !r.is_walk_in);
+  const walkIns = allInFocus.filter(r => r.is_walk_in);
 
   const stageCounts = (set) => ({
     leads: set.length,
@@ -402,6 +428,11 @@ function leadsSection(clientId, month) {
     focus_month: focus,
     months_available: months,
     account: withRates(inFocus),
+    // Reported alongside, never inside. Same stage counts so the clinic's own
+    // conversion on walk-ins is visible, which is a useful comparison against
+    // what the ads deliver.
+    walk_ins: walkIns.length ? withRates(walkIns) : null,
+    walk_in_note: 'Leads the client logged by hand in their portal: walk-ins and direct calls. No ad bought them, so they are excluded from every cost and rate above.',
     by_platform: Object.entries(byPlatform)
       .map(([platform, set]) => ({ platform, ...withRates(set) }))
       .sort((a, b) => b.leads - a.leads),
