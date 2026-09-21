@@ -26,6 +26,27 @@ Campaign performance for the focus month, with the prior month for comparison.
 per-campaign CTRs. If you average the campaign column you will get a different
 number and it will be wrong.
 
+### Two lead counts, and the gap between them
+
+- `leads_reported` — what the ad platform counted. Total volume.
+- `leads_captured` — rows that reached the CRM and can be called, qualified and
+  booked.
+- `leads` — the volume figure CPL is computed from.
+- `lead_capture_pct` — captured as a share of reported.
+
+Captured is a **subset** of reported: a form submission whose webhook never
+fired, a phone call nobody logged, a lead the platform counted and the landing
+page never posted. Each widens the gap.
+
+**This is a headline finding, not a footnote.** A capture rate of 4% means 96%
+of the leads that spend bought never reached anyone who could call them — which
+is almost always the most expensive thing wrong with an account, and nothing
+else in this system reports it. Lead it with, at Critical, whenever it is low.
+
+**Trap:** every rate in the `leads` section is measured against the *captured*
+leads. Quoting a qualification rate without `lead_capture_pct` beside it
+describes a sample and calls it the account.
+
 ## `leads`
 
 Outcomes for the leads those campaigns bought. Test leads are already excluded.

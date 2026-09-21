@@ -30,6 +30,12 @@ say not to invent account context; this makes the same point concrete:
 - **Revenue is the first booked treatment only.** No repeat visit is recorded
   anywhere, so it is never lifetime value. `coverage_pct` is how much of the
   booked volume could be priced — below 100 the figure is a floor.
+- **Two lead counts exist and they measure different things.** `leads_reported`
+  is what the platform counted; `leads_captured` is what reached the CRM;
+  `lead_capture_pct` is the gap. Cost per lead uses reported volume. Every
+  qualification, contact and booking rate is measured against captured leads
+  only — so quote the capture rate alongside any of them, and raise a low one
+  as a finding in its own right rather than as a caveat.
 - **There is no landing-page conversion rate.** No sessions figure exists here,
   so contact clicks have no denominator. Any such percentage would be invented.
 

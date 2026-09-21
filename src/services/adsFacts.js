@@ -27,6 +27,7 @@
 
 import crypto from 'crypto';
 import db from '../../database.js';
+import { countableLeadSql } from './leadFilters.js';
 
 /** Rounds to `dp` places, or null when the input is not a finite number. */
 function round(value, dp = 2) {
@@ -85,12 +86,13 @@ const CAMPAIGN_MONTH = `COALESCE(month, strftime('%Y-%m', created_at))`;
  */
 function deriveCampaign(row) {
   const spend = row.total_ad_spend_inr || 0;
+  const leads = row.resolved_leads;
   const derived = {
     ctr_pct: pct(row.clicks, row.impressions),
     cpc_inr: ratio(spend, row.clicks),
-    cpl_inr: ratio(spend, row.leads),
+    cpl_inr: ratio(spend, leads),
     cpm_inr: ratio(spend * 1000, row.impressions),
-    lead_rate_pct: pct(row.leads, row.clicks),
+    lead_rate_pct: pct(leads, row.clicks),
   };
 
   const drift = [];
@@ -112,7 +114,14 @@ function deriveCampaign(row) {
     spend_inr: round(spend),
     impressions: row.impressions || 0,
     clicks: row.clicks || 0,
-    leads: row.leads || 0,
+    leads,
+    lead_source: row.lead_source,
+    leads_reported: row.leads_reported,
+    leads_captured: row.leads_captured,
+    // Below 100, leads the spend bought never reached the CRM — so they cannot
+    // be called, qualified or booked, and every outcome rate below is measured
+    // against the fraction that did arrive.
+    lead_capture_pct: row.lead_capture_pct,
     ...derived,
     // Present only when the stored and recomputed values genuinely disagree,
     // so its absence is not something the model has to reason about.
@@ -128,12 +137,15 @@ function totalise(rows) {
     spend_inr: acc.spend_inr + (r.total_ad_spend_inr || 0),
     impressions: acc.impressions + (r.impressions || 0),
     clicks: acc.clicks + (r.clicks || 0),
-    leads: acc.leads + (r.leads || 0),
-  }), { spend_inr: 0, impressions: 0, clicks: 0, leads: 0 });
+    leads: acc.leads + (r.resolved_leads || 0),
+    leads_reported: acc.leads_reported + (r.leads_reported || 0),
+    leads_captured: acc.leads_captured + (r.leads_captured || 0),
+  }), { spend_inr: 0, impressions: 0, clicks: 0, leads: 0, leads_reported: 0, leads_captured: 0 });
 
   return {
     ...t,
     spend_inr: round(t.spend_inr),
+    lead_capture_pct: t.leads_reported > 0 ? pct(t.leads_captured, t.leads_reported) : null,
     ctr_pct: pct(t.clicks, t.impressions),
     cpc_inr: ratio(t.spend_inr, t.clicks),
     cpl_inr: ratio(t.spend_inr, t.leads),
@@ -150,15 +162,68 @@ function totalise(rows) {
 
 /** Spend, reach and cost per lead: per campaign, per platform, per month. */
 function spendSection(clientId, month) {
+  // actual_leads is counted from campaign_leads by the SAME rule the marketing
+  // routes and the client portal use, because all three are expected to agree.
+  //
+  // The stored `leads` column cannot be trusted on its own: the Add Campaign
+  // form does not collect it, so every campaign entered through the dashboard
+  // carries 0 while its leads sit in campaign_leads. Reading the column alone
+  // reported "0 leads, CPL unavailable" for a campaign that was working.
   const rows = db.prepare(`
-    SELECT id, platform, ad_campaign_name, leads, total_ad_spend_inr, impressions, clicks,
-           ctr_pct, cpc_inr, cpl_inr, revenue_generated, roas, ${CAMPAIGN_MONTH} AS month
-    FROM marketing_ad_campaigns
-    WHERE client_id = ?
-    ORDER BY month DESC, total_ad_spend_inr DESC
+    SELECT a.id, a.platform, a.ad_campaign_name, a.leads, a.total_ad_spend_inr,
+           a.impressions, a.clicks, a.ctr_pct, a.cpc_inr, a.cpl_inr,
+           a.revenue_generated, a.roas, ${CAMPAIGN_MONTH.replace(/\b(month|created_at)\b/g, 'a.$1')} AS month,
+           (
+             SELECT COUNT(l.id) FROM campaign_leads l
+             WHERE l.client_id = a.client_id
+               AND (
+                 (l.campaign_name IS NOT NULL AND TRIM(l.campaign_name) != ''
+                   AND LOWER(TRIM(l.campaign_name)) = LOWER(TRIM(a.ad_campaign_name)))
+                 OR
+                 -- A lead with no campaign name falls back to its platform, which
+                 -- is how manually logged and phone leads are attributed.
+                 ((l.campaign_name IS NULL OR TRIM(l.campaign_name) = ''
+                   OR LOWER(TRIM(l.campaign_name)) = 'manual entry')
+                   AND LOWER(TRIM(l.platform)) = LOWER(TRIM(a.platform)))
+               )
+               AND ${countableLeadSql('l')}
+               AND SUBSTR(l.created_at, 1, 7) = COALESCE(NULLIF(a.month, ''), SUBSTR(a.created_at, 1, 7))
+           ) AS actual_leads
+    FROM marketing_ad_campaigns a
+    WHERE a.client_id = ?
+    ORDER BY month DESC, a.total_ad_spend_inr DESC
   `).all(clientId);
 
   if (!rows.length) return null;
+
+  // Two lead counts exist and they measure different things.
+  //
+  //   `leads`        — what the ad platform reported, typed in from the ad
+  //                    account's own reporting. Total volume.
+  //   `actual_leads` — rows in campaign_leads: the leads that actually reached
+  //                    the CRM and can be qualified, called and booked.
+  //
+  // The second is a SUBSET of the first. A form submission that never fired the
+  // webhook, a phone call nobody logged, a lead the platform counted and the
+  // landing page never posted — each widens the gap. Janya's August is 48
+  // reported against 2 captured.
+  //
+  // Neither is "the" number, so neither is silently chosen. Volume comes from
+  // the larger source, outcome rates come from what was captured, and the gap
+  // between them is published as `lead_capture_pct` — because a 96% capture
+  // failure is not a footnote about data quality, it is the most expensive
+  // thing wrong with the account and nothing else in this system reports it.
+  for (const row of rows) {
+    const reported = row.leads || 0;
+    const captured = row.actual_leads || 0;
+    row.leads_reported = reported;
+    row.leads_captured = captured;
+    // Volume for cost-per-lead: the platform's count where it has one, since
+    // the spend bought those leads whether or not the CRM received them.
+    row.resolved_leads = Math.max(reported, captured);
+    row.lead_source = reported >= captured && reported > 0 ? 'platform_reported' : 'campaign_leads';
+    row.lead_capture_pct = reported > 0 ? pct(captured, reported) : null;
+  }
 
   const months = [...new Set(rows.map(r => r.month).filter(Boolean))].sort().reverse();
   const focus = month && months.includes(month) ? month : months[0];
@@ -198,13 +263,18 @@ function spendSection(clientId, month) {
   // answered from the series rather than from two points the model picked.
   const series = months.map(m => {
     const t = totalise(rows.filter(r => r.month === m));
-    return { month: m, spend_inr: t.spend_inr, leads: t.leads, cpl_inr: t.cpl_inr, ctr_pct: t.ctr_pct, cpc_inr: t.cpc_inr };
+    return { month: m, spend_inr: t.spend_inr, leads: t.leads, cpl_inr: t.cpl_inr, ctr_pct: t.ctr_pct, cpc_inr: t.cpc_inr, lead_capture_pct: t.lead_capture_pct };
   }).reverse();
 
   return {
     focus_month: focus,
     prior_month: priorTotals ? prior : null,
     months_available: months,
+    // How much of the focus month's reported lead volume reached the CRM.
+    // Every outcome rate in the `leads` section is measured against the
+    // captured fraction, so a report quoting a qualification rate without this
+    // number beside it is describing a sample and calling it the account.
+    lead_capture_pct: focusTotals.lead_capture_pct,
     account: {
       ...focusTotals,
       mom: priorTotals && {
