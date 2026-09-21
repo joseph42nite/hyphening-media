@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play, Terminal, Loader2, XCircle, AlertTriangle, CheckCircle2,
   TrendingUp, TrendingDown, Minus, Database, ListChecks, X, ChevronRight, ChevronDown,
+  RefreshCw,
 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
@@ -137,6 +138,9 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
   // Collapsed by default. These cards are inventory, not a to-do list: nothing
   // about them changes until somebody decides to run a new platform.
   const [showNotConnected, setShowNotConnected] = useState(false);
+  const [googleAds, setGoogleAds] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncPlan, setSyncPlan] = useState(null);
 
   const consoleEndRef = useRef(null);
   const isAdmin = auth?.role === 'admin' || auth?.role === 'super_admin';
@@ -178,6 +182,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
         setSnapshot(data.snapshot || null);
         setDataGaps(data.dataGaps || []);
         setMonthsAvailable(data.monthsAvailable || []);
+        setGoogleAds(data.googleAds || null);
         setFocusMonth(data.focusMonth || null);
         // Hydrated from the database, not from this component's memory, so a
         // refresh mid-run shows "Running" rather than offering a second,
@@ -347,6 +352,50 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
     }
   };
 
+  /**
+   * Pulls campaigns from Google Ads.
+   *
+   * Dry run by default: the first thing shown is what WOULD be written, with
+   * any collision against hand-typed rows and the account's currency. The write
+   * is a second, deliberate click. A sync that wrote on the first press would
+   * be the one time nobody looked.
+   */
+  const runSync = async (dryRun = true) => {
+    setSyncing(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/ads/sync?dryRun=${dryRun}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monthsBack: 3 }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSyncPlan(null);
+        showToast?.(data.message || 'Sync failed.', 'error');
+        return;
+      }
+
+      if (dryRun) {
+        setSyncPlan(data);
+      } else {
+        setSyncPlan(null);
+        showToast?.(
+          `Synced ${data.account.name}: ${data.toInsert} added, ${data.toUpdate} updated` +
+          (data.skippedManual ? `, ${data.skippedManual} left alone (entered by hand)` : ''),
+          'success',
+        );
+        fetchClient(selectedClientId, focusMonth);
+        fetchOverview();
+      }
+    } catch (err) {
+      showToast?.(`Sync failed: ${err.message}`, 'error');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const loadFacts = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/ads/facts?month=${focusMonth || ''}`, {
@@ -492,6 +541,18 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                 style={{ padding: '9px 16px', borderRadius: 8, fontWeight: 600, background: isConsoleOpen ? 'rgba(224, 35, 28, 0.18)' : 'rgba(255, 255, 255, 0.05)', color: isConsoleOpen ? '#fca5a5' : 'var(--text-primary)', border: '1px solid rgba(223, 231, 224, 0.15)' }}>
                 <Terminal size={15} style={{ verticalAlign: -2, marginRight: 6 }} />Console ({consoleLogs.length})
               </button>
+              {googleAds?.configured && (
+                <button onClick={() => runSync(true)} disabled={syncing || !isAdmin} className="btn btn-secondary"
+                  style={{ padding: '9px 16px', borderRadius: 8, fontWeight: 600, background: 'rgba(96, 165, 250, 0.12)', color: '#93c5fd', border: '1px solid rgba(96, 165, 250, 0.35)', cursor: syncing || !isAdmin ? 'not-allowed' : 'pointer' }}
+                  title={googleAds.lastSyncedAt
+                    ? `Last synced ${new Date(`${googleAds.lastSyncedAt.replace(' ', 'T')}Z`).toLocaleString()}`
+                    : 'Never synced'}>
+                  {syncing
+                    ? <Loader2 size={15} className="spin" style={{ verticalAlign: -2, marginRight: 6 }} />
+                    : <RefreshCw size={15} style={{ verticalAlign: -2, marginRight: 6 }} />}
+                  Sync Google Ads
+                </button>
+              )}
               <button onClick={() => (facts ? setFacts(null) : loadFacts())} className="btn btn-secondary"
                 style={{ padding: '9px 16px', borderRadius: 8, fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', border: '1px solid rgba(223, 231, 224, 0.15)' }}
                 title="The exact numbers every agent is given. Every figure in every report traces to this.">
@@ -520,6 +581,13 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
               <Stat label="Cost per qualified" value={inr(snapshot.costPerQualifiedLeadInr)} />
               <Stat label="CTR" value={pct(snapshot.ctrPct, 2)} />
               {snapshot.roas != null && <Stat label="ROAS" value={`${snapshot.roas}x`} />}
+            </div>
+          )}
+
+          {googleAds?.lastError && (
+            <div style={{ ...panel, padding: '10px 14px', marginBottom: 14, borderLeft: '3px solid #f87171', fontSize: '0.8rem', color: '#fca5a5', lineHeight: 1.5 }}>
+              <AlertTriangle size={13} style={{ verticalAlign: -2, marginRight: 6 }} />
+              Last Google Ads sync failed: {googleAds.lastError}
             </div>
           )}
 
@@ -721,6 +789,56 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
             <div ref={consoleEndRef} />
           </div>
         </div>
+      )}
+
+      {/* ---------------- Sync preview ---------------- */}
+      {syncPlan && (
+        <Modal title={`Sync preview — ${syncPlan.account.name}`} onClose={() => setSyncPlan(null)}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.7)', marginBottom: 14 }}>
+            <span>Currency <strong style={{ color: 'var(--text-primary)' }}>{syncPlan.account.currency}</strong></span>
+            <span>Time zone <strong style={{ color: 'var(--text-primary)' }}>{syncPlan.account.timeZone}</strong></span>
+            <span>Months <strong style={{ color: 'var(--text-primary)' }}>{syncPlan.months.join(', ')}</strong></span>
+            <span>Total spend <strong style={{ color: 'var(--text-primary)' }}>{inr(syncPlan.totalSpend)}</strong></span>
+          </div>
+
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginBottom: 12 }}>
+            <strong>{syncPlan.toInsert}</strong> to add · <strong>{syncPlan.toUpdate}</strong> to update
+            {syncPlan.skippedManual > 0 && (
+              <> · <strong style={{ color: '#fbbf24' }}>{syncPlan.skippedManual}</strong> left alone</>
+            )}
+            {' · '}{syncPlan.adGroupsSeen} ad groups
+          </div>
+
+          {syncPlan.skippedManual > 0 && (
+            <div style={{ fontSize: '0.78rem', color: '#fbbf24', marginBottom: 12, lineHeight: 1.5 }}>
+              Some months already hold rows entered by hand. Those are never overwritten — delete the
+              manual row if you want the platform's figure instead.
+            </div>
+          )}
+
+          <div style={{ maxHeight: '40vh', overflowY: 'auto', fontSize: '0.78rem' }}>
+            {[...syncPlan.plan.insert.map(c => ({ ...c, kind: 'add' })),
+              ...syncPlan.plan.update.map(c => ({ ...c, kind: 'update' })),
+              ...syncPlan.plan.skippedManual.map(c => ({ ...c, kind: 'skip' }))].map((c, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, padding: '5px 0', borderBottom: '1px solid rgba(223,231,224,0.06)', color: 'rgba(223, 231, 224, 0.8)' }}>
+                <span style={{ width: 54, color: c.kind === 'skip' ? '#fbbf24' : c.kind === 'add' ? '#4ade80' : '#93c5fd', fontWeight: 700 }}>
+                  {c.kind === 'skip' ? 'keep' : c.kind}
+                </span>
+                <span style={{ width: 62, color: 'rgba(223,231,224,0.5)' }}>{c.month}</span>
+                <span style={{ width: 62 }}>{c.platform}</span>
+                <span style={{ width: 78, textAlign: 'right' }}>{inr(Math.round(c.spend))}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <MiniButton onClick={() => runSync(false)}>
+              {syncing ? 'Writing…' : 'Write these rows'}
+            </MiniButton>
+            <MiniButton muted onClick={() => setSyncPlan(null)}>Cancel</MiniButton>
+          </div>
+        </Modal>
       )}
 
       {/* ---------------- Fact pack drawer ---------------- */}

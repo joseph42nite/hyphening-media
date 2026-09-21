@@ -124,7 +124,7 @@ router.post('/', authorize('admin'), (req, res) => {
       name, client_type, contact_person, contact_email, contact_phone,
       parent_id, website_url, instagram_url, youtube_url,
       gsc_property, ga4_property_id,
-      google_ads_customer_id, meta_ads_account_id
+      google_ads_customer_id, google_ads_login_customer_id, meta_ads_account_id
     } = req.body;
 
     if (!name) {
@@ -136,8 +136,8 @@ router.post('/', authorize('admin'), (req, res) => {
         name, client_type, contact_person, contact_email, contact_phone,
         parent_id, website_url, instagram_url, youtube_url,
         gsc_property, ga4_property_id,
-        google_ads_customer_id, meta_ads_account_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        google_ads_customer_id, google_ads_login_customer_id, meta_ads_account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       client_type || 'marketing',
@@ -151,6 +151,7 @@ router.post('/', authorize('admin'), (req, res) => {
       gsc_property || null,
       ga4_property_id || null,
       google_ads_customer_id || null,
+      google_ads_login_customer_id || null,
       meta_ads_account_id || null
     );
 
@@ -196,7 +197,7 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       // would return one client's search data during another client's audit,
       // attributed to the wrong client with nothing in the report to show it.
       'gsc_property', 'ga4_property_id',
-      'google_ads_customer_id', 'meta_ads_account_id'
+      'google_ads_customer_id', 'google_ads_login_customer_id', 'meta_ads_account_id'
     ];
 
     const updates = {};

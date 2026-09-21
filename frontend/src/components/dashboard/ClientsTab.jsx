@@ -11,7 +11,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
   const [clientFormData, setClientFormData] = useState({
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
     parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
-    google_ads_customer_id: '', meta_ads_account_id: ''
+    google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: ''
   });
 
   const filteredClients = clients.filter(c =>
@@ -34,6 +34,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
         gsc_property: client.gsc_property || '',
         ga4_property_id: client.ga4_property_id || '',
         google_ads_customer_id: client.google_ads_customer_id || '',
+        google_ads_login_customer_id: client.google_ads_login_customer_id || '',
         meta_ads_account_id: client.meta_ads_account_id || ''
       });
     } else {
@@ -41,7 +42,7 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
       setClientFormData({
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
         parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
-    google_ads_customer_id: '', meta_ads_account_id: ''
+    google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: ''
       });
     }
     setShowClientModal(true);
@@ -357,21 +358,22 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                   these are and the note says where the numbers actually come
                   from. */}
               <h4 style={{ margin: '20px 0 4px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
-                Ad account references
+                Ad accounts
               </h4>
               <div style={{
                 margin: '0 0 12px', padding: '8px 10px', borderRadius: 6,
-                background: 'rgba(234, 179, 8, 0.07)',
-                border: '1px solid rgba(234, 179, 8, 0.25)',
+                background: 'rgba(74, 222, 128, 0.06)',
+                border: '1px solid rgba(74, 222, 128, 0.22)',
                 fontSize: '0.76rem', color: 'rgba(223, 231, 224, 0.8)', lineHeight: 1.5,
               }}>
-                <strong style={{ color: '#fbbf24' }}>These do not import anything.</strong>{' '}
-                There is no connection to Google Ads or Meta. They are labels, so a client report
-                can say which account the spend ran from.
+                <strong style={{ color: '#4ade80' }}>Google Ads imports automatically.</strong>{' '}
+                Set the customer ID and the Ads Monitor pulls campaigns, spend, impressions, clicks
+                and ad groups on its own — daily, and on demand from the Sync button.
                 <br />
                 <span style={{ color: 'var(--text-muted)' }}>
-                  Campaign spend, impressions and clicks are entered by hand each month under
-                  Marketing Data → Ad Campaigns Performance. The Ads Monitor reads them from there.
+                  Meta has no connection yet, so its numbers are still entered by hand under
+                  Marketing Data → Ad Campaigns Performance. Rows entered by hand are never
+                  overwritten by a sync.
                 </span>
               </div>
 
@@ -386,8 +388,23 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                     onChange={e => setClientFormData({...clientFormData, google_ads_customer_id: e.target.value})}
                   />
                   <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Which account the ads run from — ours or theirs. Reference only: entering it
-                    connects nothing and fetches nothing.
+                    10 digits, no dashes. This is what the sync reads — set it and the Ads Monitor
+                    starts importing this account's campaigns.
+                  </small>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Google Ads Manager ID <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— optional</span></label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Only if reached through an MCC"
+                    value={clientFormData.google_ads_login_customer_id}
+                    onChange={e => setClientFormData({...clientFormData, google_ads_login_customer_id: e.target.value})}
+                  />
+                  <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Leave blank when the account is accessed directly. If it sits under a manager
+                    account and this is missing, the sync fails with a permission error that never
+                    mentions the real cause.
                   </small>
                 </div>
                 <div className="form-group">

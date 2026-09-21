@@ -19,6 +19,7 @@ import { buildFactPack, checkRequirements, currentMonth } from '../services/adsF
 import {
   createRun, cancelRun, getActiveRunsForClient, listQueue,
 } from '../services/adsRuns.js';
+import { syncClient, syncAllClients } from '../services/adsSyncWorker.js';
 
 // Each agent owns one score column; the rest read the fallback. Same shape as
 // the SEO route's map, and for the same reason: a creative score and a pacing
@@ -181,8 +182,22 @@ router.get('/:id/ads/agents/status', (req, res) => {
       };
     });
 
+    const syncState = db.prepare(`
+      SELECT google_ads_customer_id, ads_last_synced_at, ads_last_sync_error
+      FROM crm_clients WHERE id = ?
+    `).get(clientId);
+
     res.json({
       agents,
+      // Drives the Sync button. `configured` is what separates 'press this'
+      // from 'there is nothing to press yet' — without it the button would
+      // offer to sync an account nobody has named.
+      googleAds: {
+        configured: !!syncState?.google_ads_customer_id,
+        customerId: syncState?.google_ads_customer_id || null,
+        lastSyncedAt: syncState?.ads_last_synced_at || null,
+        lastError: syncState?.ads_last_sync_error || null,
+      },
       focusMonth: pack.focus_month,
       monthsAvailable: pack.sections.spend?.months_available || [],
       factsHash: pack.facts_hash,
@@ -478,10 +493,84 @@ router.post('/:id/ads/recommendations/:recId/convert-task', (req, res) => {
 });
 
 /**
+ * POST /api/clients/:id/ads/sync
+ *
+ * Pulls campaigns and ad groups from Google Ads into this database.
+ *
+ * `?dryRun=true` performs every read and every decision and writes nothing,
+ * returning the plan the real run would execute. Worth using on a client's
+ * first sync: the currency check and any collision with hand-typed rows are
+ * both better seen than discovered.
+ */
+router.post('/:id/ads/sync', async (req, res) => {
+  try {
+    const role = req.user.role;
+    if (role !== 'admin' && role !== 'super_admin') {
+      return res.status(403).json({ error: 'forbidden', message: 'Syncing ad data is limited to admins.' });
+    }
+
+    const dryRun = req.query.dryRun === 'true' || req.body?.dryRun === true;
+    const monthsBack = Math.min(Math.max(Number(req.body?.monthsBack) || 3, 1), 24);
+
+    const result = await syncClient(Number(req.params.id), { dryRun, monthsBack, triggerSource: 'manual' });
+
+    if (!result.ok) {
+      // 400 rather than 500: every failure here is a setup problem with a named
+      // fix — no customer id, a non-INR account, the project not approved — and
+      // a 500 would suggest the server is broken instead.
+      return res.status(result.error === 'already_running' ? 409 : 400).json(result);
+    }
+
+    if (!dryRun) {
+      logAction({
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        action: 'ads_sync',
+        entityType: 'client',
+        entityId: Number(req.params.id),
+        diff: { inserted: result.toInsert, updated: result.toUpdate, skipped: result.skippedManual, months: result.months },
+      });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('[ADS ROUTE] Sync error:', err);
+    res.status(500).json({ error: 'Internal server error', message: err.message });
+  }
+});
+
+/** GET /api/clients/:id/ads/sync/history — what each run did, newest first. */
+router.get('/:id/ads/sync/history', (req, res) => {
+  try {
+    res.json(db.prepare(`
+      SELECT * FROM ads_sync_runs WHERE client_id = ? ORDER BY started_at DESC LIMIT 20
+    `).all(req.params.id));
+  } catch (err) {
+    console.error('[ADS ROUTE] Sync history error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * Client-agnostic queue routes, mounted at /api/ads.
  */
 export const queueRouter = Router();
 queueRouter.use(authenticate);
+
+/** POST /api/ads/sync-all — sync every client that has a customer ID. */
+queueRouter.post('/sync-all', async (req, res) => {
+  try {
+    const role = req.user.role;
+    if (role !== 'admin' && role !== 'super_admin') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    const results = await syncAllClients({ monthsBack: Math.min(Number(req.body?.monthsBack) || 3, 24) });
+    res.json({ synced: results.filter(r => r.ok).length, total: results.length, results });
+  } catch (err) {
+    console.error('[ADS ROUTE] Sync-all error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 /** GET /api/ads/queue — everything in flight across all clients. */
 queueRouter.get('/queue', (req, res) => {

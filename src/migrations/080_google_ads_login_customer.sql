@@ -1,0 +1,13 @@
+-- Migration: 080_google_ads_login_customer.sql
+--
+-- The manager account a client's ad account is reached through.
+--
+-- Google requires this as the login-customer-id header whenever the account is
+-- accessed via a manager account, and its absence fails as a plain permission
+-- error that never mentions the real cause — indistinguishable from the service
+-- account not being on the account at all. Storing it per client because an
+-- agency can hold accounts under more than one manager.
+--
+-- Null for an account accessed directly, which is the common case and the one
+-- DentAlchemy's account (9289449109, not under a manager) uses today.
+ALTER TABLE crm_clients ADD COLUMN google_ads_login_customer_id TEXT;

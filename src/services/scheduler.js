@@ -6,6 +6,7 @@ import { runAutoPublisher } from './autoPublisher.js';
 import { runMetricSyncWorker } from './metricSyncWorker.js';
 import { runDailyCommentSync } from './dailyCommentSync.js';
 import { runDailyAdsWatch, runWeeklyAdsSweep } from './adsScheduler.js';
+import { syncAllClients } from './adsSyncWorker.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +33,15 @@ export function initScheduler() {
   cron.schedule('0 3 * * *', () => {
     console.log('[SCHEDULER] Running daily automated metric refresh worker (Composio Free Tier Safe)...');
     runMetricSyncWorker();
+  });
+
+  // Google Ads data sync — 6:00 AM daily, half an hour before the monitor runs,
+  // so the agents analyse the night's finished numbers rather than yesterday's.
+  // Three months back each time: platforms restate conversions for weeks, so a
+  // sync that only fetched the current month would leave the restatements out.
+  cron.schedule('0 6 * * *', () => {
+    console.log('[SCHEDULER] Running daily Google Ads sync...');
+    syncAllClients({ monthsBack: 3 }).catch(err => console.error('[SCHEDULER] Ads sync failed:', err.message));
   });
 
   // Ads anomaly watch — 6:30 AM daily, so a break that happened overnight is
