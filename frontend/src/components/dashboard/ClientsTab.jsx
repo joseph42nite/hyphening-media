@@ -349,18 +349,31 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                 </div>
               </div>
 
-              {/* Paid media. Set here rather than on each month's campaign rows:
-                  these describe the client, not the month, so re-entering them
-                  every month is both work and a chance to get it wrong. */}
+              {/* Labels, not connections.
+                  Sitting under a heading that said "Read by the Ads Monitor",
+                  these read as a data source — an account ID was entered and
+                  campaign data was expected to appear. Nothing in this system
+                  talks to Google Ads or Meta, so the heading now says what
+                  these are and the note says where the numbers actually come
+                  from. */}
               <h4 style={{ margin: '20px 0 4px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
-                Paid media
+                Ad account references
               </h4>
-              <p style={{ margin: '0 0 12px', fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                Read by the Ads Monitor. The ads point at the Website URL above — there is no
-                separate landing-page field, because a second place to put the same page is a
-                second place for it to go stale. Monthly spend still goes on the campaign rows in
-                Marketing Data: one client record cannot hold a different number for every month.
-              </p>
+              <div style={{
+                margin: '0 0 12px', padding: '8px 10px', borderRadius: 6,
+                background: 'rgba(234, 179, 8, 0.07)',
+                border: '1px solid rgba(234, 179, 8, 0.25)',
+                fontSize: '0.76rem', color: 'rgba(223, 231, 224, 0.8)', lineHeight: 1.5,
+              }}>
+                <strong style={{ color: '#fbbf24' }}>These do not import anything.</strong>{' '}
+                There is no connection to Google Ads or Meta. They are labels, so a client report
+                can say which account the spend ran from.
+                <br />
+                <span style={{ color: 'var(--text-muted)' }}>
+                  Campaign spend, impressions and clicks are entered by hand each month under
+                  Marketing Data → Ad Campaigns Performance. The Ads Monitor reads them from there.
+                </span>
+              </div>
 
               <div className="form-grid-2">
                 <div className="form-group">
@@ -373,8 +386,8 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                     onChange={e => setClientFormData({...clientFormData, google_ads_customer_id: e.target.value})}
                   />
                   <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Which account the ads run from — ours or theirs. An identifier only; no
-                    credential is stored here.
+                    Which account the ads run from — ours or theirs. Reference only: entering it
+                    connects nothing and fetches nothing.
                   </small>
                 </div>
                 <div className="form-group">
@@ -387,7 +400,8 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                     onChange={e => setClientFormData({...clientFormData, meta_ads_account_id: e.target.value})}
                   />
                   <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    From Meta Ads Manager. Identifier only.
+                    From Meta Ads Manager. Reference only: entering it connects nothing and
+                    fetches nothing.
                   </small>
                 </div>
               </div>
