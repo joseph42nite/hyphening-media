@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play, Terminal, Loader2, XCircle, AlertTriangle, CheckCircle2,
-  TrendingUp, TrendingDown, Minus, Database, ListChecks, X, ChevronRight,
+  TrendingUp, TrendingDown, Minus, Database, ListChecks, X, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
@@ -134,6 +134,9 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
   const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [confirmRerun, setConfirmRerun] = useState(null);
+  // Collapsed by default. These cards are inventory, not a to-do list: nothing
+  // about them changes until somebody decides to run a new platform.
+  const [showNotConnected, setShowNotConnected] = useState(false);
 
   const consoleEndRef = useRef(null);
   const isAdmin = auth?.role === 'admin' || auth?.role === 'super_admin';
@@ -367,6 +370,16 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
     }
   };
 
+  // Grouped by what the card asks of you, not by whether it happens to be
+  // blocked: "add some campaign rows" and "this agency does not run TikTok" are
+  // the same state to the server and completely different to a person.
+  const groups = { ready: [], needsData: [], notConnected: [] };
+  for (const agent of agents) {
+    if (!agent.blockedReason) groups.ready.push(agent);
+    else if (agent.blockedPermanently) groups.notConnected.push(agent);
+    else groups.needsData.push(agent);
+  }
+
   const selectedClient = marketingClients.find(c => String(c.id) === String(selectedClientId));
 
   return (
@@ -510,139 +523,118 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
             </div>
           )}
 
-          {/* ---------------- Data gaps ---------------- */}
+          {/* ---------------- Data gaps ----------------
+
+               Phrased as a setup checklist rather than a warning. The content
+               is the same either way; a panel headed "N data sources missing"
+               in amber reads as something broken, and the honest state for a
+               client nobody has entered campaigns for yet is "not set up".
+
+               `spend` is called out separately because it is the one gap that
+               blocks most of the fleet, and because its fix is a specific place
+               to go rather than a general instruction to add data. */}
           {dataGaps.length > 0 && (
-            <div style={{ border: '1px solid rgba(234, 179, 8, 0.3)', borderLeft: '5px solid #eab308', borderRadius: 8, padding: '14px 16px', marginBottom: 18, background: 'rgba(234, 179, 8, 0.07)' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 8, color: '#fbbf24' }}>
-                {dataGaps.length} data source{dataGaps.length === 1 ? '' : 's'} missing for {selectedClient?.name}
+            <div style={{ ...panel, padding: '14px 16px', marginBottom: 18, borderLeft: '3px solid rgba(96, 165, 250, 0.5)' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: 8, color: 'var(--text-primary)' }}>
+                Setup for {selectedClient?.name}
               </div>
-              {dataGaps.map(gap => (
-                <div key={gap.section} style={{ fontSize: '0.8rem', lineHeight: 1.5, color: 'rgba(223, 231, 224, 0.75)' }}>
-                  <code style={{ color: '#fde047', fontSize: '0.75rem' }}>{gap.section}</code> — {gap.reason}
+
+              {dataGaps.some(g => g.section === 'spend') && (
+                <div style={{ fontSize: '0.82rem', lineHeight: 1.55, color: 'rgba(223, 231, 224, 0.85)', marginBottom: 10 }}>
+                  <strong style={{ color: '#93c5fd' }}>No campaign rows yet.</strong>{' '}
+                  Add them under <strong>Marketing Data → Ad Campaigns Performance</strong> — one row per
+                  campaign per month, with spend, impressions and clicks from the ad account. Most of
+                  the fleet unblocks on the first one.
                 </div>
-              ))}
-              <div style={{ marginTop: 10, fontSize: '0.74rem', color: 'rgba(223, 231, 224, 0.5)' }}>
-                Agents that need these are disabled rather than run on nothing. An agent with no data
-                does not fail — it writes a plausible answer from training knowledge.
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {dataGaps.filter(g => g.section !== 'spend').map(gap => (
+                  <div key={gap.section} style={{ fontSize: '0.78rem', lineHeight: 1.5, color: 'rgba(223, 231, 224, 0.6)' }}>
+                    <code style={{ color: 'rgba(147, 197, 253, 0.8)', fontSize: '0.74rem' }}>{gap.section}</code>
+                    {' — '}{gap.reason}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 10, fontSize: '0.73rem', color: 'rgba(223, 231, 224, 0.4)', lineHeight: 1.5 }}>
+                Cards needing these stay disabled rather than running on nothing — an agent with no
+                data does not fail, it writes a plausible answer from training knowledge.
               </div>
             </div>
           )}
 
-          {/* ---------------- Fleet ---------------- */}
-          <h3 style={{ ...heading, fontSize: '1.1rem', marginBottom: 12 }}>
-            Agent fleet {loading && <Loader2 size={14} className="spin" style={{ verticalAlign: -2, marginLeft: 6 }} />}
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12, marginBottom: 28 }}>
-            {agents.map(agent => {
-              const run = activeRuns[agent.agentType];
-              const blocked = !!agent.blockedReason;
-              return (
-                <div key={agent.agentType} className="card"
-                  style={{
-                    ...panel,
-                    borderTop: `4px solid ${blocked ? 'rgba(223, 231, 224, 0.15)' : freshnessColor(agent.freshness)}`,
-                    padding: 14, opacity: blocked ? 0.62 : 1,
-                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-                  }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.88rem', wordBreak: 'break-word', minWidth: 0, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
-                        {agent.label}
-                      </span>
-                      <span className="badge" style={{
-                        background: `${freshnessColor(agent.freshness)}1a`,
-                        border: `1px solid ${freshnessColor(agent.freshness)}66`,
-                        color: freshnessColor(agent.freshness),
-                        fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em',
-                        padding: '2px 8px', borderRadius: 9999, flexShrink: 0,
-                        whiteSpace: 'nowrap', textTransform: 'uppercase',
-                      }}>
-                        {agent.freshness.replace('_', ' ')}
-                      </span>
-                    </div>
+          {/* ---------------- Fleet ----------------
 
-                    <div style={{ margin: '10px 0', fontSize: '0.78rem', color: 'rgba(223, 231, 224, 0.65)', lineHeight: 1.5 }}>
-                      <div>Cadence: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.staleAfterDays >= 9999 ? 'on demand' : `${agent.staleAfterDays} days`}</span></div>
-                      <div>Last run: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.lastRunAt ? new Date(`${agent.lastRunAt.replace(' ', 'T')}Z`).toLocaleDateString() : 'Never'}</span></div>
-                      <div style={{ fontSize: '0.7rem', color: 'rgba(223, 231, 224, 0.35)' }}>
-                        {agent.skillName}{agent.platform ? ` · ${agent.platform}` : ''}
-                      </div>
-                    </div>
+               Grouped rather than listed flat. Thirty-three cards of which
+               fourteen are blocked reads as a broken page; the same cards in
+               three groups read as nineteen things working, two waiting on
+               data, and twelve platforms this agency does not run.
 
-                    <p style={{ margin: '0 0 8px', fontSize: '0.74rem', lineHeight: 1.45, color: 'rgba(223, 231, 224, 0.55)' }}>
-                      {agent.description}
-                    </p>
-
-                    {blocked && (
-                      // Two colours for two different asks. Amber means "add some
-                      // data and this starts working"; grey means "someone has to
-                      // configure something on purpose". Painting both amber sends
-                      // people off to fix the wrong thing.
-                      <div style={{
-                        marginTop: 6, fontSize: '0.72rem', lineHeight: 1.4,
-                        padding: '3px 6px', borderRadius: 4,
-                        color: agent.blockedPermanently ? 'rgba(223, 231, 224, 0.5)' : '#fbbf24',
-                        background: agent.blockedPermanently ? 'rgba(148, 163, 184, 0.08)' : 'rgba(234, 179, 8, 0.1)',
-                        border: `1px solid ${agent.blockedPermanently ? 'rgba(148, 163, 184, 0.2)' : 'rgba(234, 179, 8, 0.25)'}`,
-                      }}>
-                        ⚠ {agent.blockedReason}
-                      </div>
-                    )}
-
-                    {agent.openRecommendations > 0 && (
-                      <button onClick={() => openAuditDetail(agent.lastAuditId)}
-                        style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontSize: '0.72rem', color: '#fdba74', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <ListChecks size={12} />{agent.openRecommendations} open action{agent.openRecommendations === 1 ? '' : 's'}
-                        <ChevronRight size={11} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Score and action, on one footer row — the same shape as the
-                      SEO fleet's cards, so a glance across both tabs reads the
-                      same way rather than needing two mental models. */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 12, paddingTop: 8, borderTop: '1px solid rgba(223, 231, 224, 0.08)' }}>
-                    <div
-                      title={agent.score != null
-                        ? `Scored ${agent.score} out of 100 by ${agent.skillName}${agent.periodMonth ? ` for ${agent.periodMonth}` : ''}`
-                        : 'No score yet — run this card, or the last run could not support one'}
-                      style={{ fontWeight: 800, fontSize: '1.2rem', lineHeight: 1, color: scoreColor(agent.score) }}
-                    >
-                      {agent.score != null ? `${agent.score}%` : '--'}
-                    </div>
-
-                    {run ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: '0.72rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Loader2 size={12} className="spin" />{elapsed(run.startedAt, now)}
-                        </span>
-                        <button onClick={() => cancel(run.id)} title="Free the queue slot"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}>
-                          <XCircle size={15} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => trigger(agent.agentType)}
-                        disabled={blocked || !isAdmin}
-                        className="btn"
-                        style={{
-                          padding: '6px 14px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700,
-                          cursor: blocked || !isAdmin ? 'not-allowed' : 'pointer',
-                          background: blocked || !isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(224, 35, 28, 0.16)',
-                          color: blocked || !isAdmin ? 'rgba(223, 231, 224, 0.35)' : '#fca5a5',
-                          border: `1px solid ${blocked || !isAdmin ? 'rgba(223,231,224,0.1)' : 'rgba(224, 35, 28, 0.4)'}`,
-                        }}
-                        title={blocked ? agent.blockedReason : isAdmin ? `Run ${agent.skillName}` : 'Runs cost tokens, so they are limited to admins'}
-                      >
-                        <Play size={12} style={{ verticalAlign: -1, marginRight: 4 }} />Run
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+               The distinction that earns the grouping is what each blocked card
+               ASKS OF YOU. "Waiting on data" is a to-do. "Not connected" is not
+               — it is inventory, and it belongs collapsed. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <h3 style={{ ...heading, fontSize: '1.1rem', margin: 0 }}>
+              Agent fleet {loading && <Loader2 size={14} className="spin" style={{ verticalAlign: -2, marginLeft: 6 }} />}
+            </h3>
+            <span style={{ fontSize: '0.78rem', color: 'rgba(223, 231, 224, 0.5)' }}>
+              {groups.ready.length} ready · {groups.needsData.length} waiting on data · {groups.notConnected.length} not connected
+            </span>
           </div>
+
+          {groups.ready.length > 0 && (
+            <FleetGroup>
+              {groups.ready.map(agent => (
+                <AgentCard key={agent.agentType} agent={agent} run={activeRuns[agent.agentType]} now={now}
+                  isAdmin={isAdmin} onRun={trigger} onCancel={cancel} onOpenAudit={openAuditDetail} />
+              ))}
+            </FleetGroup>
+          )}
+
+          {groups.needsData.length > 0 && (
+            <>
+              <h4 style={{ ...heading, fontSize: '0.9rem', margin: '4px 0 10px', color: '#fbbf24' }}>
+                Waiting on data ({groups.needsData.length})
+              </h4>
+              <FleetGroup>
+                {groups.needsData.map(agent => (
+                  <AgentCard key={agent.agentType} agent={agent} run={activeRuns[agent.agentType]} now={now}
+                    isAdmin={isAdmin} onRun={trigger} onCancel={cancel} onOpenAudit={openAuditDetail} />
+                ))}
+              </FleetGroup>
+            </>
+          )}
+
+          {groups.notConnected.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <button
+                onClick={() => setShowNotConnected(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(223, 231, 224, 0.08)',
+                  borderRadius: 8, padding: '9px 12px', cursor: 'pointer',
+                  color: 'rgba(223, 231, 224, 0.5)', fontSize: '0.8rem', fontWeight: 600, textAlign: 'left',
+                }}
+              >
+                {showNotConnected ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                Not connected ({groups.notConnected.length})
+                <span style={{ fontWeight: 400, color: 'rgba(223, 231, 224, 0.35)' }}>
+                  — platforms this agency does not run, and skills needing a key or a deliberate switch
+                </span>
+              </button>
+              {showNotConnected && (
+                <div style={{ marginTop: 12 }}>
+                  <FleetGroup>
+                    {groups.notConnected.map(agent => (
+                      <AgentCard key={agent.agentType} agent={agent} run={activeRuns[agent.agentType]} now={now}
+                        isAdmin={isAdmin} onRun={trigger} onCancel={cancel} onOpenAudit={openAuditDetail} />
+                    ))}
+                  </FleetGroup>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ---------------- Open actions ---------------- */}
           <h3 style={{ ...heading, fontSize: '1.1rem', marginBottom: 12 }}>
@@ -792,6 +784,126 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
 }
 
 // ---------------------------------------------------------------------------
+
+/** Grid wrapper, so all three groups lay out identically. */
+function FleetGroup({ children }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12, marginBottom: 20 }}>
+      {children}
+    </div>
+  );
+}
+
+/** One fleet card. Lifted out of the map unchanged when the fleet was grouped,
+ *  so grouping could not quietly alter how a card looks. */
+function AgentCard({ agent, run, now, isAdmin, onRun, onCancel, onOpenAudit }) {
+  const blocked = !!agent.blockedReason;
+  return (
+                <div key={agent.agentType} className="card"
+                  style={{
+                    ...panel,
+                    borderTop: `4px solid ${blocked ? 'rgba(223, 231, 224, 0.15)' : freshnessColor(agent.freshness)}`,
+                    padding: 14, opacity: blocked ? 0.62 : 1,
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                  }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem', wordBreak: 'break-word', minWidth: 0, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                        {agent.label}
+                      </span>
+                      <span className="badge" style={{
+                        background: `${freshnessColor(agent.freshness)}1a`,
+                        border: `1px solid ${freshnessColor(agent.freshness)}66`,
+                        color: freshnessColor(agent.freshness),
+                        fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em',
+                        padding: '2px 8px', borderRadius: 9999, flexShrink: 0,
+                        whiteSpace: 'nowrap', textTransform: 'uppercase',
+                      }}>
+                        {agent.freshness.replace('_', ' ')}
+                      </span>
+                    </div>
+
+                    <div style={{ margin: '10px 0', fontSize: '0.78rem', color: 'rgba(223, 231, 224, 0.65)', lineHeight: 1.5 }}>
+                      <div>Cadence: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.staleAfterDays >= 9999 ? 'on demand' : `${agent.staleAfterDays} days`}</span></div>
+                      <div>Last run: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.lastRunAt ? new Date(`${agent.lastRunAt.replace(' ', 'T')}Z`).toLocaleDateString() : 'Never'}</span></div>
+                      <div style={{ fontSize: '0.7rem', color: 'rgba(223, 231, 224, 0.35)' }}>
+                        {agent.skillName}{agent.platform ? ` · ${agent.platform}` : ''}
+                      </div>
+                    </div>
+
+                    <p style={{ margin: '0 0 8px', fontSize: '0.74rem', lineHeight: 1.45, color: 'rgba(223, 231, 224, 0.55)' }}>
+                      {agent.description}
+                    </p>
+
+                    {blocked && (
+                      // Two colours for two different asks. Amber means "add some
+                      // data and this starts working"; grey means "someone has to
+                      // configure something on purpose". Painting both amber sends
+                      // people off to fix the wrong thing.
+                      <div style={{
+                        marginTop: 6, fontSize: '0.72rem', lineHeight: 1.4,
+                        padding: '3px 6px', borderRadius: 4,
+                        color: agent.blockedPermanently ? 'rgba(223, 231, 224, 0.5)' : '#fbbf24',
+                        background: agent.blockedPermanently ? 'rgba(148, 163, 184, 0.08)' : 'rgba(234, 179, 8, 0.1)',
+                        border: `1px solid ${agent.blockedPermanently ? 'rgba(148, 163, 184, 0.2)' : 'rgba(234, 179, 8, 0.25)'}`,
+                      }}>
+                        ⚠ {agent.blockedReason}
+                      </div>
+                    )}
+
+                    {agent.openRecommendations > 0 && (
+                      <button onClick={() => onOpenAudit(agent.lastAuditId)}
+                        style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontSize: '0.72rem', color: '#fdba74', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <ListChecks size={12} />{agent.openRecommendations} open action{agent.openRecommendations === 1 ? '' : 's'}
+                        <ChevronRight size={11} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Score and action, on one footer row — the same shape as the
+                      SEO fleet's cards, so a glance across both tabs reads the
+                      same way rather than needing two mental models. */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 12, paddingTop: 8, borderTop: '1px solid rgba(223, 231, 224, 0.08)' }}>
+                    <div
+                      title={agent.score != null
+                        ? `Scored ${agent.score} out of 100 by ${agent.skillName}${agent.periodMonth ? ` for ${agent.periodMonth}` : ''}`
+                        : 'No score yet — run this card, or the last run could not support one'}
+                      style={{ fontWeight: 800, fontSize: '1.2rem', lineHeight: 1, color: scoreColor(agent.score) }}
+                    >
+                      {agent.score != null ? `${agent.score}%` : '--'}
+                    </div>
+
+                    {run ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '0.72rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Loader2 size={12} className="spin" />{elapsed(run.startedAt, now)}
+                        </span>
+                        <button onClick={() => onCancel(run.id)} title="Free the queue slot"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}>
+                          <XCircle size={15} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onRun(agent.agentType)}
+                        disabled={blocked || !isAdmin}
+                        className="btn"
+                        style={{
+                          padding: '6px 14px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700,
+                          cursor: blocked || !isAdmin ? 'not-allowed' : 'pointer',
+                          background: blocked || !isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(224, 35, 28, 0.16)',
+                          color: blocked || !isAdmin ? 'rgba(223, 231, 224, 0.35)' : '#fca5a5',
+                          border: `1px solid ${blocked || !isAdmin ? 'rgba(223,231,224,0.1)' : 'rgba(224, 35, 28, 0.4)'}`,
+                        }}
+                        title={blocked ? agent.blockedReason : isAdmin ? `Run ${agent.skillName}` : 'Runs cost tokens, so they are limited to admins'}
+                      >
+                        <Play size={12} style={{ verticalAlign: -1, marginRight: 4 }} />Run
+                      </button>
+                    )}
+                  </div>
+                </div>
+  );
+}
 
 function Stat({ label, value, delta }) {
   return (
