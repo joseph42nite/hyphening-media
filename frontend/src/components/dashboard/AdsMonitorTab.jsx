@@ -64,13 +64,18 @@ function freshnessColor(freshness) {
   return 'rgba(223, 231, 224, 0.25)';
 }
 
+/**
+ * Score colour, using the SEO monitor's thresholds verbatim.
+ *
+ * Both tabs show a 0-100 score on a card, and a 72 that is amber on one tab and
+ * green on the other is worse than no colour at all — it makes the colour mean
+ * "which tab am I on" rather than "how is this doing".
+ */
 function scoreColor(score) {
-  if (score == null) return 'rgba(223, 231, 224, 0.45)';
-  if (score >= 85) return '#4ade80';
-  if (score >= 70) return '#a3e635';
-  if (score >= 50) return '#eab308';
-  if (score >= 30) return '#fb923c';
-  return '#f87171';
+  if (score == null) return 'var(--text-muted)';
+  if (score >= 80) return '#22c55e';
+  if (score >= 60) return '#38bdf8';
+  return '#e0231c';
 }
 
 const PRIORITY_STYLE = {
@@ -537,62 +542,79 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                     ...panel,
                     borderTop: `4px solid ${blocked ? 'rgba(223, 231, 224, 0.15)' : freshnessColor(agent.freshness)}`,
                     padding: 14, opacity: blocked ? 0.62 : 1,
-                    display: 'flex', flexDirection: 'column', gap: 8,
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                   }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem', wordBreak: 'break-word', minWidth: 0, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
                         {agent.label}
-                        {agent.platform && <Pill tone="muted">{agent.platform}</Pill>}
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: 'rgba(223, 231, 224, 0.4)', marginTop: 2 }}>
-                        {agent.freshness === 'never_run' ? 'never run'
-                          : `${agent.ageDays}d ago${agent.periodMonth ? ` · ${agent.periodMonth}` : ''}`}
-                        {/* The skill name, not just the card name. When a run
-                            fails, "ads-google did not report" is something you
-                            can go and check; "google failed" is not. */}
-                        {agent.skillName && (
-                          <span style={{ color: 'rgba(223, 231, 224, 0.28)' }}> · {agent.skillName}</span>
-                        )}
+                      </span>
+                      <span className="badge" style={{
+                        background: `${freshnessColor(agent.freshness)}1a`,
+                        border: `1px solid ${freshnessColor(agent.freshness)}66`,
+                        color: freshnessColor(agent.freshness),
+                        fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em',
+                        padding: '2px 8px', borderRadius: 9999, flexShrink: 0,
+                        whiteSpace: 'nowrap', textTransform: 'uppercase',
+                      }}>
+                        {agent.freshness.replace('_', ' ')}
+                      </span>
+                    </div>
+
+                    <div style={{ margin: '10px 0', fontSize: '0.78rem', color: 'rgba(223, 231, 224, 0.65)', lineHeight: 1.5 }}>
+                      <div>Cadence: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.staleAfterDays >= 9999 ? 'on demand' : `${agent.staleAfterDays} days`}</span></div>
+                      <div>Last run: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.lastRunAt ? new Date(`${agent.lastRunAt.replace(' ', 'T')}Z`).toLocaleDateString() : 'Never'}</span></div>
+                      <div style={{ fontSize: '0.7rem', color: 'rgba(223, 231, 224, 0.35)' }}>
+                        {agent.skillName}{agent.platform ? ` · ${agent.platform}` : ''}
                       </div>
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, lineHeight: 1, color: scoreColor(agent.score), fontFamily: 'Space Grotesk, sans-serif' }}>
-                      {agent.score ?? '--'}
-                    </div>
+
+                    <p style={{ margin: '0 0 8px', fontSize: '0.74rem', lineHeight: 1.45, color: 'rgba(223, 231, 224, 0.55)' }}>
+                      {agent.description}
+                    </p>
+
+                    {blocked && (
+                      // Two colours for two different asks. Amber means "add some
+                      // data and this starts working"; grey means "someone has to
+                      // configure something on purpose". Painting both amber sends
+                      // people off to fix the wrong thing.
+                      <div style={{
+                        marginTop: 6, fontSize: '0.72rem', lineHeight: 1.4,
+                        padding: '3px 6px', borderRadius: 4,
+                        color: agent.blockedPermanently ? 'rgba(223, 231, 224, 0.5)' : '#fbbf24',
+                        background: agent.blockedPermanently ? 'rgba(148, 163, 184, 0.08)' : 'rgba(234, 179, 8, 0.1)',
+                        border: `1px solid ${agent.blockedPermanently ? 'rgba(148, 163, 184, 0.2)' : 'rgba(234, 179, 8, 0.25)'}`,
+                      }}>
+                        ⚠ {agent.blockedReason}
+                      </div>
+                    )}
+
+                    {agent.openRecommendations > 0 && (
+                      <button onClick={() => openAuditDetail(agent.lastAuditId)}
+                        style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontSize: '0.72rem', color: '#fdba74', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <ListChecks size={12} />{agent.openRecommendations} open action{agent.openRecommendations === 1 ? '' : 's'}
+                        <ChevronRight size={11} />
+                      </button>
+                    )}
                   </div>
 
-                  <p style={{ margin: 0, fontSize: '0.74rem', lineHeight: 1.45, color: 'rgba(223, 231, 224, 0.6)' }}>
-                    {agent.description}
-                  </p>
-
-                  {blocked && (
-                    // Two different colours for two different asks. Amber means
-                    // "add some data and this starts working"; grey means
-                    // "someone has to configure something on purpose". Painting
-                    // both amber sends people off to fix the wrong thing.
-                    <div style={{
-                      fontSize: '0.7rem', display: 'flex', gap: 5, lineHeight: 1.4,
-                      color: agent.blockedPermanently ? 'rgba(223, 231, 224, 0.45)' : '#fbbf24',
-                    }}>
-                      <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 2 }} />
-                      <span>{agent.blockedReason}</span>
+                  {/* Score and action, on one footer row — the same shape as the
+                      SEO fleet's cards, so a glance across both tabs reads the
+                      same way rather than needing two mental models. */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 12, paddingTop: 8, borderTop: '1px solid rgba(223, 231, 224, 0.08)' }}>
+                    <div
+                      title={agent.score != null
+                        ? `Scored ${agent.score} out of 100 by ${agent.skillName}${agent.periodMonth ? ` for ${agent.periodMonth}` : ''}`
+                        : 'No score yet — run this card, or the last run could not support one'}
+                      style={{ fontWeight: 800, fontSize: '1.2rem', lineHeight: 1, color: scoreColor(agent.score) }}
+                    >
+                      {agent.score != null ? `${agent.score}%` : '--'}
                     </div>
-                  )}
 
-                  {agent.openRecommendations > 0 && (
-                    <button onClick={() => openAuditDetail(agent.lastAuditId)}
-                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontSize: '0.72rem', color: '#fdba74', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <ListChecks size={12} />{agent.openRecommendations} open action{agent.openRecommendations === 1 ? '' : 's'}
-                      <ChevronRight size={11} />
-                    </button>
-                  )}
-
-                  <div style={{ marginTop: 'auto', paddingTop: 6 }}>
                     {run ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ flex: 1, fontSize: '0.75rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <Loader2 size={12} className="spin" />
-                          {run.status} {elapsed(run.startedAt, now)}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '0.72rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Loader2 size={12} className="spin" />{elapsed(run.startedAt, now)}
                         </span>
                         <button onClick={() => cancel(run.id)} title="Free the queue slot"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}>
@@ -605,15 +627,15 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                         disabled={blocked || !isAdmin}
                         className="btn"
                         style={{
-                          width: '100%', padding: '7px 10px', borderRadius: 6, fontSize: '0.78rem', fontWeight: 700,
+                          padding: '6px 14px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700,
                           cursor: blocked || !isAdmin ? 'not-allowed' : 'pointer',
                           background: blocked || !isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(224, 35, 28, 0.16)',
                           color: blocked || !isAdmin ? 'rgba(223, 231, 224, 0.35)' : '#fca5a5',
                           border: `1px solid ${blocked || !isAdmin ? 'rgba(223,231,224,0.1)' : 'rgba(224, 35, 28, 0.4)'}`,
                         }}
-                        title={blocked ? agent.blockedReason : isAdmin ? `Stale after ${agent.staleAfterDays} days` : 'Runs cost tokens, so they are limited to admins'}
+                        title={blocked ? agent.blockedReason : isAdmin ? `Run ${agent.skillName}` : 'Runs cost tokens, so they are limited to admins'}
                       >
-                        <Play size={12} style={{ verticalAlign: -1, marginRight: 5 }} />Run
+                        <Play size={12} style={{ verticalAlign: -1, marginRight: 4 }} />Run
                       </button>
                     )}
                   </div>

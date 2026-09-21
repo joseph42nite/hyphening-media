@@ -438,7 +438,7 @@ function contentSection(clientId) {
 }
 
 /** What paid traffic does after the click, as far as this system can see it. */
-function landingSection(clientId) {
+function landingSection(clientId, client) {
   const landing = db.prepare(`
     SELECT channel, campaign_name, page_url, COUNT(*) AS clicks,
            strftime('%Y-%m', created_at) AS month
@@ -459,9 +459,19 @@ function landingSection(clientId) {
     ORDER BY created_at DESC LIMIT 3
   `).all(clientId);
 
-  if (!landing.length && !fromLeads.length && !seo.length) return null;
+  // The page the ads point at is the client's website. Its presence alone is
+  // enough to build this section: the landing skill fetches and audits the page
+  // itself, so a URL is something to work with before a single contact click
+  // has been recorded. Without one there is nothing to look at, however much
+  // click data exists — a click count with no page is not an audit.
+  const landingUrl = client.website_url || null;
+  if (!landingUrl && !landing.length && !fromLeads.length && !seo.length) return null;
 
   return {
+    // The ads and the site share one URL. Named `landing_url` rather than
+    // `website_url` so a skill reading this section does not have to know that,
+    // and reported once rather than as two fields holding the same string.
+    landing_url: landingUrl,
     landing_contact_clicks: landing,
     lead_contact_clicks: fromLeads,
     // Borrowed from the SEO fleet rather than re-audited. A landing page's
@@ -489,9 +499,11 @@ function landingSection(clientId) {
  * nothing.
  */
 export function buildFactPack(clientId, { month = null } = {}) {
-  const client = db.prepare(
-    'SELECT id, name, client_type, website_url, contact_phone FROM crm_clients WHERE id = ?'
-  ).get(clientId);
+  const client = db.prepare(`
+    SELECT id, name, client_type, website_url, contact_phone,
+           google_ads_customer_id, meta_ads_account_id
+    FROM crm_clients WHERE id = ?
+  `).get(clientId);
   if (!client) return null;
 
   const sections = {};
@@ -510,8 +522,8 @@ export function buildFactPack(clientId, { month = null } = {}) {
     'No treatment prices recorded, so booked appointments cannot be valued.');
   add('content', contentSection(clientId),
     'No posted, tracked content with views recorded for this client.');
-  add('landing', landingSection(clientId),
-    'No landing-page contact clicks and no SEO audits recorded for this client.');
+  add('landing', landingSection(clientId, client),
+    'No website URL is set on the client record, and no contact clicks or SEO audits exist. Add the Website URL on the client to unblock this.');
 
   const available = new Set(Object.keys(sections));
   const spend = sections.spend;
@@ -630,7 +642,16 @@ export function buildFactPack(clientId, { month = null } = {}) {
   }
 
   const pack = {
-    client: { id: client.id, name: client.name, type: client.client_type, website: client.website_url },
+    client: {
+      id: client.id,
+      name: client.name,
+      type: client.client_type,
+      website: client.website_url,
+      // Which account the spend was run from. Carried so a client report can
+      // state it rather than leaving the reader to assume the client's own.
+      google_ads_customer_id: client.google_ads_customer_id || null,
+      meta_ads_account_id: client.meta_ads_account_id || null,
+    },
     generated_at: new Date().toISOString(),
     focus_month: sections.spend?.focus_month || month || currentMonth(),
     sections,

@@ -1,0 +1,23 @@
+-- Migration: 077_client_ads_properties.sql
+--
+-- Which ad account a client's spend runs from, recorded on the client next to
+-- website_url, gsc_property and ga4_property_id.
+--
+-- An identifier only; no credential is stored in this database. It is here so a
+-- client report can state which account a number came from — for this agency
+-- that is usually its own, not the client's — and so that if platform API
+-- access is ever added there is already one agreed place naming the account to
+-- connect.
+--
+-- There is deliberately no separate landing-page URL. The ads point at the
+-- client's website, which website_url already holds, and a second field for the
+-- same page would only create two places to look and one of them to go stale.
+--
+-- Monthly spend stays on marketing_ad_campaigns. It cannot live here: a client
+-- record holds one value per field, and spend is a different number every month
+-- for every campaign.
+--
+-- google_ads_customer_id is absent because crm_clients has carried it since the
+-- Google properties work.
+
+ALTER TABLE crm_clients ADD COLUMN meta_ads_account_id TEXT;

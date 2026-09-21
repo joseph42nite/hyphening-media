@@ -107,7 +107,8 @@ well organically is a creative hypothesis worth testing, not a prediction.
 
 ## `landing`
 
-`landing_contact_clicks` and `lead_contact_clicks` by channel, plus the most
+`landing_url` — the page the ads point at, which is the client's website —
+plus `landing_contact_clicks` and `lead_contact_clicks` by channel and the most
 recent SEO audits for the site.
 
 **Trap:** contact clicks are not conversions. They are intent signals with no

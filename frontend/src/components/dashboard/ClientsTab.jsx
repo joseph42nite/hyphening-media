@@ -10,7 +10,8 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
   const [editingClient, setEditingClient] = useState(null);
   const [clientFormData, setClientFormData] = useState({
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
-    parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: ''
+    parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
+    google_ads_customer_id: '', meta_ads_account_id: ''
   });
 
   const filteredClients = clients.filter(c =>
@@ -31,13 +32,16 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
         instagram_url: client.instagram_url || '',
         youtube_url: client.youtube_url || '',
         gsc_property: client.gsc_property || '',
-        ga4_property_id: client.ga4_property_id || ''
+        ga4_property_id: client.ga4_property_id || '',
+        google_ads_customer_id: client.google_ads_customer_id || '',
+        meta_ads_account_id: client.meta_ads_account_id || ''
       });
     } else {
       setEditingClient(null);
       setClientFormData({
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
-        parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: ''
+        parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
+    google_ads_customer_id: '', meta_ads_account_id: ''
       });
     }
     setShowClientModal(true);
@@ -341,6 +345,49 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                   />
                   <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                     GA4 → Admin → Property Settings. The plain number, not the G- measurement ID.
+                  </small>
+                </div>
+              </div>
+
+              {/* Paid media. Set here rather than on each month's campaign rows:
+                  these describe the client, not the month, so re-entering them
+                  every month is both work and a chance to get it wrong. */}
+              <h4 style={{ margin: '20px 0 4px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                Paid media
+              </h4>
+              <p style={{ margin: '0 0 12px', fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                Read by the Ads Monitor. The ads point at the Website URL above — there is no
+                separate landing-page field, because a second place to put the same page is a
+                second place for it to go stale. Monthly spend still goes on the campaign rows in
+                Marketing Data: one client record cannot hold a different number for every month.
+              </p>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Google Ads Customer ID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="123-456-7890"
+                    value={clientFormData.google_ads_customer_id}
+                    onChange={e => setClientFormData({...clientFormData, google_ads_customer_id: e.target.value})}
+                  />
+                  <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Which account the ads run from — ours or theirs. An identifier only; no
+                    credential is stored here.
+                  </small>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Meta Ads Account ID</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="act_1234567890"
+                    value={clientFormData.meta_ads_account_id}
+                    onChange={e => setClientFormData({...clientFormData, meta_ads_account_id: e.target.value})}
+                  />
+                  <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    From Meta Ads Manager. Identifier only.
                   </small>
                 </div>
               </div>
