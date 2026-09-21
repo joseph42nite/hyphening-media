@@ -56,11 +56,33 @@ export function platformForChannel(channelType) {
   return CHANNEL_TO_PLATFORM[channelType] || 'Google';
 }
 
-/** The service account key, from the first place it is found. */
+/**
+ * The service account key, from the first place it is found.
+ *
+ * GOOGLE_ADS_SERVICE_ACCOUNT_KEY takes either a path or the key's JSON inline.
+ * Inline matters for the server: the SEO tooling reads this key from a file in
+ * a developer's home directory, and a deployed process has no such directory —
+ * the first production sync failed for exactly that reason. An env var keeps
+ * the credential out of the repo and out of a backup of it.
+ *
+ * Returns null when nothing is configured, so the caller can say which of the
+ * places it looked were empty rather than throwing a bare file-not-found.
+ */
 export function findServiceAccountKey() {
+  const inline = process.env.GOOGLE_ADS_SERVICE_ACCOUNT_KEY || '';
+  if (inline.trim().startsWith('{')) {
+    try {
+      return { path: 'GOOGLE_ADS_SERVICE_ACCOUNT_KEY (inline)', key: JSON.parse(inline) };
+    } catch (err) {
+      throw new Error(`GOOGLE_ADS_SERVICE_ACCOUNT_KEY looks like inline JSON but does not parse: ${err.message}`);
+    }
+  }
+
   const candidates = [
     process.env.GOOGLE_ADS_SERVICE_ACCOUNT_KEY,
     process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    // Where the SEO tooling keeps it on a developer machine. Last, so a server
+    // that sets an env var is never surprised by a stray file.
     path.join(os.homedir(), '.config', 'claude-seo', 'service-account.json'),
   ].filter(Boolean);
 
@@ -73,7 +95,7 @@ export function findServiceAccountKey() {
       }
     }
   }
-  return null;
+  return { missing: candidates };
 }
 
 // Tokens last an hour. Cached because a sync of several clients would otherwise
@@ -84,8 +106,15 @@ export async function getAccessToken() {
   if (tokenCache.token && Date.now() < tokenCache.expiresAt) return tokenCache.token;
 
   const found = findServiceAccountKey();
-  if (!found) {
-    throw new Error('No Google service account key found. Set GOOGLE_ADS_SERVICE_ACCOUNT_KEY or GOOGLE_APPLICATION_CREDENTIALS.');
+  if (!found || found.missing) {
+    // Names the paths actually checked. The previous message said only which
+    // variables to set, which on a server where neither is set and no file
+    // exists gives nothing to act on.
+    const looked = (found?.missing || []).join(', ') || '(nothing configured)';
+    throw new Error(
+      'No Google service account key found. Set GOOGLE_ADS_SERVICE_ACCOUNT_KEY to the key\'s JSON ' +
+      'or to a path on this machine. Looked in: ' + looked,
+    );
   }
 
   const { key } = found;

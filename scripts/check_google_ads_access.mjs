@@ -41,6 +41,15 @@ const digits = (v) => (v ? String(v).replace(/\D/g, '') : null);
 
 /** The same key the SEO tooling already uses, unless pointed elsewhere. */
 function findKey() {
+  // An inline key is written to a temp file so the rest of the script, which
+  // only knows how to read a path, needs no special case.
+  const inline = process.env.GOOGLE_ADS_SERVICE_ACCOUNT_KEY || '';
+  if (inline.trim().startsWith('{')) {
+    const tmp = path.join(os.tmpdir(), `gads-key-${process.pid}.json`);
+    fs.writeFileSync(tmp, inline, { mode: 0o600 });
+    return tmp;
+  }
+
   const candidates = [
     process.env.GOOGLE_ADS_SERVICE_ACCOUNT_KEY,
     process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -141,6 +150,8 @@ async function main() {
   // 1. Key
   const keyPath = findKey();
   if (!keyPath) {
+    // Mirrors the server's own lookup: inline JSON first, then paths.
+
     console.log('\n✗ No service account key found.');
     console.log('  Looked at GOOGLE_ADS_SERVICE_ACCOUNT_KEY, GOOGLE_APPLICATION_CREDENTIALS,');
     console.log('  and ~/.config/claude-seo/service-account.json');
