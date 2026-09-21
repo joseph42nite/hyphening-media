@@ -59,16 +59,29 @@ A high share is a finding: it means the landing page is not passing the campaign
 through, so no campaign-level cost per lead can be trusted. Say so before
 quoting one.
 
-### Walk-ins are not ad leads
+### Walk-ins count, and are also listed separately
 
 `walk_in_leads` counts leads the client logged by hand in their portal —
-walk-ins and direct calls. **No ad bought them.** They are excluded from every
-lead count, cost figure and rate in the `spend` and `leads` sections, and
-reported separately so the clinic's own conversion on them is still visible.
+walk-ins and direct calls.
 
-Never fold them into cost per lead. Crediting ad spend with a customer who
-walked in flatters every figure downstream, and the flattery grows with how
-well the clinic does offline — which is exactly backwards.
+They **are included** in `leads`, in `cpl_inr`, and in every rate in the `leads`
+section. That is the agency's decision: someone who walks into the clinic has
+usually seen the advertising first. It also keeps these figures equal to the
+Marketing Data tab's, and two screens disagreeing about one month's cost per
+lead is worse than either definition being imperfect.
+
+They are a **subset**, not a separate population — do not add `walk_in_leads` to
+`leads`, it is already there.
+
+`cpl_excluding_walk_ins_inr` gives the ads-only view. Use it when the question is
+specifically what the advertising bought, and **say which basis you used** — the
+two differ a lot (₹4,495 against ₹7,492 on DentAlchemy's September), and a
+number quoted without its basis is the kind that gets repeated back wrongly.
+
+One caveat worth raising when it bites: walk-in volume moves for reasons that
+have nothing to do with the ads, so a quiet month offline makes cost per lead
+look worse even if the campaigns did not change. Check `walk_in_leads` before
+calling a cost-per-lead move an advertising result.
 
 **Trap:** every rate in the `leads` section is measured against the *captured*
 leads. Quoting a qualification rate without `lead_capture_pct` beside it

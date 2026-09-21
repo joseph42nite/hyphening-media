@@ -154,24 +154,39 @@ function totalise(rows) {
 }
 
 /**
- * Folds platform-level leads that no campaign claimed back into a total.
+ * Rolls every lead of the month into an account or platform total.
  *
- * Per-campaign CPL is deliberately null when a campaign has no attributable
- * leads — we cannot say the spend on THAT campaign bought them. But the account
- * did buy them, so an account total that ignores them reports no cost per lead
- * at all while the money and the leads both plainly exist.
+ * Three kinds arrive here and all three count towards cost per lead:
  *
- * That is exactly what happened on DentAlchemy: ₹143,000 of synced spend and 17
- * landing-page leads, and a blank CPL, because every lead named a campaign that
- * no Google campaign is called.
+ *   attributed   — named a campaign that exists. Already in `totals`.
+ *   unattributed — reached the CRM naming no campaign we hold. The spend bought
+ *                  them; we just cannot say which campaign did.
+ *   walk_in      — logged by hand in the client portal: someone who walked in
+ *                  or phoned directly.
+ *
+ * Including walk-ins is the agency's decision (2026-09-21), on the reasoning
+ * that someone who walks in has usually seen the advertising first. It also
+ * keeps this figure equal to the Marketing Data tab's, which counts the same
+ * way — two screens showing a different cost per lead for one month is worse
+ * than either definition being imperfect.
+ *
+ * They stay counted separately in `walk_in_leads` so an agent can still reason
+ * about ad-only efficiency, and must say which basis it is using when it does.
+ *
+ * Per-campaign CPL is untouched and stays null where a campaign has no
+ * attributable leads: no campaign may claim a lead that named none.
  */
-function withOrphans(totals, orphanLeads) {
-  const leads = totals.leads + orphanLeads;
+function withOrphans(totals, orphanLeads, walkInLeads = 0) {
+  const leads = totals.leads + orphanLeads + walkInLeads;
   return {
     ...totals,
     leads,
-    leads_captured: totals.leads_captured + orphanLeads,
+    leads_captured: totals.leads_captured + orphanLeads + walkInLeads,
     leads_unattributed: orphanLeads,
+    walk_in_leads: walkInLeads,
+    // Ad-driven only, for an agent that wants to separate the two. The headline
+    // `cpl_inr` above deliberately does not use it.
+    cpl_excluding_walk_ins_inr: ratio(totals.spend_inr, totals.leads + orphanLeads),
     cpl_inr: ratio(totals.spend_inr, leads),
   };
 }
@@ -314,10 +329,9 @@ function spendSection(clientId, month) {
     return {
       platform,
       campaigns: rs.length,
-      // Unattributed leads are folded in here, never into a campaign. Walk-ins
-      // are deliberately left out entirely: no ad bought them.
-      ...withOrphans(now, orphan),
-      walk_in_leads: walkInFor(focus, platform),
+      // Unattributed leads and walk-ins are folded in here, never into a
+      // campaign — no campaign may claim a lead that named none.
+      ...withOrphans(now, orphan, walkInFor(focus, platform)),
       share_of_spend_pct: pct(now.spend_inr, focusTotals.spend_inr),
       mom: before && {
         spend_pct: delta(now.spend_inr, before.spend_inr),
@@ -331,8 +345,8 @@ function spendSection(clientId, month) {
   // A per-month account series so trend questions ("is CPL drifting up?") are
   // answered from the series rather than from two points the model picked.
   const series = months.map(m => {
-    const t = withOrphans(totalise(rows.filter(r => r.month === m)), unattributedFor(m));
-    return { month: m, spend_inr: t.spend_inr, leads: t.leads, cpl_inr: t.cpl_inr, ctr_pct: t.ctr_pct, cpc_inr: t.cpc_inr, leads_unattributed: t.leads_unattributed };
+    const t = withOrphans(totalise(rows.filter(r => r.month === m)), unattributedFor(m), walkInFor(m));
+    return { month: m, spend_inr: t.spend_inr, leads: t.leads, cpl_inr: t.cpl_inr, ctr_pct: t.ctr_pct, cpc_inr: t.cpc_inr, leads_unattributed: t.leads_unattributed, walk_in_leads: t.walk_in_leads };
   }).reverse();
 
   return {
@@ -346,24 +360,24 @@ function spendSection(clientId, month) {
     lead_capture_pct: focusTotals.leads_reported > 0
       ? pct(focusTotals.leads_captured + unattributedFor(focus), focusTotals.leads_reported)
       : null,
-    walk_in_leads: walkInFor(focus),
     account: {
-      // Leads the spend bought whose campaign is unknown are counted here and
-      // included in cost per lead: the account paid for them either way.
-      ...withOrphans(focusTotals, unattributedFor(focus)),
+      ...withOrphans(focusTotals, unattributedFor(focus), walkInFor(focus)),
       // Walk-ins and direct calls the client logged by hand. Excluded from
       // every figure above and from cost per lead — reported because they are
       // real business, but they are not what the ads bought.
       walk_in_leads: walkInFor(focus),
       mom: priorTotals && {
         spend_pct: delta(focusTotals.spend_inr, priorTotals.spend_inr),
-        // Compared like against like: both sides include their own month's
-        // unattributed leads, so a month where attribution improved does not
-        // read as a collapse in volume.
-        leads_pct: delta(focusTotals.leads + unattributedFor(focus), priorTotals.leads + unattributedFor(prior)),
+        // Both sides counted the same way — every lead of that month — so a
+        // month where attribution improved does not read as a collapse in
+        // volume, and a quiet month for walk-ins does not read as ad failure.
+        leads_pct: delta(
+          focusTotals.leads + unattributedFor(focus) + walkInFor(focus),
+          priorTotals.leads + unattributedFor(prior) + walkInFor(prior),
+        ),
         cpl_pct: delta(
-          ratio(focusTotals.spend_inr, focusTotals.leads + unattributedFor(focus)),
-          ratio(priorTotals.spend_inr, priorTotals.leads + unattributedFor(prior)),
+          ratio(focusTotals.spend_inr, focusTotals.leads + unattributedFor(focus) + walkInFor(focus)),
+          ratio(priorTotals.spend_inr, priorTotals.leads + unattributedFor(prior) + walkInFor(prior)),
         ),
         ctr_pct: delta(focusTotals.ctr_pct, priorTotals.ctr_pct),
         cpc_pct: delta(focusTotals.cpc_inr, priorTotals.cpc_inr),
@@ -399,12 +413,11 @@ function leadsSection(clientId, month) {
 
   const months = [...new Set(rows.map(r => r.month).filter(Boolean))].sort().reverse();
   const focus = month && months.includes(month) ? month : months[0];
-  // Walk-ins are held apart from every ad figure. They qualify and book like
-  // any other patient — worth reporting — but crediting ad spend with someone
-  // who walked in or phoned directly flatters every cost figure downstream.
-  const allInFocus = rows.filter(r => r.month === focus);
-  const inFocus = allInFocus.filter(r => !r.is_walk_in);
-  const walkIns = allInFocus.filter(r => r.is_walk_in);
+  // Every lead of the month, walk-ins included — the same basis as cost per
+  // lead and as the Marketing Data tab's qualified and booking totals. Walk-ins
+  // are also broken out below so the split stays visible.
+  const inFocus = rows.filter(r => r.month === focus);
+  const walkIns = inFocus.filter(r => r.is_walk_in);
 
   const stageCounts = (set) => ({
     leads: set.length,
@@ -453,11 +466,11 @@ function leadsSection(clientId, month) {
     focus_month: focus,
     months_available: months,
     account: withRates(inFocus),
-    // Reported alongside, never inside. Same stage counts so the clinic's own
-    // conversion on walk-ins is visible, which is a useful comparison against
-    // what the ads deliver.
+    // A subset of `account` above, not a separate population. Broken out so the
+    // clinic's own conversion on walk-ins stays visible and so an agent can
+    // discuss ad-only efficiency when it wants to.
     walk_ins: walkIns.length ? withRates(walkIns) : null,
-    walk_in_note: 'Leads the client logged by hand in their portal: walk-ins and direct calls. No ad bought them, so they are excluded from every cost and rate above.',
+    walk_in_note: 'Leads the client logged by hand in their portal: walk-ins and direct calls. INCLUDED in every count and rate above, by the agency\'s decision that a walk-in has usually seen the advertising. Subtract these for an ads-only view.',
     by_platform: Object.entries(byPlatform)
       .map(([platform, set]) => ({ platform, ...withRates(set) }))
       .sort((a, b) => b.leads - a.leads),

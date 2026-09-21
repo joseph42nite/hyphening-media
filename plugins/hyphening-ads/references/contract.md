@@ -30,6 +30,9 @@ say not to invent account context; this makes the same point concrete:
 - **Revenue is the first booked treatment only.** No repeat visit is recorded
   anywhere, so it is never lifetime value. `coverage_pct` is how much of the
   booked volume could be priced — below 100 the figure is a floor.
+- **Walk-ins are included in cost per lead**, by the agency's decision. They are
+  a subset of `leads`, not an addition to it. `cpl_excluding_walk_ins_inr` is
+  the ads-only figure; whenever you quote either, say which one it is.
 - **Two lead counts exist and they measure different things.** `leads_reported`
   is what the platform counted; `leads_captured` is what reached the CRM;
   `lead_capture_pct` is the gap. Cost per lead uses reported volume. Every
