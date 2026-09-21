@@ -141,6 +141,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
   const [googleAds, setGoogleAds] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [syncPlan, setSyncPlan] = useState(null);
+  const [showSyncHelp, setShowSyncHelp] = useState(false);
 
   const consoleEndRef = useRef(null);
   const isAdmin = auth?.role === 'admin' || auth?.role === 'super_admin';
@@ -541,18 +542,39 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                 style={{ padding: '9px 16px', borderRadius: 8, fontWeight: 600, background: isConsoleOpen ? 'rgba(224, 35, 28, 0.18)' : 'rgba(255, 255, 255, 0.05)', color: isConsoleOpen ? '#fca5a5' : 'var(--text-primary)', border: '1px solid rgba(223, 231, 224, 0.15)' }}>
                 <Terminal size={15} style={{ verticalAlign: -2, marginRight: 6 }} />Console ({consoleLogs.length})
               </button>
-              {googleAds?.configured && (
-                <button onClick={() => runSync(true)} disabled={syncing || !isAdmin} className="btn btn-secondary"
-                  style={{ padding: '9px 16px', borderRadius: 8, fontWeight: 600, background: 'rgba(96, 165, 250, 0.12)', color: '#93c5fd', border: '1px solid rgba(96, 165, 250, 0.35)', cursor: syncing || !isAdmin ? 'not-allowed' : 'pointer' }}
-                  title={googleAds.lastSyncedAt
-                    ? `Last synced ${new Date(`${googleAds.lastSyncedAt.replace(' ', 'T')}Z`).toLocaleString()}`
-                    : 'Never synced'}>
-                  {syncing
-                    ? <Loader2 size={15} className="spin" style={{ verticalAlign: -2, marginRight: 6 }} />
-                    : <RefreshCw size={15} style={{ verticalAlign: -2, marginRight: 6 }} />}
-                  Sync Google Ads
-                </button>
-              )}
+              {/* Always rendered, never hidden.
+                  It used to appear only once a customer ID was set, which meant
+                  the one person who needed to know the feature existed — someone
+                  looking at a client with no campaign data — could not see it.
+                  A disabled control that says what it wants is discoverable; an
+                  absent one is not. */}
+              <button
+                onClick={() => (googleAds?.configured ? runSync(true) : setShowSyncHelp(true))}
+                disabled={syncing || !isAdmin}
+                className="btn btn-secondary"
+                style={{
+                  padding: '9px 16px', borderRadius: 8, fontWeight: 600,
+                  background: googleAds?.configured ? 'rgba(96, 165, 250, 0.12)' : 'rgba(255,255,255,0.04)',
+                  color: googleAds?.configured ? '#93c5fd' : 'rgba(223, 231, 224, 0.45)',
+                  border: `1px solid ${googleAds?.configured ? 'rgba(96, 165, 250, 0.35)' : 'rgba(223,231,224,0.12)'}`,
+                  cursor: syncing || !isAdmin ? 'not-allowed' : 'pointer',
+                }}
+                title={!isAdmin
+                  ? 'Syncing ad data is limited to admins'
+                  : !googleAds?.configured
+                    ? 'No Google Ads customer ID on this client yet — click to see how to add it'
+                    : googleAds.lastSyncedAt
+                      ? `Last synced ${new Date(`${googleAds.lastSyncedAt.replace(' ', 'T')}Z`).toLocaleString()}`
+                      : 'Never synced — click to preview what would be imported'}
+              >
+                {syncing
+                  ? <Loader2 size={15} className="spin" style={{ verticalAlign: -2, marginRight: 6 }} />
+                  : <RefreshCw size={15} style={{ verticalAlign: -2, marginRight: 6 }} />}
+                Sync Google Ads
+                {!googleAds?.configured && (
+                  <span style={{ marginLeft: 6, fontSize: '0.7rem', opacity: 0.7 }}>— not linked</span>
+                )}
+              </button>
               <button onClick={() => (facts ? setFacts(null) : loadFacts())} className="btn btn-secondary"
                 style={{ padding: '9px 16px', borderRadius: 8, fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', border: '1px solid rgba(223, 231, 224, 0.15)' }}
                 title="The exact numbers every agent is given. Every figure in every report traces to this.">
@@ -800,6 +822,41 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
             <div ref={consoleEndRef} />
           </div>
         </div>
+      )}
+
+      {/* ---------------- Sync setup help ---------------- */}
+      {showSyncHelp && (
+        <Modal title="Link this client's Google Ads account" onClose={() => setShowSyncHelp(false)}>
+          <p style={{ fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-primary)', marginTop: 0 }}>
+            {selectedClient?.name} has no Google Ads customer ID, so there is no account to sync.
+            Once one is set, this button imports campaigns, spend, impressions, clicks and ad groups —
+            and repeats daily at 06:00.
+          </p>
+          <ol style={{ fontSize: '0.84rem', lineHeight: 1.7, color: 'rgba(223, 231, 224, 0.8)', paddingLeft: 18 }}>
+            <li>Open <strong>Clients</strong> → {selectedClient?.name || 'the client'} → <strong>Edit</strong>.</li>
+            <li>Under <strong>Ad accounts</strong>, put the 10-digit <strong>Google Ads Customer ID</strong> in
+              (no dashes). It is shown top-right in Google Ads.</li>
+            <li>If the account is reached through a manager account, add the{' '}
+              <strong>Google Ads Manager ID</strong> too — without it the sync fails with a permission
+              error that never mentions the real cause.</li>
+            <li>In Google Ads → <strong>Admin → Access and security</strong>, add the service account as a
+              read-only user:
+              <br />
+              <code style={{ fontSize: '0.74rem', color: '#93c5fd', wordBreak: 'break-all' }}>
+                claudeseo@fit-sanctum-454909-s0.iam.gserviceaccount.com
+              </code>
+            </li>
+            <li>Come back here and press <strong>Sync Google Ads</strong>. It previews what it would
+              import before writing anything.</li>
+          </ol>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+            Meta has no connection yet — those rows are still entered by hand under Marketing Data.
+            Anything entered by hand is never overwritten by a sync.
+          </p>
+          <div style={{ marginTop: 14 }}>
+            <MiniButton muted onClick={() => setShowSyncHelp(false)}>Close</MiniButton>
+          </div>
+        </Modal>
       )}
 
       {/* ---------------- Sync preview ---------------- */}
