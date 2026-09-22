@@ -439,6 +439,29 @@ select.task-card-status-select option,
   z-index: 10;
 }
 
+.content-tracker-table-scroll {
+  max-height: 385px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.content-tracker-table-scroll thead tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  padding: 10px 14px;
+}
+
+.content-tracker-table-scroll thead tr:nth-child(2) th {
+  position: sticky;
+  top: 36px;
+  z-index: 14;
+  background: rgba(12, 16, 22, 0.98);
+}
+
 table {
   width: 100%;
   min-width: 100%;

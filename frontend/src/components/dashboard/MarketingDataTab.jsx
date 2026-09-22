@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ContentModal from './ContentModal.jsx';
@@ -35,12 +35,13 @@ export default function MarketingDataTab({
   const isVideoEditor = auth?.role === 'ops_video_editor';
   const canEdit = isAdmin || isSMM || isVideoEditor;
 
-  // Content Tracker Pagination State
+  // Content Tracker Filter State
   const [contentPage, setContentPage] = useState(1);
-  const ITEMS_PER_PAGE_CONTENT = 10;
+  const [contentMonthFilter, setContentMonthFilter] = useState('all');
 
   useEffect(() => {
     setContentPage(1);
+    setContentMonthFilter('all');
     if (selectedClientForReports?.id === 'all' || !selectedClientForReports) {
       fetchMarketingData('all');
     } else if (selectedClientForReports?.id) {
@@ -61,9 +62,18 @@ export default function MarketingDataTab({
     blogs: '', calls: '', directions: '', reviews: '', avg_rating: '', top_keywords: '', da: '', ai_overview_visible: 'No'
   });
 
-  // Platform filter — the tracker is sorted by date, so a client whose YouTube
-  // posts are older than their Instagram ones has them stranded pages deep.
-  //
+  // Extract available months from content rows
+  const availableContentMonths = useMemo(() => {
+    const set = new Set();
+    (marketingContent || []).forEach(item => {
+      if (item.date && /^\d{4}-\d{2}/.test(item.date)) {
+        set.add(item.date.slice(0, 7));
+      }
+    });
+    return Array.from(set).sort().reverse();
+  }, [marketingContent]);
+
+  // Platform & Month filters — the tracker is sorted by date.
   // Cross-posted Shorts are logged as platform=instagram with the YouTube URL in
   // `link`, so matching on `platform` alone would hide most of the YouTube
   // catalogue. Ask whether the row has a YouTube video instead.
@@ -74,11 +84,15 @@ export default function MarketingDataTab({
     /(?:youtube\.com|youtu\.be)\//i.test(i.link || '') ||
     /(?:youtube\.com|youtu\.be)\//i.test(i.youtube_link || '')
   );
-  const visibleContent = platformFilter === 'all'
-    ? marketingContent
+  const filteredByPlatform = platformFilter === 'all'
+    ? (marketingContent || [])
     : platformFilter === 'youtube'
-      ? marketingContent.filter(hasYouTube)
-      : marketingContent.filter(i => (i.platform || '').toLowerCase() === 'instagram' && !hasYouTube(i));
+      ? (marketingContent || []).filter(hasYouTube)
+      : (marketingContent || []).filter(i => (i.platform || '').toLowerCase() === 'instagram' && !hasYouTube(i));
+
+  const visibleContent = contentMonthFilter === 'all'
+    ? filteredByPlatform
+    : filteredByPlatform.filter(i => i.date && i.date.startsWith(contentMonthFilter));
 
   // Video length as m:ss (YouTube durations are short enough that hours are rare)
   const formatDuration = (seconds) => {
@@ -489,6 +503,17 @@ export default function MarketingDataTab({
                 <option value="instagram">Instagram only</option>
                 <option value="youtube">YouTube only</option>
               </select>
+              <select
+                value={contentMonthFilter}
+                onChange={e => { setContentMonthFilter(e.target.value); setContentPage(1); }}
+                style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: '700', border: '2px solid #000', borderRadius: '6px', cursor: 'pointer' }}
+                title="Filter content by month"
+              >
+                <option value="all">All months</option>
+                {availableContentMonths.map(m => (
+                  <option key={m} value={m}>{formatMonthStr(m)}</option>
+                ))}
+              </select>
               {canEdit && (
                 <>
                   {lastSync?.finishedAt && !isSyncing && (
@@ -512,14 +537,17 @@ export default function MarketingDataTab({
               )}
             </div>
           </div>
-          <div className="table-container table-scrollable-y" style={{ marginBottom: visibleContent.length > 0 ? '12px' : '32px' }}>
+          <div
+            className="table-container table-scrollable-y content-tracker-table-scroll"
+            style={{ marginBottom: visibleContent.length > 0 ? '8px' : '32px' }}
+          >
             <table>
               <thead>
                 <tr>
-                  <th colSpan="8" style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: 'rgba(255, 255, 255, 0.04)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Metadata</th>
-                  <th colSpan="12" style={{ borderBottom: '1px solid rgba(224, 35, 28, 0.3)', textAlign: 'center', background: 'rgba(224, 35, 28, 0.12)', color: '#fca5a5', whiteSpace: 'nowrap', fontWeight: '800' }}>Instagram Metrics</th>
-                  <th colSpan="8" style={{ borderBottom: '1px solid rgba(56, 189, 248, 0.3)', textAlign: 'center', background: 'rgba(56, 189, 248, 0.12)', color: '#7dd3fc', whiteSpace: 'nowrap', fontWeight: '800' }}>YouTube Metrics</th>
-                  <th style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: 'rgba(255, 255, 255, 0.04)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Actions</th>
+                  <th colSpan="8" style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: '#0c1016', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Metadata</th>
+                  <th colSpan="12" style={{ borderBottom: '1px solid rgba(224, 35, 28, 0.3)', textAlign: 'center', background: 'linear-gradient(rgba(224, 35, 28, 0.22), rgba(224, 35, 28, 0.22)), #0c1016', color: '#fca5a5', whiteSpace: 'nowrap', fontWeight: '800' }}>Instagram Metrics</th>
+                  <th colSpan="8" style={{ borderBottom: '1px solid rgba(56, 189, 248, 0.3)', textAlign: 'center', background: 'linear-gradient(rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.22)), #0c1016', color: '#7dd3fc', whiteSpace: 'nowrap', fontWeight: '800' }}>YouTube Metrics</th>
+                  <th style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: '#0c1016', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Actions</th>
                 </tr>
                 <tr>
                   <th>Date</th>
@@ -557,13 +585,11 @@ export default function MarketingDataTab({
                 {visibleContent.length === 0 ? (
                   <tr>
                     <td colSpan="29" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                      No content items tracked yet.
+                      No content items tracked yet{contentMonthFilter !== 'all' ? ` for ${formatMonthStr(contentMonthFilter)}` : ''}.
                     </td>
                   </tr>
                 ) : (
-                  visibleContent
-                    .slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT)
-                    .map(item => (
+                  visibleContent.map(item => (
                     <tr key={item.id}>
                       <td>{item.date ? formatDateStr(item.date) : '-'}</td>
                       <td><span className="badge badge-info">{item.post_type}</span></td>
@@ -738,38 +764,10 @@ export default function MarketingDataTab({
           </div>
 
           {visibleContent.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '32px', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', marginBottom: '32px', flexWrap: 'wrap', gap: '12px' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                Showing {Math.min((contentPage - 1) * ITEMS_PER_PAGE_CONTENT + 1, visibleContent.length)} to {Math.min(contentPage * ITEMS_PER_PAGE_CONTENT, visibleContent.length)} of {visibleContent.length} entries
+                Showing {visibleContent.length} {visibleContent.length === 1 ? 'entry' : 'entries'}{contentMonthFilter !== 'all' ? ` for ${formatMonthStr(contentMonthFilter)}` : ''} · scroll down table to view more
               </span>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <button
-                  onClick={() => setContentPage(p => Math.max(1, p - 1))}
-                  disabled={contentPage === 1}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: contentPage === 1 ? 0.5 : 1, cursor: contentPage === 1 ? 'not-allowed' : 'pointer' }}
-                >
-                  Previous
-                </button>
-                {Array.from({ length: Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT) }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setContentPage(page)}
-                    className={`btn ${contentPage === page ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ padding: '4px 10px', fontSize: '0.8rem', minWidth: '32px' }}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setContentPage(p => Math.min(Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT), p + 1))}
-                  disabled={contentPage >= Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT)}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: contentPage >= Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT) ? 0.5 : 1, cursor: contentPage >= Math.ceil(visibleContent.length / ITEMS_PER_PAGE_CONTENT) ? 'not-allowed' : 'pointer' }}
-                >
-                  Next
-                </button>
-              </div>
             </div>
           )}
 
