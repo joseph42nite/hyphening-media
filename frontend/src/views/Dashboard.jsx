@@ -605,20 +605,29 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         if (allClients.length > 0) {
           const marketingClients = allClients.filter(c => c.client_type !== 'artist_curation');
           if (marketingClients.length > 0) {
-            if (!selectedClientForReports || selectedClientForReports.id === 'all') {
+            if (!selectedClientForReports || (selectedClientForReports.id !== 'all' && !marketingClients.some(c => c.id === selectedClientForReports.id))) {
               const allClientsOption = { id: 'all', name: 'All Clients' };
               setSelectedClientForReports(allClientsOption);
               fetchMarketingData('all');
+            } else if (selectedClientForReports.id === 'all') {
+              fetchMarketingData('all');
             }
             // Scripts stay closed to video editors, so there is no client to preselect.
-            if (!isVideoEditor && !selectedScriptClient) {
+            if (!isVideoEditor && (!selectedScriptClient || !marketingClients.some(c => c.id === selectedScriptClient.id))) {
               setSelectedScriptClient(marketingClients[0]);
             }
+          } else {
+            setSelectedClientForReports({ id: 'all', name: 'All Clients' });
+            setSelectedScriptClient(null);
           }
-          if (!selectedChatClient) {
+          if (!selectedChatClient || !allClients.some(c => c.id === selectedChatClient.id)) {
             setSelectedChatClient(allClients[0]);
             fetchChats(allClients[0].id);
           }
+        } else {
+          setSelectedClientForReports({ id: 'all', name: 'All Clients' });
+          setSelectedScriptClient(null);
+          setSelectedChatClient(null);
         }
       }
     } catch (err) {

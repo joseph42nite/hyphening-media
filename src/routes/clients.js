@@ -435,4 +435,49 @@ router.post('/:id/portal/pin', authorize('admin'), (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/clients/:id
+ * Permanently delete a client and all associated resources. Admins only.
+ */
+router.delete('/:id', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare('SELECT id, name, client_type FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    const clientId = parseInt(req.params.id);
+
+    const deleteTransaction = db.transaction(() => {
+      // 1. Unlink any child clients referencing this client as parent
+      db.prepare('UPDATE crm_clients SET parent_id = NULL WHERE parent_id = ?').run(clientId);
+
+      // 2. Remove references without cascading FKs
+      db.prepare('DELETE FROM client_competitors WHERE client_id = ?').run(clientId);
+      db.prepare('DELETE FROM sys_composio_quota_logs WHERE client_id = ?').run(clientId);
+      db.prepare('DELETE FROM kanban_tasks WHERE client_id = ?').run(clientId);
+
+      // 3. Delete the client itself (all ON DELETE CASCADE tables will automatically be deleted)
+      db.prepare('DELETE FROM crm_clients WHERE id = ?').run(clientId);
+    });
+
+    deleteTransaction();
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'delete',
+      entityType: 'client',
+      entityId: clientId,
+      diff: { name: client.name, client_type: client.client_type },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, message: `Client "${client.name}" successfully deleted`, id: clientId });
+  } catch (err) {
+    console.error('[CLIENTS] Delete client error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

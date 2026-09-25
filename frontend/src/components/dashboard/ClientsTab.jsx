@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
@@ -109,6 +109,28 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
       });
       if (!res.ok) throw new Error('Failed to set PIN');
       showToast(pin ? 'PIN updated successfully' : 'PIN protection removed', 'success');
+      fetchClients();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteClient = async (client) => {
+    if (!client) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${client.name}"?\n\nThis will remove the client, client portal credentials, and all associated marketing content, scripts, leads, campaigns, and tasks.\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${client.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete client');
+      showToast(`Client "${client.name}" deleted successfully`, 'success');
+      setShowClientModal(false);
       fetchClients();
     } catch (err) {
       showToast(err.message, 'error');
@@ -243,6 +265,14 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => openClientModal(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
                       Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClient(client)}
+                      className="btn btn-danger"
+                      style={{ padding: '6px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      title={`Delete ${client.name}`}
+                    >
+                      <Trash2 size={13} /> Delete
                     </button>
                   </div>
                 </td>
@@ -423,9 +453,21 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowClientModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Client</button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+                {editingClient ? (
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                    onClick={() => handleDeleteClient(editingClient)}
+                  >
+                    <Trash2 size={15} /> Delete Client
+                  </button>
+                ) : <div />}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowClientModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">{editingClient ? 'Update Client' : 'Save Client'}</button>
+                </div>
               </div>
             </form>
           </div>
