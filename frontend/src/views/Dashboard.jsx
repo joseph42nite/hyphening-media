@@ -1464,7 +1464,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             fetchCurationData={fetchCurationData}
             showToast={showToast}
             formatDateStr={formatDateStr}
-            clients={clients}
           />
         )}
 

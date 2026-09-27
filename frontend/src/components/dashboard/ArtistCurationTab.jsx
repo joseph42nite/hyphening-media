@@ -9,8 +9,7 @@ export default function ArtistCurationTab({
   venues,
   fetchCurationData,
   showToast,
-  formatDateStr,
-  clients
+  formatDateStr
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSuperAdmin = auth?.role === 'super_admin';
@@ -137,12 +136,6 @@ export default function ArtistCurationTab({
   const [decryptedBank, setDecryptedBank] = useState({});
 
   // Modals visibility states
-  const [showVenueModal, setShowVenueModal] = useState(false);
-  const [editingVenue, setEditingVenue] = useState(null);
-  const [venueFormData, setVenueFormData] = useState({
-    name: '', address: '', city: '', map_link: '', poc_name: '', poc_phone: '', poc_email: '', social_links: '', gig_confirmed_message: '', client_id: ''
-  });
-
   const [showArtistModal, setShowArtistModal] = useState(false);
   const [editingArtist, setEditingArtist] = useState(null);
   const [artistFormData, setArtistFormData] = useState({
@@ -169,57 +162,6 @@ export default function ArtistCurationTab({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setDecryptedBank(prev => ({ ...prev, [artistId]: data.bank_details || 'No bank details recorded' }));
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
-  // Venue CRUD handlers
-  const openVenueModal = (venue = null) => {
-    if (venue) {
-      setEditingVenue(venue);
-      setVenueFormData({
-        name: venue.name,
-        address: venue.address || '',
-        city: venue.city || '',
-        map_link: venue.map_link || '',
-        poc_name: venue.poc_name || '',
-        poc_phone: venue.poc_phone || '',
-        poc_email: venue.poc_email || '',
-        social_links: venue.social_links || '',
-        gig_confirmed_message: venue.gig_confirmed_message || '',
-        client_id: venue.client_id || ''
-      });
-    } else {
-      setEditingVenue(null);
-      setVenueFormData({
-        name: '', address: '', city: '', map_link: '', poc_name: '', poc_phone: '', poc_email: '', social_links: '', gig_confirmed_message: '', client_id: ''
-      });
-    }
-    setShowVenueModal(true);
-  };
-
-  const handleVenueSubmit = async (e) => {
-    e.preventDefault();
-    const url = editingVenue ? `/api/artists/venues/${editingVenue.id}` : '/api/artists/venues';
-    const method = editingVenue ? 'PATCH' : 'POST';
-
-    try {
-      const res = await fetch(`${API_BASE}${url}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...venueFormData,
-          client_id: venueFormData.client_id ? parseInt(venueFormData.client_id) : null
-        }),
-        credentials: 'include'
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to submit venue data');
-
-      showToast(`Venue ${editingVenue ? 'updated' : 'added'} successfully`, 'success');
-      setShowVenueModal(false);
-      fetchCurationData();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -867,60 +809,6 @@ export default function ArtistCurationTab({
         </div>
       )}
 
-      {/* Venues Table */}
-      <div className="dashboard-toolbar curation-section-header">
-        <h3>Venue List</h3>
-        <button onClick={() => openVenueModal()} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={16} /> Add Venue
-        </button>
-      </div>
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Client Name</th>
-              <th>Location Name</th>
-              <th>Address</th>
-              <th>Google Maps Link</th>
-              <th>POC Name</th>
-              <th>POC Phone</th>
-              <th>POC Email</th>
-              <th>Social Links</th>
-              <th>Telegram Template</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {venues.map(v => (
-              <tr key={v.id}>
-                <td>{v.client_name || '-'}</td>
-                <td style={{ fontWeight: 'bold' }}>{v.name}</td>
-                <td>{v.address || '-'}</td>
-                <td>
-                  {v.map_link ? (
-                    <a href={v.map_link} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
-                      View Map
-                    </a>
-                  ) : '-'}
-                </td>
-                <td>{v.poc_name || '-'}</td>
-                <td>{v.poc_phone || '-'}</td>
-                <td>{v.poc_email || '-'}</td>
-                <td>{v.social_links || '-'}</td>
-                <td style={{ fontSize: '0.75rem', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={v.gig_confirmed_message}>
-                  {v.gig_confirmed_message || '-'}
-                </td>
-                <td>
-                  <button onClick={() => openVenueModal(v)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
       {/* Artist Modal */}
       {showArtistModal && (
         <div className="modal-overlay" onClick={() => setShowArtistModal(false)}>
@@ -1059,139 +947,6 @@ export default function ArtistCurationTab({
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Save Artist
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Venue Modal */}
-      {showVenueModal && (
-        <div className="modal-overlay" onClick={() => setShowVenueModal(false)}>
-          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2>{editingVenue ? 'Edit Venue Details' : 'Add Venue'}</h2>
-            <form onSubmit={handleVenueSubmit} style={{ marginTop: '20px' }}>
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Client Name (Association)</label>
-                  <select
-                    className="form-control"
-                    value={venueFormData.client_id}
-                    onChange={e => setVenueFormData({ ...venueFormData, client_id: e.target.value })}
-                  >
-                    <option value="">Select Client (None)</option>
-                    {clients.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Location / Venue Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={venueFormData.name}
-                    onChange={e => setVenueFormData({ ...venueFormData, name: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Address</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={venueFormData.address}
-                    onChange={e => setVenueFormData({ ...venueFormData, address: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">City</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={venueFormData.city}
-                    onChange={e => setVenueFormData({ ...venueFormData, city: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Google Maps Link</label>
-                  <input
-                    type="url"
-                    className="form-control"
-                    value={venueFormData.map_link}
-                    onChange={e => setVenueFormData({ ...venueFormData, map_link: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Social Links (Instagram/Website/Other)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. instagram.com/venue"
-                    value={venueFormData.social_links}
-                    onChange={e => setVenueFormData({ ...venueFormData, social_links: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Point of Contact (POC)</h4>
-
-              <div className="form-grid-3" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">POC Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={venueFormData.poc_name}
-                    onChange={e => setVenueFormData({ ...venueFormData, poc_name: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">POC Number</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={venueFormData.poc_phone}
-                    onChange={e => setVenueFormData({ ...venueFormData, poc_phone: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">POC Email</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    value={venueFormData.poc_email}
-                    onChange={e => setVenueFormData({ ...venueFormData, poc_email: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '16px' }}>
-                <label className="form-label">Gig Confirmed Message (Telegram DM Template)</label>
-                <textarea
-                  className="form-control"
-                  rows="3"
-                  placeholder="Hey {{artist_name}}! Confirmed: {{gig_date}} at {{venue_name}}..."
-                  value={venueFormData.gig_confirmed_message}
-                  onChange={e => setVenueFormData({ ...venueFormData, gig_confirmed_message: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowVenueModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Venue
                 </button>
               </div>
             </form>
