@@ -2,17 +2,27 @@ import React, { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
-export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
+const EMPTY_VENUE_FIELDS = {
+  venue_name: '', venue_address: '', venue_city: '', venue_map_link: '',
+  venue_poc_name: '', venue_poc_phone: '', venue_poc_email: '', venue_social_links: '',
+  venue_gig_confirmed_message: ''
+};
+
+export default function ClientsTab({ auth, clients, fetchClients, venues = [], fetchCurationData, showToast }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
 
   const [clientSearch, setClientSearch] = useState('');
   const [showClientModal, setShowClientModal] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+  const [editingVenueId, setEditingVenueId] = useState(null);
   const [clientFormData, setClientFormData] = useState({
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
     parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
-    google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: ''
+    google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: '',
+    ...EMPTY_VENUE_FIELDS
   });
+
+  const isCurationType = clientFormData.client_type === 'artist_curation' || clientFormData.client_type === 'both';
 
   const filteredClients = clients.filter(c =>
     c.name.toLowerCase().includes(clientSearch.toLowerCase())
@@ -21,6 +31,8 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
   const openClientModal = (client = null) => {
     if (client) {
       setEditingClient(client);
+      const existingVenue = venues.find(v => v.client_id === client.id);
+      setEditingVenueId(existingVenue ? existingVenue.id : null);
       setClientFormData({
         name: client.name,
         client_type: client.client_type,
@@ -35,14 +47,25 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
         ga4_property_id: client.ga4_property_id || '',
         google_ads_customer_id: client.google_ads_customer_id || '',
         google_ads_login_customer_id: client.google_ads_login_customer_id || '',
-        meta_ads_account_id: client.meta_ads_account_id || ''
+        meta_ads_account_id: client.meta_ads_account_id || '',
+        venue_name: existingVenue?.name || '',
+        venue_address: existingVenue?.address || '',
+        venue_city: existingVenue?.city || '',
+        venue_map_link: existingVenue?.map_link || '',
+        venue_poc_name: existingVenue?.poc_name || '',
+        venue_poc_phone: existingVenue?.poc_phone || '',
+        venue_poc_email: existingVenue?.poc_email || '',
+        venue_social_links: existingVenue?.social_links || '',
+        venue_gig_confirmed_message: existingVenue?.gig_confirmed_message || ''
       });
     } else {
       setEditingClient(null);
+      setEditingVenueId(null);
       setClientFormData({
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
         parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
-    google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: ''
+        google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: '',
+        ...EMPTY_VENUE_FIELDS
       });
     }
     setShowClientModal(true);
@@ -52,15 +75,51 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
     e.preventDefault();
     const url = editingClient ? `/api/clients/${editingClient.id}` : '/api/clients';
     const method = editingClient ? 'PATCH' : 'POST';
+    const isCuration = clientFormData.client_type === 'artist_curation' || clientFormData.client_type === 'both';
+    const { venue_name, venue_address, venue_city, venue_map_link, venue_poc_name, venue_poc_phone,
+      venue_poc_email, venue_social_links, venue_gig_confirmed_message, ...clientPayload } = clientFormData;
     try {
       const res = await fetch(`${API_BASE}${url}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clientFormData),
+        body: JSON.stringify(clientPayload),
         credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
+      if (isCuration) {
+        const venuePayload = {
+          name: venue_name.trim() || clientPayload.name.trim(),
+          address: venue_address || null,
+          city: venue_city || null,
+          map_link: venue_map_link || null,
+          poc_name: venue_poc_name || null,
+          poc_phone: venue_poc_phone || null,
+          poc_email: venue_poc_email || null,
+          social_links: venue_social_links || null,
+          gig_confirmed_message: venue_gig_confirmed_message || null,
+          client_id: data.id
+        };
+        const venueUrl = editingVenueId ? `/api/artists/venues/${editingVenueId}` : '/api/artists/venues';
+        const venueMethod = editingVenueId ? 'PATCH' : 'POST';
+        try {
+          const venueRes = await fetch(`${API_BASE}${venueUrl}`, {
+            method: venueMethod,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(venuePayload),
+            credentials: 'include'
+          });
+          if (!venueRes.ok) {
+            const venueErr = await venueRes.json();
+            throw new Error(venueErr.error || 'Failed to save venue');
+          }
+          if (fetchCurationData) fetchCurationData();
+        } catch (venueErr) {
+          showToast(`Client saved, but venue setup failed: ${venueErr.message}`, 'warning');
+        }
+      }
+
       showToast(`Client ${editingClient ? 'updated' : 'created'} successfully`, 'success');
       setShowClientModal(false);
       fetchClients();
@@ -326,6 +385,76 @@ export default function ClientsTab({ auth, clients, fetchClients, showToast }) {
                   <input type="text" className="form-control" value={clientFormData.contact_phone} onChange={e => setClientFormData({...clientFormData, contact_phone: e.target.value})} />
                 </div>
               </div>
+
+              {isCurationType && (
+                <>
+                  <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Booking Venue Details</h4>
+                  <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Saving this client creates (or updates) a matching venue automatically, so it shows up in the
+                    Location dropdown when adding a Gig Status — no need to add it separately in Venue List.
+                  </p>
+                  <div className="form-grid-2" style={{ marginBottom: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Venue / Location Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={clientFormData.name || 'Same as client name'}
+                        value={clientFormData.venue_name}
+                        onChange={e => setClientFormData({...clientFormData, venue_name: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">City</label>
+                      <input type="text" className="form-control" value={clientFormData.venue_city} onChange={e => setClientFormData({...clientFormData, venue_city: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="form-grid-2" style={{ marginBottom: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Address</label>
+                      <input type="text" className="form-control" value={clientFormData.venue_address} onChange={e => setClientFormData({...clientFormData, venue_address: e.target.value})} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Google Maps Link</label>
+                      <input type="url" className="form-control" value={clientFormData.venue_map_link} onChange={e => setClientFormData({...clientFormData, venue_map_link: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="form-grid-3" style={{ marginBottom: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">POC Name</label>
+                      <input type="text" className="form-control" value={clientFormData.venue_poc_name} onChange={e => setClientFormData({...clientFormData, venue_poc_name: e.target.value})} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">POC Phone</label>
+                      <input type="text" className="form-control" value={clientFormData.venue_poc_phone} onChange={e => setClientFormData({...clientFormData, venue_poc_phone: e.target.value})} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">POC Email</label>
+                      <input type="email" className="form-control" value={clientFormData.venue_poc_email} onChange={e => setClientFormData({...clientFormData, venue_poc_email: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label className="form-label">Social Links (Instagram/Website/Other)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. instagram.com/venue"
+                      value={clientFormData.venue_social_links}
+                      onChange={e => setClientFormData({...clientFormData, venue_social_links: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label className="form-label">Gig Confirmed Message (Telegram DM Template)</label>
+                    <textarea
+                      className="form-control"
+                      rows="3"
+                      placeholder="Hey {{artist_name}}! Confirmed: {{gig_date}} at {{venue_name}}..."
+                      value={clientFormData.venue_gig_confirmed_message}
+                      onChange={e => setClientFormData({...clientFormData, venue_gig_confirmed_message: e.target.value})}
+                    />
+                  </div>
+                </>
+              )}
 
               <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Public Profile Links</h4>
               <div className="form-grid-3">

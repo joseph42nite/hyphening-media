@@ -1397,6 +1397,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             auth={auth}
             clients={clients}
             fetchClients={fetchClients}
+            venues={venues}
+            fetchCurationData={fetchCurationData}
             showToast={showToast}
           />
         )}
