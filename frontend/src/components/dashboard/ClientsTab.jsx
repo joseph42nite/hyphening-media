@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 const EMPTY_VENUE_FIELDS = {
@@ -24,9 +24,33 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
 
   const isCurationType = clientFormData.client_type === 'artist_curation' || clientFormData.client_type === 'both';
 
-  const filteredClients = clients.filter(c =>
-    c.name.toLowerCase().includes(clientSearch.toLowerCase())
-  );
+  const [collapsedParents, setCollapsedParents] = useState(new Set());
+  const toggleParentCollapsed = (id) => {
+    setCollapsedParents(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Group children under their parent company so the table can render them as a
+  // collapsible dropdown instead of separate flat rows.
+  const childrenByParent = {};
+  clients.forEach(c => {
+    if (c.parent_id) {
+      if (!childrenByParent[c.parent_id]) childrenByParent[c.parent_id] = [];
+      childrenByParent[c.parent_id].push(c);
+    }
+  });
+
+  const q = clientSearch.trim().toLowerCase();
+  const matchesSearch = (c) => !q || c.name.toLowerCase().includes(q);
+  // The Parent Company picker allows chaining a client under another client that
+  // already has its own parent, so a group can be more than one level deep —
+  // check the whole subtree, not just direct children.
+  const subtreeMatchesSearch = (c) => matchesSearch(c) || (childrenByParent[c.id] || []).some(subtreeMatchesSearch);
+
+  const topLevelClients = clients.filter(c => !c.parent_id).filter(subtreeMatchesSearch);
 
   const openClientModal = (client = null) => {
     if (client) {
@@ -196,6 +220,140 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
     }
   };
 
+  const renderClientRow = (client, { depth = 0, hasChildren = false, isCollapsed = false } = {}) => (
+    <tr key={client.id} style={depth > 0 ? { background: 'rgba(255, 255, 255, 0.015)' } : undefined}>
+      <td style={{ fontWeight: 'bold' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: depth * 22 }}>
+          {hasChildren ? (
+            <button
+              onClick={() => toggleParentCollapsed(client.id)}
+              aria-label={isCollapsed ? 'Expand companies' : 'Collapse companies'}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'var(--text-muted)' }}
+            >
+              {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+            </button>
+          ) : depth > 0 ? (
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>↳</span>
+          ) : null}
+          <span>{client.name}</span>
+          {hasChildren && (
+            <span className="badge badge-info" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>
+              {(childrenByParent[client.id] || []).length}
+            </span>
+          )}
+        </div>
+      </td>
+      <td><span className="badge badge-info">{client.client_type}</span></td>
+      <td>
+        <div>{client.contact_person}</div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{client.contact_email}</div>
+      </td>
+      <td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {client.website_url && (
+            <a href={client.website_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>Website</a>
+          )}
+          {client.instagram_url && (
+            <a href={client.instagram_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>Instagram</a>
+          )}
+          {client.youtube_url && (
+            <a href={client.youtube_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>YouTube</a>
+          )}
+        </div>
+      </td>
+      <td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className={`badge badge-${client.portal_enabled ? 'success' : 'muted'}`}>
+              {client.portal_enabled ? 'Enabled' : 'Disabled'}
+            </span>
+            <button
+              onClick={() => togglePortal(client, !client.portal_enabled)}
+              className="btn btn-secondary"
+              style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+            >
+              {client.portal_enabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+          {client.portal_enabled && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {client.portal_token ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/portal/${client.portal_token}`;
+                      navigator.clipboard.writeText(url);
+                      showToast('Portal link copied to clipboard!', 'success');
+                    }}
+                    className="btn btn-primary"
+                    style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
+                  >
+                    Copy Portal Link
+                  </button>
+                  {(client.client_type === 'marketing' || client.client_type === 'both') && (
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/api/portal/${client.portal_token}/leads/capture`;
+                        navigator.clipboard.writeText(url);
+                        showToast('Lead capture webhook URL copied!', 'success');
+                      }}
+                      className="btn btn-primary"
+                      style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content', background: '#0ea5e9', border: 'none' }}
+                      title="Copy Lead Capture Webhook API URL for Ads Manager"
+                    >
+                      Copy Webhook URL
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => generatePortalToken(client)}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
+                >
+                  Generate Token
+                </button>
+              )}
+              <button
+                onClick={() => setPortalPin(client)}
+                className="btn btn-secondary"
+                style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
+              >
+                {client.has_portal_pin ? 'Change PIN' : 'Set PIN'}
+              </button>
+            </div>
+          )}
+        </div>
+      </td>
+      <td>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => openClientModal(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
+            Edit
+          </button>
+          <button
+            onClick={() => handleDeleteClient(client)}
+            className="btn btn-danger"
+            style={{ padding: '6px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            title={`Delete ${client.name}`}
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
+  const renderClientTree = (client, depth = 0) => {
+    const kids = childrenByParent[client.id] || [];
+    const isCollapsed = collapsedParents.has(client.id);
+    return (
+      <React.Fragment key={client.id}>
+        {renderClientRow(client, { depth, hasChildren: kids.length > 0, isCollapsed })}
+        {kids.length > 0 && !isCollapsed && kids.map(child => renderClientTree(child, depth + 1))}
+      </React.Fragment>
+    );
+  };
+
   if (!isAdmin) return null;
 
   return (
@@ -228,115 +386,13 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
             </tr>
           </thead>
           <tbody>
-            {filteredClients.map(client => (
-              <tr key={client.id}>
-                <td style={{ fontWeight: 'bold' }}>
-                  {client.name}
-                  {client.parent_name && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '2px' }}>
-                      Company: <span style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{client.parent_name}</span>
-                    </div>
-                  )}
-                </td>
-                <td><span className="badge badge-info">{client.client_type}</span></td>
-                <td>
-                  <div>{client.contact_person}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{client.contact_email}</div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {client.website_url && (
-                      <a href={client.website_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>Website</a>
-                    )}
-                    {client.instagram_url && (
-                      <a href={client.instagram_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>Instagram</a>
-                    )}
-                    {client.youtube_url && (
-                      <a href={client.youtube_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--accent)' }}>YouTube</a>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className={`badge badge-${client.portal_enabled ? 'success' : 'muted'}`}>
-                        {client.portal_enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                      <button
-                        onClick={() => togglePortal(client, !client.portal_enabled)}
-                        className="btn btn-secondary"
-                        style={{ padding: '2px 6px', fontSize: '0.7rem' }}
-                      >
-                        {client.portal_enabled ? 'Disable' : 'Enable'}
-                      </button>
-                    </div>
-                    {client.portal_enabled && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {client.portal_token ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <button
-                              onClick={() => {
-                                const url = `${window.location.origin}/portal/${client.portal_token}`;
-                                navigator.clipboard.writeText(url);
-                                showToast('Portal link copied to clipboard!', 'success');
-                              }}
-                              className="btn btn-primary"
-                              style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
-                            >
-                              Copy Portal Link
-                            </button>
-                            {(client.client_type === 'marketing' || client.client_type === 'both') && (
-                              <button
-                                onClick={() => {
-                                  const url = `${window.location.origin}/api/portal/${client.portal_token}/leads/capture`;
-                                  navigator.clipboard.writeText(url);
-                                  showToast('Lead capture webhook URL copied!', 'success');
-                                }}
-                                className="btn btn-primary"
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content', background: '#0ea5e9', border: 'none' }}
-                                title="Copy Lead Capture Webhook API URL for Ads Manager"
-                              >
-                                Copy Webhook URL
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => generatePortalToken(client)}
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
-                          >
-                            Generate Token
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setPortalPin(client)}
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'fit-content' }}
-                        >
-                          {client.has_portal_pin ? 'Change PIN' : 'Set PIN'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => openClientModal(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClient(client)}
-                      className="btn btn-danger"
-                      style={{ padding: '6px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                      title={`Delete ${client.name}`}
-                    >
-                      <Trash2 size={13} /> Delete
-                    </button>
-                  </div>
-                </td>
+            {topLevelClients.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>No clients found</td>
               </tr>
-            ))}
+            ) : (
+              topLevelClients.map(client => renderClientTree(client))
+            )}
           </tbody>
         </table>
       </div>
