@@ -24,9 +24,10 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
 
   const isCurationType = clientFormData.client_type === 'artist_curation' || clientFormData.client_type === 'both';
 
-  const [collapsedParents, setCollapsedParents] = useState(new Set());
+  // Parents start closed; opening one is an explicit click, tracked here.
+  const [expandedParents, setExpandedParents] = useState(new Set());
   const toggleParentCollapsed = (id) => {
-    setCollapsedParents(prev => {
+    setExpandedParents(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -345,7 +346,9 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
 
   const renderClientTree = (client, depth = 0) => {
     const kids = childrenByParent[client.id] || [];
-    const isCollapsed = collapsedParents.has(client.id);
+    // While searching, force parents open so a matching child isn't hidden
+    // behind a closed dropdown; otherwise respect the manual toggle (closed by default).
+    const isCollapsed = q ? false : !expandedParents.has(client.id);
     return (
       <React.Fragment key={client.id}>
         {renderClientRow(client, { depth, hasChildren: kids.length > 0, isCollapsed })}
