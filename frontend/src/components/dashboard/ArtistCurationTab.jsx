@@ -6,7 +6,7 @@ export default function ArtistCurationTab({
   auth,
   gigs,
   artists,
-  venues,
+  venues = [],
   fetchCurationData,
   showToast,
   formatDateStr
@@ -24,6 +24,8 @@ export default function ArtistCurationTab({
   });
   const [editingMsgType, setEditingMsgType] = useState(null);
   const [tempMsgText, setTempMsgText] = useState('');
+  const [selectedVenueMessageId, setSelectedVenueMessageId] = useState('');
+  const currentVenue = (venues || []).find(v => String(v.id) === String(selectedVenueMessageId)) || (venues && venues[0]) || null;
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -60,6 +62,23 @@ export default function ArtistCurationTab({
 
   const handleSaveTemplate = async (type) => {
     try {
+      if (type === 'venue') {
+        const venueId = currentVenue?.id;
+        if (!venueId) throw new Error('No venue selected');
+        const res = await fetch(`${API_BASE}/api/artists/venues/${venueId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gig_confirmed_message: tempMsgText }),
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save venue template');
+        if (fetchCurationData) fetchCurationData();
+        setEditingMsgType(null);
+        showToast(`Template saved for ${currentVenue.name}!`, 'success');
+        return;
+      }
+
       const res = await fetch(`${API_BASE}/api/artists/templates`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -85,6 +104,24 @@ export default function ArtistCurationTab({
 
   const handleClearTemplate = async (type) => {
     try {
+      if (type === 'venue') {
+        const venueId = currentVenue?.id;
+        if (!venueId) throw new Error('No venue selected');
+        const res = await fetch(`${API_BASE}/api/artists/venues/${venueId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gig_confirmed_message: null }),
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to clear venue template');
+        if (fetchCurationData) fetchCurationData();
+        setTempMsgText('');
+        setEditingMsgType(null);
+        showToast(`Template cleared for ${currentVenue.name}`, 'info');
+        return;
+      }
+
       const res = await fetch(`${API_BASE}/api/artists/templates`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -406,6 +443,68 @@ export default function ArtistCurationTab({
               {confirmationMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
             </div>
           </div>
+
+          {/* Venue Confirmation Template */}
+          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', whiteSpace: 'nowrap' }}>
+                  3. Venue Message
+                </span>
+                {venues && venues.length > 0 && (
+                  <select
+                    className="form-control"
+                    value={currentVenue ? currentVenue.id : ''}
+                    onChange={e => setSelectedVenueMessageId(e.target.value)}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '2px 8px',
+                      height: '26px',
+                      background: 'rgba(5, 7, 10, 0.8)',
+                      borderColor: 'rgba(223, 231, 224, 0.18)',
+                      color: 'var(--text-primary)',
+                      borderRadius: '6px',
+                      maxWidth: '190px'
+                    }}
+                    title="Select Venue"
+                  >
+                    {venues.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}{v.client_name ? ` (${v.client_name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  disabled={!currentVenue}
+                  onClick={() => handleCopyTemplate(currentVenue?.gig_confirmed_message, `${currentVenue?.name || 'Venue'} Confirmation Message`)}
+                  className="btn btn-primary"
+                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
+                >
+                  <Copy size={12} /> Copy
+                </button>
+                <button
+                  disabled={!currentVenue}
+                  onClick={() => { setEditingMsgType('venue'); setTempMsgText(currentVenue?.gig_confirmed_message || ''); }}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
+                >
+                  <Edit3 size={12} /> Edit
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
+              {!venues || venues.length === 0 ? (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No venues available. Add an Artist Curation client in Clients tab.</span>
+              ) : currentVenue?.gig_confirmed_message ? (
+                currentVenue.gig_confirmed_message
+              ) : (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No custom message for {currentVenue?.name}. Click 'Edit' to enter your template.</span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -427,7 +526,7 @@ export default function ArtistCurationTab({
             }}
           >
             <h3 style={{ margin: '0 0 14px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : 'Confirmation Message'} Template
+              Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : editingMsgType === 'confirmation' ? 'General Confirmation Message' : `${currentVenue?.name || 'Venue'} Confirmation Message`} Template
             </h3>
             <div style={{ marginBottom: '18px' }}>
               <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>
@@ -451,6 +550,11 @@ export default function ArtistCurationTab({
                   borderRadius: '8px'
                 }}
               />
+              {editingMsgType === 'venue' && (
+                <div style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <strong>Supported variables:</strong> <code style={{ color: '#7dd3fc' }}>{'{{artist_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{gig_date}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{venue_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{address}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{map_link}}'}</code>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
               <button
