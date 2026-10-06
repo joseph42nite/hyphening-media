@@ -1132,6 +1132,50 @@ function PerformanceTrendChart({ data }) {
   );
 }
 
+function UpcomingPostsCalendar({ posts }) {
+  const list = posts || [];
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const groups = list.reduce((acc, p) => {
+    (acc[p.date] = acc[p.date] || []).push(p);
+    return acc;
+  }, {});
+  const fmt = (d) => {
+    const [y, m, day] = d.split('-').map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+  return (
+    <div className="portal-bento-card" style={{ padding: '24px' }}>
+      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#dfe7e0' }}>Upcoming Posting Calendar</h3>
+      <p style={{ margin: '4px 0 16px', fontSize: '0.82rem', color: '#8b9b90' }}>Planned posts. They disappear from here once posted (see Reports).</p>
+      {list.length === 0 ? (
+        <div style={{ color: '#8b9b90', fontSize: '0.85rem' }}>Nothing scheduled right now.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {Object.keys(groups).sort().map(date => (
+            <div key={date} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: '110px', fontWeight: 600, fontSize: '0.85rem', color: date < todayKey ? '#e0231c' : '#dfe7e0' }}>
+                {fmt(date)}{date < todayKey ? ' (overdue)' : date === todayKey ? ' (today)' : ''}
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '200px' }}>
+                {groups[date].map(p => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '0.85rem', color: '#dfe7e0' }}>
+                    <span>{p.title || 'Untitled'}{p.post_type ? ` · ${p.post_type}` : ''}</span>
+                    <span style={{ color: '#8b9b90', whiteSpace: 'nowrap' }}>
+                      {[p.platform, p.time].filter(Boolean).join(' · ')}
+                      {p.status === 'Pending Client Approval' ? ' · awaiting approval' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ClientPortal({ showToast }) {
   const { token } = useParams();
   
@@ -2262,6 +2306,9 @@ export default function ClientPortal({ showToast }) {
                 </>
               )}
             </div>
+
+            {/* Upcoming Posting Calendar — posts leave once marked Posted */}
+            <UpcomingPostsCalendar posts={overview.upcoming_posts} />
 
             {/* Performance Trend Chart */}
             <PerformanceTrendChart data={overview.views_trend} />

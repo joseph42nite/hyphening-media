@@ -244,9 +244,21 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       .filter(c => c.id !== clientId)
       .map(c => c.name);
 
+    // Planned posts not yet live; once marked Posted they drop off (they live in Reports)
+    const upcomingPosts = db.prepare(`
+      SELECT id, date, time, platform, post_type, title, status
+      FROM marketing_content_tracker
+      WHERE client_id = ? AND is_tracked = 1
+        AND status IN ('Client Approved', 'Pending Client Approval')
+        AND date IS NOT NULL AND date != ''
+      ORDER BY date ASC, time ASC
+      LIMIT 60
+    `).all(clientId);
+
     res.json({
       client_name: req.portalClient.name,
       client_type: req.portalClient.client_type,
+      upcoming_posts: upcomingPosts,
       lead_alerts_enabled: req.portalClient.lead_alerts_enabled,
       content: contentStats,
       ads: leadStats,
