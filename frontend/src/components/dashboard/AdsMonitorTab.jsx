@@ -131,6 +131,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
   const [overview, setOverview] = useState(null);
   const [facts, setFacts] = useState(null);
   const [openAudit, setOpenAudit] = useState(null);
+  const [auditTab, setAuditTab] = useState('report');
   const [consoleLogs, setConsoleLogs] = useState([]);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -415,7 +416,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
       const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/ads/audits/${auditId}`, {
         credentials: 'include',
       });
-      if (res.ok) setOpenAudit(await res.json());
+      if (res.ok) { setAuditTab('report'); setOpenAudit(await res.json()); }
     } catch (err) {
       showToast?.(`Could not load that report: ${err.message}`, 'error');
     }
@@ -929,10 +930,23 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
           {openAudit.summary && (
             <p style={{ fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--text-primary)' }}>{openAudit.summary}</p>
           )}
-          <AuditReport audit={openAudit} />
-          {openAudit.recommendations?.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, borderBottom: '1px solid rgba(223, 231, 224, 0.1)', paddingBottom: 10 }}>
+            {[
+              ['report', 'Full report'],
+              ['actions', `Action plan (${openAudit.recommendations?.length || 0})`],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => setAuditTab(id)} style={{
+                padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700,
+                border: auditTab === id ? '1px solid rgba(224, 35, 28, 0.5)' : '1px solid transparent',
+                background: auditTab === id ? 'rgba(224, 35, 28, 0.15)' : 'transparent',
+                color: auditTab === id ? '#fff' : 'rgba(223, 231, 224, 0.65)',
+              }}>{label}</button>
+            ))}
+          </div>
+          {auditTab === 'report' ? (
+            <AuditReport audit={openAudit} />
+          ) : openAudit.recommendations?.length > 0 ? (
             <div style={{ marginTop: 14 }}>
-              <h4 style={{ ...heading, fontSize: '0.9rem', margin: '0 0 8px' }}>Action plan</h4>
               {openAudit.recommendations.map(rec => (
                 <div key={rec.id} style={{ borderLeft: `3px solid ${(PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.Low).bd}`, padding: '6px 0 6px 10px', marginBottom: 10 }}>
                   <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{rec.priority} · {rec.metric}</strong>
@@ -941,6 +955,8 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                 </div>
               ))}
             </div>
+          ) : (
+            <p style={{ fontSize: '0.85rem', color: 'rgba(223, 231, 224, 0.6)', marginTop: 14 }}>No actions in this report.</p>
           )}
         </Modal>
       )}
@@ -972,7 +988,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
 /** Grid wrapper, so all three groups lay out identically. */
 function FleetGroup({ children }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12, marginBottom: 20 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 28 }}>
       {children}
     </div>
   );
@@ -984,11 +1000,21 @@ function AgentCard({ agent, run, now, isAdmin, onRun, onCancel, onOpenAudit }) {
   const blocked = !!agent.blockedReason;
   return (
                 <div key={agent.agentType} className="card"
+                  onClick={() => { if (agent.lastAuditId) onOpenAudit(agent.lastAuditId); }}
+                  title={blocked ? agent.blockedReason : `${agent.description || ''}${agent.skillName ? `\n${agent.skillName}${agent.platform ? ` · ${agent.platform}` : ''}` : ''}${agent.lastAuditId ? '\nClick to view the latest report' : ''}`}
                   style={{
-                    ...panel,
+                    border: '1px solid rgba(223, 231, 224, 0.1)',
                     borderTop: `4px solid ${blocked ? 'rgba(223, 231, 224, 0.15)' : freshnessColor(agent.freshness)}`,
-                    padding: 14, opacity: blocked ? 0.62 : 1,
+                    padding: 14,
                     display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                    background: 'rgba(12, 16, 24, 0.85)',
+                    backdropFilter: 'blur(16px)',
+                    borderRadius: 10,
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+                    position: 'relative',
+                    transition: 'all 0.2s ease',
+                    opacity: blocked ? 0.55 : 1,
+                    cursor: agent.lastAuditId ? 'pointer' : 'default',
                   }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
@@ -1009,15 +1035,9 @@ function AgentCard({ agent, run, now, isAdmin, onRun, onCancel, onOpenAudit }) {
 
                     <div style={{ margin: '10px 0', fontSize: '0.78rem', color: 'rgba(223, 231, 224, 0.65)', lineHeight: 1.5 }}>
                       <div>Cadence: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.staleAfterDays >= 9999 ? 'on demand' : `${agent.staleAfterDays} days`}</span></div>
-                      <div>Last run: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.lastRunAt ? new Date(`${agent.lastRunAt.replace(' ', 'T')}Z`).toLocaleDateString() : 'Never'}</span></div>
-                      <div style={{ fontSize: '0.7rem', color: 'rgba(223, 231, 224, 0.35)' }}>
-                        {agent.skillName}{agent.platform ? ` · ${agent.platform}` : ''}
-                      </div>
+                      <div>Last Run: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.lastRunAt ? new Date(`${agent.lastRunAt.replace(' ', 'T')}Z`).toLocaleDateString() : 'Never'}</span></div>
                     </div>
 
-                    <p style={{ margin: '0 0 8px', fontSize: '0.74rem', lineHeight: 1.45, color: 'rgba(223, 231, 224, 0.55)' }}>
-                      {agent.description}
-                    </p>
 
                     {blocked && (
                       // Two colours for two different asks. Amber means "add some
@@ -1036,7 +1056,7 @@ function AgentCard({ agent, run, now, isAdmin, onRun, onCancel, onOpenAudit }) {
                     )}
 
                     {agent.openRecommendations > 0 && (
-                      <button onClick={() => onOpenAudit(agent.lastAuditId)}
+                      <button onClick={e => { e.stopPropagation(); onOpenAudit(agent.lastAuditId); }}
                         style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontSize: '0.72rem', color: '#fdba74', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <ListChecks size={12} />{agent.openRecommendations} open action{agent.openRecommendations === 1 ? '' : 's'}
                         <ChevronRight size={11} />
@@ -1058,30 +1078,36 @@ function AgentCard({ agent, run, now, isAdmin, onRun, onCancel, onOpenAudit }) {
                     </div>
 
                     {run ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: '0.72rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Loader2 size={12} className="spin" />{elapsed(run.startedAt, now)}
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <span title={`Run #${run.id} — ${run.status}`}
+                          style={{ padding: '5px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 5, border: '1px solid rgba(234, 179, 8, 0.4)', background: 'rgba(234, 179, 8, 0.2)', color: '#fbbf24', fontWeight: 700, borderRadius: 6 }}>
+                          <Loader2 size={12} className="spin" />
+                          {run.status === 'queued' ? 'Queued' : 'Running'} {elapsed(run.startedAt, now)}
                         </span>
-                        <button onClick={() => onCancel(run.id)} title="Free the queue slot"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', padding: 2 }}>
-                          <XCircle size={15} />
+                        <button onClick={e => { e.stopPropagation(); onCancel(run.id); }} title="Free slot"
+                          style={{ padding: '5px 7px', border: '1px solid rgba(224, 35, 28, 0.4)', background: 'rgba(224, 35, 28, 0.15)', color: '#f87171', fontWeight: 700, borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                          <XCircle size={13} />
                         </button>
+                      </div>
+                    ) : blocked ? (
+                      <div title={agent.blockedReason}
+                        style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'rgba(223, 231, 224, 0.4)', border: '1px solid rgba(223, 231, 224, 0.08)', padding: '5px 8px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 600 }}>
+                        Unavailable
                       </div>
                     ) : (
                       <button
-                        onClick={() => onRun(agent.agentType)}
-                        disabled={blocked || !isAdmin}
-                        className="btn"
+                        onClick={e => { e.stopPropagation(); onRun(agent.agentType); }}
+                        disabled={!isAdmin}
+                        className="btn btn-primary"
                         style={{
-                          padding: '6px 14px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 700,
-                          cursor: blocked || !isAdmin ? 'not-allowed' : 'pointer',
-                          background: blocked || !isAdmin ? 'rgba(255,255,255,0.04)' : 'rgba(224, 35, 28, 0.16)',
-                          color: blocked || !isAdmin ? 'rgba(223, 231, 224, 0.35)' : '#fca5a5',
-                          border: `1px solid ${blocked || !isAdmin ? 'rgba(223,231,224,0.1)' : 'rgba(224, 35, 28, 0.4)'}`,
+                          padding: '5px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 5,
+                          background: 'linear-gradient(135deg, #e0231c 0%, #b51a14 100%)',
+                          border: '1px solid rgba(224, 35, 28, 0.4)', color: '#fff', borderRadius: 6, fontWeight: 700,
+                          opacity: isAdmin ? 1 : 0.4, cursor: isAdmin ? 'pointer' : 'not-allowed',
                         }}
-                        title={blocked ? agent.blockedReason : isAdmin ? `Run ${agent.skillName}` : 'Runs cost tokens, so they are limited to admins'}
+                        title={isAdmin ? `Run ${agent.skillName}` : 'Runs cost tokens, so they are limited to admins'}
                       >
-                        <Play size={12} style={{ verticalAlign: -1, marginRight: 4 }} />Run
+                        <Play size={12} fill="currentColor" /> Run
                       </button>
                     )}
                   </div>
@@ -1133,7 +1159,6 @@ function AuditReport({ audit }) {
   const markdown = typeof parsed === 'string' ? parsed : parsed.report_markdown;
   return (
     <div style={{ marginTop: 14 }}>
-      <h4 style={{ ...heading, fontSize: '0.9rem', margin: '0 0 8px' }}>Full report</h4>
       {typeof markdown === 'string'
         ? <MarkdownBlock text={markdown} />
         : <ReportValue value={parsed} />}
