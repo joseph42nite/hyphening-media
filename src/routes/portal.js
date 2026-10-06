@@ -248,8 +248,8 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     const upcomingPosts = db.prepare(`
       SELECT id, date, time, platform, post_type, title, status
       FROM marketing_content_tracker
-      WHERE client_id = ? AND is_tracked = 1
-        AND status IN ('Client Approved', 'Pending Client Approval')
+      WHERE client_id = ?
+        AND COALESCE(status, 'Pending') NOT IN ('Posted', 'Client Rejected', 'Rejected', 'Draft')
         AND date IS NOT NULL AND date != ''
       ORDER BY date ASC, time ASC
       LIMIT 60
