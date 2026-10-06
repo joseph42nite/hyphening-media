@@ -5,6 +5,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
+import { MarkdownBlock, ReportValue, parseReportJson } from './SeoMonitorTab.jsx';
 
 const IN_FLIGHT = ['queued', 'running'];
 
@@ -928,8 +929,10 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
           {openAudit.summary && (
             <p style={{ fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--text-primary)' }}>{openAudit.summary}</p>
           )}
+          <AuditReport audit={openAudit} />
           {openAudit.recommendations?.length > 0 && (
             <div style={{ marginTop: 14 }}>
+              <h4 style={{ ...heading, fontSize: '0.9rem', margin: '0 0 8px' }}>Action plan</h4>
               {openAudit.recommendations.map(rec => (
                 <div key={rec.id} style={{ borderLeft: `3px solid ${(PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.Low).bd}`, padding: '6px 0 6px 10px', marginBottom: 10 }}>
                   <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{rec.priority} · {rec.metric}</strong>
@@ -938,11 +941,6 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                 </div>
               ))}
             </div>
-          )}
-          {openAudit.report_json && (
-            <pre style={{ fontSize: '0.7rem', color: 'rgba(223, 231, 224, 0.7)', background: 'rgba(0,0,0,0.4)', padding: 12, borderRadius: 8, overflow: 'auto', maxHeight: '40vh', marginTop: 14 }}>
-              {typeof openAudit.report_json === 'string' ? openAudit.report_json : JSON.stringify(openAudit.report_json, null, 2)}
-            </pre>
           )}
         </Modal>
       )}
@@ -1123,6 +1121,23 @@ function MiniButton({ children, onClick, muted }) {
       color: muted ? 'rgba(223, 231, 224, 0.6)' : '#fca5a5',
       border: `1px solid ${muted ? 'rgba(223,231,224,0.12)' : 'rgba(224, 35, 28, 0.35)'}`,
     }}>{children}</button>
+  );
+}
+
+// The written report, formatted as the SEO Monitor's is. Runs from before the
+// contract asked for report_markdown fall back to a structured view of whatever
+// report_json holds, rather than showing nothing.
+function AuditReport({ audit }) {
+  const parsed = parseReportJson(audit.report_json);
+  if (!parsed) return null;
+  const markdown = typeof parsed === 'string' ? parsed : parsed.report_markdown;
+  return (
+    <div style={{ marginTop: 14 }}>
+      <h4 style={{ ...heading, fontSize: '0.9rem', margin: '0 0 8px' }}>Full report</h4>
+      {typeof markdown === 'string'
+        ? <MarkdownBlock text={markdown} />
+        : <ReportValue value={parsed} />}
+    </div>
   );
 }
 

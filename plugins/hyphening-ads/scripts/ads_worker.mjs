@@ -16,7 +16,7 @@
  *   ADS_WORKER_ID          name in the logs         (default hostname)
  *   ADS_POLL_SECONDS       idle poll interval       (default 30)
  *   ADS_CLAUDE_BIN         Claude CLI binary        (default 'claude')
- *   ADS_MODEL              model override           (default: the run's own)
+ *   ADS_MODEL              model the worker runs on (default: claude-sonnet-5-5)
  *   ADS_PLUGIN_DIR         this plugin's directory  (default: two levels up)
  *
  * Usage:
@@ -39,6 +39,9 @@ const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SE
 const WORKER = process.env.ADS_WORKER_ID || os.hostname();
 const POLL_MS = (Number(process.env.ADS_POLL_SECONDS) || 30) * 1000;
 const CLAUDE_BIN = process.env.ADS_CLAUDE_BIN || 'claude';
+// The worker picks the model, as the SEO worker does. A run's own model is an
+// OpenRouter id the claude CLI cannot run, so it is deliberately not used.
+const MODEL = process.env.ADS_MODEL || 'claude-sonnet-5-5';
 const ONCE = process.argv.includes('--once');
 
 if (!SECRET) {
@@ -163,7 +166,7 @@ function runClaude(promptFile, model) {
     proc.stderr.on('data', d => { err += d; });
     proc.on('error', reject);
     proc.on('close', code => {
-      if (code !== 0) return reject(new Error(`claude exited ${code}: ${err.slice(0, 500)}`));
+      if (code !== 0) return reject(new Error(`claude exited ${code}: ${(err || out).trim().slice(0, 500)}`));
       resolve(out);
     });
     readFile(promptFile, 'utf8').then(text => { proc.stdin.write(text); proc.stdin.end(); }).catch(reject);
@@ -212,7 +215,7 @@ async function runJob(job) {
 
   try {
     await writeFile(promptFile, await buildPrompt(job), 'utf8');
-    const raw = await runClaude(promptFile, process.env.ADS_MODEL || job.model || null);
+    const raw = await runClaude(promptFile, MODEL);
     const parsed = extractJson(raw);
 
     if (!parsed) {
@@ -242,7 +245,7 @@ async function runJob(job) {
       facts_hash: job.facts_hash,
       token_usage: {
         ...(parsed.token_usage || {}),
-        model: parsed.token_usage?.model || process.env.ADS_MODEL || job.model || 'unknown',
+        model: parsed.token_usage?.model || MODEL,
         duration_seconds: Math.round((Date.now() - started) / 1000),
       },
     };

@@ -62,7 +62,10 @@ webhook:
   "facts_hash":   "1a0b9a88aef68aee",
   "<name>_score": 72,           // 0-100, or omit — see below
   "summary":      "Two or three sentences. The verdict, not a recap.",
-  "report_json":  { /* the skill's own structured findings */ },
+  "report_json":  {
+    "report_markdown": "The full written report, in markdown — see below.",
+    /* plus the skill's own structured findings */
+  },
   "recommendations": [ /* below */ ],
   "data_gaps":    [ { "section": "prices", "reason": "..." } ],
   "token_usage":  { "model": "...", "input_tokens": 0, "output_tokens": 0 }
@@ -75,6 +78,15 @@ another card.
 
 Progress lines go to `ads_run_log` with the `run_id` and appear live in the
 dashboard console.
+
+### The written report
+
+`report_json.report_markdown` is what the dashboard shows under "Full report", so
+write it for a person: headed sections, the verdict first, then what was found,
+with the figures quoted from the pack (tables are fine), then what to do and in
+what order. It should stand alone — someone who never opens the recommendation
+list should still come away knowing what to do. Do not leave it out and put the
+prose in `summary`; that field is two or three sentences.
 
 ### Scores
 

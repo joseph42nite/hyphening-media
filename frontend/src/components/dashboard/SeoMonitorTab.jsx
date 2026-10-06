@@ -105,7 +105,7 @@ function getAuditScore(audit) {
 // report_json is stored as a JSON-stringified column; it may itself be plain
 // text (not an object) if OpenClaw sent a long-form text report instead of
 // structured JSON — both are valid, so this never throws.
-function parseReportJson(raw) {
+export function parseReportJson(raw) {
   if (raw == null) return null;
   if (typeof raw !== 'string') return raw;
   try {
@@ -182,7 +182,7 @@ function renderInline(text, keyPrefix = 'i') {
 /**
  * Renders the audit narrative as rich, high-contrast dark Kyoto markdown.
  */
-function MarkdownBlock({ text }) {
+export function MarkdownBlock({ text }) {
   if (!text) return null;
   const lines = String(text).split(/\r?\n/);
   const blocks = [];
@@ -306,7 +306,7 @@ function MarkdownBlock({ text }) {
 }
 
 // Renders an arbitrary report_json object with dark Kyoto styling
-function ReportValue({ value, depth = 0 }) {
+export function ReportValue({ value, depth = 0 }) {
   if (value === null || value === undefined) {
     return <span style={{ color: 'rgba(223, 231, 224, 0.4)' }}>—</span>;
   }
