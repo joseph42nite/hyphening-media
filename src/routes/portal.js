@@ -8,7 +8,6 @@ import bcrypt from 'bcryptjs';
 import db from '../../database.js';
 import { portalLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
-import { notifyAdmin } from '../services/telegram.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { getConnectUrl, getClientConnectedAccounts, executeClientAction } from '../services/composioService.js';
 import { fetchPostComments, replyToComment } from '../services/commentSync.js';
@@ -476,10 +475,9 @@ router.post('/:token/leads', portalAuth, (req, res) => {
       now
     );
 
-    if (req.portalClient.lead_alerts_enabled) {
-      const alertMsg = `🔔 *New Lead Manually Added!*\n\n*Client:* ${req.portalClient.name}\n*Lead Name:* ${name.trim()}\n*Phone:* ${phone.trim()}\n*Platform:* ${cleanPlatform}\n*Source:* Manual Entry${cleanTreatment ? `\n*Treatment:* ${cleanTreatment}` : ''}\n*Date:* ${leadCreatedAt.slice(0, 10)}`;
-      notifyAdmin(alertMsg);
-    }
+    // Telegram lead alerts retired 2026-10-11 (007's decision). lead_alerts_enabled
+    // is still a live client-facing toggle (see GET/PATCH below) but currently has
+    // no effect on the backend — needs a replacement channel decided if still wanted.
 
     const newLead = db.prepare('SELECT * FROM campaign_leads WHERE id = ?').get(result.lastInsertRowid);
 
@@ -795,11 +793,8 @@ router.post('/:token/leads/capture', async (req, res) => {
       additionalDataStr
     );
 
-    // Send telegram notification to admin/SMM if lead alerts are enabled for this client
-    if (client.lead_alerts_enabled) {
-      const alertMsg = `🔔 *New Lead Captured!*\n\n*Client:* ${client.name}\n*Lead Name:* ${name}\n*Phone:* ${phone}\n*Platform:* ${cleanPlatform}\n*Source:* ${cleanSource === 'call' ? '📞 Call' : '📝 Form'}\n*Campaign:* ${campaign_name || 'N/A'}${cleanTreatment ? `\n*Treatment:* ${cleanTreatment}` : ''}`;
-      notifyAdmin(alertMsg);
-    }
+    // Telegram lead alerts retired 2026-10-11 (007's decision) — see the note on
+    // the manual-lead-creation route above for the lead_alerts_enabled toggle status.
 
     res.json({ success: true, lead_id: result.lastInsertRowid });
   } catch (err) {

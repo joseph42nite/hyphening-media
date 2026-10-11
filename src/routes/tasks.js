@@ -7,7 +7,6 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { notifyAdmin, notifyAssignee } from '../services/telegram.js';
 
 const router = Router();
 
@@ -120,35 +119,9 @@ router.post('/', authorize('admin', 'ops_video_editor', 'ops_social_media_manage
       ip: req.ip,
     });
 
-    // Send Telegram notifications
-    try {
-      let assigneeName = 'Unassigned';
-      let assigneeRole = null;
-      if (assigned_to) {
-        const user = db.prepare('SELECT name, role FROM users WHERE id = ?').get(assigned_to);
-        if (user) {
-          assigneeName = user.name;
-          assigneeRole = user.role;
-        }
-      }
-
-      notifyAdmin(`➕ *New Task Created*\n\n` +
-        `*Task:* ${title}\n` +
-        `*Type:* ${task_type || 'video'}\n` +
-        `*Priority:* ${priority || 'medium'}\n` +
-        `*Assignee:* ${assigneeName}\n` +
-        `*Due Date:* ${due_date || 'N/A'}`);
-
-      if (assigned_to && assigneeRole) {
-        notifyAssignee(assigneeRole, `📋 *New Task Assigned*\n\n` +
-          `*Task:* ${title}\n` +
-          `*Priority:* ${priority || 'medium'}\n` +
-          `*Due Date:* ${due_date || 'N/A'}\n` +
-          `*Description:* ${description || 'No description provided'}`);
-      }
-    } catch (telegramErr) {
-      console.error('[TELEGRAM] Notification error during task creation:', telegramErr.message);
-    }
+    // Telegram task notifications retired 2026-10-11 (007's decision) — staff see
+    // this in-app via tabNotifications.js badge counts instead (already built to
+    // replace these digests).
 
     const newTask = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(result.lastInsertRowid);
 
@@ -201,21 +174,8 @@ router.patch('/:id', authorize('admin', 'ops_video_editor', 'ops_social_media_ma
       ip: req.ip,
     });
 
-    // Send Telegram assignment notification
-    try {
-      if (req.body.assigned_to !== undefined && req.body.assigned_to !== task.assigned_to && req.body.assigned_to !== null) {
-        const user = db.prepare('SELECT name, role FROM users WHERE id = ?').get(req.body.assigned_to);
-        if (user) {
-          notifyAssignee(user.role, `📋 *New Task Assigned*\n\n` +
-            `*Task:* ${updates.title || task.title}\n` +
-            `*Priority:* ${updates.priority || task.priority || 'medium'}\n` +
-            `*Due Date:* ${updates.due_date || task.due_date || 'N/A'}\n` +
-            `*Description:* ${updates.description || task.description || 'No description provided'}`);
-        }
-      }
-    } catch (telegramErr) {
-      console.error('[TELEGRAM] Notification error during task update:', telegramErr.message);
-    }
+    // Telegram assignment notification retired 2026-10-11 (007's decision) — same
+    // in-app replacement as task creation, above.
 
     const updatedTask = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(req.params.id);
 

@@ -9,7 +9,6 @@ import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { encrypt, decrypt } from '../services/encryption.js';
-import { sendArtistGigConfirmation } from '../services/telegram.js';
 
 const router = Router();
 
@@ -581,20 +580,8 @@ export function publicGigConfirmRoute(req, res) {
     // Recalculate rollups
     recalculateRollups(gig.artist_id);
 
-    // Send Telegram DM to artist with confirmed details
-    const artist = db.prepare('SELECT * FROM artists WHERE id = ?').get(gig.artist_id);
-    const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(gig.venue_id);
-    if (artist && venue && artist.telegram_chat_id) {
-      sendArtistGigConfirmation(
-        artist.telegram_chat_id,
-        artist.name,
-        gig.gig_date,
-        venue.name,
-        venue.address,
-        venue.map_link,
-        venue.gig_confirmed_message
-      );
-    }
+    // Telegram gig-confirmation DM retired 2026-10-11 (007's decision) — he
+    // sends confirmed gig details to artists manually now.
 
     logAction({
       actorId: null,
@@ -604,7 +591,7 @@ export function publicGigConfirmRoute(req, res) {
       diff: { artist_id: gig.artist_id },
     });
 
-    res.json({ message: '✅ Gig confirmed! You will receive details via Telegram shortly.' });
+    res.json({ message: '✅ Gig confirmed!' });
   } catch (err) {
     console.error('[GIG] Confirm error:', err);
     res.status(500).json({ error: 'Internal server error' });

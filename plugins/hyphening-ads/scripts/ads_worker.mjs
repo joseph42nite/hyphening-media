@@ -31,8 +31,12 @@ import { fileURLToPath } from 'url';
 import { readFile, writeFile, mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
+import dotenv from 'dotenv';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// Explicit path, not dotenv's cwd-relative default: cron's working directory
+// is not guaranteed to be the repo root, but this file's location is fixed.
+dotenv.config({ path: path.resolve(HERE, '../../../.env') });
 const PLUGIN_DIR = process.env.ADS_PLUGIN_DIR || path.resolve(HERE, '..');
 const API = (process.env.HYPHENING_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SECRET;
