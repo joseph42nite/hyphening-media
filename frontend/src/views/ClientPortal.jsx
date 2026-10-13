@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { 
   TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink,
-  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus, ArrowLeft
+  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus, ArrowLeft,
+  Clock
 } from 'lucide-react';
 
 import { API_BASE } from '../api.js';
@@ -1195,6 +1196,8 @@ export default function ClientPortal({ showToast }) {
   const [leadsMonth, setLeadsMonth] = useState('all');
   // Landing-page Call/WhatsApp taps, one bucket per month.
   const [landingClicks, setLandingClicks] = useState([]);
+  const [landingClicksLog, setLandingClicksLog] = useState([]);
+  const [contactHistoryModal, setContactHistoryModal] = useState(null);
   const [seoReports, setSeoReports] = useState([]);
   const [pendingPlan, setPendingPlan] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -1333,6 +1336,7 @@ export default function ClientPortal({ showToast }) {
         const data = await res.json();
         if (res.ok && data.leads) {
           setLandingClicks(data.landing_clicks || []);
+          setLandingClicksLog(data.landing_clicks_log || []);
           // Compare lists to identify new leads
           const existingIds = new Set(leads.map(l => l.id));
           const newLeads = data.leads.filter(l => !existingIds.has(l.id));
@@ -1473,6 +1477,7 @@ export default function ClientPortal({ showToast }) {
           if (resLeads.ok) {
             setLeads(dataLeads.leads || []);
             setLandingClicks(dataLeads.landing_clicks || []);
+            setLandingClicksLog(dataLeads.landing_clicks_log || []);
           }
         } catch (e) {
           console.error('Error fetching leads:', e);
@@ -1662,6 +1667,73 @@ export default function ClientPortal({ showToast }) {
   };
 
   /**
+   * Format contact timestamp into human-readable local day and time.
+   */
+  const formatContactDateTime = (dateStr) => {
+    if (!dateStr) return '';
+    const normalized = dateStr.includes('T')
+      ? (dateStr.endsWith('Z') ? dateStr : dateStr + 'Z')
+      : dateStr.replace(' ', 'T') + 'Z';
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  /**
+   * Relative time string for recent clicks (e.g., '10m ago', 'Yesterday').
+   */
+  const formatContactTimeAgo = (dateStr) => {
+    if (!dateStr) return '';
+    const normalized = dateStr.includes('T')
+      ? (dateStr.endsWith('Z') ? dateStr : dateStr + 'Z')
+      : dateStr.replace(' ', 'T') + 'Z';
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return '';
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    const days = Math.floor(diffSec / 86400);
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+    return `${Math.floor(days / 30)}mo ago`;
+  };
+
+  /**
+   * Rich tooltip showing the total clicks and exact day & time of previous calls / WhatsApp taps.
+   */
+  const getContactTooltip = (lead, channel) => {
+    const history = (lead.contact_history || []).filter(h => h.channel === channel);
+    const actionLabel = channel === 'call' ? 'Call this lead' : 'Open WhatsApp';
+    if (!history.length) {
+      return `${actionLabel} (No ${channel} taps yet)`;
+    }
+    const lines = [
+      `${actionLabel}`,
+      `Total ${channel === 'call' ? 'calls' : 'WhatsApp chats'}: ${history.length}`,
+      `Last tap: ${formatContactDateTime(history[0].created_at)} (${formatContactTimeAgo(history[0].created_at)})`,
+    ];
+    if (history.length > 1) {
+      lines.push('Tap History:');
+      history.slice(0, 4).forEach(h => {
+        lines.push(`• ${formatContactDateTime(h.created_at)}`);
+      });
+      if (history.length > 4) {
+        lines.push(`• ...+${history.length - 4} more (click History)`);
+      }
+    }
+    return lines.join('\n');
+  };
+
+  /**
    * Open the dialler or the WhatsApp thread for a lead and record the click, so
    * the box above the table shows how much the leads are actually being worked.
    * The link is opened first — a failed log should never cost the client the call.
@@ -1686,9 +1758,11 @@ export default function ClientPortal({ showToast }) {
     // Optimistic, so the cards above the table move the instant the button is
     // pressed. They are summed from these per-lead counts, so this is the only
     // place the numbers have to be kept up to date.
+    const optimisticTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
     setLeads(prev => prev.map(l => l.id === lead.id
       ? { ...l, call_clicks: (l.call_clicks || 0) + (channel === 'call' ? 1 : 0),
-              whatsapp_clicks: (l.whatsapp_clicks || 0) + (channel === 'whatsapp' ? 1 : 0) }
+              whatsapp_clicks: (l.whatsapp_clicks || 0) + (channel === 'whatsapp' ? 1 : 0),
+              contact_history: [{ channel, created_at: optimisticTimestamp }, ...(l.contact_history || [])] }
       : l));
 
     try {
@@ -1703,7 +1777,7 @@ export default function ClientPortal({ showToast }) {
 
       // Replace the optimistic guess with what was actually stored.
       setLeads(prev => prev.map(l => l.id === lead.id
-        ? { ...l, call_clicks: data.call_clicks, whatsapp_clicks: data.whatsapp_clicks }
+        ? { ...l, call_clicks: data.call_clicks, whatsapp_clicks: data.whatsapp_clicks, contact_history: data.contact_history || l.contact_history }
         : l));
     } catch (err) {
       console.error('[PORTAL] Contact click not recorded:', err);
@@ -3239,15 +3313,35 @@ export default function ClientPortal({ showToast }) {
                 <div>
                   {/* Taps on landing page Call & WhatsApp buttons */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px', maxWidth: '760px' }}>
-                    <div className="portal-metric-card" style={{ padding: '16px' }}>
-                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.04em' }}>📞 Landing Page Call Taps</span>
+                    <div
+                      className="portal-metric-card"
+                      onClick={() => setContactHistoryModal({ type: 'landing', channel: 'call' })}
+                      style={{ padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+                      title="Click to view dates and times of visitor call taps"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.04em' }}>📞 Landing Page Call Taps</span>
+                        <span style={{ fontSize: '0.68rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={11} /> View log
+                        </span>
+                      </div>
                       <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: 600, color: '#60a5fa', display: 'block', marginTop: '4px' }}>
                         {landingCalls.toLocaleString()}
                       </span>
                     </div>
 
-                    <div className="portal-metric-card" style={{ padding: '16px' }}>
-                      <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.04em' }}>💬 Landing Page WhatsApp Taps</span>
+                    <div
+                      className="portal-metric-card"
+                      onClick={() => setContactHistoryModal({ type: 'landing', channel: 'whatsapp' })}
+                      style={{ padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+                      title="Click to view dates and times of visitor WhatsApp taps"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="portal-metric-label" style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.04em' }}>💬 Landing Page WhatsApp Taps</span>
+                        <span style={{ fontSize: '0.68rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={11} /> View log
+                        </span>
+                      </div>
                       <span className="portal-metric-value" style={{ fontSize: '1.8rem', fontWeight: 600, color: '#34d399', display: 'block', marginTop: '4px' }}>
                         {landingWhatsapp.toLocaleString()}
                       </span>
@@ -3409,11 +3503,11 @@ export default function ClientPortal({ showToast }) {
                                       {cleanEmail && <span style={{ fontSize: '0.75rem', color: '#8b9b90' }}>{cleanEmail}</span>}
                                       <span style={{ fontSize: '0.75rem', color: '#dfe7e0', fontWeight: 600 }}>{lead.phone}</span>
                                       {lead.phone && (
-                                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                           <button
                                             type="button"
                                             onClick={() => handleContactClick(lead, 'call')}
-                                            title="Call this lead"
+                                            title={getContactTooltip(lead, 'call')}
                                             style={{
                                               display: 'flex', alignItems: 'center', gap: '4px',
                                               padding: '3px 9px', borderRadius: '9999px',
@@ -3426,7 +3520,7 @@ export default function ClientPortal({ showToast }) {
                                           <button
                                             type="button"
                                             onClick={() => handleContactClick(lead, 'whatsapp')}
-                                            title="Open this lead on WhatsApp"
+                                            title={getContactTooltip(lead, 'whatsapp')}
                                             style={{
                                               display: 'flex', alignItems: 'center', gap: '4px',
                                               padding: '3px 9px', borderRadius: '9999px',
@@ -3436,6 +3530,27 @@ export default function ClientPortal({ showToast }) {
                                           >
                                             💬 WhatsApp{lead.whatsapp_clicks ? ` · ${lead.whatsapp_clicks}` : ''}
                                           </button>
+                                          {((lead.call_clicks > 0) || (lead.whatsapp_clicks > 0) || (lead.contact_history && lead.contact_history.length > 0)) && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setContactHistoryModal({ type: 'lead', lead });
+                                              }}
+                                              title="View tap dates and times"
+                                              style={{
+                                                display: 'flex', alignItems: 'center', gap: '3px',
+                                                padding: '3px 8px', borderRadius: '9999px',
+                                                border: '1px solid rgba(223, 231, 224, 0.2)',
+                                                background: 'rgba(255, 255, 255, 0.06)',
+                                                color: '#dfe7e0',
+                                                fontSize: '0.68rem', fontWeight: 500,
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              <Clock size={11} /> History
+                                            </button>
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -3716,6 +3831,256 @@ export default function ClientPortal({ showToast }) {
               );
             })()}
 
+          </div>
+        )}
+
+        {/* Contact Tap History Modal */}
+        {contactHistoryModal && (
+          <div className="portal-modal-overlay" onClick={() => setContactHistoryModal(null)}>
+            <div 
+              className="portal-bento-card" 
+              onClick={(e) => e.stopPropagation()}
+              style={{ 
+                width: '100%', 
+                maxWidth: '560px', 
+                maxHeight: '85vh', 
+                overflowY: 'auto',
+                padding: '24px', 
+                margin: 0,
+                background: 'rgba(10, 14, 18, 0.96)',
+                border: '1px solid rgba(223, 231, 224, 0.16)',
+                backdropFilter: 'blur(32px)',
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid rgba(223, 231, 224, 0.12)', paddingBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'inline-flex', padding: '8px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '8px' }}>
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', color: '#dfe7e0' }}>
+                      {contactHistoryModal.type === 'lead' 
+                        ? `Tap History · ${(contactHistoryModal.lead.name || contactHistoryModal.lead.phone || 'Lead').replace(/^=/, '')}`
+                        : `Landing Page ${contactHistoryModal.channel === 'call' ? 'Call' : 'WhatsApp'} Taps Log`}
+                    </h3>
+                    <span style={{ fontSize: '0.75rem', color: '#8b9b90' }}>
+                      {contactHistoryModal.type === 'lead'
+                        ? (contactHistoryModal.lead.phone || 'No phone number recorded')
+                        : 'Exact dates and times visitor buttons were tapped'}
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setContactHistoryModal(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#8b9b90' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {contactHistoryModal.type === 'lead' ? (() => {
+                const currentLead = leads.find(l => l.id === contactHistoryModal.lead.id) || contactHistoryModal.lead;
+                const history = currentLead.contact_history || [];
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <div style={{ flex: 1, padding: '12px 14px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#93c5fd', textTransform: 'uppercase', fontWeight: 600 }}>📞 Calls Placed</span>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#dfe7e0', marginTop: '2px' }}>
+                          {currentLead.call_clicks || 0}
+                        </div>
+                      </div>
+                      <div style={{ flex: 1, padding: '12px 14px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#6ee7b7', textTransform: 'uppercase', fontWeight: 600 }}>💬 WhatsApp Chats</span>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#dfe7e0', marginTop: '2px' }}>
+                          {currentLead.whatsapp_clicks || 0}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8b9b90', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Activity Timeline ({history.length} {history.length === 1 ? 'event' : 'events'})
+                      </span>
+                      {history.length === 0 ? (
+                        <div style={{ padding: '24px 0', textAlign: 'center', color: '#8b9b90', fontSize: '0.85rem' }}>
+                          No call or WhatsApp taps recorded yet for this lead.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px', maxHeight: '45vh', overflowY: 'auto' }}>
+                          {history.map((h, idx) => {
+                            const isCall = h.channel === 'call';
+                            return (
+                              <div 
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 14px',
+                                  background: 'rgba(255, 255, 255, 0.03)',
+                                  border: '1px solid rgba(223, 231, 224, 0.08)',
+                                  borderRadius: '8px'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '50%',
+                                    background: isCall ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                    color: isCall ? '#60a5fa' : '#34d399',
+                                    fontSize: '0.85rem'
+                                  }}>
+                                    {isCall ? '📞' : '💬'}
+                                  </span>
+                                  <div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#dfe7e0' }}>
+                                      {isCall ? 'Call Initiated' : 'WhatsApp Chat Opened'}
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: '#8b9b90' }}>
+                                      {formatContactDateTime(h.created_at)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <span style={{ fontSize: '0.72rem', color: '#aab4ad', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                                  {formatContactTimeAgo(h.created_at)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '8px', paddingTop: '14px', borderTop: '1px solid rgba(223, 231, 224, 0.1)' }}>
+                      {currentLead.phone && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleContactClick(currentLead, 'call')}
+                            style={{
+                              flex: 1, padding: '8px 14px', borderRadius: '8px',
+                              background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)',
+                              color: '#93c5fd', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
+                            }}
+                          >
+                            📞 Call Now
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleContactClick(currentLead, 'whatsapp')}
+                            style={{
+                              flex: 1, padding: '8px 14px', borderRadius: '8px',
+                              background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.35)',
+                              color: '#6ee7b7', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
+                            }}
+                          >
+                            💬 WhatsApp
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })() : (() => {
+                const filteredLogs = landingClicksLog.filter(l => 
+                  contactHistoryModal.channel === 'all' || l.channel === contactHistoryModal.channel
+                );
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setContactHistoryModal({ ...contactHistoryModal, channel: 'all' })}
+                        style={{
+                          padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                          background: contactHistoryModal.channel === 'all' ? '#dfe7e0' : 'rgba(255, 255, 255, 0.05)',
+                          color: contactHistoryModal.channel === 'all' ? '#05070a' : '#8b9b90',
+                          border: '1px solid rgba(223, 231, 224, 0.15)'
+                        }}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContactHistoryModal({ ...contactHistoryModal, channel: 'call' })}
+                        style={{
+                          padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                          background: contactHistoryModal.channel === 'call' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: contactHistoryModal.channel === 'call' ? '#93c5fd' : '#8b9b90',
+                          border: '1px solid rgba(59, 130, 246, 0.3)'
+                        }}
+                      >
+                        📞 Call Taps
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContactHistoryModal({ ...contactHistoryModal, channel: 'whatsapp' })}
+                        style={{
+                          padding: '5px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                          background: contactHistoryModal.channel === 'whatsapp' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          color: contactHistoryModal.channel === 'whatsapp' ? '#6ee7b7' : '#8b9b90',
+                          border: '1px solid rgba(16, 185, 129, 0.3)'
+                        }}
+                      >
+                        💬 WhatsApp Taps
+                      </button>
+                    </div>
+
+                    {filteredLogs.length === 0 ? (
+                      <div style={{ padding: '28px 0', textAlign: 'center', color: '#8b9b90', fontSize: '0.85rem' }}>
+                        No landing page taps recorded for this filter.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '50vh', overflowY: 'auto' }}>
+                        {filteredLogs.map((l) => (
+                          <div
+                            key={l.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 14px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              border: '1px solid rgba(223, 231, 224, 0.08)',
+                              borderRadius: '8px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '1rem' }}>
+                                {l.channel === 'call' ? '📞' : '💬'}
+                              </span>
+                              <div>
+                                <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#dfe7e0' }}>
+                                  {formatContactDateTime(l.created_at)}
+                                </div>
+                                {(l.campaign_name || l.page_url) && (
+                                  <div style={{ fontSize: '0.72rem', color: '#8b9b90', marginTop: '2px' }}>
+                                    {l.campaign_name && <span>🎯 {l.campaign_name} </span>}
+                                    {l.page_url && <span>• 🔗 {l.page_url}</span>}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#aab4ad', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                              {formatContactTimeAgo(l.created_at)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
 

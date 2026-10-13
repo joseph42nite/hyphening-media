@@ -384,6 +384,27 @@ router.get('/:token/leads', portalAuth, (req, res) => {
       ORDER BY l.created_at DESC
     `).all(req.portalClient.id);
 
+    // Fetch contact click logs for leads to show day and time
+    const leadContactClicks = db.prepare(`
+      SELECT lead_id, channel, created_at
+      FROM lead_contact_clicks
+      WHERE client_id = ?
+      ORDER BY created_at DESC
+    `).all(req.portalClient.id);
+
+    const clicksByLead = {};
+    for (const c of leadContactClicks) {
+      if (!clicksByLead[c.lead_id]) clicksByLead[c.lead_id] = [];
+      clicksByLead[c.lead_id].push({
+        channel: c.channel,
+        created_at: c.created_at
+      });
+    }
+
+    leads.forEach(l => {
+      l.contact_history = clicksByLead[l.id] || [];
+    });
+
     // Bucketed by month so the leads tab can filter them with its own month
     // selector without a second request.
     const landingClicks = db.prepare(`
@@ -396,7 +417,19 @@ router.get('/:token/leads', portalAuth, (req, res) => {
       GROUP BY month
     `).all(req.portalClient.id);
 
-    res.json({ leads, landing_clicks: landingClicks });
+    const landingClicksLog = db.prepare(`
+      SELECT id, channel, campaign_name, page_url, created_at
+      FROM landing_contact_clicks
+      WHERE client_id = ?
+      ORDER BY created_at DESC
+      LIMIT 100
+    `).all(req.portalClient.id);
+
+    res.json({
+      leads,
+      landing_clicks: landingClicks,
+      landing_clicks_log: landingClicksLog
+    });
   } catch (err) {
     console.error('[PORTAL] Get leads error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -635,11 +668,19 @@ router.post('/:token/leads/:leadId/contact-click', portalAuth, (req, res) => {
       WHERE lead_id = ?
     `).get(lead.id);
 
+    const contactHistory = db.prepare(`
+      SELECT channel, created_at
+      FROM lead_contact_clicks
+      WHERE lead_id = ?
+      ORDER BY created_at DESC
+    `).all(lead.id);
+
     res.json({
       success: true,
       lead_id: lead.id,
       call_clicks: leadCounts.call_clicks || 0,
       whatsapp_clicks: leadCounts.whatsapp_clicks || 0,
+      contact_history: contactHistory,
     });
   } catch (err) {
     console.error('[PORTAL] Lead contact click error:', err);
