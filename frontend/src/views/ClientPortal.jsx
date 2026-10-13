@@ -1708,6 +1708,21 @@ export default function ClientPortal({ showToast }) {
   };
 
   /**
+   * Compact display label for landing page URLs to avoid breaking layout cards.
+   */
+  const cleanLandingUrl = (urlStr) => {
+    if (!urlStr) return '';
+    try {
+      const u = new URL(urlStr);
+      const isAds = u.searchParams.has('gclid') || u.searchParams.has('gad_campaignid') || u.searchParams.has('wbraid') || u.searchParams.has('gbraid') || u.searchParams.has('gad_source');
+      const cleanPath = u.pathname && u.pathname !== '/' ? u.pathname : '';
+      return `${u.hostname}${cleanPath}${isAds ? ' • Google Ads' : ''}`;
+    } catch {
+      return (urlStr.split('?')[0] || urlStr).replace(/^https?:\/\//, '');
+    }
+  };
+
+  /**
    * Rich tooltip showing the total clicks and exact day & time of previous calls / WhatsApp taps.
    */
   const getContactTooltip = (lead, channel) => {
@@ -3842,7 +3857,7 @@ export default function ClientPortal({ showToast }) {
               onClick={(e) => e.stopPropagation()}
               style={{ 
                 width: '100%', 
-                maxWidth: '560px', 
+                maxWidth: '620px', 
                 maxHeight: '85vh', 
                 overflowY: 'auto',
                 padding: '24px', 
@@ -3920,13 +3935,15 @@ export default function ClientPortal({ showToast }) {
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
+                                  gap: '12px',
                                   padding: '10px 14px',
                                   background: 'rgba(255, 255, 255, 0.03)',
                                   border: '1px solid rgba(223, 231, 224, 0.08)',
-                                  borderRadius: '8px'
+                                  borderRadius: '8px',
+                                  minWidth: 0
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                                   <span style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -3934,13 +3951,14 @@ export default function ClientPortal({ showToast }) {
                                     width: '28px',
                                     height: '28px',
                                     borderRadius: '50%',
+                                    flexShrink: 0,
                                     background: isCall ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
                                     color: isCall ? '#60a5fa' : '#34d399',
                                     fontSize: '0.85rem'
                                   }}>
                                     {isCall ? '📞' : '💬'}
                                   </span>
-                                  <div>
+                                  <div style={{ minWidth: 0, flex: 1 }}>
                                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#dfe7e0' }}>
                                       {isCall ? 'Call Initiated' : 'WhatsApp Chat Opened'}
                                     </div>
@@ -3949,7 +3967,10 @@ export default function ClientPortal({ showToast }) {
                                     </div>
                                   </div>
                                 </div>
-                                <span style={{ fontSize: '0.72rem', color: '#aab4ad', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                                <span style={{
+                                  fontSize: '0.72rem', color: '#aab4ad', background: 'rgba(255, 255, 255, 0.05)',
+                                  padding: '2px 8px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap'
+                                }}>
                                   {formatContactTimeAgo(h.created_at)}
                                 </span>
                               </div>
@@ -4048,29 +4069,49 @@ export default function ClientPortal({ showToast }) {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
+                              gap: '12px',
                               padding: '10px 14px',
                               background: 'rgba(255, 255, 255, 0.03)',
                               border: '1px solid rgba(223, 231, 224, 0.08)',
-                              borderRadius: '8px'
+                              borderRadius: '8px',
+                              minWidth: 0
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <span style={{ fontSize: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>
                                 {l.channel === 'call' ? '📞' : '💬'}
                               </span>
-                              <div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#dfe7e0' }}>
                                   {formatContactDateTime(l.created_at)}
                                 </div>
                                 {(l.campaign_name || l.page_url) && (
-                                  <div style={{ fontSize: '0.72rem', color: '#8b9b90', marginTop: '2px' }}>
-                                    {l.campaign_name && <span>🎯 {l.campaign_name} </span>}
-                                    {l.page_url && <span>• 🔗 {l.page_url}</span>}
+                                  <div 
+                                    style={{
+                                      fontSize: '0.72rem', color: '#8b9b90', marginTop: '2px',
+                                      display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap',
+                                      wordBreak: 'break-word', overflowWrap: 'anywhere'
+                                    }}
+                                    title={l.page_url || ''}
+                                  >
+                                    {l.campaign_name && (
+                                      <span style={{ color: '#aab4ad', fontWeight: 500 }}>
+                                        🎯 {l.campaign_name}
+                                      </span>
+                                    )}
+                                    {l.page_url && (
+                                      <span style={{ color: '#6ee7b7' }}>
+                                        • 🔗 {cleanLandingUrl(l.page_url)}
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                               </div>
                             </div>
-                            <span style={{ fontSize: '0.72rem', color: '#aab4ad', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                            <span style={{
+                              fontSize: '0.72rem', color: '#aab4ad', background: 'rgba(255, 255, 255, 0.05)',
+                              padding: '2px 8px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap'
+                            }}>
                               {formatContactTimeAgo(l.created_at)}
                             </span>
                           </div>
