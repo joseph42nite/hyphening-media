@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle, DollarSign, Calendar, ChevronDown, ChevronUp, ExternalLink, RefreshCw, X } from 'lucide-react';
+import { Plus, CheckCircle, DollarSign, Calendar, ChevronDown, ChevronUp, ExternalLink, RefreshCw, X, Trash2 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function FreelancersTab({
@@ -221,6 +221,25 @@ export default function FreelancersTab({
     }
   };
 
+  const handleDeleteFreelancer = async (freelancer) => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${freelancer.name}"? This will remove them from the freelancer roster.`)) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/freelancers/${freelancer.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete freelancer');
+      }
+      showToast('Freelancer deleted successfully', 'success');
+      refreshRoster();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   if (!isAdmin) return null;
 
   return (
@@ -396,6 +415,23 @@ export default function FreelancersTab({
                           style={{ padding: '5px 8px', fontSize: '0.75rem' }}
                         >
                           {free.is_active === 1 ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteFreelancer(free)}
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '5px 8px',
+                            fontSize: '0.75rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            color: '#f87171',
+                            borderColor: 'rgba(239, 68, 68, 0.35)',
+                            background: 'rgba(239, 68, 68, 0.08)'
+                          }}
+                          title="Permanently delete freelancer"
+                        >
+                          <Trash2 size={13} /> Delete
                         </button>
                       </div>
                     </td>

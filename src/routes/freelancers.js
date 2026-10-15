@@ -335,28 +335,30 @@ router.patch('/:id', authorize('admin'), (req, res) => {
 });
 
 /**
- * DELETE /api/freelancers/:id (soft delete)
+ * DELETE /api/freelancers/:id
  */
 router.delete('/:id', authorize('admin'), (req, res) => {
   try {
     const freelancer = db.prepare('SELECT * FROM freelancers WHERE id = ?').get(req.params.id);
     if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
 
-    db.prepare('UPDATE freelancers SET is_active = 0, updated_at = ? WHERE id = ?').run(
-      new Date().toISOString(), req.params.id
-    );
+    // Unlink any marketing content or kanban tasks
+    db.prepare('UPDATE marketing_content_tracker SET freelancer_id = NULL WHERE freelancer_id = ?').run(req.params.id);
+    db.prepare('UPDATE kanban_tasks SET assigned_to = NULL WHERE assigned_to = ?').run(req.params.id);
+    db.prepare('DELETE FROM freelancer_monthly_payments WHERE freelancer_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM freelancers WHERE id = ?').run(req.params.id);
 
     logAction({
       actorId: req.user.id,
       actorEmail: req.user.email,
-      action: 'soft_delete',
+      action: 'delete',
       entityType: 'freelancer',
       entityId: parseInt(req.params.id),
       diff: { name: freelancer.name },
       ip: req.ip,
     });
 
-    res.json({ message: 'Freelancer deactivated' });
+    res.json({ message: 'Freelancer deleted successfully' });
   } catch (err) {
     console.error('[FREELANCERS] Delete error:', err);
     res.status(500).json({ error: 'Internal server error' });

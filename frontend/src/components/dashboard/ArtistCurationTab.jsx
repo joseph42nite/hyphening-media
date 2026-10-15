@@ -2,6 +2,234 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Copy, Edit3, Check, RotateCcw, MessageSquare, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
+// Reusable Metric Stat Card
+function StatCard({ title, value, subtitle, icon: Icon, color, bg }) {
+  return (
+    <div
+      className="glass-card glass-premium"
+      style={{
+        background: 'var(--bg-card, rgba(12, 16, 24, 0.85))',
+        padding: '18px 20px',
+        borderRadius: '14px',
+        border: '1px solid rgba(223, 231, 224, 0.12)',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+        backdropFilter: 'blur(20px)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {title}
+        </span>
+        <div style={{ background: bg, color, padding: '6px', borderRadius: '8px', border: `1px solid ${color}4d`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon size={18} />
+        </div>
+      </div>
+      <div style={{ fontSize: '1.9rem', fontWeight: 900, color: color === '#38bdf8' ? 'var(--text-primary)' : color, fontFamily: 'var(--font-heading)' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '6px' }}>
+        {subtitle}
+      </div>
+    </div>
+  );
+}
+
+// Reusable Pagination Controls
+function PaginationControls({ page, setPage, limit, setLimit, totalItems }) {
+  if (totalItems <= 0) return null;
+  const totalPages = Math.ceil(totalItems / limit);
+  const startPage = Math.max(1, page - 2);
+  const endPage = Math.min(totalPages, page + 2);
+  const buttons = [];
+  for (let i = startPage; i <= endPage; i++) {
+    buttons.push(
+      <button
+        key={i}
+        className={`btn ${page === i ? 'btn-primary' : ''}`}
+        style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px', minWidth: '32px' }}
+        onClick={() => setPage(i)}
+      >
+        {i}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+        Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((page - 1) * limit + 1, totalItems)}</span> to{' '}
+        <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(page * limit, totalItems)}</span> of{' '}
+        <span style={{ fontFamily: 'var(--font-mono)' }}>{totalItems}</span> entries
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
+          <select
+            className="form-control"
+            value={limit}
+            onChange={(e) => {
+              setLimit(parseInt(e.target.value));
+              setPage(1);
+            }}
+            style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '1px', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+          <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={page === 1} onClick={() => setPage(1)}>First</button>
+          <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
+          {buttons}
+          <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
+          <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={page >= totalPages} onClick={() => setPage(totalPages)}>Last</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Reusable Message Template Card
+function MessageTemplateCard({
+  badge,
+  badgeBg,
+  badgeBorder,
+  badgeColor,
+  text,
+  emptyText,
+  onCopy,
+  onEdit,
+  extraHeaderControls = null,
+  disabled = false
+}) {
+  return (
+    <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px' }}>
+          <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: badgeBg, border: `1px solid ${badgeBorder}`, color: badgeColor, whiteSpace: 'nowrap' }}>
+            {badge}
+          </span>
+          {extraHeaderControls}
+        </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            disabled={disabled}
+            onClick={onCopy}
+            className="btn btn-primary"
+            style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
+          >
+            <Copy size={12} /> Copy
+          </button>
+          <button
+            disabled={disabled}
+            onClick={onEdit}
+            className="btn btn-secondary"
+            style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
+          >
+            <Edit3 size={12} /> Edit
+          </button>
+        </div>
+      </div>
+      <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
+        {text || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>{emptyText}</span>}
+      </div>
+    </div>
+  );
+}
+
+// Reusable Searchable Autocomplete Select
+function SearchableSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  required = false
+}) {
+  const [search, setSearch] = useState(value || '');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    setSearch(value || '');
+  }, [value]);
+
+  const filtered = options.filter(opt =>
+    (opt.label || '').toLowerCase().includes((search || '').toLowerCase()) ||
+    (opt.sublabel && opt.sublabel.toLowerCase().includes((search || '').toLowerCase()))
+  );
+
+  return (
+    <div className="form-group" style={{ position: 'relative' }}>
+      <label className="form-label">{label}</label>
+      <input
+        type="text"
+        className="form-control"
+        placeholder={placeholder}
+        value={search}
+        onChange={e => {
+          setSearch(e.target.value);
+          setShowDropdown(true);
+          onChange(e.target.value, null);
+        }}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        required={required}
+      />
+      {showDropdown && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          background: 'rgba(12, 16, 24, 0.96)',
+          border: '1px solid rgba(223, 231, 224, 0.18)',
+          borderRadius: '8px',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75)',
+          maxHeight: '200px',
+          overflowY: 'auto',
+          marginTop: '4px',
+          backdropFilter: 'blur(16px)'
+        }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+              No matches found
+            </div>
+          ) : (
+            filtered.map(opt => (
+              <div
+                key={opt.id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const displayText = opt.display || opt.label;
+                  setSearch(displayText);
+                  onChange(displayText, opt);
+                  setShowDropdown(false);
+                }}
+                className="dropdown-item-hover"
+                style={{
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  borderBottom: '1px solid rgba(223, 231, 224, 0.08)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                {opt.label} {opt.sublabel ? `(${opt.sublabel})` : ''}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ArtistCurationTab({
   auth,
   gigs,
@@ -188,9 +416,7 @@ export default function ArtistCurationTab({
 
   // Autocomplete search states inside modals
   const [artistSearch, setArtistSearch] = useState('');
-  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
   const [venueSearch, setVenueSearch] = useState('');
-  const [showVenueDropdown, setShowVenueDropdown] = useState(false);
 
   // Bank decryption handler
   const decryptBankDetails = async (artistId) => {
@@ -388,91 +614,30 @@ export default function ArtistCurationTab({
       
       {/* Gig Summary Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        
-        {/* 1. Gigs Done Card */}
-        <div
-          className="glass-card glass-premium"
-          style={{
-            background: 'var(--bg-card, rgba(12, 16, 24, 0.85))',
-            padding: '18px 20px',
-            borderRadius: '14px',
-            border: '1px solid rgba(223, 231, 224, 0.12)',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
-            backdropFilter: 'blur(20px)'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Gigs Done
-            </span>
-            <div style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '6px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Calendar size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
-            {gigsDoneCount}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '6px' }}>
-            Completed & active gigs
-          </div>
-        </div>
-
-        {/* 2. Left for Payment Card */}
-        <div
-          className="glass-card glass-premium"
-          style={{
-            background: 'var(--bg-card, rgba(12, 16, 24, 0.85))',
-            padding: '18px 20px',
-            borderRadius: '14px',
-            border: '1px solid rgba(223, 231, 224, 0.12)',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
-            backdropFilter: 'blur(20px)'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Left for Payment
-            </span>
-            <div style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '6px', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Clock size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: '#fbbf24', fontFamily: 'var(--font-heading)' }}>
-            {leftForPaymentCount}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '6px' }}>
-            ₹{totalPendingAmount.toLocaleString('en-IN')} pending balance
-          </div>
-        </div>
-
-        {/* 3. Paid Gigs Card */}
-        <div
-          className="glass-card glass-premium"
-          style={{
-            background: 'var(--bg-card, rgba(12, 16, 24, 0.85))',
-            padding: '18px 20px',
-            borderRadius: '14px',
-            border: '1px solid rgba(223, 231, 224, 0.12)',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
-            backdropFilter: 'blur(20px)'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Paid Gigs
-            </span>
-            <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '6px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckCircle2 size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: '#34d399', fontFamily: 'var(--font-heading)' }}>
-            {paidGigsCount}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '6px' }}>
-            ₹{totalPaidAmount.toLocaleString('en-IN')} disbursed
-          </div>
-        </div>
-
+        <StatCard
+          title="Gigs Done"
+          value={gigsDoneCount}
+          subtitle="Completed & active gigs"
+          icon={Calendar}
+          color="#38bdf8"
+          bg="rgba(56, 189, 248, 0.15)"
+        />
+        <StatCard
+          title="Left for Payment"
+          value={leftForPaymentCount}
+          subtitle={`₹${totalPendingAmount.toLocaleString('en-IN')} pending balance`}
+          icon={Clock}
+          color="#fbbf24"
+          bg="rgba(245, 158, 11, 0.15)"
+        />
+        <StatCard
+          title="Paid Gigs"
+          value={paidGigsCount}
+          subtitle={`₹${totalPaidAmount.toLocaleString('en-IN')} disbursed`}
+          icon={CheckCircle2}
+          color="#34d399"
+          bg="rgba(16, 185, 129, 0.15)"
+        />
       </div>
 
       {/* Gig Status Tracker */}
@@ -553,59 +718,13 @@ export default function ArtistCurationTab({
       </div>
 
       {/* Pagination Controls for Gigs */}
-      {gigs.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
-            Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((gigsPage - 1) * gigsLimit + 1, gigs.length)}</span> to{' '}
-            <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(gigsPage * gigsLimit, gigs.length)}</span> of{' '}
-            <span style={{ fontFamily: 'var(--font-mono)' }}>{gigs.length}</span> entries
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
-              <select
-                className="form-control"
-                value={gigsLimit}
-                onChange={(e) => {
-                  setGigsLimit(parseInt(e.target.value));
-                  setGigsPage(1);
-                }}
-                style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '1px', borderRadius: '6px', cursor: 'pointer' }}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage === 1} onClick={() => setGigsPage(1)}>First</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage === 1} onClick={() => setGigsPage(gigsPage - 1)}>Prev</button>
-
-              {(() => {
-                const totalPages = Math.ceil(gigs.length / gigsLimit);
-                const buttons = [];
-                const startPage = Math.max(1, gigsPage - 2);
-                const endPage = Math.min(totalPages, gigsPage + 2);
-                for (let i = startPage; i <= endPage; i++) {
-                  buttons.push(
-                    <button key={i} className={`btn ${gigsPage === i ? 'btn-primary' : ''}`} style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px', minWidth: '32px' }} onClick={() => setGigsPage(i)}>
-                      {i}
-                    </button>
-                  );
-                }
-                return buttons;
-              })()}
-
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)} onClick={() => setGigsPage(gigsPage + 1)}>Next</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={gigsPage >= Math.ceil(gigs.length / gigsLimit)} onClick={() => setGigsPage(Math.ceil(gigs.length / gigsLimit))}>Last</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PaginationControls
+        page={gigsPage}
+        setPage={setGigsPage}
+        limit={gigsLimit}
+        setLimit={setGigsLimit}
+        totalItems={gigs.length}
+      />
 
       {/* Roster & Encrypted Details */}
       <div className="dashboard-toolbar curation-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
@@ -724,59 +843,13 @@ export default function ArtistCurationTab({
       </div>
 
       {/* Pagination Controls for Artists */}
-      {filteredArtists.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
-            Showing <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min((artistsPage - 1) * artistsLimit + 1, filteredArtists.length)}</span> to{' '}
-            <span style={{ fontFamily: 'var(--font-mono)' }}>{Math.min(artistsPage * artistsLimit, filteredArtists.length)}</span> of{' '}
-            <span style={{ fontFamily: 'var(--font-mono)' }}>{filteredArtists.length}</span> entries
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Show</span>
-              <select
-                className="form-control"
-                value={artistsLimit}
-                onChange={(e) => {
-                  setArtistsLimit(parseInt(e.target.value));
-                  setArtistsPage(1);
-                }}
-                style={{ width: 'auto', padding: '8px 16px 8px 12px', height: 'auto', fontSize: '0.85rem', borderWidth: '1px', borderRadius: '6px', cursor: 'pointer' }}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>entries</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage === 1} onClick={() => setArtistsPage(1)}>First</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage === 1} onClick={() => setArtistsPage(artistsPage - 1)}>Prev</button>
-
-              {(() => {
-                const totalPages = Math.ceil(filteredArtists.length / artistsLimit);
-                const buttons = [];
-                const startPage = Math.max(1, artistsPage - 2);
-                const endPage = Math.min(totalPages, artistsPage + 2);
-                for (let i = startPage; i <= endPage; i++) {
-                  buttons.push(
-                    <button key={i} className={`btn ${artistsPage === i ? 'btn-primary' : ''}`} style={{ padding: '8px 12px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px', minWidth: '32px' }} onClick={() => setArtistsPage(i)}>
-                      {i}
-                    </button>
-                  );
-                }
-                return buttons;
-              })()}
-
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(artistsPage + 1)}>Next</button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(Math.ceil(filteredArtists.length / artistsLimit))}>Last</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PaginationControls
+        page={artistsPage}
+        setPage={setArtistsPage}
+        limit={artistsLimit}
+        setLimit={setArtistsLimit}
+        totalItems={filteredArtists.length}
+      />
 
       {/* Quick Artist Message Templates Strip (Bottom of Page) */}
       <div
@@ -802,123 +875,71 @@ export default function ArtistCurationTab({
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
-          {/* Onboarding Template */}
-          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#7dd3fc' }}>
-                1. Onboarding Message
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  onClick={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
-                  className="btn btn-primary"
-                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
-                >
-                  <Copy size={12} /> Copy
-                </button>
-                <button
-                  onClick={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
-                >
-                  <Edit3 size={12} /> Edit
-                </button>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
-              {onboardingMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
-            </div>
-          </div>
+          <MessageTemplateCard
+            badge="1. Onboarding Message"
+            badgeBg="rgba(56, 189, 248, 0.12)"
+            badgeBorder="rgba(56, 189, 248, 0.3)"
+            badgeColor="#7dd3fc"
+            text={onboardingMsg}
+            emptyText="No template set yet. Click 'Edit' to enter your template."
+            onCopy={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
+            onEdit={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
+          />
 
-          {/* Confirmation Template */}
-          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#4ade80' }}>
-                2. Confirmation Message
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  onClick={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
-                  className="btn btn-primary"
-                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
-                >
-                  <Copy size={12} /> Copy
-                </button>
-                <button
-                  onClick={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
-                >
-                  <Edit3 size={12} /> Edit
-                </button>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
-              {confirmationMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
-            </div>
-          </div>
+          <MessageTemplateCard
+            badge="2. Confirmation Message"
+            badgeBg="rgba(34, 197, 94, 0.12)"
+            badgeBorder="rgba(34, 197, 94, 0.3)"
+            badgeColor="#4ade80"
+            text={confirmationMsg}
+            emptyText="No template set yet. Click 'Edit' to enter your template."
+            onCopy={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
+            onEdit={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
+          />
 
-          {/* Venue Confirmation Template */}
-          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px' }}>
-                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', whiteSpace: 'nowrap' }}>
-                  3. Venue Message
-                </span>
-                {venues && venues.length > 0 && (
-                  <select
-                    className="form-control"
-                    value={currentVenue ? currentVenue.id : ''}
-                    onChange={e => setSelectedVenueMessageId(e.target.value)}
-                    style={{
-                      fontSize: '0.74rem',
-                      padding: '2px 8px',
-                      height: '26px',
-                      background: 'rgba(5, 7, 10, 0.8)',
-                      borderColor: 'rgba(223, 231, 224, 0.18)',
-                      color: 'var(--text-primary)',
-                      borderRadius: '6px',
-                      maxWidth: '190px'
-                    }}
-                    title="Select Venue"
-                  >
-                    {venues.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}{v.client_name ? ` (${v.client_name})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  disabled={!currentVenue}
-                  onClick={() => handleCopyTemplate(currentVenue?.gig_confirmed_message, `${currentVenue?.name || 'Venue'} Confirmation Message`)}
-                  className="btn btn-primary"
-                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
+          <MessageTemplateCard
+            badge="3. Venue Message"
+            badgeBg="rgba(245, 158, 11, 0.12)"
+            badgeBorder="rgba(245, 158, 11, 0.3)"
+            badgeColor="#fbbf24"
+            disabled={!currentVenue}
+            extraHeaderControls={
+              venues && venues.length > 0 ? (
+                <select
+                  className="form-control"
+                  value={currentVenue ? currentVenue.id : ''}
+                  onChange={e => setSelectedVenueMessageId(e.target.value)}
+                  style={{
+                    fontSize: '0.74rem',
+                    padding: '2px 8px',
+                    height: '26px',
+                    background: 'rgba(5, 7, 10, 0.8)',
+                    borderColor: 'rgba(223, 231, 224, 0.18)',
+                    color: 'var(--text-primary)',
+                    borderRadius: '6px',
+                    maxWidth: '190px'
+                  }}
+                  title="Select Venue"
                 >
-                  <Copy size={12} /> Copy
-                </button>
-                <button
-                  disabled={!currentVenue}
-                  onClick={() => { setEditingMsgType('venue'); setTempMsgText(currentVenue?.gig_confirmed_message || ''); }}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
-                >
-                  <Edit3 size={12} /> Edit
-                </button>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
-              {!venues || venues.length === 0 ? (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No venues available. Add an Artist Curation client in Clients tab.</span>
-              ) : currentVenue?.gig_confirmed_message ? (
-                currentVenue.gig_confirmed_message
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No custom message for {currentVenue?.name}. Click 'Edit' to enter your template.</span>
-              )}
-            </div>
-          </div>
+                  {venues.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}{v.client_name ? ` (${v.client_name})` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : null
+            }
+            text={
+              !venues || venues.length === 0 ? null : currentVenue?.gig_confirmed_message || null
+            }
+            emptyText={
+              !venues || venues.length === 0
+                ? 'No venues available. Add an Artist Curation client in Clients tab.'
+                : `No custom message for ${currentVenue?.name}. Click 'Edit' to enter your template.`
+            }
+            onCopy={() => handleCopyTemplate(currentVenue?.gig_confirmed_message, `${currentVenue?.name || 'Venue'} Confirmation Message`)}
+            onEdit={() => { setEditingMsgType('venue'); setTempMsgText(currentVenue?.gig_confirmed_message || ''); }}
+          />
         </div>
       </div>
 
@@ -1177,151 +1198,53 @@ export default function ArtistCurationTab({
             <form onSubmit={handleGigSubmit} style={{ marginTop: '20px' }}>
 
               <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label className="form-label">Artist</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search artist..."
-                    value={artistSearch}
-                    onChange={e => {
-                      setArtistSearch(e.target.value);
-                      setShowArtistDropdown(true);
-                      const match = artists.find(a =>
-                        `${a.name} (${a.category || 'No Category'})` === e.target.value ||
-                        a.name === e.target.value
+                <SearchableSelect
+                  label="Artist"
+                  placeholder="Search artist..."
+                  value={artistSearch}
+                  required
+                  options={artists.map(a => ({
+                    id: a.id,
+                    label: a.name,
+                    sublabel: a.category || 'No Category',
+                    display: `${a.name} (${a.category || 'No Category'})`,
+                    artist: a
+                  }))}
+                  onChange={(displayText, match) => {
+                    setArtistSearch(displayText);
+                    if (match) {
+                      setGigFormData(prev => ({ ...prev, artist_id: String(match.id) }));
+                    } else {
+                      const found = artists.find(a =>
+                        `${a.name} (${a.category || 'No Category'})` === displayText ||
+                        a.name === displayText
                       );
-                      if (match) {
-                        setGigFormData(prev => ({ ...prev, artist_id: String(match.id) }));
-                      } else {
-                        setGigFormData(prev => ({ ...prev, artist_id: '' }));
-                      }
-                    }}
-                    onFocus={() => setShowArtistDropdown(true)}
-                    onBlur={() => {
-                      setTimeout(() => setShowArtistDropdown(false), 200);
-                    }}
-                    required
-                  />
-                  {showArtistDropdown && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      zIndex: 1000,
-                      background: 'rgba(12, 16, 24, 0.96)',
-                      border: '1px solid rgba(223, 231, 224, 0.18)',
-                      borderRadius: '8px',
-                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75)',
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                      marginTop: '4px',
-                      backdropFilter: 'blur(16px)'
-                    }}>
-                      {(() => {
-                        const filtered = artists.filter(a =>
-                          a.name.toLowerCase().includes(artistSearch.toLowerCase()) ||
-                          (a.category && a.category.toLowerCase().includes(artistSearch.toLowerCase()))
-                        );
-                        if (filtered.length === 0) {
-                          return <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 'bold' }}>No artists found</div>;
-                        }
-                        return filtered.map(a => (
-                          <div
-                            key={a.id}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setGigFormData(prev => ({ ...prev, artist_id: String(a.id) }));
-                              setArtistSearch(`${a.name} (${a.category || 'No Category'})`);
-                              setShowArtistDropdown(false);
-                            }}
-                            className="dropdown-item-hover"
-                            style={{
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              borderBottom: '1px solid rgba(223, 231, 224, 0.08)',
-                              color: 'var(--text-primary)'
-                            }}
-                          >
-                            {a.name} ({a.category || 'No Category'})
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  )}
-                </div>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label className="form-label">Location / Venue</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Search venue..."
-                    value={venueSearch}
-                    onChange={e => {
-                      setVenueSearch(e.target.value);
-                      setShowVenueDropdown(true);
-                      const match = venues.find(v => v.name === e.target.value);
-                      if (match) {
-                        setGigFormData(prev => ({ ...prev, venue_id: String(match.id) }));
-                      } else {
-                        setGigFormData(prev => ({ ...prev, venue_id: '' }));
-                      }
-                    }}
-                    onFocus={() => setShowVenueDropdown(true)}
-                    onBlur={() => {
-                      setTimeout(() => setShowVenueDropdown(false), 200);
-                    }}
-                  />
-                  {showVenueDropdown && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      zIndex: 1000,
-                      background: 'rgba(12, 16, 24, 0.96)',
-                      border: '1px solid rgba(223, 231, 224, 0.18)',
-                      borderRadius: '8px',
-                      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75)',
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                      marginTop: '4px',
-                      backdropFilter: 'blur(16px)'
-                    }}>
-                      {(() => {
-                        const filtered = venues.filter(v =>
-                          v.name.toLowerCase().includes(venueSearch.toLowerCase())
-                        );
-                        if (filtered.length === 0) {
-                          return <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 'bold' }}>No venues found</div>;
-                        }
-                        return filtered.map(v => (
-                          <div
-                            key={v.id}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setGigFormData(prev => ({ ...prev, venue_id: String(v.id) }));
-                              setVenueSearch(v.name);
-                              setShowVenueDropdown(false);
-                            }}
-                            className="dropdown-item-hover"
-                            style={{
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              borderBottom: '1px solid rgba(223, 231, 224, 0.08)',
-                              color: 'var(--text-primary)'
-                            }}
-                          >
-                            {v.name}
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  )}
-                </div>
+                      setGigFormData(prev => ({ ...prev, artist_id: found ? String(found.id) : '' }));
+                    }
+                  }}
+                />
+
+                <SearchableSelect
+                  label="Location / Venue"
+                  placeholder="Search venue..."
+                  value={venueSearch}
+                  options={venues.map(v => ({
+                    id: v.id,
+                    label: v.name,
+                    sublabel: v.client_name ? `Client: ${v.client_name}` : null,
+                    display: v.name,
+                    venue: v
+                  }))}
+                  onChange={(displayText, match) => {
+                    setVenueSearch(displayText);
+                    if (match) {
+                      setGigFormData(prev => ({ ...prev, venue_id: String(match.id) }));
+                    } else {
+                      const found = venues.find(v => v.name === displayText);
+                      setGigFormData(prev => ({ ...prev, venue_id: found ? String(found.id) : '' }));
+                    }
+                  }}
+                />
               </div>
 
               <div className="form-group" style={{ marginBottom: '16px' }}>
