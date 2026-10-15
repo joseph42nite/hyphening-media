@@ -6,9 +6,10 @@ import {
   Users, Folder, Calendar, Clock, CheckSquare, 
   Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
   Search, Share2, FileDown, Eye, HelpCircle, Check, X,
-  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu
+  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus
 } from 'lucide-react';
 
+import LeadsTab from '../components/dashboard/LeadsTab.jsx';
 import TasksTab from '../components/dashboard/TasksTab.jsx';
 import FreelancersTab from '../components/dashboard/FreelancersTab.jsx';
 import ArtistCurationTab from '../components/dashboard/ArtistCurationTab.jsx';
@@ -126,7 +127,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const isVideoEditor = userRole === 'ops_video_editor';
   
   // Tab states
-  const [activeTab, setActiveTab] = useState('tasks');
+  const [activeTab, setActiveTab] = useState('leads');
+  const [leadRemindersCount, setLeadRemindersCount] = useState(0);
+  const [leadRemindersDismissed, setLeadRemindersDismissed] = useState(false);
   
   // Data states
   const [tasks, setTasks] = useState([]);
@@ -170,6 +173,25 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // done, rather than pushed every morning regardless.
   const [tabCounts, setTabCounts] = useState({});
 
+  const fetchLeadReminders = async () => {
+    try {
+      const res = await authFetch('/api/leads/reminders');
+      if (!res.ok) return;
+      const data = await res.json();
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      const isAfter12PM = new Date().getHours() >= 12;
+      const activeReminders = (data.leads || []).filter(l => {
+        if (!l.follow_up_date) return false;
+        if (l.follow_up_date < todayStr) return true;
+        if (l.follow_up_date === todayStr) return isAfter12PM;
+        return false;
+      });
+      setLeadRemindersCount(activeReminders.length);
+    } catch {
+      // Affordance
+    }
+  };
+
   const fetchTabCounts = async () => {
     try {
       const res = await authFetch('/api/notifications/tabs');
@@ -209,6 +231,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const handleTabClick = (tabName) => {
     setActiveTab(tabName);
+    if (tabName === 'leads') {
+      setLeadRemindersDismissed(true);
+    }
     if (tabName === 'scripts') {
       if (selectedScriptClient) fetchMarketingData(selectedScriptClient.id);
       const pendingScript = (marketingScripts || []).find(s => s.has_unseen_changes === 1 || s.content_status === 'Pending Client Approval');
@@ -278,12 +303,16 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // that changes server-side. Opening a badged tab marks it seen first — that
   // call returns the fresh counts, so the plain fetch is only for the others.
   useEffect(() => {
+    fetchLeadReminders();
     if (BADGED_TABS.includes(activeTab)) {
       markTabSeen(activeTab);
     } else {
       fetchTabCounts();
     }
-    const t = setInterval(fetchTabCounts, 120000);
+    const t = setInterval(() => {
+      fetchTabCounts();
+      fetchLeadReminders();
+    }, 120000);
     return () => { clearInterval(t); };
   }, [activeTab]);
 
@@ -1222,10 +1251,18 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
       {/* Tabs Menu */}
       <div className="dashboard-tabs">
-        {/* 1. Kanban Tasks */}
-        <button onClick={() => handleTabClick('tasks')} className={`btn ${activeTab === 'tasks' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.tasks ? `${tabCounts.tasks} task(s) overdue` : undefined}>
-          <Layers size={16} /> Kanban Tasks
-          <TabBadge count={getTabBadgeCount('tasks', tabCounts.tasks)} />
+        {/* 1. Leads */}
+        <button 
+          onClick={() => {
+            handleTabClick('leads');
+            setLeadRemindersDismissed(true);
+          }} 
+          className={`btn ${activeTab === 'leads' ? 'btn-primary' : 'btn-secondary'}`} 
+          style={{ position: 'relative', overflow: 'visible' }} 
+          title={!leadRemindersDismissed && leadRemindersCount ? `${leadRemindersCount} lead follow-up reminder(s)` : undefined}
+        >
+          <UserPlus size={16} /> Leads
+          <TabBadge count={leadRemindersDismissed ? 0 : leadRemindersCount} />
         </button>
 
         {/* 2. Client Workspace */}
@@ -1333,7 +1370,17 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           />
         )}
 
-        {(activeTab === 'tasks' || activeTab === 'calendar') && (
+        {activeTab === 'leads' && (
+          <LeadsTab
+            auth={auth}
+            showToast={showToast}
+            onRemindersCountChange={setLeadRemindersCount}
+            remindersDismissed={leadRemindersDismissed}
+            onDismissReminders={() => setLeadRemindersDismissed(true)}
+          />
+        )}
+
+        {activeTab === 'calendar' && (
           <TasksTab
             auth={auth}
             activeTab={activeTab}

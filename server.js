@@ -34,6 +34,7 @@ import authRoutes from './src/routes/auth.js';
 import clientRoutes from './src/routes/clients.js';
 import freelancerRoutes from './src/routes/freelancers.js';
 import taskRoutes from './src/routes/tasks.js';
+import leadRoutes from './src/routes/leads.js';
 import csvExportRoutes from './src/routes/csvExport.js';
 import marketingRoutes from './src/routes/marketing.js';
 import portalRoutes from './src/routes/portal.js';
@@ -225,6 +226,7 @@ app.use('/api/clients', csvExportRoutes);
 app.use('/api/clients', marketingRoutes);
 app.use('/api/freelancers', freelancerRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/leads', leadRoutes);
 
 // Portal (no auth middleware — uses token-based auth)
 app.use('/api/portal', portalRoutes);
