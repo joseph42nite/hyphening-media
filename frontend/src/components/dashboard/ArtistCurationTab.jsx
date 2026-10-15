@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Copy, Edit3, Check, RotateCcw, MessageSquare } from 'lucide-react';
+import { Plus, Search, Copy, Edit3, Check, RotateCcw, MessageSquare, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function ArtistCurationTab({
@@ -360,255 +360,120 @@ export default function ArtistCurationTab({
     }
   };
 
+  // Gig Summary Metrics
+  const nonCancelledGigs = (gigs || []).filter(g => g.status !== 'Cancelled');
+  const gigsDoneCount = nonCancelledGigs.length;
+  const paidGigs = (gigs || []).filter(g => g.status === 'Paid');
+  const paidGigsCount = paidGigs.length;
+  const leftForPaymentGigs = nonCancelledGigs.filter(g => g.status !== 'Paid');
+  const leftForPaymentCount = leftForPaymentGigs.length;
+
+  const totalPaidAmount = (gigs || []).reduce((acc, g) => {
+    if (g.status === 'Paid') {
+      return acc + (Number(g.fee_inr) || 0);
+    }
+    return acc + (Number(g.advance_paid) || 0);
+  }, 0);
+
+  const totalPendingAmount = leftForPaymentGigs.reduce((acc, g) => {
+    const fee = Number(g.fee_inr) || 0;
+    const advance = Number(g.advance_paid) || 0;
+    return acc + Math.max(0, fee - advance);
+  }, 0);
+
   if (!isAdmin && !isSMM) return null;
 
   return (
     <div style={{ textAlign: 'left' }}>
       
-      {/* Quick Artist Message Templates Strip */}
-      <div
-        className="glass-card glass-premium"
-        style={{
-          marginBottom: '24px',
-          padding: '16px 20px',
-          border: '1px solid rgba(223, 231, 224, 0.12)',
-          borderRadius: '12px',
-          background: 'rgba(12, 16, 24, 0.85)',
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.4)'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-          <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', letterSpacing: '0.01em' }}>
-            <MessageSquare size={18} style={{ color: 'var(--accent)' }} /> Quick Artist Message Templates
-          </h4>
-          <span style={{ fontSize: '0.68rem', color: 'rgba(223, 231, 224, 0.75)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(223, 231, 224, 0.05)', padding: '3px 9px', borderRadius: '4px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
-            1-CLICK COPY & EDIT
-          </span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
-          {/* Onboarding Template */}
-          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#7dd3fc' }}>
-                1. Onboarding Message
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  onClick={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
-                  className="btn btn-primary"
-                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
-                >
-                  <Copy size={12} /> Copy
-                </button>
-                <button
-                  onClick={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
-                >
-                  <Edit3 size={12} /> Edit
-                </button>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
-              {onboardingMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
+      {/* Gig Summary Metric Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        
+        {/* 1. Gigs Done Card */}
+        <div
+          className="glass-card glass-premium"
+          style={{
+            background: 'var(--bg-card, rgba(12, 16, 24, 0.85))',
+            padding: '18px 20px',
+            borderRadius: '14px',
+            border: '1px solid rgba(223, 231, 224, 0.12)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+            backdropFilter: 'blur(20px)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Gigs Done
+            </span>
+            <div style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '6px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Calendar size={18} />
             </div>
           </div>
-
-          {/* Confirmation Template */}
-          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#4ade80' }}>
-                2. Confirmation Message
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  onClick={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
-                  className="btn btn-primary"
-                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
-                >
-                  <Copy size={12} /> Copy
-                </button>
-                <button
-                  onClick={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
-                >
-                  <Edit3 size={12} /> Edit
-                </button>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
-              {confirmationMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
-            </div>
+          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)' }}>
+            {gigsDoneCount}
           </div>
-
-          {/* Venue Confirmation Template */}
-          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px' }}>
-                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', whiteSpace: 'nowrap' }}>
-                  3. Venue Message
-                </span>
-                {venues && venues.length > 0 && (
-                  <select
-                    className="form-control"
-                    value={currentVenue ? currentVenue.id : ''}
-                    onChange={e => setSelectedVenueMessageId(e.target.value)}
-                    style={{
-                      fontSize: '0.74rem',
-                      padding: '2px 8px',
-                      height: '26px',
-                      background: 'rgba(5, 7, 10, 0.8)',
-                      borderColor: 'rgba(223, 231, 224, 0.18)',
-                      color: 'var(--text-primary)',
-                      borderRadius: '6px',
-                      maxWidth: '190px'
-                    }}
-                    title="Select Venue"
-                  >
-                    {venues.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}{v.client_name ? ` (${v.client_name})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  disabled={!currentVenue}
-                  onClick={() => handleCopyTemplate(currentVenue?.gig_confirmed_message, `${currentVenue?.name || 'Venue'} Confirmation Message`)}
-                  className="btn btn-primary"
-                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
-                >
-                  <Copy size={12} /> Copy
-                </button>
-                <button
-                  disabled={!currentVenue}
-                  onClick={() => { setEditingMsgType('venue'); setTempMsgText(currentVenue?.gig_confirmed_message || ''); }}
-                  className="btn btn-secondary"
-                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
-                >
-                  <Edit3 size={12} /> Edit
-                </button>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
-              {!venues || venues.length === 0 ? (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No venues available. Add an Artist Curation client in Clients tab.</span>
-              ) : currentVenue?.gig_confirmed_message ? (
-                currentVenue.gig_confirmed_message
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No custom message for {currentVenue?.name}. Click 'Edit' to enter your template.</span>
-              )}
-            </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '6px' }}>
+            Completed & active gigs
           </div>
         </div>
+
+        {/* 2. Left for Payment Card */}
+        <div
+          className="glass-card glass-premium"
+          style={{
+            background: 'var(--bg-card, rgba(12, 16, 24, 0.85))',
+            padding: '18px 20px',
+            borderRadius: '14px',
+            border: '1px solid rgba(223, 231, 224, 0.12)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+            backdropFilter: 'blur(20px)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Left for Payment
+            </span>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '6px', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={18} />
+            </div>
+          </div>
+          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: '#fbbf24', fontFamily: 'var(--font-heading)' }}>
+            {leftForPaymentCount}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '6px' }}>
+            ₹{totalPendingAmount.toLocaleString('en-IN')} pending balance
+          </div>
+        </div>
+
+        {/* 3. Paid Gigs Card */}
+        <div
+          className="glass-card glass-premium"
+          style={{
+            background: 'var(--bg-card, rgba(12, 16, 24, 0.85))',
+            padding: '18px 20px',
+            borderRadius: '14px',
+            border: '1px solid rgba(223, 231, 224, 0.12)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+            backdropFilter: 'blur(20px)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Paid Gigs
+            </span>
+            <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '6px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div style={{ fontSize: '1.9rem', fontWeight: 900, color: '#34d399', fontFamily: 'var(--font-heading)' }}>
+            {paidGigsCount}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '6px' }}>
+            ₹{totalPaidAmount.toLocaleString('en-IN')} disbursed
+          </div>
+        </div>
+
       </div>
-
-      {/* Edit Template Modal */}
-      {editingMsgType && (
-        <div className="modal-overlay" onClick={() => setEditingMsgType(null)}>
-          <div
-            className="modal-content glass-premium"
-            onClick={e => e.stopPropagation()}
-            style={{
-              maxWidth: '560px',
-              width: '92%',
-              padding: '24px',
-              background: 'rgba(10, 14, 20, 0.96)',
-              border: '1px solid rgba(223, 231, 224, 0.18)',
-              borderRadius: '14px',
-              boxShadow: '0 24px 64px rgba(0,0,0,0.85)',
-              backdropFilter: 'blur(32px)'
-            }}
-          >
-            <h3 style={{ margin: '0 0 14px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : editingMsgType === 'confirmation' ? 'General Confirmation Message' : `${currentVenue?.name || 'Venue'} Confirmation Message`} Template
-            </h3>
-            <div style={{ marginBottom: '18px' }}>
-              <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>
-                Template Text
-              </label>
-              <textarea
-                className="form-control"
-                rows={8}
-                placeholder="Type or paste your custom message template here..."
-                value={tempMsgText}
-                onChange={(e) => setTempMsgText(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  fontSize: '0.85rem',
-                  fontFamily: 'inherit',
-                  lineHeight: '1.5',
-                  background: 'rgba(5, 7, 10, 0.85)',
-                  border: '1px solid rgba(223, 231, 224, 0.18)',
-                  color: 'var(--text-primary)',
-                  borderRadius: '8px'
-                }}
-              />
-              {editingMsgType === 'venue' && (
-                <div style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  <strong>Supported variables:</strong> <code style={{ color: '#7dd3fc' }}>{'{{artist_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{gig_date}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{venue_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{address}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{map_link}}'}</code>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-              <button
-                onClick={() => handleClearTemplate(editingMsgType)}
-                className="btn btn-secondary"
-                style={{
-                  fontSize: '0.8rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  color: '#f87171',
-                  background: 'rgba(224, 35, 28, 0.1)',
-                  border: '1px solid rgba(224, 35, 28, 0.3)',
-                  borderRadius: '6px',
-                  padding: '6px 12px'
-                }}
-              >
-                Clear Text
-              </button>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => setEditingMsgType(null)}
-                  className="btn btn-secondary"
-                  style={{
-                    fontSize: '0.8rem',
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(223, 231, 224, 0.15)',
-                    color: 'var(--text-primary)',
-                    borderRadius: '6px',
-                    padding: '6px 14px'
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleSaveTemplate(editingMsgType)}
-                  className="btn btn-primary"
-                  style={{
-                    fontSize: '0.8rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    borderRadius: '6px',
-                    padding: '6px 16px',
-                    fontWeight: 700
-                  }}
-                >
-                  <Check size={14} /> Save Template
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Gig Status Tracker */}
       <div className="dashboard-toolbar curation-section-header">
@@ -908,6 +773,252 @@ export default function ArtistCurationTab({
 
               <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(artistsPage + 1)}>Next</button>
               <button className="btn" style={{ padding: '8px 14px', fontSize: '0.75rem', borderWidth: '1px', borderRadius: '6px' }} disabled={artistsPage >= Math.ceil(filteredArtists.length / artistsLimit)} onClick={() => setArtistsPage(Math.ceil(filteredArtists.length / artistsLimit))}>Last</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Artist Message Templates Strip (Bottom of Page) */}
+      <div
+        className="glass-card glass-premium"
+        style={{
+          marginTop: '32px',
+          marginBottom: '24px',
+          padding: '16px 20px',
+          border: '1px solid rgba(223, 231, 224, 0.12)',
+          borderRadius: '12px',
+          background: 'rgba(12, 16, 24, 0.85)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.4)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', letterSpacing: '0.01em' }}>
+            <MessageSquare size={18} style={{ color: 'var(--accent)' }} /> Quick Artist Message Templates
+          </h4>
+          <span style={{ fontSize: '0.68rem', color: 'rgba(223, 231, 224, 0.75)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(223, 231, 224, 0.05)', padding: '3px 9px', borderRadius: '4px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
+            1-CLICK COPY & EDIT
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
+          {/* Onboarding Template */}
+          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#7dd3fc' }}>
+                1. Onboarding Message
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
+                  className="btn btn-primary"
+                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
+                >
+                  <Copy size={12} /> Copy
+                </button>
+                <button
+                  onClick={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
+                >
+                  <Edit3 size={12} /> Edit
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
+              {onboardingMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
+            </div>
+          </div>
+
+          {/* Confirmation Template */}
+          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.3)', color: '#4ade80' }}>
+                2. Confirmation Message
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
+                  className="btn btn-primary"
+                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
+                >
+                  <Copy size={12} /> Copy
+                </button>
+                <button
+                  onClick={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
+                >
+                  <Edit3 size={12} /> Edit
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
+              {confirmationMsg || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No template set yet. Click 'Edit' to enter your template.</span>}
+            </div>
+          </div>
+
+          {/* Venue Confirmation Template */}
+          <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px' }}>
+                <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', whiteSpace: 'nowrap' }}>
+                  3. Venue Message
+                </span>
+                {venues && venues.length > 0 && (
+                  <select
+                    className="form-control"
+                    value={currentVenue ? currentVenue.id : ''}
+                    onChange={e => setSelectedVenueMessageId(e.target.value)}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '2px 8px',
+                      height: '26px',
+                      background: 'rgba(5, 7, 10, 0.8)',
+                      borderColor: 'rgba(223, 231, 224, 0.18)',
+                      color: 'var(--text-primary)',
+                      borderRadius: '6px',
+                      maxWidth: '190px'
+                    }}
+                    title="Select Venue"
+                  >
+                    {venues.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}{v.client_name ? ` (${v.client_name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  disabled={!currentVenue}
+                  onClick={() => handleCopyTemplate(currentVenue?.gig_confirmed_message, `${currentVenue?.name || 'Venue'} Confirmation Message`)}
+                  className="btn btn-primary"
+                  style={{ padding: '4px 11px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', fontWeight: 600 }}
+                >
+                  <Copy size={12} /> Copy
+                </button>
+                <button
+                  disabled={!currentVenue}
+                  onClick={() => { setEditingMsgType('venue'); setTempMsgText(currentVenue?.gig_confirmed_message || ''); }}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(223, 231, 224, 0.15)', color: 'var(--text-primary)' }}
+                >
+                  <Edit3 size={12} /> Edit
+                </button>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(223, 231, 224, 0.9)', whiteSpace: 'pre-wrap', maxHeight: '72px', overflowY: 'auto', background: 'rgba(5, 7, 10, 0.75)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(223, 231, 224, 0.08)', fontFamily: 'inherit', lineHeight: '1.45' }}>
+              {!venues || venues.length === 0 ? (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No venues available. Add an Artist Curation client in Clients tab.</span>
+              ) : currentVenue?.gig_confirmed_message ? (
+                currentVenue.gig_confirmed_message
+              ) : (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No custom message for {currentVenue?.name}. Click 'Edit' to enter your template.</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Template Modal */}
+      {editingMsgType && (
+        <div className="modal-overlay" onClick={() => setEditingMsgType(null)}>
+          <div
+            className="modal-content glass-premium"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '560px',
+              width: '92%',
+              padding: '24px',
+              background: 'rgba(10, 14, 20, 0.96)',
+              border: '1px solid rgba(223, 231, 224, 0.18)',
+              borderRadius: '14px',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.85)',
+              backdropFilter: 'blur(32px)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 14px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : editingMsgType === 'confirmation' ? 'General Confirmation Message' : `${currentVenue?.name || 'Venue'} Confirmation Message`} Template
+            </h3>
+            <div style={{ marginBottom: '18px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>
+                Template Text
+              </label>
+              <textarea
+                className="form-control"
+                rows={8}
+                placeholder="Type or paste your custom message template here..."
+                value={tempMsgText}
+                onChange={(e) => setTempMsgText(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  fontSize: '0.85rem',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.5',
+                  background: 'rgba(5, 7, 10, 0.85)',
+                  border: '1px solid rgba(223, 231, 224, 0.18)',
+                  color: 'var(--text-primary)',
+                  borderRadius: '8px'
+                }}
+              />
+              {editingMsgType === 'venue' && (
+                <div style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <strong>Supported variables:</strong> <code style={{ color: '#7dd3fc' }}>{'{{artist_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{gig_date}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{venue_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{address}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{map_link}}'}</code>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <button
+                onClick={() => handleClearTemplate(editingMsgType)}
+                className="btn btn-secondary"
+                style={{
+                  fontSize: '0.8rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: '#f87171',
+                  background: 'rgba(224, 35, 28, 0.1)',
+                  border: '1px solid rgba(224, 35, 28, 0.3)',
+                  borderRadius: '6px',
+                  padding: '6px 12px'
+                }}
+              >
+                Clear Text
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setEditingMsgType(null)}
+                  className="btn btn-secondary"
+                  style={{
+                    fontSize: '0.8rem',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(223, 231, 224, 0.15)',
+                    color: 'var(--text-primary)',
+                    borderRadius: '6px',
+                    padding: '6px 14px'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSaveTemplate(editingMsgType)}
+                  className="btn btn-primary"
+                  style={{
+                    fontSize: '0.8rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderRadius: '6px',
+                    padding: '6px 16px',
+                    fontWeight: 700
+                  }}
+                >
+                  <Check size={14} /> Save Template
+                </button>
+              </div>
             </div>
           </div>
         </div>
