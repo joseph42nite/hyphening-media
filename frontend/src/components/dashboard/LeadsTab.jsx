@@ -59,6 +59,7 @@ export default function LeadsTab({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dueFilter, setDueFilter] = useState('all');
+  const [industryFilter, setIndustryFilter] = useState('all');
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -72,7 +73,8 @@ export default function LeadsTab({
     website: '',
     notes: '',
     follow_up_date: '',
-    status: 'New'
+    status: 'New',
+    industry: ''
   });
 
   // Sound toggle state (defaults to on, persisted in localStorage)
@@ -88,6 +90,7 @@ export default function LeadsTab({
     try {
       let url = `${API_BASE}/api/leads?`;
       if (statusFilter !== 'all') url += `status=${encodeURIComponent(statusFilter)}&`;
+      if (industryFilter !== 'all') url += `industry=${encodeURIComponent(industryFilter)}&`;
       if (search.trim()) url += `q=${encodeURIComponent(search.trim())}&`;
       if (dueFilter !== 'all') url += `due=${encodeURIComponent(dueFilter)}&`;
 
@@ -104,7 +107,7 @@ export default function LeadsTab({
 
   useEffect(() => {
     fetchLeads();
-  }, [statusFilter, dueFilter]);
+  }, [statusFilter, dueFilter, industryFilter]);
 
   // Debounced search
   useEffect(() => {
@@ -168,7 +171,8 @@ export default function LeadsTab({
       website: '',
       notes: '',
       follow_up_date: '',
-      status: 'New'
+      status: 'New',
+      industry: ''
     });
     setShowModal(true);
   };
@@ -184,7 +188,8 @@ export default function LeadsTab({
       website: lead.website || '',
       notes: lead.notes || '',
       follow_up_date: lead.follow_up_date || '',
-      status: lead.status || 'New'
+      status: lead.status || 'New',
+      industry: lead.industry || ''
     });
     setShowModal(true);
   };
@@ -409,6 +414,20 @@ export default function LeadsTab({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Industry:</span>
+          <select
+            className="form-control"
+            value={industryFilter}
+            onChange={e => setIndustryFilter(e.target.value)}
+            style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem' }}
+          >
+            <option value="all">All Industries</option>
+            <option value="FnB">🍽️ FnB</option>
+            <option value="Healthcare">🏥 Healthcare</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Follow-up:</span>
           <select
             className="form-control"
@@ -422,9 +441,9 @@ export default function LeadsTab({
           </select>
         </div>
 
-        {(search || statusFilter !== 'all' || dueFilter !== 'all') && (
+        {(search || statusFilter !== 'all' || dueFilter !== 'all' || industryFilter !== 'all') && (
           <button
-            onClick={() => { setSearch(''); setStatusFilter('all'); setDueFilter('all'); }}
+            onClick={() => { setSearch(''); setStatusFilter('all'); setDueFilter('all'); setIndustryFilter('all'); }}
             className="btn btn-secondary"
             style={{ padding: '6px 12px', fontSize: '0.78rem' }}
           >
@@ -440,6 +459,7 @@ export default function LeadsTab({
             <tr>
               <th>Client Name</th>
               <th>Company Name</th>
+              <th>Industry</th>
               <th>Location</th>
               <th>Phone (Click to Call)</th>
               <th>Email</th>
@@ -453,13 +473,13 @@ export default function LeadsTab({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="10" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                <td colSpan="11" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
                   Loading leads...
                 </td>
               </tr>
             ) : leads.length === 0 ? (
               <tr>
-                <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
                   No leads found. Click "+ Add Lead" to record a new client inquiry.
                 </td>
               </tr>
@@ -484,6 +504,49 @@ export default function LeadsTab({
                     {/* Company Name */}
                     <td style={{ fontWeight: 600 }}>
                       {lead.company_name || <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                    </td>
+
+                    {/* Industry */}
+                    <td>
+                      {lead.industry === 'FnB' ? (
+                        <span 
+                          className="badge" 
+                          style={{ 
+                            background: 'rgba(249, 115, 22, 0.14)', 
+                            color: '#fb923c', 
+                            border: '1px solid rgba(249, 115, 22, 0.35)', 
+                            fontWeight: 700, 
+                            fontSize: '0.74rem',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          🍽️ FnB
+                        </span>
+                      ) : lead.industry === 'Healthcare' ? (
+                        <span 
+                          className="badge" 
+                          style={{ 
+                            background: 'rgba(14, 165, 233, 0.14)', 
+                            color: '#38bdf8', 
+                            border: '1px solid rgba(14, 165, 233, 0.35)', 
+                            fontWeight: 700, 
+                            fontSize: '0.74rem',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          🏥 Healthcare
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                      )}
                     </td>
 
                     {/* Location */}
@@ -795,13 +858,16 @@ export default function LeadsTab({
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div className="form-group">
-                  <label className="form-label">Follow-Up Date (12:00 PM Reminder)</label>
-                  <input
-                    type="date"
+                  <label className="form-label">Industry / Sector</label>
+                  <select
                     className="form-control"
-                    value={formData.follow_up_date}
-                    onChange={e => setFormData({ ...formData, follow_up_date: e.target.value })}
-                  />
+                    value={formData.industry || ''}
+                    onChange={e => setFormData({ ...formData, industry: e.target.value })}
+                  >
+                    <option value="">-- Select Industry --</option>
+                    <option value="FnB">🍽️ FnB (Food & Beverage / Hospitality)</option>
+                    <option value="Healthcare">🏥 Healthcare (Clinics / Hospitals / Wellness)</option>
+                  </select>
                 </div>
 
                 <div className="form-group">
@@ -818,6 +884,18 @@ export default function LeadsTab({
                     <option value="Converted">Converted</option>
                     <option value="Lost">Lost</option>
                   </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px', marginBottom: '14px' }}>
+                <div className="form-group">
+                  <label className="form-label">Follow-Up Date (12:00 PM Reminder)</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={formData.follow_up_date}
+                    onChange={e => setFormData({ ...formData, follow_up_date: e.target.value })}
+                  />
                 </div>
               </div>
 

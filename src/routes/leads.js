@@ -18,7 +18,7 @@ router.use(authenticate);
  */
 router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
-    const { status, q, due } = req.query;
+    const { status, q, due, industry } = req.query;
 
     let query = 'SELECT * FROM leads WHERE 1=1';
     const params = [];
@@ -26,6 +26,11 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
     if (status && status !== 'all') {
       query += ' AND status = ?';
       params.push(status);
+    }
+
+    if (industry && industry !== 'all') {
+      query += ' AND industry = ?';
+      params.push(industry);
     }
 
     if (q && q.trim()) {
@@ -36,9 +41,10 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
         location LIKE ? OR 
         phone LIKE ? OR 
         email LIKE ? OR 
-        notes LIKE ?
+        notes LIKE ? OR
+        industry LIKE ?
       )`;
-      params.push(term, term, term, term, term, term);
+      params.push(term, term, term, term, term, term, term);
     }
 
     if (due === 'today') {
@@ -102,7 +108,8 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
       website,
       notes,
       follow_up_date,
-      status = 'New'
+      status = 'New',
+      industry
     } = req.body;
 
     if (!client_name || !client_name.trim()) {
@@ -111,8 +118,8 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
 
     const info = db.prepare(`
       INSERT INTO leads (
-        client_name, company_name, location, phone, email, website, notes, follow_up_date, status, created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        client_name, company_name, location, phone, email, website, notes, follow_up_date, status, industry, created_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `).run(
       client_name.trim(),
       company_name?.trim() || null,
@@ -123,6 +130,7 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
       notes?.trim() || null,
       follow_up_date?.trim() || null,
       status || 'New',
+      industry?.trim() || null,
       req.user.id
     );
 
@@ -134,7 +142,7 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
       action: 'create_lead',
       entityType: 'lead',
       entityId: info.lastInsertRowid,
-      diff: { client_name, company_name, follow_up_date },
+      diff: { client_name, company_name, follow_up_date, industry },
       ip: req.ip,
     });
 
@@ -166,7 +174,8 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_e
       website,
       notes,
       follow_up_date,
-      status
+      status,
+      industry
     } = req.body;
 
     const updated = {
@@ -179,6 +188,7 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_e
       notes: notes !== undefined ? (notes?.trim() || null) : existing.notes,
       follow_up_date: follow_up_date !== undefined ? (follow_up_date?.trim() || null) : existing.follow_up_date,
       status: status !== undefined ? status : existing.status,
+      industry: industry !== undefined ? (industry?.trim() || null) : existing.industry,
     };
 
     if (!updated.client_name) {
@@ -196,6 +206,7 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_e
         notes = ?,
         follow_up_date = ?,
         status = ?,
+        industry = ?,
         updated_at = datetime('now')
       WHERE id = ?
     `).run(
@@ -208,6 +219,7 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_e
       updated.notes,
       updated.follow_up_date,
       updated.status,
+      updated.industry,
       id
     );
 
