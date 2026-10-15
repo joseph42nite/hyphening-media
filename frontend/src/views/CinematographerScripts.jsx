@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Search } from 'lucide-react';
-import { API_BASE } from '../api.js';
+import { API_BASE, authFetch } from '../api.js';
 import logoImg from '../assets/logo.png';
 
 const formatMonthLabel = (m) => {
@@ -25,17 +25,7 @@ export default function CinematographerScripts({ auth, setAuth, showToast }) {
 
   const fetchScripts = async () => {
     try {
-      let res = await fetch(`${API_BASE}/api/clients/marketing/scripts-library`, { credentials: 'include' });
-      if (res.status === 401) {
-        const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
-        if (!refreshRes.ok) {
-          localStorage.removeItem('user');
-          setAuth(null);
-          navigate('/login');
-          return;
-        }
-        res = await fetch(`${API_BASE}/api/clients/marketing/scripts-library`, { credentials: 'include' });
-      }
+      const res = await authFetch('/api/clients/marketing/scripts-library');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load scripts');
       setScripts(data.scripts || []);
@@ -48,6 +38,15 @@ export default function CinematographerScripts({ auth, setAuth, showToast }) {
 
   useEffect(() => {
     fetchScripts();
+
+    const es = new EventSource(`${API_BASE}/api/events`, { withCredentials: true });
+    es.addEventListener('script_updated', () => {
+      fetchScripts();
+    });
+
+    return () => {
+      es.close();
+    };
   }, []);
 
   const handleLogout = async () => {

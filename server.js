@@ -117,7 +117,26 @@ app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; },
 }));
 
-// 5. Global rate limiter (only applied to API endpoints)
+// 5. Disable caching for all API responses.
+//
+// Without this, browsers (especially mobile Safari and Chromium) silently
+// serve stale 200s from their HTTP cache for GET /api/* requests. That made
+// script edits appear not to save until a hard refresh, and portal logins
+// showed outdated content. `no-store` tells the browser to never cache, and
+// disabling ETag prevents Express from returning 304 Not Modified on JSON
+// responses whose bytes haven't changed between two rapid fetches.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  // Disable ETag for API responses so Express never sends 304.
+  req.app.set('etag', false);
+  res.removeHeader('ETag');
+  next();
+});
+
+// 6. Global rate limiter (only applied to API endpoints)
 app.use('/api', globalLimiter);
 
 // 6. Request logging (dev only)

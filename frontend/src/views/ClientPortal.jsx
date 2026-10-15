@@ -1332,7 +1332,7 @@ export default function ClientPortal({ showToast }) {
 
     const intervalId = setInterval(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include', cache: 'no-store' });
         const data = await res.json();
         if (res.ok && data.leads) {
           setLandingClicks(data.landing_clicks || []);
@@ -1385,6 +1385,10 @@ export default function ClientPortal({ showToast }) {
       fetchData();
     });
 
+    es.addEventListener('script_updated', () => {
+      fetchData();
+    });
+
     return () => {
       es.close();
     };
@@ -1393,7 +1397,7 @@ export default function ClientPortal({ showToast }) {
   const checkPortalAuth = async (overrideMonth = selectedPortalMonth) => {
     try {
       const url = `${API_BASE}/api/portal/${token}/overview${overrideMonth ? `?month=${overrideMonth}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
       const data = await response.json();
       
       if (response.status === 401 && data.requires_pin) {
@@ -1459,20 +1463,20 @@ export default function ClientPortal({ showToast }) {
   const fetchData = async (type = clientType) => {
     try {
       if (type === 'artist_curation' || type === 'both') {
-        const resBookings = await fetch(`${API_BASE}/api/portal/${token}/bookings`, { credentials: 'include' });
+        const resBookings = await fetch(`${API_BASE}/api/portal/${token}/bookings`, { credentials: 'include', cache: 'no-store' });
         const dataBookings = await resBookings.json();
         if (resBookings.ok) setBookings(dataBookings.bookings || []);
       }
       if (type === 'marketing' || type === 'both') {
         // Content list
-        const resContent = await fetch(`${API_BASE}/api/portal/${token}/content`, { credentials: 'include' });
+        const resContent = await fetch(`${API_BASE}/api/portal/${token}/content`, { credentials: 'include', cache: 'no-store' });
         const dataContent = await resContent.json();
         if (resContent.ok) setContentList(dataContent.content || []);
 
         // Leads list
         setLeadsLoading(true);
         try {
-          const resLeads = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include' });
+          const resLeads = await fetch(`${API_BASE}/api/portal/${token}/leads`, { credentials: 'include', cache: 'no-store' });
           const dataLeads = await resLeads.json();
           if (resLeads.ok) {
             setLeads(dataLeads.leads || []);
@@ -1486,24 +1490,24 @@ export default function ClientPortal({ showToast }) {
         }
 
         // SEO monthly reports
-        const resSEO = await fetch(`${API_BASE}/api/portal/${token}/seo-reports`, { credentials: 'include' });
+        const resSEO = await fetch(`${API_BASE}/api/portal/${token}/seo-reports`, { credentials: 'include', cache: 'no-store' });
         const dataSEO = await resSEO.json();
         if (resSEO.ok) setSeoReports(dataSEO.reports || []);
 
         // Content plan pending approval
-        const resPlan = await fetch(`${API_BASE}/api/portal/${token}/content-plan`, { credentials: 'include' });
+        const resPlan = await fetch(`${API_BASE}/api/portal/${token}/content-plan`, { credentials: 'include', cache: 'no-store' });
         const dataPlan = await resPlan.json();
         if (resPlan.ok) setPendingPlan(dataPlan.content_plan || []);
 
         // Fetch monthly scripts (Content tab)
-        const resScripts = await fetch(`${API_BASE}/api/portal/${token}/scripts`, { credentials: 'include' });
+        const resScripts = await fetch(`${API_BASE}/api/portal/${token}/scripts`, { credentials: 'include', cache: 'no-store' });
         const dataScripts = await resScripts.json();
         if (resScripts.ok) {
           const loadedScripts = dataScripts.scripts || [];
           setScripts(loadedScripts);
           if (loadedScripts.length > 0) {
             const months = [...new Set(loadedScripts.map(s => s.month))].sort((a, b) => b.localeCompare(a));
-            setSelectedMonth(prev => prev || months[0] || '');
+            setSelectedMonth(prev => (prev && months.includes(prev) ? prev : (months[0] || '')));
           }
         }
 
@@ -1882,7 +1886,7 @@ export default function ClientPortal({ showToast }) {
   const fetchIntegrations = async () => {
     try {
       setIntegrationsLoading(true);
-      const res = await fetch(`${API_BASE}/api/portal/${token}/integrations/status`, { credentials: 'include' });
+      const res = await fetch(`${API_BASE}/api/portal/${token}/integrations/status`, { credentials: 'include', cache: 'no-store' });
       const data = await res.json();
       if (res.ok && data.integrations) {
         setIntegrations(data.integrations);
@@ -1897,7 +1901,7 @@ export default function ClientPortal({ showToast }) {
   const fetchComments = async () => {
     try {
       setCommentsLoading(true);
-      const res = await fetch(`${API_BASE}/api/portal/${token}/comments`, { credentials: 'include' });
+      const res = await fetch(`${API_BASE}/api/portal/${token}/comments`, { credentials: 'include', cache: 'no-store' });
       const data = await res.json();
       if (res.ok && data.comments) {
         setComments(data.comments);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { API_BASE } from '../../api.js';
+import { API_BASE, authFetch } from '../../api.js';
 
 export default function ScriptTrackerTab({
   auth,
@@ -34,11 +34,10 @@ export default function ScriptTrackerTab({
     const method = editingScript ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(`${API_BASE}${url}`, {
+      const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(scriptFormData),
-        credentials: 'include'
+        body: JSON.stringify(scriptFormData)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save script');
@@ -68,9 +67,8 @@ export default function ScriptTrackerTab({
     if (!window.confirm('Are you sure you want to delete this script?')) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const res = await authFetch(`/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}`, {
+        method: 'DELETE'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete script');
@@ -86,11 +84,10 @@ export default function ScriptTrackerTab({
   const handleStatusChange = async (scriptId, newStatus) => {
     if (!selectedScriptClient) return;
     try {
-      const res = await fetch(`${API_BASE}/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}/status`, {
+      const res = await authFetch(`/api/clients/${selectedScriptClient.id}/marketing/scripts/${scriptId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-        credentials: 'include'
+        body: JSON.stringify({ status: newStatus })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update status');
@@ -106,11 +103,10 @@ export default function ScriptTrackerTab({
   const handleMarkScriptSeen = async (scriptId = null) => {
     if (!selectedScriptClient) return;
     try {
-      await fetch(`${API_BASE}/api/clients/${selectedScriptClient.id}/marketing/scripts/mark-seen`, {
+      await authFetch(`/api/clients/${selectedScriptClient.id}/marketing/scripts/mark-seen`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId }),
-        credentials: 'include'
+        body: JSON.stringify({ scriptId })
       });
       fetchMarketingData(selectedScriptClient.id);
       if (fetchTabCounts) fetchTabCounts();

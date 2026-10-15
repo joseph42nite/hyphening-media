@@ -956,6 +956,7 @@ router.post('/:token/content-plan/script/:scriptId/approve', portalAuth, (req, r
 
     import('../../server.js').then(({ broadcastEvent }) => {
       broadcastEvent('content_approved', { client_id: req.portalClient.id, script_id: req.params.scriptId });
+      broadcastEvent('script_updated', { client_id: req.portalClient.id, script_id: parseInt(req.params.scriptId) });
     }).catch(e => console.error('[SSE] Broadcast error:', e));
 
     res.json({ message: 'Script approved', status: 'Client Approved' });
@@ -1018,6 +1019,7 @@ router.post('/:token/content-plan/script/:scriptId/reject', portalAuth, (req, re
     import('../../server.js').then(({ broadcastEvent }) => {
       broadcastEvent('client_feedback', { client_id: req.portalClient.id, message: `Revision requested on script "${script.title}": ${comment}` });
       broadcastEvent('task_updated', { title: script.title, status: 'todo' });
+      broadcastEvent('script_updated', { client_id: req.portalClient.id, script_id: parseInt(req.params.scriptId) });
     }).catch(e => console.error('[SSE] Broadcast error:', e));
 
     res.json({ message: 'Changes requested', status: 'Client Rejected' });

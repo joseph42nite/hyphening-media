@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE } from '../api.js';
+import { API_BASE, authFetch } from '../api.js';
 import logoImg from '../assets/logo.png';
 import { 
   Users, Folder, Calendar, Clock, CheckSquare, 
@@ -23,8 +23,6 @@ import SeoMonitorTab from '../components/dashboard/SeoMonitorTab.jsx';
 import AdsMonitorTab from '../components/dashboard/AdsMonitorTab.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from '../components/dashboard/contentFormHelper.js';
 
-let isRefreshing = false;
-let refreshPromise = null;
 
 /** Tabs the server keeps a count for — mirrors BADGED_TABS in tabNotifications.js. */
 const BADGED_TABS = ['seo', 'ads', 'scripts', 'tasks', 'blog'];
@@ -174,7 +172,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const fetchTabCounts = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/notifications/tabs`, { credentials: 'include' });
+      const res = await authFetch('/api/notifications/tabs');
       if (!res.ok) return;
       const data = await res.json();
       setTabCounts(data.tabs || {});
@@ -198,9 +196,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (!BADGED_TABS.includes(tabName)) return;
     setTabCounts(prev => ({ ...prev, [tabName]: 0 }));
     try {
-      const res = await fetch(`${API_BASE}/api/notifications/tabs/${tabName}/seen`, {
-        method: 'POST',
-        credentials: 'include'
+      const res = await authFetch(`/api/notifications/tabs/${tabName}/seen`, {
+        method: 'POST'
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -262,6 +259,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const selectedClientForReportsRef = useRef(selectedClientForReports);
   selectedClientForReportsRef.current = selectedClientForReports;
 
+  const selectedScriptClientRef = useRef(selectedScriptClient);
+  selectedScriptClientRef.current = selectedScriptClient;
+
   const selectedChatClientRef = useRef(selectedChatClient);
   selectedChatClientRef.current = selectedChatClient;
 
@@ -314,46 +314,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       });
     }
   }, [selectedChatClient, activeTab, clients]);
-
-  // Auto-refresh fetch wrapper: handles expired JWT tokens transparently
-  const authFetch = async (url, options = {}) => {
-    let res = await fetch(`${API_BASE}${url}`, { ...options, credentials: 'include' });
-    if (res.status === 401) {
-      if (!isRefreshing) {
-        isRefreshing = true;
-        refreshPromise = fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
-          .then(async (refreshRes) => {
-            isRefreshing = false;
-            refreshPromise = null;
-            if (refreshRes.ok) {
-              return true;
-            } else {
-              localStorage.removeItem('user');
-              setAuth(null);
-              navigate('/login');
-              return false;
-            }
-          })
-          .catch(() => {
-            isRefreshing = false;
-            refreshPromise = null;
-            localStorage.removeItem('user');
-            setAuth(null);
-            navigate('/login');
-            return false;
-          });
-      }
-
-      const success = await refreshPromise;
-      if (success) {
-        // Retry the original request with the new cookie
-        res = await fetch(`${API_BASE}${url}`, { ...options, credentials: 'include' });
-      } else {
-        throw new Error('Session expired. Please log in again.');
-      }
-    }
-    return res;
-  };
 
 
   // Request Notification Permissions on load
@@ -489,6 +449,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         fetchMarketingData(selectedClientForReportsRef.current.id);
       }
       fetchCalendarMarketingContent();
+    });
+
+    es.addEventListener('script_updated', () => {
+      if (selectedScriptClientRef.current) {
+        fetchMarketingData(selectedScriptClientRef.current.id);
+      }
+      fetchTabCounts();
     });
 
     es.addEventListener('client_feedback', (e) => {
@@ -828,11 +795,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const method = editingTask ? 'PATCH' : 'POST';
 
     try {
-      const res = await fetch(`${API_BASE}${url}`, {
+      const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskFormData),
-        credentials: 'include'
+        body: JSON.stringify(taskFormData)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -892,11 +858,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/status`, {
+      const res = await authFetch(`/api/tasks/${taskId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-        credentials: 'include'
+        body: JSON.stringify({ status: newStatus })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -919,11 +884,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   const updateContentStatus = async (itemId, newStatus) => {
     try {
-      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/content/${itemId}`, {
+      const res = await authFetch(`/api/clients/${selectedClientForReports.id}/marketing/content/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-        credentials: 'include'
+        body: JSON.stringify({ status: newStatus })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -941,11 +905,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   // --- SOCIAL REVIEW QUEUE ---
   const handleReviewDecision = async (contentId, track) => {
     try {
-      const res = await fetch(`${API_BASE}/api/clients/marketing/review/${contentId}`, {
+      const res = await authFetch(`/api/clients/marketing/review/${contentId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_tracked: track ? 1 : 0 }),
-        credentials: 'include'
+        body: JSON.stringify({ is_tracked: track ? 1 : 0 })
       });
       if (!res.ok) throw new Error('Failed to submit decision');
       showToast(track ? 'Item added to performance tracker' : 'Item discarded', 'success');
@@ -997,11 +960,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     const bodyData = buildContentPayload(contentFormData);
 
     try {
-      const res = await fetch(`${API_BASE}${url}`, {
+      const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData),
-        credentials: 'include'
+        body: JSON.stringify(bodyData)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save content row');
@@ -1021,9 +983,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (!skipConfirm && !window.confirm('Are you sure you want to delete this content item? This action cannot be undone.')) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/content/${contentId}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const res = await authFetch(`/api/clients/${selectedClientForReports.id}/marketing/content/${contentId}`, {
+        method: 'DELETE'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete content item');

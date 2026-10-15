@@ -1483,6 +1483,11 @@ router.post('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manag
     `).get(newScriptId);
 
     res.status(201).json(script);
+
+    // Notify connected clients (portal, cinematographer) that scripts changed.
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('script_updated', { client_id: parseInt(req.params.id), script_id: newScriptId });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
   } catch (err) {
     console.error('[MARKETING] Script create error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -1541,6 +1546,11 @@ router.patch('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social_
     `).get(req.params.scriptId);
 
     res.json(updatedScript);
+
+    // Notify connected clients (portal, cinematographer) that scripts changed.
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('script_updated', { client_id: parseInt(req.params.id), script_id: parseInt(req.params.scriptId) });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
   } catch (err) {
     console.error('[MARKETING] Script update error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -1570,6 +1580,11 @@ router.delete('/:id/marketing/scripts/:scriptId', authorize('admin', 'ops_social
     });
 
     res.json({ message: 'Script deleted successfully' });
+
+    // Notify connected clients (portal, cinematographer) that scripts changed.
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('script_updated', { client_id: parseInt(req.params.id), script_id: parseInt(req.params.scriptId) });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
   } catch (err) {
     console.error('[MARKETING] Script delete error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -1631,6 +1646,11 @@ router.put('/:id/marketing/scripts/:scriptId/status', authorize('admin', 'ops_so
     });
 
     res.json({ success: true, status, relation_id: relation.id });
+
+    // Notify connected clients (portal, cinematographer) that scripts changed.
+    import('../../server.js').then(({ broadcastEvent }) => {
+      broadcastEvent('script_updated', { client_id: parseInt(req.params.id), script_id: parseInt(req.params.scriptId) });
+    }).catch(e => console.error('[SSE] Broadcast error:', e));
   } catch (err) {
     console.error('[MARKETING] Script status update error:', err);
     res.status(500).json({ error: 'Internal server error' });
