@@ -127,7 +127,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const isVideoEditor = userRole === 'ops_video_editor';
   
   // Tab states
-  const [activeTab, setActiveTab] = useState('leads');
+  const [activeTab, setActiveTab] = useState('calendar');
   const [leadRemindersCount, setLeadRemindersCount] = useState(0);
   const [leadRemindersDismissed, setLeadRemindersDismissed] = useState(false);
   
@@ -1251,18 +1251,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
       {/* Tabs Menu */}
       <div className="dashboard-tabs">
-        {/* 1. Leads */}
-        <button 
-          onClick={() => {
-            handleTabClick('leads');
-            setLeadRemindersDismissed(true);
-          }} 
-          className={`btn ${activeTab === 'leads' ? 'btn-primary' : 'btn-secondary'}`} 
-          style={{ position: 'relative', overflow: 'visible' }} 
-          title={!leadRemindersDismissed && leadRemindersCount ? `${leadRemindersCount} lead follow-up reminder(s)` : undefined}
-        >
-          <UserPlus size={16} /> Leads
-          <TabBadge count={leadRemindersDismissed ? 0 : leadRemindersCount} />
+        {/* 1. Calendar */}
+        <button onClick={() => handleTabClick('calendar')} className={`btn ${activeTab === 'calendar' ? 'btn-primary' : 'btn-secondary'}`}>
+          <Calendar size={16} /> Calendar
         </button>
 
         {/* 2. Client Workspace */}
@@ -1306,17 +1297,26 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
-        {/* 5. Calendar */}
-        <button onClick={() => handleTabClick('calendar')} className={`btn ${activeTab === 'calendar' ? 'btn-primary' : 'btn-secondary'}`}>
-          <Calendar size={16} /> Calendar
-        </button>
-
-        {/* 6. Artist Curation */}
+        {/* 5. Artist Curation */}
         {(isAdmin || isSMM) && (
           <button onClick={() => handleTabClick('curation')} className={`btn ${activeTab === 'curation' ? 'btn-primary' : 'btn-secondary'}`}>
             <Calendar size={16} /> Artist Curation
           </button>
         )}
+
+        {/* 6. Leads */}
+        <button 
+          onClick={() => {
+            handleTabClick('leads');
+            setLeadRemindersDismissed(true);
+          }} 
+          className={`btn ${activeTab === 'leads' ? 'btn-primary' : 'btn-secondary'}`} 
+          style={{ position: 'relative', overflow: 'visible' }} 
+          title={!leadRemindersDismissed && leadRemindersCount ? `${leadRemindersCount} lead follow-up reminder(s)` : undefined}
+        >
+          <UserPlus size={16} /> Leads
+          <TabBadge count={leadRemindersDismissed ? 0 : leadRemindersCount} />
+        </button>
 
         {/* 7. Blogs */}
         {isAdmin && (
