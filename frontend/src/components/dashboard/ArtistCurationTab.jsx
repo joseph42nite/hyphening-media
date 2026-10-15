@@ -726,6 +726,98 @@ export default function ArtistCurationTab({
         totalItems={gigs.length}
       />
 
+      {/* Quick Artist Message Templates Strip (Above Artist Roster) */}
+      <div
+        className="glass-card glass-premium"
+        style={{
+          marginTop: '32px',
+          marginBottom: '28px',
+          padding: '16px 20px',
+          border: '1px solid rgba(223, 231, 224, 0.12)',
+          borderRadius: '12px',
+          background: 'rgba(12, 16, 24, 0.85)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.4)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', letterSpacing: '0.01em' }}>
+            <MessageSquare size={18} style={{ color: 'var(--accent)' }} /> Quick Artist Message Templates
+          </h4>
+          <span style={{ fontSize: '0.68rem', color: 'rgba(223, 231, 224, 0.75)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(223, 231, 224, 0.05)', padding: '3px 9px', borderRadius: '4px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
+            1-CLICK COPY & EDIT
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
+          <MessageTemplateCard
+            badge="1. Onboarding Message"
+            badgeBg="rgba(56, 189, 248, 0.12)"
+            badgeBorder="rgba(56, 189, 248, 0.3)"
+            badgeColor="#7dd3fc"
+            text={onboardingMsg}
+            emptyText="No template set yet. Click 'Edit' to enter your template."
+            onCopy={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
+            onEdit={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
+          />
+
+          <MessageTemplateCard
+            badge="2. Confirmation Message"
+            badgeBg="rgba(34, 197, 94, 0.12)"
+            badgeBorder="rgba(34, 197, 94, 0.3)"
+            badgeColor="#4ade80"
+            text={confirmationMsg}
+            emptyText="No template set yet. Click 'Edit' to enter your template."
+            onCopy={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
+            onEdit={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
+          />
+
+          <MessageTemplateCard
+            badge="3. Venue Message"
+            badgeBg="rgba(245, 158, 11, 0.12)"
+            badgeBorder="rgba(245, 158, 11, 0.3)"
+            badgeColor="#fbbf24"
+            disabled={!currentVenue}
+            extraHeaderControls={
+              venues && venues.length > 0 ? (
+                <select
+                  className="form-control"
+                  value={currentVenue ? currentVenue.id : ''}
+                  onChange={e => setSelectedVenueMessageId(e.target.value)}
+                  style={{
+                    fontSize: '0.74rem',
+                    padding: '2px 8px',
+                    height: '26px',
+                    background: 'rgba(5, 7, 10, 0.8)',
+                    borderColor: 'rgba(223, 231, 224, 0.18)',
+                    color: 'var(--text-primary)',
+                    borderRadius: '6px',
+                    maxWidth: '190px'
+                  }}
+                  title="Select Venue"
+                >
+                  {venues.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}{v.client_name ? ` (${v.client_name})` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : null
+            }
+            text={
+              !venues || venues.length === 0 ? null : currentVenue?.gig_confirmed_message || null
+            }
+            emptyText={
+              !venues || venues.length === 0
+                ? 'No venues available. Add an Artist Curation client in Clients tab.'
+                : `No custom message for ${currentVenue?.name}. Click 'Edit' to enter your template.`
+            }
+            onCopy={() => handleCopyTemplate(currentVenue?.gig_confirmed_message, `${currentVenue?.name || 'Venue'} Confirmation Message`)}
+            onEdit={() => { setEditingMsgType('venue'); setTempMsgText(currentVenue?.gig_confirmed_message || ''); }}
+          />
+        </div>
+      </div>
+
       {/* Roster & Encrypted Details */}
       <div className="dashboard-toolbar curation-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
         <h3 style={{ margin: 0 }}>Artist Roster (Client Specific)</h3>
@@ -850,98 +942,6 @@ export default function ArtistCurationTab({
         setLimit={setArtistsLimit}
         totalItems={filteredArtists.length}
       />
-
-      {/* Quick Artist Message Templates Strip (Bottom of Page) */}
-      <div
-        className="glass-card glass-premium"
-        style={{
-          marginTop: '32px',
-          marginBottom: '24px',
-          padding: '16px 20px',
-          border: '1px solid rgba(223, 231, 224, 0.12)',
-          borderRadius: '12px',
-          background: 'rgba(12, 16, 24, 0.85)',
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.4)'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-          <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', letterSpacing: '0.01em' }}>
-            <MessageSquare size={18} style={{ color: 'var(--accent)' }} /> Quick Artist Message Templates
-          </h4>
-          <span style={{ fontSize: '0.68rem', color: 'rgba(223, 231, 224, 0.75)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(223, 231, 224, 0.05)', padding: '3px 9px', borderRadius: '4px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
-            1-CLICK COPY & EDIT
-          </span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
-          <MessageTemplateCard
-            badge="1. Onboarding Message"
-            badgeBg="rgba(56, 189, 248, 0.12)"
-            badgeBorder="rgba(56, 189, 248, 0.3)"
-            badgeColor="#7dd3fc"
-            text={onboardingMsg}
-            emptyText="No template set yet. Click 'Edit' to enter your template."
-            onCopy={() => handleCopyTemplate(onboardingMsg, 'Onboarding Message')}
-            onEdit={() => { setEditingMsgType('onboarding'); setTempMsgText(onboardingMsg); }}
-          />
-
-          <MessageTemplateCard
-            badge="2. Confirmation Message"
-            badgeBg="rgba(34, 197, 94, 0.12)"
-            badgeBorder="rgba(34, 197, 94, 0.3)"
-            badgeColor="#4ade80"
-            text={confirmationMsg}
-            emptyText="No template set yet. Click 'Edit' to enter your template."
-            onCopy={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
-            onEdit={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
-          />
-
-          <MessageTemplateCard
-            badge="3. Venue Message"
-            badgeBg="rgba(245, 158, 11, 0.12)"
-            badgeBorder="rgba(245, 158, 11, 0.3)"
-            badgeColor="#fbbf24"
-            disabled={!currentVenue}
-            extraHeaderControls={
-              venues && venues.length > 0 ? (
-                <select
-                  className="form-control"
-                  value={currentVenue ? currentVenue.id : ''}
-                  onChange={e => setSelectedVenueMessageId(e.target.value)}
-                  style={{
-                    fontSize: '0.74rem',
-                    padding: '2px 8px',
-                    height: '26px',
-                    background: 'rgba(5, 7, 10, 0.8)',
-                    borderColor: 'rgba(223, 231, 224, 0.18)',
-                    color: 'var(--text-primary)',
-                    borderRadius: '6px',
-                    maxWidth: '190px'
-                  }}
-                  title="Select Venue"
-                >
-                  {venues.map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}{v.client_name ? ` (${v.client_name})` : ''}
-                    </option>
-                  ))}
-                </select>
-              ) : null
-            }
-            text={
-              !venues || venues.length === 0 ? null : currentVenue?.gig_confirmed_message || null
-            }
-            emptyText={
-              !venues || venues.length === 0
-                ? 'No venues available. Add an Artist Curation client in Clients tab.'
-                : `No custom message for ${currentVenue?.name}. Click 'Edit' to enter your template.`
-            }
-            onCopy={() => handleCopyTemplate(currentVenue?.gig_confirmed_message, `${currentVenue?.name || 'Venue'} Confirmation Message`)}
-            onEdit={() => { setEditingMsgType('venue'); setTempMsgText(currentVenue?.gig_confirmed_message || ''); }}
-          />
-        </div>
-      </div>
 
       {/* Edit Template Modal */}
       {editingMsgType && (
