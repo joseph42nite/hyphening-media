@@ -5,6 +5,7 @@
 
 import jwt from 'jsonwebtoken';
 import db from '../../database.js';
+import { logAction } from '../services/auditLogger.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 
@@ -15,6 +16,14 @@ const CINEMATOGRAPHER_ALLOWED = new Set([
   'POST /api/auth/logout',
   'GET /api/clients/marketing/scripts-library',
 ]);
+
+// api_readonly accounts (external agents) may only list clients and read one
+// client. Anchored patterns, so sub-routes like /api/clients/:id/marketing/...
+// stay denied. Every allowed read and every denied attempt is audit-logged.
+const API_READONLY_ALLOWED = [
+  /^GET \/api\/clients\/?$/,
+  /^GET \/api\/clients\/(\d+)$/,
+];
 
 /**
  * Authenticate — verify access JWT from cookie, attach req.user
@@ -45,6 +54,19 @@ export function authenticate(req, res, next) {
 
     if (user.role === 'cinematographer' && !CINEMATOGRAPHER_ALLOWED.has(`${req.method} ${req.baseUrl}${req.path}`)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    if (user.role === 'api_readonly') {
+      const requestKey = `${req.method} ${req.baseUrl}${req.path}`;
+      const match = API_READONLY_ALLOWED.map(re => requestKey.match(re)).find(Boolean);
+      const audit = { actorId: user.id, actorEmail: user.email, ip: req.ip, diff: { request: requestKey } };
+
+      if (!match) {
+        logAction({ ...audit, action: 'denied', entityType: 'api_request' });
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+
+      logAction({ ...audit, action: 'read', entityType: 'client', entityId: match[1] ? parseInt(match[1]) : null });
     }
 
     next();

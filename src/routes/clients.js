@@ -19,7 +19,7 @@ router.use(authenticate);
  * GET /api/clients
  * List all clients. Admins and super_admins only.
  */
-router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
+router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor', 'api_readonly'), (req, res) => {
   try {
     const { client_type, is_active } = req.query;
     let query;
@@ -86,7 +86,7 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
  * GET /api/clients/:id
  * Get single client details.
  */
-router.get('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
+router.get('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_editor', 'api_readonly'), (req, res) => {
   try {
     const client = db.prepare(`
       SELECT c.*, p.name AS parent_name
