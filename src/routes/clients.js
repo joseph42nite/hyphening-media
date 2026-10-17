@@ -198,6 +198,9 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       // attributed to the wrong client with nothing in the report to show it.
       'gsc_property', 'ga4_property_id',
       'google_ads_customer_id', 'google_ads_login_customer_id', 'meta_ads_account_id'
+      // Pipeline kill switches (blog_enabled/seo_enabled/ads_enabled) are
+      // deliberately NOT in this generic allow-list — they go only through
+      // PATCH /:id/flags below, so every toggle hits one audited code path.
     ];
 
     const updates = {};
@@ -375,6 +378,57 @@ router.patch('/:id/portal', authorize('admin'), (req, res) => {
     res.json({ success: true, portal_enabled: !!portal_enabled });
   } catch (err) {
     console.error('[CLIENTS] Toggle portal error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PATCH /api/clients/:id/flags
+ * Set per-client publishing control flags (blog_enabled, seo_enabled,
+ * ads_enabled). Admin role only — these replace ad-hoc "pause/stop"
+ * instructions relayed through chat; no draft or monitor signal is
+ * sufficient to publish on its own, the relevant flag must also be on.
+ */
+router.patch('/:id/flags', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare('SELECT id, blog_enabled, seo_enabled, ads_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const flagFields = ['blog_enabled', 'seo_enabled', 'ads_enabled'];
+    const updates = {};
+    const diff = {};
+
+    for (const field of flagFields) {
+      if (req.body[field] !== undefined) {
+        const val = req.body[field] ? 1 : 0;
+        updates[field] = val;
+        diff[field] = { from: client[field], to: val };
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid flags to update' });
+    }
+
+    updates.updated_at = new Date().toISOString();
+    const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    const values = [...Object.values(updates), req.params.id];
+    db.prepare(`UPDATE crm_clients SET ${setClauses} WHERE id = ?`).run(...values);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_flags_toggle',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff,
+      ip: req.ip,
+    });
+
+    const updated = db.prepare('SELECT id, blog_enabled, seo_enabled, ads_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
+    res.json({ success: true, ...updated });
+  } catch (err) {
+    console.error('[CLIENTS] Toggle flags error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

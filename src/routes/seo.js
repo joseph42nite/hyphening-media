@@ -487,6 +487,9 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
 
     const client = db.prepare('SELECT * FROM crm_clients WHERE id = ?').get(clientId);
     if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.seo_enabled) {
+      return res.status(403).json({ error: 'seo_disabled', message: 'SEO monitoring is turned off for this client. Enable it in the client portal first.' });
+    }
     if (!client.website_url) return res.status(400).json({ error: 'Client website URL is not configured' });
 
     // Look up config
@@ -977,6 +980,13 @@ router.post('/:id/seo/competitors', (req, res) => {
 router.post('/:id/seo/competitors/:competitorId/audit/:agentType', (req, res) => {
   try {
     const agentType = req.params.agentType;
+
+    const client = db.prepare('SELECT id, seo_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.seo_enabled) {
+      return res.status(403).json({ error: 'seo_disabled', message: 'SEO monitoring is turned off for this client. Enable it in the client portal first.' });
+    }
+
     const competitor = db.prepare(
       'SELECT * FROM client_competitors WHERE id = ? AND client_id = ?'
     ).get(req.params.competitorId, req.params.id);

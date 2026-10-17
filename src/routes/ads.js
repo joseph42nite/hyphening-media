@@ -261,8 +261,11 @@ router.post('/:id/ads/trigger/:agentType', (req, res) => {
     const conf = db.prepare('SELECT * FROM ads_agent_config WHERE agent_type = ?').get(agentType);
     if (!conf) return res.status(400).json({ error: `Unknown ads agent: ${agentType}` });
 
-    const client = db.prepare('SELECT id, name FROM crm_clients WHERE id = ?').get(clientId);
+    const client = db.prepare('SELECT id, name, ads_enabled FROM crm_clients WHERE id = ?').get(clientId);
     if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.ads_enabled) {
+      return res.status(403).json({ error: 'ads_disabled', message: 'Ads execution is turned off for this client. Enable it in the client portal first.' });
+    }
 
     const built = buildFactPack(clientId, { month: req.body?.month || null });
     const blocked = blockReason(conf, built.available, built.gaps, platformsEverRun(clientId));

@@ -169,6 +169,22 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
     }
   };
 
+  const toggleFlag = async (client, field, enable) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${client.id}/flags`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: enable ? 1 : 0 }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to update flag');
+      showToast(`${field.replace('_enabled', '')} ${enable ? 'enabled' : 'disabled'} for ${client.name}`, 'success');
+      fetchClients();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const generatePortalToken = async (client) => {
     try {
       const res = await fetch(`${API_BASE}/api/clients/${client.id}/portal/token`, { method: 'POST', credentials: 'include' });
@@ -327,6 +343,29 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
         </div>
       </td>
       <td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {[
+            { field: 'blog_enabled', label: 'Blog' },
+            { field: 'seo_enabled', label: 'SEO' },
+            { field: 'ads_enabled', label: 'Ads' },
+          ].map(({ field, label }) => (
+            <div key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className={`badge badge-${client[field] ? 'success' : 'muted'}`} style={{ minWidth: '28px', textAlign: 'center' }}>
+                {label}
+              </span>
+              <button
+                onClick={() => toggleFlag(client, field, !client[field])}
+                className="btn btn-secondary"
+                style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+                title={`${client[field] ? 'Disable' : 'Enable'} ${label} for ${client.name}`}
+              >
+                {client[field] ? 'On' : 'Off'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </td>
+      <td>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => openClientModal(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
             Edit
@@ -385,13 +424,14 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
               <th>Contact Info</th>
               <th>Links</th>
               <th>Client Portal</th>
+              <th>Publishing</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {topLevelClients.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>No clients found</td>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>No clients found</td>
               </tr>
             ) : (
               topLevelClients.map(client => renderClientTree(client))

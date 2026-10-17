@@ -43,11 +43,17 @@ function rangeFor(months) {
  */
 export async function syncClient(clientId, { dryRun = false, monthsBack = 3, triggerSource = 'manual' } = {}) {
   const client = db.prepare(`
-    SELECT id, name, google_ads_customer_id, google_ads_login_customer_id
+    SELECT id, name, google_ads_customer_id, google_ads_login_customer_id, ads_enabled
     FROM crm_clients WHERE id = ?
   `).get(clientId);
 
   if (!client) return { ok: false, error: 'not_found', message: 'Client not found.' };
+  // Kill switch checked before any spend/API call, manual or scheduled alike —
+  // see decision 2026-10-17 (vault: Companies/Hyphening/Decisions/Per-client
+  // publishing flags.md). A draft or a schedule tick is never enough on its own.
+  if (!client.ads_enabled) {
+    return { ok: false, error: 'ads_disabled', message: 'Ads execution is turned off for this client. Enable it in the client portal first.' };
+  }
   if (!client.google_ads_customer_id) {
     return {
       ok: false,
@@ -265,7 +271,7 @@ export async function syncAllClients({ monthsBack = 3 } = {}) {
   const clients = db.prepare(`
     SELECT id, name FROM crm_clients
     WHERE client_type = 'marketing' AND google_ads_customer_id IS NOT NULL
-      AND TRIM(google_ads_customer_id) != ''
+      AND TRIM(google_ads_customer_id) != '' AND ads_enabled = 1
   `).all();
 
   const results = [];
