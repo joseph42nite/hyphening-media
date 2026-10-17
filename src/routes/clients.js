@@ -434,6 +434,30 @@ router.patch('/:id/flags', authorize('admin'), (req, res) => {
 });
 
 /**
+ * POST /api/clients/:id/blog/publish-check
+ * Gate for pushing blog content live on a client's own site/repo.
+ * Each client site is its own separate codebase, pushed/deployed manually
+ * (007's own CLI workflow) — there is no central CMS or auto-deploy here.
+ * This endpoint is the one code-level checkpoint, consistent with the
+ * seo_enabled/ads_enabled gates: it answers whether blog_enabled is on
+ * for the client, nothing more. Callers (manual step today, a per-client
+ * build script later) are expected to check this before publishing.
+ */
+router.post('/:id/blog/publish-check', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare('SELECT id, name, blog_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.blog_enabled) {
+      return res.status(403).json({ error: 'blog_disabled', message: 'Blog publishing is turned off for this client. Enable it in the client portal first.' });
+    }
+    res.json({ allowed: true });
+  } catch (err) {
+    console.error('[CLIENTS] Blog publish-check error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /api/clients/:id/portal/token
  * Generate a fresh secure UUID token for the client portal.
  */
