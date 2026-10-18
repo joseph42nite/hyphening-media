@@ -1286,15 +1286,16 @@ function handleCreateBlogPost(payload) {
 
   const result = db.prepare(`
     INSERT INTO blog_posts (
-      title, slug, excerpt, content, cover_image_url, author, category, tags,
+      title, slug, excerpt, content, cover_image_url, audio_url, author, category, tags,
       meta_title, meta_description, meta_keywords, internal_links, status, published_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payload.title,
     slug,
     payload.excerpt || null,
     payload.content,
     payload.cover_image_url || null,
+    payload.audio_url || null,
     payload.author || 'Hyphening Media',
     payload.category || 'General',
     payload.tags || null,
@@ -1331,7 +1332,7 @@ function handleUpdateBlogPost(payload) {
   if (!post) return { success: false, summary: 'Blog post not found. Provide blog_id or slug.' };
 
   const allowedFields = [
-    'title', 'excerpt', 'content', 'cover_image_url', 'author', 'category', 'tags',
+    'title', 'excerpt', 'content', 'cover_image_url', 'audio_url', 'author', 'category', 'tags',
     'meta_title', 'meta_description', 'meta_keywords', 'internal_links', 'status'
   ];
   const updates = {};

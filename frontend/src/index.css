@@ -3924,6 +3924,19 @@ html.dark-theme {
   display: block;
 }
 
+.blog-article-audio-wrap {
+  margin: 0 0 40px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(223, 231, 224, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.blog-article-audio {
+  width: 100%;
+  display: block;
+}
+
 /* Editorial Markdown Body */
 .blog-article-prose {
   font-size: 1.08rem;

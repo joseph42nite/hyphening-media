@@ -544,10 +544,19 @@ function BlogArticle() {
             </div>
           )}
 
+          {/* Narration (only when this post has an audio_url) */}
+          {post.audio_url && (
+            <div className="blog-article-audio-wrap">
+              <audio controls preload="none" className="blog-article-audio" src={post.audio_url}>
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          )}
+
           {/* Article Markdown Content Body */}
-          <div 
-            className="blog-article-prose" 
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }} 
+          <div
+            className="blog-article-prose"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
           />
 
           {/* Tags Section */}

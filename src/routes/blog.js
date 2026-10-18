@@ -155,7 +155,7 @@ router.get('/sitemap', (req, res) => {
 router.get('/admin/all', requireAdmin, (req, res) => {
   try {
     const posts = db.prepare(
-      'SELECT id, title, slug, excerpt, content, cover_image_url, author, category, tags, meta_title, meta_description, meta_keywords, internal_links, status, published_at, created_at, updated_at FROM blog_posts ORDER BY created_at DESC'
+      'SELECT id, title, slug, excerpt, content, cover_image_url, audio_url, author, category, tags, meta_title, meta_description, meta_keywords, internal_links, status, published_at, created_at, updated_at FROM blog_posts ORDER BY created_at DESC'
     ).all();
     res.json({ posts });
   } catch (err) {
@@ -218,7 +218,7 @@ router.get('/:slug', (req, res) => {
  */
 router.post('/', requireAdmin, (req, res) => {
   try {
-    const { title, excerpt, content, cover_image_url, author, category, tags,
+    const { title, excerpt, content, cover_image_url, audio_url, author, category, tags,
             meta_title, meta_description, meta_keywords, internal_links, status } = req.body;
 
     if (!title || !content) {
@@ -230,11 +230,11 @@ router.post('/', requireAdmin, (req, res) => {
     const publishedAt = postStatus === 'published' ? new Date().toISOString() : null;
 
     const result = db.prepare(`
-      INSERT INTO blog_posts (title, slug, excerpt, content, cover_image_url, author, category, tags,
+      INSERT INTO blog_posts (title, slug, excerpt, content, cover_image_url, audio_url, author, category, tags,
         meta_title, meta_description, meta_keywords, internal_links, status, published_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      title, slug, excerpt || null, content, cover_image_url || null,
+      title, slug, excerpt || null, content, cover_image_url || null, audio_url || null,
       author || 'Hyphening Media', category || 'General', tags || null,
       meta_title || null, meta_description || null, meta_keywords || null,
       JSON.stringify(internal_links || []), postStatus, publishedAt
@@ -259,7 +259,7 @@ router.patch('/:id', requireAdmin, (req, res) => {
     const post = db.prepare('SELECT * FROM blog_posts WHERE id = ?').get(req.params.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    const allowedFields = ['title', 'excerpt', 'content', 'cover_image_url', 'author', 'category', 'tags',
+    const allowedFields = ['title', 'excerpt', 'content', 'cover_image_url', 'audio_url', 'author', 'category', 'tags',
                            'meta_title', 'meta_description', 'meta_keywords', 'internal_links', 'status'];
     const updates = {};
 
