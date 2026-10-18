@@ -317,6 +317,15 @@ app.get('/api/audit-logs', (req, res) => {
 });
 
 // ============================================================
+// STATIC FILES — blog narration audio
+// ============================================================
+// Lives outside frontend/dist so `npm run build` (which wipes dist) never
+// takes it out. Referenced by blog_posts.audio_url, e.g. /audio/<file>.mp3.
+app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'),
+}));
+
+// ============================================================
 // STATIC FILES (Production — serve frontend build)
 // ============================================================
 
