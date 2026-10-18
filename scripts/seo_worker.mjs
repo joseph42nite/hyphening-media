@@ -1,21 +1,5 @@
 #!/usr/bin/env node
 /**
- * ============================================================================
- * NOT YET GO-LIVE. Mechanically complete and wired (webhook claim/post, --once,
- * .env loading) but blocked on one external prerequisite, re-verified 2026-10-11:
- *
- *   `claude plugin list` on this machine reports zero plugins installed, and
- *   no "seo" skill appears anywhere under ~/.claude (plugins, skills, or
- *   skillUsage history) or in the plugin marketplace cache under the name
- *   `claude-seo` / AgriciDaniel. The `docs/claude_seo_SKILL.md` spec this
- *   worker's prompt is built against describes a skill that is not actually
- *   reachable by the `claude` CLI this script spawns. `/seo <command> <url>`
- *   will fail as an unrecognised command until that plugin is installed.
- *
- * See Companies/Hyphening/Docs/Worker Automation Readiness.md §2/§4 for the
- * full credential/setup list this still needs before a real run can work.
- * ============================================================================
- *
  * SEO Monitor worker.
  *
  * Pulls queued runs from the Ops Center, runs the matching claude-seo skill,
