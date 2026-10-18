@@ -52,6 +52,7 @@ import sitemapRoutes from './src/routes/sitemap.js';
 
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
+import { attachMacConnector } from './src/services/macConnector.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -412,7 +413,7 @@ app.use((err, req, res, next) => {
 // START SERVER
 // ============================================================
 
-app.listen(PORT, () => {
+const httpServer = app.listen(PORT, () => {
   console.log('');
   console.log('╔══════════════════════════════════════════════╗');
   console.log('║   Marketing Ops Center — Server Running      ║');
@@ -437,5 +438,8 @@ app.listen(PORT, () => {
     .then(({ recoverInFlightRuns }) => recoverInFlightRuns())
     .catch(err => console.error('[SERVER] Ads run recovery failed:', err));
 });
+
+// Push channel to the Mac connector — see src/services/macConnector.js.
+attachMacConnector(httpServer);
 
 export default app;

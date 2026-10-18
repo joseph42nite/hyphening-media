@@ -17,6 +17,7 @@
 
 import db from '../../database.js';
 import { registerPendingAudit, clearPendingAudit } from './pendingAudits.js';
+import { pushRunSignal } from './macConnector.js';
 
 const IN_FLIGHT = ['queued', 'running'];
 const MINUTE = 60 * 1000;
@@ -125,6 +126,7 @@ export function createRun({ clientId, agentType, periodMonth = null, model = nul
 
     const run = getRun(result.lastInsertRowid);
     broadcastRunStatus(run);
+    pushRunSignal('ads');
     return { run };
   } catch (err) {
     const isDuplicate = err.code === 'SQLITE_CONSTRAINT_UNIQUE'

@@ -9,6 +9,7 @@
 
 import db from '../../database.js';
 import { registerPendingAudit, clearPendingAudit, timeoutMsFor } from './pendingAudits.js';
+import { pushRunSignal } from './macConnector.js';
 
 
 const IN_FLIGHT = ['queued', 'running'];
@@ -114,6 +115,7 @@ export function createRun({
 
     const run = getRun(result.lastInsertRowid);
     broadcastRunStatus(run);
+    pushRunSignal('seo');
     return { run };
   } catch (err) {
     const isDuplicate = err.code === 'SQLITE_CONSTRAINT_UNIQUE'
