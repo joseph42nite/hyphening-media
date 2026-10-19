@@ -36,11 +36,9 @@ export default function MarketingDataTab({
   const canEdit = isAdmin || isSMM || isVideoEditor;
 
   // Content Tracker Filter State
-  const [contentPage, setContentPage] = useState(1);
   const [contentMonthFilter, setContentMonthFilter] = useState('all');
 
   useEffect(() => {
-    setContentPage(1);
     setContentMonthFilter('all');
     if (selectedClientForReports?.id === 'all' || !selectedClientForReports) {
       fetchMarketingData('all');
@@ -496,7 +494,7 @@ export default function MarketingDataTab({
             <div className="marketing-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <select
                 value={platformFilter}
-                onChange={e => { setPlatformFilter(e.target.value); setContentPage(1); }}
+                onChange={e => setPlatformFilter(e.target.value)}
                 style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: '700', border: '2px solid #000', borderRadius: '6px', cursor: 'pointer' }}
               >
                 <option value="all">All platforms</option>
@@ -505,7 +503,7 @@ export default function MarketingDataTab({
               </select>
               <select
                 value={contentMonthFilter}
-                onChange={e => { setContentMonthFilter(e.target.value); setContentPage(1); }}
+                onChange={e => setContentMonthFilter(e.target.value)}
                 style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: '700', border: '2px solid #000', borderRadius: '6px', cursor: 'pointer' }}
                 title="Filter content by month"
               >

@@ -2,11 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE, authFetch } from '../api.js';
 import logoImg from '../assets/logo.png';
-import { 
-  Users, Folder, Calendar, Clock, CheckSquare, 
-  Layers, Shield, LogOut, RefreshCw, FileSpreadsheet, Plus, 
-  Search, Share2, FileDown, Eye, HelpCircle, Check, X,
-  AlertTriangle, Play, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus
+import {
+  Users, Folder, Calendar, Shield, LogOut, FileSpreadsheet,
+  X, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus
 } from 'lucide-react';
 
 import LeadsTab from '../components/dashboard/LeadsTab.jsx';
@@ -82,47 +80,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     return `${parseInt(day)} ${monthName} ${year}`;
   };
 
-  const formatMonthStr = (monthStr) => {
-    if (!monthStr) return '-';
-    const parts = monthStr.split('-');
-    if (parts.length !== 2) return monthStr;
-    const [year, month] = parts;
-    const monthName = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ][parseInt(month) - 1];
-    return `${monthName} ${year}`;
-  };
-
-  const isOverdue = (task) => {
-    if (!task.due_date || task.status === 'delivered') return false;
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    return task.due_date < todayStr;
-  };
-
-  const getTaskPriority = (task) => {
-    if (task.task_type === 'social') {
-      if (task.due_date) {
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        if (task.due_date < todayStr) return 'high';
-        if (task.due_date === todayStr) return 'medium';
-        if (task.due_date > todayStr) return 'low';
-      }
-      return 'medium';
-    }
-    return task.priority || 'medium';
-  };
-
-  const getPriorityBadgeClass = (priority) => {
-    if (priority === 'urgent' || priority === 'high') return 'danger';
-    if (priority === 'medium') return 'warning';
-    if (priority === 'low') return 'muted';
-    return 'muted';
-  };
-
   const userRole = auth?.role || 'ops_video_editor';
   const isAdmin = ['admin', 'super_admin'].includes(userRole);
-  const isSuperAdmin = userRole === 'super_admin';
   const isSMM = userRole === 'ops_social_media_manager';
   const isVideoEditor = userRole === 'ops_video_editor';
   
@@ -139,13 +98,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [auditPage, setAuditPage] = useState(1);
   const [auditLimit, setAuditLimit] = useState(25);
   const [totalAuditLogs, setTotalAuditLogs] = useState(0);
-  const [assignmentsPage, setAssignmentsPage] = useState(1);
-  const [assignmentsLimit, setAssignmentsLimit] = useState(5);
   const [artists, setArtists] = useState([]);
   const [venues, setVenues] = useState([]);
   const [gigs, setGigs] = useState([]);
-  const [reviewQueue, setReviewQueue] = useState([]);
-  
+
   // Selected client for marketing reports
   const [selectedClientForReports, setSelectedClientForReports] = useState({ id: 'all', name: 'All Clients' });
   const [allClientsOverview, setAllClientsOverview] = useState([]);
@@ -251,27 +207,12 @@ export default function Dashboard({ auth, setAuth, showToast }) {
 
   // Search/Filters
   const [mobileHeaderMenuOpen, setMobileHeaderMenuOpen] = useState(false);
-  const [clientSearch, setClientSearch] = useState('');
-  const [taskSearch, setTaskSearch] = useState('');
-  const [taskClientFilter, setTaskClientFilter] = useState('');
 
   // Calendar states
-  const localTodayStr = new Date().toLocaleDateString('en-CA');
-  const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [selectedDateStr, setSelectedDateStr] = useState(localTodayStr);
   const [calendarClientFilter, setCalendarClientFilter] = useState('');
   const [calendarMarketingContent, setCalendarMarketingContent] = useState([]);
 
   // Modals state
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [taskFormData, setTaskFormData] = useState({
-    title: '', description: '', client_id: '', priority: 'medium',
-    task_type: 'video', assigned_to: '', due_date: '', drive_link: ''
-  });
-
   const [showContentModal, setShowContentModal] = useState(false);
   const [editingContent, setEditingContent] = useState(null);
   const [contentFormData, setContentFormData] = useState({ ...CONTENT_FORM_DEFAULTS });
@@ -445,9 +386,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     if (isAdmin || isSMM) {
       fetchCurationData();
     }
-    if (isAdmin || isSMM) {
-      fetchReviewQueue();
-    }
   }, [auth]);
 
   // 1b. Audit Logs Fetch Hook
@@ -471,8 +409,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
       fetchTasks();
     });
 
-    es.addEventListener('content_approved', (e) => {
-      const data = JSON.parse(e.data);
+    es.addEventListener('content_approved', () => {
       showToast(`Content approved by client!`, 'success');
       if (selectedClientForReportsRef.current) {
         fetchMarketingData(selectedClientForReportsRef.current.id);
@@ -700,17 +637,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
-  const fetchReviewQueue = async () => {
-    try {
-      const res = await authFetch('/api/clients/marketing/review-queue');
-      if (!res || !res.ok) return;
-      const data = await res.json();
-      setReviewQueue(data.content || []);
-    } catch (err) {
-      console.error('[ReviewQueue] fetch error:', err);
-    }
-  };
-
   // The leaderboard's period is its own: it spans every client, so it has no
   // reason to move when the single-client ad month does.
   const fetchAllClientsOverview = async (month = overviewMonth) => {
@@ -817,137 +743,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
-  // --- TASK CRUD ---
-  const handleTaskSubmit = async (e) => {
-    e.preventDefault();
-    const url = editingTask ? `/api/tasks/${editingTask.id}` : '/api/tasks';
-    const method = editingTask ? 'PATCH' : 'POST';
-
-    try {
-      const res = await authFetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskFormData)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      showToast(`Task ${editingTask ? 'updated' : 'created'} successfully`, 'success');
-      setShowTaskModal(false);
-      fetchTasks();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
-  const openTaskModal = (task = null) => {
-    if (task) {
-      setEditingTask(task);
-      setTaskFormData({
-        title: task.title,
-        description: task.description || '',
-        client_id: task.client_id || '',
-        priority: task.priority || 'medium',
-        task_type: task.task_type || 'video',
-        assigned_to: task.assigned_to || '',
-        due_date: task.due_date || '',
-        drive_link: task.drive_link || ''
-      });
-    } else {
-      setEditingTask(null);
-      setTaskFormData({
-        title: '', description: '', client_id: '', priority: 'medium',
-        task_type: 'video', assigned_to: '', due_date: '', drive_link: ''
-      });
-    }
-    setShowTaskModal(true);
-  };
-
-  const handleKanbanCardClick = async (task) => {
-    if (task.content_id) {
-      if (isAdmin || isSMM) {
-        try {
-          const res = await authFetch(`/api/clients/${task.client_id}/marketing/content/${task.content_id}`);
-          if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || 'Failed to fetch content details');
-          }
-          const contentData = await res.json();
-          openContentModal(contentData);
-        } catch (err) {
-          showToast(err.message, 'error');
-        }
-      }
-    } else {
-      if (isAdmin) {
-        openTaskModal(task);
-      }
-    }
-  };
-
-  const updateTaskStatus = async (taskId, newStatus) => {
-    try {
-      const res = await authFetch(`/api/tasks/${taskId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error);
-      }
-      showToast('Status updated successfully', 'success');
-
-      const task = tasks.find(t => t.id === taskId);
-      const clientId = task ? task.client_id : null;
-
-      fetchTasks();
-      fetchCalendarMarketingContent();
-      if (clientId) {
-        fetchMarketingData(clientId);
-      }
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
-  const updateContentStatus = async (itemId, newStatus) => {
-    try {
-      const res = await authFetch(`/api/clients/${selectedClientForReports.id}/marketing/content/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to update status');
-      }
-      showToast('Status updated successfully', 'success');
-      fetchMarketingData(selectedClientForReports.id);
-      fetchCalendarMarketingContent();
-      fetchTasks();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
-  // --- SOCIAL REVIEW QUEUE ---
-  const handleReviewDecision = async (contentId, track) => {
-    try {
-      const res = await authFetch(`/api/clients/marketing/review/${contentId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_tracked: track ? 1 : 0 })
-      });
-      if (!res.ok) throw new Error('Failed to submit decision');
-      showToast(track ? 'Item added to performance tracker' : 'Item discarded', 'success');
-      fetchReviewQueue();
-      if (selectedClientForReports) fetchMarketingData(selectedClientForReports.id);
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
   // --- CONTENT TRACKER MANUAL CRUD ---
   const openContentModal = (content = null, defaultDate = null) => {
     if (content) {
@@ -1047,63 +842,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     });
     return list;
   }, [clients, clientRecencyOrder]);
-
-  // Filtering lists
-  const filteredTasks = tasks.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(taskSearch.toLowerCase()) || 
-      (t.client_name && t.client_name.toLowerCase().includes(taskSearch.toLowerCase()));
-    const matchesClient = !taskClientFilter || t.client_id === parseInt(taskClientFilter);
-    return matchesSearch && matchesClient;
-  });
-
-  // Render Kanban Columns helper
-  const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
-  const getTasksByStatus = (status) => {
-    if (status === 'todo') {
-      // TO - DO - TODAY: pending tasks due today or explicitly status 'todo' with no due date
-      return filteredTasks.filter(t => 
-        t.status !== 'delivered' && 
-        t.status !== 'in_progress' && 
-        (t.due_date === localTodayStr || (t.status === 'todo' && !t.due_date))
-      );
-    }
-    if (status === 'backlog') {
-      // BACKLOG: pending tasks that are not due today (overdue, future, or explicitly backlog)
-      const list = filteredTasks.filter(t => 
-        t.status !== 'delivered' && 
-        t.status !== 'in_progress' && 
-        t.due_date !== localTodayStr &&
-        !(t.status === 'todo' && !t.due_date)
-      );
-      return list.sort((a, b) => {
-        const isOverdueA = a.due_date && a.due_date < localTodayStr;
-        const isOverdueB = b.due_date && b.due_date < localTodayStr;
-        
-        if (isOverdueA && !isOverdueB) return -1;
-        if (!isOverdueA && isOverdueB) return 1;
-        
-        if (a.due_date && b.due_date) {
-          return a.due_date.localeCompare(b.due_date);
-        }
-        if (a.due_date) return -1;
-        if (b.due_date) return 1;
-        return 0;
-      });
-    }
-    if (status === 'in_progress') {
-      return filteredTasks.filter(t => t.status === 'in_progress');
-    }
-    if (status === 'delivered') {
-      const deliveredTasks = filteredTasks.filter(t => t.status === 'delivered');
-      // Sort: most recently completed/updated first, limit to 10
-      return deliveredTasks.sort((a, b) => {
-        const timeA = new Date(a.completed_at || a.updated_at || 0).getTime();
-        const timeB = new Date(b.completed_at || b.updated_at || 0).getTime();
-        return timeB - timeA;
-      }).slice(0, 10);
-    }
-    return [];
-  };
 
   return (
     <div className="dashboard-wrapper">

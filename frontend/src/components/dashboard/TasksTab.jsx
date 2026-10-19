@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, AlertTriangle, Calendar as CalendarIcon, CheckSquare, Search } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 export default function TasksTab({
@@ -21,12 +21,6 @@ export default function TasksTab({
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
   const isSMM = auth?.role === 'ops_social_media_manager';
 
-  // Kanban filters/search
-  const [taskSearch, setTaskSearch] = useState('');
-  const [taskClientFilter, setTaskClientFilter] = useState('');
-  const [taskFormatFilter, setTaskFormatFilter] = useState('');
-  const [mobileColumnFilter, setMobileColumnFilter] = useState('all');
-
   // Calendar states
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -39,101 +33,6 @@ export default function TasksTab({
     title: '', description: '', client_id: '', priority: 'medium',
     task_type: 'video', assigned_to: '', due_date: '', drive_link: ''
   });
-
-  const columns = ['backlog', 'todo', 'in_progress', 'delivered'];
-
-  // Helper functions
-  const isOverdue = (task) => {
-    if (!task.due_date || task.status === 'delivered') return false;
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    return task.due_date < todayStr;
-  };
-
-  const getTaskPriority = (task) => {
-    if (task.task_type === 'social') {
-      if (task.due_date) {
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        if (task.due_date < todayStr) return 'high';
-        if (task.due_date === todayStr) return 'medium';
-        if (task.due_date > todayStr) return 'low';
-      }
-      return 'medium';
-    }
-    return task.priority || 'medium';
-  };
-
-  const getPriorityBadgeClass = (priority) => {
-    if (priority === 'urgent' || priority === 'high') return 'danger';
-    if (priority === 'medium') return 'warning';
-    if (priority === 'low') return 'muted';
-    return 'muted';
-  };
-
-  const getTasksByStatus = (status) => {
-    const filteredTasks = tasks.filter(t => {
-      if (taskClientFilter && String(t.client_id) !== taskClientFilter) return false;
-      if (taskFormatFilter) {
-        const desc = (t.description || '').toLowerCase();
-        if (taskFormatFilter === 'reel' && !desc.includes('post type: reel')) return false;
-        if (taskFormatFilter === 'carousel' && !desc.includes('post type: carousel')) return false;
-        if (taskFormatFilter === 'long_format' && !(desc.includes('post type: youtube') || desc.includes('post type: long_format'))) return false;
-      }
-      if (taskSearch) {
-        const matchTitle = t.title.toLowerCase().includes(taskSearch.toLowerCase());
-        const matchClient = t.client_name && t.client_name.toLowerCase().includes(taskSearch.toLowerCase());
-        const matchDesc = t.description && t.description.toLowerCase().includes(taskSearch.toLowerCase());
-        if (!matchTitle && !matchClient && !matchDesc) return false;
-      }
-      return true;
-    });
-
-    const localTodayStr = new Date().toLocaleDateString('en-CA');
-
-    if (status === 'todo') {
-      // TO - DO - TODAY: pending tasks due today or explicitly status 'todo' with no due date
-      return filteredTasks.filter(t => 
-        t.status !== 'delivered' && 
-        t.status !== 'in_progress' && 
-        (t.due_date === localTodayStr || (t.status === 'todo' && !t.due_date))
-      );
-    }
-    if (status === 'backlog') {
-      // BACKLOG: pending tasks that are not due today (overdue, future, or explicitly backlog)
-      const list = filteredTasks.filter(t => 
-        t.status !== 'delivered' && 
-        t.status !== 'in_progress' && 
-        t.due_date !== localTodayStr &&
-        !(t.status === 'todo' && !t.due_date)
-      );
-      return list.sort((a, b) => {
-        const isOverdueA = a.due_date && a.due_date < localTodayStr;
-        const isOverdueB = b.due_date && b.due_date < localTodayStr;
-        
-        if (isOverdueA && !isOverdueB) return -1;
-        if (!isOverdueA && isOverdueB) return 1;
-        
-        if (a.due_date && b.due_date) {
-          return a.due_date.localeCompare(b.due_date);
-        }
-        if (a.due_date) return -1;
-        if (b.due_date) return 1;
-        return 0;
-      });
-    }
-    if (status === 'in_progress') {
-      return filteredTasks.filter(t => t.status === 'in_progress');
-    }
-    if (status === 'delivered') {
-      const deliveredTasks = filteredTasks.filter(t => t.status === 'delivered');
-      // Sort: most recently completed/updated first, limit to 10
-      return deliveredTasks.sort((a, b) => {
-        const timeA = new Date(a.completed_at || a.updated_at || 0).getTime();
-        const timeB = new Date(b.completed_at || b.updated_at || 0).getTime();
-        return timeB - timeA;
-      }).slice(0, 10);
-    }
-    return [];
-  };
 
   // Task CRUD handlers
   const openTaskModal = (task = null) => {
@@ -178,55 +77,6 @@ export default function TasksTab({
       setShowTaskModal(false);
       fetchTasks();
       fetchCalendarMarketingContent?.();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
-  const updateTaskStatus = async (taskId, newStatus) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-        credentials: 'include'
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error);
-      }
-      showToast('Status updated successfully', 'success');
-      fetchTasks();
-      fetchCalendarMarketingContent?.();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  };
-
-  const handleKanbanCardClick = (task) => {
-    if (task.content_id) {
-      if (isAdmin || isSMM) {
-        // We will define content detail fetching in TasksTab too
-        fetchContentAndOpenModal(task.client_id, task.content_id);
-      }
-    } else {
-      if (isAdmin) {
-        openTaskModal(task);
-      }
-    }
-  };
-
-  const fetchContentAndOpenModal = async (clientId, contentId) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/clients/${clientId}/marketing/content/${contentId}`, {
-        credentials: 'include'
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to fetch content details');
-      }
-      const contentData = await res.json();
-      openContentModal(contentData);
     } catch (err) {
       showToast(err.message, 'error');
     }

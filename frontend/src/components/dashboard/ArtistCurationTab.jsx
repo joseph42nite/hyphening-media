@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Copy, Edit3, Check, RotateCcw, MessageSquare, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Copy, Edit3, Check, MessageSquare, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 // Reusable Metric Stat Card
@@ -240,7 +240,6 @@ export default function ArtistCurationTab({
   formatDateStr
 }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
-  const isSuperAdmin = auth?.role === 'super_admin';
   const isSMM = auth?.role === 'ops_social_media_manager';
 
   // Message Templates State (synced with backend + cached in localStorage)
@@ -458,7 +457,7 @@ export default function ArtistCurationTab({
             setDecryptedBank(prev => ({ ...prev, [artist.id]: data.bank_details }));
             setArtistFormData(prev => ({ ...prev, bank_details: data.bank_details }));
           }
-        } catch (err) {
+        } catch {
           // ignore
         }
       }

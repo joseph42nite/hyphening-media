@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Terminal, CheckCircle2, AlertTriangle, HelpCircle, Loader2, ChevronUp, ChevronDown, XCircle, Users, Check, X } from 'lucide-react';
+import { Play, Terminal, AlertTriangle, Loader2, ChevronUp, ChevronDown, XCircle, Users, Check, X } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 const IN_FLIGHT_STATUSES = ['queued', 'running'];
@@ -128,21 +128,6 @@ function getAuditReportMarkdown(audit) {
     if (typeof parsed.summary === 'string') return parsed.summary;
   }
   return null;
-}
-
-// Short preview shown in card or snippets.
-function getPreviewText(audit) {
-  const md = getAuditReportMarkdown(audit);
-  if (md) {
-    const clean = md.replace(/[#*`_~[\]()|]/g, ' ').replace(/\s+/g, ' ').trim();
-    return clean.length > 220 ? `${clean.slice(0, 220).trim()}…` : clean;
-  }
-  const parsed = parseReportJson(audit?.report_json);
-  if (parsed && typeof parsed === 'string') {
-    const trimmed = parsed.trim();
-    return trimmed.length > 220 ? `${trimmed.slice(0, 220).trim()}…` : trimmed;
-  }
-  return audit?.summary || null;
 }
 
 // Inline formatting: **bold**, `code`, [text](url). Applied to already-escaped
@@ -342,7 +327,7 @@ export function ReportValue({ value, depth = 0 }) {
   return <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', color: 'rgba(223, 231, 224, 0.9)' }}>{String(value)}</span>;
 }
 
-export default function SeoMonitorTab({ auth, clients, showToast }) {
+export default function SeoMonitorTab({ clients, showToast }) {
   const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem('seo_monitor_selected_client_id') || '');
   const [agents, setAgents] = useState([]);
   const [audits, setAudits] = useState([]);
@@ -461,14 +446,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
   // View mode tab for the selected audit: 'report' (formatted markdown) | 'actions' | 'json'
   const [reportViewTab, setReportViewTab] = useState('report');
 
-  // Assign to SMM modal
-  const [freelancers, setFreelancers] = useState([]);
-  const [assignForm, setAssignForm] = useState({
-    assigned_to: '',
-    priority: 'medium',
-    due_date: ''
-  });
-
   const selectedClient = clients.find(c => String(c.id) === String(selectedClientId));
   const currentAudit = audits.find(a => String(a.id) === String(selectedAuditId));
   const dropdownAudits = focusedAgentType ? audits.filter(a => a.audit_type === focusedAgentType) : audits;
@@ -507,14 +484,6 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
         return 'text-gray-400';
     }
   };
-
-  // Fetch freelancers for the assignment modal
-  useEffect(() => {
-    fetch(`${API_BASE}/api/freelancers`, { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => setFreelancers(data))
-      .catch(err => console.error('[SEO TAB] Fetch freelancers failed:', err));
-  }, []);
 
   const fetchCompetitors = async (clientId) => {
     if (!clientId) return;
@@ -637,7 +606,7 @@ export default function SeoMonitorTab({ auth, clients, showToast }) {
           setRecommendations([]);
         }
       }
-    } catch (err) {
+    } catch {
       showToast('Failed to load SEO client metrics', 'error');
     }
   };

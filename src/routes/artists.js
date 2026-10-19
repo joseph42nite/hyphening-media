@@ -4,7 +4,6 @@
  */
 
 import { Router } from 'express';
-import crypto from 'crypto';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';

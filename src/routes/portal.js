@@ -9,7 +9,7 @@ import db from '../../database.js';
 import { portalLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
-import { getConnectUrl, getClientConnectedAccounts, executeClientAction } from '../services/composioService.js';
+import { getConnectUrl, getClientConnectedAccounts } from '../services/composioService.js';
 import { fetchPostComments, replyToComment } from '../services/commentSync.js';
 import { countableLeadSql } from '../services/leadFilters.js';
 

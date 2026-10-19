@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../../database.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { authenticate } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { cancelRun, getActiveRunsForClient, getRun, listQueue, broadcastRunLog } from '../services/agentRuns.js';
 import { startAgentRun, abortOpenClawRun, isAbortSupported } from '../services/agentRunner.js';

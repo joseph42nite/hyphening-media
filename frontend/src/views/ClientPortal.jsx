@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { 
-  TrendingUp, BarChart2, Check, X, FileText, Send, Lock, Calendar, PlayCircle, ExternalLink,
-  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus, ArrowLeft,
+  TrendingUp, BarChart2, Check, X, Send, Lock, Calendar, PlayCircle, ExternalLink,
+  Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus,
   Clock
 } from 'lucide-react';
 
