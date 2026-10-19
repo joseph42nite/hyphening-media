@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 const EMPTY_VENUE_FIELDS = {
@@ -7,6 +7,44 @@ const EMPTY_VENUE_FIELDS = {
   venue_poc_name: '', venue_poc_phone: '', venue_poc_email: '', venue_social_links: '',
   venue_gig_confirmed_message: ''
 };
+
+const EMPTY_ONBOARDING_FIELDS = {
+  brand_audience_primary: '', brand_audience_secondary: '', brand_audience_expertise: '',
+  brand_positioning: '', brand_editorial_do: '', brand_editorial_dont: '', brand_taboo_phrases: '',
+  brand_competitor_differentiation: '',
+  persona_tone_funny_serious: 0.5, persona_tone_formal_casual: 0.5,
+  persona_tone_respectful_irreverent: 0.5, persona_tone_enthusiastic_matter_of_fact: 0.5,
+  persona_sentence_length_mean: 18, persona_sentence_length_std: 6,
+  persona_vocabulary_tier: 'professional', persona_contraction_frequency: 0.5, persona_summary_label: 'Key Takeaways',
+  brand_niche_keywords: '', brand_publishing_cadence: ''
+};
+
+// Line-delimited textarea <-> stored JSON-array-as-string convention shared
+// with the backend (src/services/clientOnboarding.js renders these back into
+// BRAND.md/VOICE.md/persona.json).
+const linesToArray = (text) => (text || '').split('\n').map(s => s.trim()).filter(Boolean);
+const arrayToLines = (json) => {
+  try {
+    const arr = JSON.parse(json || '[]');
+    return Array.isArray(arr) ? arr.join('\n') : '';
+  } catch {
+    return '';
+  }
+};
+const competitorsToLines = (json) => {
+  try {
+    const arr = JSON.parse(json || '[]');
+    return Array.isArray(arr) ? arr.map(c => `${c.name || ''}: ${c.differentiator || ''}`).join('\n') : '';
+  } catch {
+    return '';
+  }
+};
+const linesToCompetitors = (text) => linesToArray(text).map(line => {
+  const idx = line.indexOf(':');
+  return idx === -1
+    ? { name: line.trim(), differentiator: '' }
+    : { name: line.slice(0, idx).trim(), differentiator: line.slice(idx + 1).trim() };
+});
 
 export default function ClientsTab({ auth, clients, fetchClients, venues = [], fetchCurationData, showToast }) {
   const isAdmin = ['admin', 'super_admin'].includes(auth?.role);
@@ -215,6 +253,103 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
     }
   };
 
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [onboardingClient, setOnboardingClient] = useState(null);
+  const [onboardingForm, setOnboardingForm] = useState(EMPTY_ONBOARDING_FIELDS);
+  const [onboardingMeta, setOnboardingMeta] = useState({ brand_onboarded_at: null, brand_files_generated_at: null });
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
+  const [onboardingGenerating, setOnboardingGenerating] = useState(false);
+
+  const openOnboardingModal = async (client) => {
+    setOnboardingClient(client);
+    setShowOnboardingModal(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${client.id}/onboarding`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load onboarding data');
+      setOnboardingForm({
+        brand_audience_primary: data.brand_audience_primary || '',
+        brand_audience_secondary: data.brand_audience_secondary || '',
+        brand_audience_expertise: data.brand_audience_expertise || '',
+        brand_positioning: data.brand_positioning || '',
+        brand_editorial_do: arrayToLines(data.brand_editorial_do),
+        brand_editorial_dont: arrayToLines(data.brand_editorial_dont),
+        brand_taboo_phrases: arrayToLines(data.brand_taboo_phrases),
+        brand_competitor_differentiation: competitorsToLines(data.brand_competitor_differentiation),
+        persona_tone_funny_serious: data.persona_tone_funny_serious ?? 0.5,
+        persona_tone_formal_casual: data.persona_tone_formal_casual ?? 0.5,
+        persona_tone_respectful_irreverent: data.persona_tone_respectful_irreverent ?? 0.5,
+        persona_tone_enthusiastic_matter_of_fact: data.persona_tone_enthusiastic_matter_of_fact ?? 0.5,
+        persona_sentence_length_mean: data.persona_sentence_length_mean ?? 18,
+        persona_sentence_length_std: data.persona_sentence_length_std ?? 6,
+        persona_vocabulary_tier: data.persona_vocabulary_tier || 'professional',
+        persona_contraction_frequency: data.persona_contraction_frequency ?? 0.5,
+        persona_summary_label: data.persona_summary_label || 'Key Takeaways',
+        brand_niche_keywords: arrayToLines(data.brand_niche_keywords),
+        brand_publishing_cadence: data.brand_publishing_cadence || ''
+      });
+      setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at, brand_files_generated_at: data.brand_files_generated_at });
+    } catch (err) {
+      showToast(err.message, 'error');
+      setShowOnboardingModal(false);
+    }
+  };
+
+  const saveOnboarding = async () => {
+    setOnboardingSaving(true);
+    try {
+      const payload = {
+        ...onboardingForm,
+        brand_editorial_do: linesToArray(onboardingForm.brand_editorial_do),
+        brand_editorial_dont: linesToArray(onboardingForm.brand_editorial_dont),
+        brand_taboo_phrases: linesToArray(onboardingForm.brand_taboo_phrases),
+        brand_competitor_differentiation: linesToCompetitors(onboardingForm.brand_competitor_differentiation),
+        brand_niche_keywords: linesToArray(onboardingForm.brand_niche_keywords),
+      };
+      const res = await fetch(`${API_BASE}/api/clients/${onboardingClient.id}/onboarding`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save onboarding');
+      setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at, brand_files_generated_at: data.brand_files_generated_at });
+      showToast('Onboarding saved', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setOnboardingSaving(false);
+    }
+  };
+
+  const generateOnboardingFiles = async () => {
+    setOnboardingGenerating(true);
+    try {
+      await saveOnboarding();
+      const res = await fetch(`${API_BASE}/api/clients/${onboardingClient.id}/onboarding/generate`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate files');
+      setOnboardingMeta(prev => ({ ...prev, brand_files_generated_at: data.generated_at }));
+      showToast('BRAND.md, VOICE.md and persona.json generated on the server — copy them into the project root manually (EC2 cannot write to the Vault).', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setOnboardingGenerating(false);
+    }
+  };
+
+  const copyKickoffPrompt = () => {
+    const keywords = linesToArray(onboardingForm.brand_niche_keywords).join(', ') || '[niche/seed keywords not set]';
+    const cadence = onboardingForm.brand_publishing_cadence || '[publishing cadence not set]';
+    const prompt = `Run blog-cluster and blog-calendar for ${onboardingClient.name}.\n\nNiche/seed keywords: ${keywords}\nDesired publishing cadence/content mix: ${cadence}\n\nLoad this client's BRAND.md and VOICE.md (generated via the Hyphening portal onboarding form) as project context first, then produce a topic cluster + publishing plan, followed by an editorial calendar.`;
+    navigator.clipboard.writeText(prompt);
+    showToast('Kickoff prompt copied — paste it into a Claude session to run blog-cluster/blog-calendar manually (no automated worker exists for this yet)', 'success');
+  };
+
   const handleDeleteClient = async (client) => {
     if (!client) return;
     const confirmed = window.confirm(
@@ -369,6 +504,14 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => openClientModal(client)} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
             Edit
+          </button>
+          <button
+            onClick={() => openOnboardingModal(client)}
+            className="btn btn-secondary"
+            style={{ padding: '6px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            title={`Brand/voice onboarding for ${client.name}`}
+          >
+            <Sparkles size={13} /> Onboarding
           </button>
           <button
             onClick={() => handleDeleteClient(client)}
@@ -698,6 +841,141 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showOnboardingModal && onboardingClient && (
+        <div className="modal-overlay" onClick={() => setShowOnboardingModal(false)}>
+          <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '760px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2>Onboarding — {onboardingClient.name}</h2>
+            <p style={{ margin: '4px 0 16px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Captured once here, this feeds BRAND.md + a persona file that every blog post for this
+              client reuses automatically — same pattern as the Blog/SEO/Ads flags above.
+              {onboardingMeta.brand_onboarded_at && (
+                <> Last saved {new Date(onboardingMeta.brand_onboarded_at).toLocaleString()}.</>
+              )}
+              {onboardingMeta.brand_files_generated_at && (
+                <> Files last generated {new Date(onboardingMeta.brand_files_generated_at).toLocaleString()}.</>
+              )}
+            </p>
+
+            <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Brand (→ BRAND.md)</h4>
+            <div className="form-grid-3" style={{ marginBottom: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Primary Audience</label>
+                <input type="text" className="form-control" placeholder="Who the content is for" value={onboardingForm.brand_audience_primary} onChange={e => setOnboardingForm({ ...onboardingForm, brand_audience_primary: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Secondary Audience</label>
+                <input type="text" className="form-control" value={onboardingForm.brand_audience_secondary} onChange={e => setOnboardingForm({ ...onboardingForm, brand_audience_secondary: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Audience Expertise</label>
+                <input type="text" className="form-control" placeholder="e.g. beginner, informed patient" value={onboardingForm.brand_audience_expertise} onChange={e => setOnboardingForm({ ...onboardingForm, brand_audience_expertise: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label className="form-label">Positioning <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— how they want to be positioned vs. competitors</span></label>
+              <textarea className="form-control" rows="2" value={onboardingForm.brand_positioning} onChange={e => setOnboardingForm({ ...onboardingForm, brand_positioning: e.target.value })} />
+            </div>
+            <div className="form-grid-2" style={{ marginBottom: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Always Do <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— one per line</span></label>
+                <textarea className="form-control" rows="3" value={onboardingForm.brand_editorial_do} onChange={e => setOnboardingForm({ ...onboardingForm, brand_editorial_do: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Never Do <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— topics/claims/framing to avoid</span></label>
+                <textarea className="form-control" rows="3" value={onboardingForm.brand_editorial_dont} onChange={e => setOnboardingForm({ ...onboardingForm, brand_editorial_dont: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-grid-2" style={{ marginBottom: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Taboo Phrases <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— one per line</span></label>
+                <textarea className="form-control" rows="3" value={onboardingForm.brand_taboo_phrases} onChange={e => setOnboardingForm({ ...onboardingForm, brand_taboo_phrases: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Competitor Differentiation <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— one per line, "Name: how we're different"</span></label>
+                <textarea className="form-control" rows="3" placeholder={'Competitor X: faster turnaround'} value={onboardingForm.brand_competitor_differentiation} onChange={e => setOnboardingForm({ ...onboardingForm, brand_competitor_differentiation: e.target.value })} />
+              </div>
+            </div>
+
+            <h4 style={{ margin: '20px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Persona (→ persona.json / VOICE.md)</h4>
+            <div className="form-grid-2" style={{ marginBottom: '12px' }}>
+              {[
+                { field: 'persona_tone_funny_serious', left: 'Funny', right: 'Serious' },
+                { field: 'persona_tone_formal_casual', left: 'Formal', right: 'Casual' },
+                { field: 'persona_tone_respectful_irreverent', left: 'Respectful', right: 'Irreverent' },
+                { field: 'persona_tone_enthusiastic_matter_of_fact', left: 'Enthusiastic', right: 'Matter-of-fact' },
+              ].map(({ field, left, right }) => (
+                <div className="form-group" key={field}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 400 }}>
+                    <span>{left}</span><span>{right}</span>
+                  </label>
+                  <input type="range" min="0" max="1" step="0.1" value={onboardingForm[field]} onChange={e => setOnboardingForm({ ...onboardingForm, [field]: parseFloat(e.target.value) })} style={{ width: '100%' }} />
+                </div>
+              ))}
+            </div>
+            <div className="form-grid-3" style={{ marginBottom: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Vocabulary Tier</label>
+                <select className="form-control" value={onboardingForm.persona_vocabulary_tier} onChange={e => setOnboardingForm({ ...onboardingForm, persona_vocabulary_tier: e.target.value })}>
+                  <option value="consumer">Consumer</option>
+                  <option value="professional">Professional</option>
+                  <option value="technical">Technical</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Sentence Length — Mean</label>
+                <input type="number" className="form-control" value={onboardingForm.persona_sentence_length_mean} onChange={e => setOnboardingForm({ ...onboardingForm, persona_sentence_length_mean: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Sentence Length — Std Dev</label>
+                <input type="number" className="form-control" value={onboardingForm.persona_sentence_length_std} onChange={e => setOnboardingForm({ ...onboardingForm, persona_sentence_length_std: parseInt(e.target.value) || 0 })} />
+              </div>
+            </div>
+            <div className="form-grid-2" style={{ marginBottom: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Contraction Frequency <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({onboardingForm.persona_contraction_frequency})</span></label>
+                <input type="range" min="0" max="1" step="0.1" value={onboardingForm.persona_contraction_frequency} onChange={e => setOnboardingForm({ ...onboardingForm, persona_contraction_frequency: parseFloat(e.target.value) })} style={{ width: '100%' }} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Summary-box Label</label>
+                <input type="text" className="form-control" placeholder="Key Takeaways" value={onboardingForm.persona_summary_label} onChange={e => setOnboardingForm({ ...onboardingForm, persona_summary_label: e.target.value })} />
+              </div>
+            </div>
+
+            <h4 style={{ margin: '20px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>One-time Kickoff (→ blog-cluster / blog-calendar)</h4>
+            <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              No automated worker runs these yet (unlike SEO/Ads, which have real workers behind their
+              flags) — saved here so they're ready, and "Copy Kickoff Prompt" assembles a prompt to
+              paste into a Claude session by hand.
+            </p>
+            <div className="form-grid-2" style={{ marginBottom: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Niche / Seed Keywords <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— one per line</span></label>
+                <textarea className="form-control" rows="2" value={onboardingForm.brand_niche_keywords} onChange={e => setOnboardingForm({ ...onboardingForm, brand_niche_keywords: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Publishing Cadence / Content Mix</label>
+                <input type="text" className="form-control" placeholder="e.g. 2x/week, 70% educational / 30% promo" value={onboardingForm.brand_publishing_cadence} onChange={e => setOnboardingForm({ ...onboardingForm, brand_publishing_cadence: e.target.value })} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+              <button type="button" className="btn btn-secondary" onClick={copyKickoffPrompt}>
+                Copy Kickoff Prompt
+              </button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowOnboardingModal(false)}>Close</button>
+                <button type="button" className="btn btn-secondary" disabled={onboardingSaving} onClick={saveOnboarding}>
+                  {onboardingSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button type="button" className="btn btn-primary" disabled={onboardingGenerating} onClick={generateOnboardingFiles}>
+                  {onboardingGenerating ? 'Generating...' : 'Save + Generate Files'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
+import { generateOnboardingFiles, readGeneratedFile } from '../services/clientOnboarding.js';
 
 const router = Router();
 
@@ -432,6 +433,144 @@ router.patch('/:id/flags', authorize('admin'), (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Onboarding fields, mapped 1:1 to the claude-blog plugin's blog-brand and
+// blog-persona skill inputs (see src/services/clientOnboarding.js for the
+// BRAND.md/VOICE.md/persona.json rendering that reads these back out).
+// JSON-array fields arrive from the frontend already stringified.
+const ONBOARDING_JSON_FIELDS = ['brand_editorial_do', 'brand_editorial_dont', 'brand_taboo_phrases', 'brand_competitor_differentiation', 'brand_niche_keywords'];
+const ONBOARDING_FIELDS = [
+  'brand_audience_primary', 'brand_audience_secondary', 'brand_audience_expertise',
+  'brand_positioning', ...ONBOARDING_JSON_FIELDS.slice(0, 4),
+  'persona_tone_funny_serious', 'persona_tone_formal_casual',
+  'persona_tone_respectful_irreverent', 'persona_tone_enthusiastic_matter_of_fact',
+  'persona_sentence_length_mean', 'persona_sentence_length_std',
+  'persona_vocabulary_tier', 'persona_contraction_frequency', 'persona_summary_label',
+  'brand_niche_keywords', 'brand_publishing_cadence',
+];
+
+/**
+ * GET /api/clients/:id/onboarding
+ * Read a client's stored brand/voice/strategy onboarding fields.
+ */
+router.get('/:id/onboarding', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare(`SELECT id, name, website_url, brand_onboarded_at, brand_files_generated_at, ${ONBOARDING_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    res.json(client);
+  } catch (err) {
+    console.error('[CLIENTS] Get onboarding error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/clients/:id/onboarding
+ * Save a client's onboarding intake. Stores the raw fields only — it does
+ * not regenerate BRAND.md/persona.json; call .../onboarding/generate for that,
+ * so a draft can be saved without immediately overwriting the live files.
+ */
+router.put('/:id/onboarding', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const updates = {};
+    const diff = {};
+    for (const field of ONBOARDING_FIELDS) {
+      if (req.body[field] !== undefined) {
+        let val = req.body[field];
+        if (ONBOARDING_JSON_FIELDS.includes(field) && val !== null) {
+          val = JSON.stringify(Array.isArray(val) ? val : parseJsonArrayInput(val));
+        }
+        updates[field] = val;
+        diff[field] = val;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid onboarding fields to update' });
+    }
+
+    updates.brand_onboarded_at = new Date().toISOString();
+    updates.updated_at = new Date().toISOString();
+
+    const setClauses = Object.keys(updates).map((k) => `${k} = ?`).join(', ');
+    const values = [...Object.values(updates), req.params.id];
+    db.prepare(`UPDATE crm_clients SET ${setClauses} WHERE id = ?`).run(...values);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_onboarding_save',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff,
+      ip: req.ip,
+    });
+
+    const updated = db.prepare(`SELECT id, ${ONBOARDING_FIELDS.join(', ')}, brand_onboarded_at, brand_files_generated_at FROM crm_clients WHERE id = ?`).get(req.params.id);
+    res.json({ success: true, ...updated });
+  } catch (err) {
+    console.error('[CLIENTS] Save onboarding error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/onboarding/generate
+ * Render BRAND.md, VOICE.md and persona.json from the saved onboarding
+ * fields. Written to this server's local data/client-brand/<id>/ — this
+ * backend runs on EC2, not on the Mac where the claude-blog project root
+ * and Vault live, so these still need a manual copy to the client's project
+ * root (same EC2/Mac split as the existing blog-audio handoff).
+ */
+router.post('/:id/onboarding/generate', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare(`SELECT id, name, website_url, ${ONBOARDING_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const { files } = generateOnboardingFiles(client);
+    const generatedAt = new Date().toISOString();
+    db.prepare('UPDATE crm_clients SET brand_files_generated_at = ?, updated_at = ? WHERE id = ?').run(generatedAt, generatedAt, req.params.id);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_onboarding_generate',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff: { brand_files_generated_at: generatedAt },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, generated_at: generatedAt, files });
+  } catch (err) {
+    console.error('[CLIENTS] Generate onboarding files error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/clients/:id/onboarding/files/:filename
+ * Re-fetch one already-generated file's content (BRAND.md, VOICE.md or
+ * persona.json) without re-rendering.
+ */
+router.get('/:id/onboarding/files/:filename', authorize('admin'), (req, res) => {
+  try {
+    const content = readGeneratedFile(req.params.id, req.params.filename);
+    if (content === null) return res.status(404).json({ error: 'File not found — generate it first' });
+    res.json({ filename: req.params.filename, content });
+  } catch (err) {
+    console.error('[CLIENTS] Read onboarding file error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+function parseJsonArrayInput(val) {
+  if (typeof val !== 'string') return [];
+  return val.split('\n').map((line) => line.trim()).filter(Boolean);
+}
 
 /**
  * POST /api/clients/:id/blog/publish-check
