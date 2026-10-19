@@ -100,7 +100,7 @@ router.get('/', (req, res) => {
 
     // Get posts (without full content for listing)
     const posts = db.prepare(`
-      SELECT id, title, slug, excerpt, cover_image_url, author, category, tags,
+      SELECT id, title, slug, excerpt, cover_image_url, audio_url, author, category, tags,
              meta_title, meta_description, status, published_at, created_at, updated_at
       ${query}
       ORDER BY published_at DESC, created_at DESC

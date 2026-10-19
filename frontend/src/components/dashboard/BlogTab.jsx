@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X, Volume2 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const CATEGORIES = ['General', 'Social Media', 'Branding', 'Growth', 'Tech', 'Content Strategy', 'SEO', 'Case Study'];
 
 const emptyForm = {
-  title: '', excerpt: '', content: '', cover_image_url: '', author: 'Hyphening Media',
+  title: '', excerpt: '', content: '', cover_image_url: '', audio_url: '', author: 'Hyphening Media',
   category: 'General', tags: '', meta_title: '', meta_description: '', meta_keywords: '',
   internal_links: '', status: 'draft'
 };
@@ -55,6 +55,7 @@ export default function BlogTab({ showToast }) {
       excerpt: post.excerpt || '',
       content: post.content || '',
       cover_image_url: post.cover_image_url || '',
+      audio_url: post.audio_url || '',
       author: post.author || 'Hyphening Media',
       category: post.category || 'General',
       tags: post.tags || '',
@@ -152,6 +153,7 @@ export default function BlogTab({ showToast }) {
                   <th>Title</th>
                   <th>Category</th>
                   <th>Status</th>
+                  <th>Audio</th>
                   <th>Published</th>
                   <th>Actions</th>
                 </tr>
@@ -170,6 +172,13 @@ export default function BlogTab({ showToast }) {
                       <span className={`badge ${post.status === 'published' ? 'badge-success' : 'badge-warning'}`}>
                         {post.status === 'published' ? <><Eye size={10} /> Published</> : <><EyeOff size={10} /> Draft</>}
                       </span>
+                    </td>
+                    <td>
+                      {post.audio_url ? (
+                        <span className="badge badge-success" title={post.audio_url}><Volume2 size={10} /> Narrated</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>
+                      )}
                     </td>
                     <td style={{ fontSize: '0.8rem' }}>{formatDate(post.published_at)}</td>
                     <td>
@@ -211,6 +220,7 @@ export default function BlogTab({ showToast }) {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', gap: '8px', flexWrap: 'wrap' }}>
                   <span className="badge badge-info">{post.category}</span>
+                  {post.audio_url && <span className="badge badge-success"><Volume2 size={10} /> Narrated</span>}
                   <span>{formatDate(post.published_at)}</span>
                 </div>
 
@@ -307,6 +317,12 @@ export default function BlogTab({ showToast }) {
                   <label className="form-label">Tags (comma-separated)</label>
                   <input className="form-control" value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })} placeholder="instagram, reels, growth" />
                 </div>
+              </div>
+
+              {/* Narration Audio */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Narration Audio URL</label>
+                <input className="form-control" value={formData.audio_url} onChange={e => setFormData({ ...formData, audio_url: e.target.value })} placeholder="/audio/your-post-slug.mp3 (from the _audio-queue render pipeline)" />
               </div>
 
               {/* SEO Fields */}

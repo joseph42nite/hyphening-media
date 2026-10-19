@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, Search, Sparkles, Share2, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, Search, Sparkles, Share2, Check, ShieldCheck, Link2, Volume2 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -61,6 +61,37 @@ function renderMarkdown(md) {
   html = html.replace(/<p class="blog-p">(<hr \/>|<div class="blog-img-frame")/g, '$1').replace(/(<\/div>)<\/p>/g, '$1');
 
   return html;
+}
+
+/**
+ * Quality signals a post genuinely earns, derived only from data actually
+ * stored on it — never a fabricated score. No fact-check/GEO/cannibalization
+ * badge exists here because nothing in the pipeline currently verifies those
+ * claims per-post; adding a badge for them would be a false trust signal.
+ */
+function qualitySignals(post) {
+  if (!post) return [];
+  let hasInternalLinks = false;
+  try {
+    const parsed = JSON.parse(post.internal_links || '[]');
+    hasInternalLinks = Array.isArray(parsed) && parsed.length > 0;
+  } catch (e) { /* malformed/empty — treat as none */ }
+
+  const signals = [];
+  if (post.meta_title && post.meta_description && post.meta_keywords) {
+    signals.push({ key: 'seo', label: 'SEO Optimized', icon: Search });
+  }
+  signals.push({ key: 'schema', label: 'Schema Markup', icon: ShieldCheck });
+  if (post.category && post.tags) {
+    signals.push({ key: 'taxonomy', label: 'Taxonomy Tagged', icon: Tag });
+  }
+  if (hasInternalLinks) {
+    signals.push({ key: 'links', label: 'Internally Linked', icon: Link2 });
+  }
+  if (post.audio_url) {
+    signals.push({ key: 'audio', label: 'Narrated', icon: Volume2 });
+  }
+  return signals;
 }
 
 function formatDate(dateStr) {
@@ -289,6 +320,11 @@ function BlogListing() {
                       <span className="blog-card-readtime">
                         <Clock size={13} /> {readTime} min read
                       </span>
+                      {post.audio_url && (
+                        <span className="blog-card-readtime">
+                          <Volume2 size={13} /> Narrated
+                        </span>
+                      )}
                     </div>
 
                     <h2 className="blog-card-title">{post.title}</h2>
@@ -514,6 +550,17 @@ function BlogArticle() {
               <span className="blog-article-meta-item">
                 <Clock size={13} /> {readTime} min read
               </span>
+            </div>
+
+            <div className="blog-signal-strip">
+              {qualitySignals(post).map(s => {
+                const Icon = s.icon;
+                return (
+                  <span key={s.key} className="blog-signal-pill">
+                    <Icon size={11} /> {s.label}
+                  </span>
+                );
+              })}
             </div>
 
             <h1 className="blog-article-main-title">{post.title}</h1>

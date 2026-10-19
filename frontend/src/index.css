@@ -4113,6 +4113,30 @@ html.dark-theme {
   padding: 5px 12px;
 }
 
+/* Quality signal strip (SEO / schema / taxonomy / links / narration — all derived from real stored fields) */
+.blog-signal-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0 4px;
+}
+
+.blog-signal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8fd9a8;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 999px;
+  padding: 5px 11px;
+}
+
 /* Author Box */
 .blog-author-box {
   display: flex;
