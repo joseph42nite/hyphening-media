@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { 
+import {
   TrendingUp, BarChart2, Check, X, Send, Lock, Calendar, PlayCircle, ExternalLink,
   Share2, RefreshCw, MessageSquare, CheckCircle, Zap, Users, Bell, BellOff, UserPlus,
-  Clock
+  Clock, Sparkles
 } from 'lucide-react';
 
 import { API_BASE } from '../api.js';
@@ -17,6 +17,43 @@ const PRESET_REASON_OPTIONS = [
   'Location Issue',
   'Already Serviced'
 ];
+
+const EMPTY_ONBOARDING_FIELDS = {
+  brand_audience_primary: '', brand_audience_secondary: '', brand_audience_expertise: '',
+  brand_positioning: '', brand_editorial_do: '', brand_editorial_dont: '', brand_taboo_phrases: '',
+  brand_competitor_differentiation: '',
+  persona_tone_funny_serious: 0.5, persona_tone_formal_casual: 0.5,
+  persona_tone_respectful_irreverent: 0.5, persona_tone_enthusiastic_matter_of_fact: 0.5,
+  persona_sentence_length_mean: 18, persona_sentence_length_std: 6,
+  persona_vocabulary_tier: 'professional', persona_contraction_frequency: 0.5, persona_summary_label: 'Key Takeaways',
+  brand_niche_keywords: '', brand_publishing_cadence: ''
+};
+
+// Line-delimited textarea <-> stored JSON-array-as-string convention shared
+// with the backend (mirrors the same helpers in ClientsTab.jsx's admin form).
+const linesToArray = (text) => (text || '').split('\n').map(s => s.trim()).filter(Boolean);
+const arrayToLines = (json) => {
+  try {
+    const arr = JSON.parse(json || '[]');
+    return Array.isArray(arr) ? arr.join('\n') : '';
+  } catch {
+    return '';
+  }
+};
+const competitorsToLines = (json) => {
+  try {
+    const arr = JSON.parse(json || '[]');
+    return Array.isArray(arr) ? arr.map(c => `${c.name || ''}: ${c.differentiator || ''}`).join('\n') : '';
+  } catch {
+    return '';
+  }
+};
+const linesToCompetitors = (text) => linesToArray(text).map(line => {
+  const idx = line.indexOf(':');
+  return idx === -1
+    ? { name: line.trim(), differentiator: '' }
+    : { name: line.slice(0, idx).trim(), differentiator: line.slice(idx + 1).trim() };
+});
 
 const PORTAL_STYLES = `
 /* =========================================================
@@ -1212,6 +1249,13 @@ export default function ClientPortal({ showToast }) {
   const [replyTextMap, setReplyTextMap] = useState({});
   const [replyingId, setReplyingId] = useState(null);
   const [connectingApp, setConnectingApp] = useState(null);
+
+  // Brand & Voice onboarding state (client self-service; admin's Onboarding
+  // button in the dashboard reads/writes the same columns for review/override)
+  const [onboardingForm, setOnboardingForm] = useState(EMPTY_ONBOARDING_FIELDS);
+  const [onboardingMeta, setOnboardingMeta] = useState({ brand_onboarded_at: null });
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
   const [syncingComments, setSyncingComments] = useState(false);
 
   // Leads & Alerts settings
@@ -1514,6 +1558,7 @@ export default function ClientPortal({ showToast }) {
         // Fetch integrations and comments
         fetchIntegrations();
         fetchComments();
+        fetchOnboarding();
       }
     } catch (err) {
       console.error('Error fetching portal sub-data:', err);
@@ -1913,6 +1958,70 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
+  const fetchOnboarding = async () => {
+    try {
+      setOnboardingLoading(true);
+      const res = await fetch(`${API_BASE}/api/portal/${token}/onboarding`, { credentials: 'include', cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok && data) {
+        setOnboardingForm({
+          brand_audience_primary: data.brand_audience_primary || '',
+          brand_audience_secondary: data.brand_audience_secondary || '',
+          brand_audience_expertise: data.brand_audience_expertise || '',
+          brand_positioning: data.brand_positioning || '',
+          brand_editorial_do: arrayToLines(data.brand_editorial_do),
+          brand_editorial_dont: arrayToLines(data.brand_editorial_dont),
+          brand_taboo_phrases: arrayToLines(data.brand_taboo_phrases),
+          brand_competitor_differentiation: competitorsToLines(data.brand_competitor_differentiation),
+          persona_tone_funny_serious: data.persona_tone_funny_serious ?? 0.5,
+          persona_tone_formal_casual: data.persona_tone_formal_casual ?? 0.5,
+          persona_tone_respectful_irreverent: data.persona_tone_respectful_irreverent ?? 0.5,
+          persona_tone_enthusiastic_matter_of_fact: data.persona_tone_enthusiastic_matter_of_fact ?? 0.5,
+          persona_sentence_length_mean: data.persona_sentence_length_mean ?? 18,
+          persona_sentence_length_std: data.persona_sentence_length_std ?? 6,
+          persona_vocabulary_tier: data.persona_vocabulary_tier || 'professional',
+          persona_contraction_frequency: data.persona_contraction_frequency ?? 0.5,
+          persona_summary_label: data.persona_summary_label || 'Key Takeaways',
+          brand_niche_keywords: arrayToLines(data.brand_niche_keywords),
+          brand_publishing_cadence: data.brand_publishing_cadence || ''
+        });
+        setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at });
+      }
+    } catch (err) {
+      console.error('Error fetching onboarding:', err);
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
+
+  const saveOnboarding = async () => {
+    setOnboardingSaving(true);
+    try {
+      const payload = {
+        ...onboardingForm,
+        brand_editorial_do: linesToArray(onboardingForm.brand_editorial_do),
+        brand_editorial_dont: linesToArray(onboardingForm.brand_editorial_dont),
+        brand_taboo_phrases: linesToArray(onboardingForm.brand_taboo_phrases),
+        brand_competitor_differentiation: linesToCompetitors(onboardingForm.brand_competitor_differentiation),
+        brand_niche_keywords: linesToArray(onboardingForm.brand_niche_keywords),
+      };
+      const res = await fetch(`${API_BASE}/api/portal/${token}/onboarding`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at });
+      showToast('Brand & voice details saved', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setOnboardingSaving(false);
+    }
+  };
+
   const handleConnectApp = async (appName) => {
     try {
       setConnectingApp(appName);
@@ -2283,11 +2392,17 @@ export default function ClientPortal({ showToast }) {
               >
                 <Users size={15} /> Leads
               </button>
-              <button 
-                onClick={() => setActiveTab('integrations')} 
+              <button
+                onClick={() => setActiveTab('integrations')}
                 className={`portal-tab-btn ${activeTab === 'integrations' ? 'active' : ''}`}
               >
                 <Share2 size={15} /> Integrations
+              </button>
+              <button
+                onClick={() => setActiveTab('onboarding')}
+                className={`portal-tab-btn ${activeTab === 'onboarding' ? 'active' : ''}`}
+              >
+                <Sparkles size={15} /> Brand & Voice
               </button>
             </>
           )}
@@ -3228,6 +3343,152 @@ export default function ClientPortal({ showToast }) {
               </button>
             </div>
 
+          </div>
+        )}
+
+        {/* Brand & Voice (Onboarding) Tab */}
+        {activeTab === 'onboarding' && (clientType === 'marketing' || clientType === 'both') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+            {/* Header / Subtitle */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.05rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>
+                  Brand & Voice
+                </h2>
+                <p style={{ color: '#8b9b90', fontSize: '0.85rem', margin: '4px 0 0', fontWeight: 400 }}>
+                  Tell us who you're writing for and how you want to sound. We use this on every piece of content we create for you.
+                  {onboardingMeta.brand_onboarded_at && (
+                    <> Last saved {new Date(onboardingMeta.brand_onboarded_at).toLocaleString()}.</>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={saveOnboarding}
+                disabled={onboardingSaving || onboardingLoading}
+                className="portal-btn portal-btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600 }}
+              >
+                <CheckCircle size={14} /> {onboardingSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+
+            {/* Audience & Positioning */}
+            <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>
+                Your Audience
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Who is your content for?</label>
+                  <input type="text" className="portal-control" placeholder="e.g. new parents in Mumbai" value={onboardingForm.brand_audience_primary} onChange={e => setOnboardingForm({ ...onboardingForm, brand_audience_primary: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Anyone else? (secondary audience)</label>
+                  <input type="text" className="portal-control" value={onboardingForm.brand_audience_secondary} onChange={e => setOnboardingForm({ ...onboardingForm, brand_audience_secondary: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">How much do they already know?</label>
+                  <input type="text" className="portal-control" placeholder="e.g. beginner, informed patient" value={onboardingForm.brand_audience_expertise} onChange={e => setOnboardingForm({ ...onboardingForm, brand_audience_expertise: e.target.value })} />
+                </div>
+              </div>
+              <div className="portal-form-group" style={{ margin: 0 }}>
+                <label className="portal-label">How do you want to be positioned vs. competitors?</label>
+                <textarea className="portal-control" rows={2} style={{ width: '100%', resize: 'vertical' }} value={onboardingForm.brand_positioning} onChange={e => setOnboardingForm({ ...onboardingForm, brand_positioning: e.target.value })} />
+              </div>
+            </div>
+
+            {/* Editorial Guidelines */}
+            <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>
+                Editorial Guidelines
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Always Do <span style={{ textTransform: 'none', fontWeight: 400 }}>— one per line</span></label>
+                  <textarea className="portal-control" rows={3} style={{ width: '100%', resize: 'vertical' }} value={onboardingForm.brand_editorial_do} onChange={e => setOnboardingForm({ ...onboardingForm, brand_editorial_do: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Never Do <span style={{ textTransform: 'none', fontWeight: 400 }}>— topics/claims to avoid</span></label>
+                  <textarea className="portal-control" rows={3} style={{ width: '100%', resize: 'vertical' }} value={onboardingForm.brand_editorial_dont} onChange={e => setOnboardingForm({ ...onboardingForm, brand_editorial_dont: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Words/Phrases to Avoid <span style={{ textTransform: 'none', fontWeight: 400 }}>— one per line</span></label>
+                  <textarea className="portal-control" rows={3} style={{ width: '100%', resize: 'vertical' }} value={onboardingForm.brand_taboo_phrases} onChange={e => setOnboardingForm({ ...onboardingForm, brand_taboo_phrases: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">What Makes You Different <span style={{ textTransform: 'none', fontWeight: 400 }}>— one per line, "Competitor: how we're different"</span></label>
+                  <textarea className="portal-control" rows={3} style={{ width: '100%', resize: 'vertical' }} placeholder={'Competitor X: faster turnaround'} value={onboardingForm.brand_competitor_differentiation} onChange={e => setOnboardingForm({ ...onboardingForm, brand_competitor_differentiation: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            {/* Voice & Tone */}
+            <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>
+                Voice & Tone
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' }}>
+                {[
+                  { field: 'persona_tone_funny_serious', left: 'Funny', right: 'Serious' },
+                  { field: 'persona_tone_formal_casual', left: 'Formal', right: 'Casual' },
+                  { field: 'persona_tone_respectful_irreverent', left: 'Respectful', right: 'Irreverent' },
+                  { field: 'persona_tone_enthusiastic_matter_of_fact', left: 'Enthusiastic', right: 'Matter-of-fact' },
+                ].map(({ field, left, right }) => (
+                  <div className="portal-form-group" style={{ margin: 0 }} key={field}>
+                    <label className="portal-label" style={{ display: 'flex', justifyContent: 'space-between', textTransform: 'none' }}>
+                      <span>{left}</span><span>{right}</span>
+                    </label>
+                    <input type="range" min="0" max="1" step="0.1" value={onboardingForm[field]} onChange={e => setOnboardingForm({ ...onboardingForm, [field]: parseFloat(e.target.value) })} style={{ width: '100%' }} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Vocabulary Level</label>
+                  <select className="portal-select" style={{ width: '100%' }} value={onboardingForm.persona_vocabulary_tier} onChange={e => setOnboardingForm({ ...onboardingForm, persona_vocabulary_tier: e.target.value })}>
+                    <option value="consumer">Consumer</option>
+                    <option value="professional">Professional</option>
+                    <option value="technical">Technical</option>
+                  </select>
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Avg. Sentence Length</label>
+                  <input type="number" className="portal-control" value={onboardingForm.persona_sentence_length_mean} onChange={e => setOnboardingForm({ ...onboardingForm, persona_sentence_length_mean: parseInt(e.target.value) || 0 })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Sentence Length Variation</label>
+                  <input type="number" className="portal-control" value={onboardingForm.persona_sentence_length_std} onChange={e => setOnboardingForm({ ...onboardingForm, persona_sentence_length_std: parseInt(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label" style={{ textTransform: 'none' }}>Contraction Frequency <span style={{ fontWeight: 400 }}>({onboardingForm.persona_contraction_frequency})</span></label>
+                  <input type="range" min="0" max="1" step="0.1" value={onboardingForm.persona_contraction_frequency} onChange={e => setOnboardingForm({ ...onboardingForm, persona_contraction_frequency: parseFloat(e.target.value) })} style={{ width: '100%' }} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Summary Box Label</label>
+                  <input type="text" className="portal-control" placeholder="Key Takeaways" value={onboardingForm.persona_summary_label} onChange={e => setOnboardingForm({ ...onboardingForm, persona_summary_label: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            {/* Content Strategy */}
+            <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>
+                Content Strategy
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Topics/Keywords You Want to Rank For <span style={{ textTransform: 'none', fontWeight: 400 }}>— one per line</span></label>
+                  <textarea className="portal-control" rows={2} style={{ width: '100%', resize: 'vertical' }} value={onboardingForm.brand_niche_keywords} onChange={e => setOnboardingForm({ ...onboardingForm, brand_niche_keywords: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">How Often Should We Post?</label>
+                  <input type="text" className="portal-control" placeholder="e.g. 2x/week, 70% educational / 30% promo" value={onboardingForm.brand_publishing_cadence} onChange={e => setOnboardingForm({ ...onboardingForm, brand_publishing_cadence: e.target.value })} />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

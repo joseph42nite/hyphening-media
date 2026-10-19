@@ -12,6 +12,7 @@ import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { getConnectUrl, getClientConnectedAccounts } from '../services/composioService.js';
 import { fetchPostComments, replyToComment } from '../services/commentSync.js';
 import { countableLeadSql } from '../services/leadFilters.js';
+import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS, parseJsonArrayInput } from '../services/onboardingFields.js';
 
 const router = Router();
 
@@ -1195,6 +1196,59 @@ router.post('/:token/integrations/connect', portalAuth, async (req, res) => {
   } catch (err) {
     console.error('[PORTAL-INTEGRATIONS] Connect error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to generate connect URL' });
+  }
+});
+
+/**
+ * GET /api/portal/:token/onboarding
+ * Read this client's own brand/voice onboarding fields, same columns the
+ * admin dashboard reads via GET /api/clients/:id/onboarding.
+ */
+router.get('/:token/onboarding', portalAuth, (req, res) => {
+  try {
+    const client = db.prepare(`SELECT id, brand_onboarded_at, ${ONBOARDING_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(req.portalClient.id);
+    res.json(client);
+  } catch (err) {
+    console.error('[PORTAL] Get onboarding error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/portal/:token/onboarding
+ * Let the client fill in or update their own brand/voice onboarding —
+ * primary entry point now; the admin Onboarding button in ClientsTab.jsx
+ * reads/writes the same columns for review and override.
+ */
+router.put('/:token/onboarding', portalAuth, (req, res) => {
+  try {
+    const updates = {};
+    for (const field of ONBOARDING_FIELDS) {
+      if (req.body[field] !== undefined) {
+        let val = req.body[field];
+        if (ONBOARDING_JSON_FIELDS.includes(field) && val !== null) {
+          val = JSON.stringify(Array.isArray(val) ? val : parseJsonArrayInput(val));
+        }
+        updates[field] = val;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid onboarding fields to update' });
+    }
+
+    updates.brand_onboarded_at = new Date().toISOString();
+    updates.updated_at = new Date().toISOString();
+
+    const setClauses = Object.keys(updates).map((k) => `${k} = ?`).join(', ');
+    const values = [...Object.values(updates), req.portalClient.id];
+    db.prepare(`UPDATE crm_clients SET ${setClauses} WHERE id = ?`).run(...values);
+
+    const updated = db.prepare(`SELECT id, ${ONBOARDING_FIELDS.join(', ')}, brand_onboarded_at FROM crm_clients WHERE id = ?`).get(req.portalClient.id);
+    res.json({ success: true, ...updated });
+  } catch (err) {
+    console.error('[PORTAL] Save onboarding error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
