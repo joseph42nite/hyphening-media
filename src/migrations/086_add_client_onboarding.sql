@@ -2,12 +2,15 @@
 -- Client-onboarding intake so a new client's brand/voice/strategy setup is
 -- captured once and reused by every blog run, instead of being re-derived
 -- by hand each time. Maps 1:1 to the claude-blog plugin's blog-brand and
--- blog-persona skill inputs so BRAND.md/VOICE.md/persona.json can be
--- generated straight from these columns (see src/services/clientOnboarding.js).
--- Flat columns on crm_clients, matching the existing convention for strictly
--- 1:1 per-client fields (see 084_add_client_control_flags.sql, 077_client_ads_properties.sql)
--- rather than a side-table. JSON-array fields are stored as stringified TEXT,
--- same convention as blog_posts.internal_links/tags.
+-- blog-persona skill inputs. Deliberately NOT rendered to BRAND.md/VOICE.md/
+-- persona.json files on disk — 007 wants this pulled live via
+-- GET /api/clients/:id/onboarding at the moment a blog skill run needs it,
+-- so it's always current with the portal and there's no EC2/Mac file-sync
+-- gap to manage. Flat columns on crm_clients, matching the existing
+-- convention for strictly 1:1 per-client fields (see
+-- 084_add_client_control_flags.sql, 077_client_ads_properties.sql) rather
+-- than a side-table. JSON-array fields are stored as stringified TEXT, same
+-- convention as blog_posts.internal_links/tags.
 
 -- blog-brand inputs
 ALTER TABLE crm_clients ADD COLUMN brand_audience_primary TEXT;
@@ -37,4 +40,3 @@ ALTER TABLE crm_clients ADD COLUMN brand_niche_keywords TEXT;
 ALTER TABLE crm_clients ADD COLUMN brand_publishing_cadence TEXT;
 
 ALTER TABLE crm_clients ADD COLUMN brand_onboarded_at TEXT;
-ALTER TABLE crm_clients ADD COLUMN brand_files_generated_at TEXT;

@@ -9,7 +9,6 @@ import bcrypt from 'bcryptjs';
 import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { generateOnboardingFiles, readGeneratedFile } from '../services/clientOnboarding.js';
 
 const router = Router();
 
@@ -435,8 +434,10 @@ router.patch('/:id/flags', authorize('admin'), (req, res) => {
 });
 
 // Onboarding fields, mapped 1:1 to the claude-blog plugin's blog-brand and
-// blog-persona skill inputs (see src/services/clientOnboarding.js for the
-// BRAND.md/VOICE.md/persona.json rendering that reads these back out).
+// blog-persona skill inputs. Pulled live by this GET route at the moment a
+// blog skill run needs them — deliberately not rendered to BRAND.md/VOICE.md/
+// persona.json files, so there's nothing to keep in sync across EC2 and the
+// Mac where those skills actually run.
 // JSON-array fields arrive from the frontend already stringified.
 const ONBOARDING_JSON_FIELDS = ['brand_editorial_do', 'brand_editorial_dont', 'brand_taboo_phrases', 'brand_competitor_differentiation', 'brand_niche_keywords'];
 const ONBOARDING_FIELDS = [
@@ -455,7 +456,7 @@ const ONBOARDING_FIELDS = [
  */
 router.get('/:id/onboarding', authorize('admin'), (req, res) => {
   try {
-    const client = db.prepare(`SELECT id, name, website_url, brand_onboarded_at, brand_files_generated_at, ${ONBOARDING_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(req.params.id);
+    const client = db.prepare(`SELECT id, name, website_url, brand_onboarded_at, ${ONBOARDING_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(req.params.id);
     if (!client) return res.status(404).json({ error: 'Client not found' });
     res.json(client);
   } catch (err) {
@@ -466,9 +467,9 @@ router.get('/:id/onboarding', authorize('admin'), (req, res) => {
 
 /**
  * PUT /api/clients/:id/onboarding
- * Save a client's onboarding intake. Stores the raw fields only — it does
- * not regenerate BRAND.md/persona.json; call .../onboarding/generate for that,
- * so a draft can be saved without immediately overwriting the live files.
+ * Save a client's onboarding intake. Stores the raw fields only — nothing
+ * is rendered to a file; GET /:id/onboarding reads these same columns back
+ * live whenever a blog skill run needs them.
  */
 router.put('/:id/onboarding', authorize('admin'), (req, res) => {
   try {
@@ -509,60 +510,10 @@ router.put('/:id/onboarding', authorize('admin'), (req, res) => {
       ip: req.ip,
     });
 
-    const updated = db.prepare(`SELECT id, ${ONBOARDING_FIELDS.join(', ')}, brand_onboarded_at, brand_files_generated_at FROM crm_clients WHERE id = ?`).get(req.params.id);
+    const updated = db.prepare(`SELECT id, ${ONBOARDING_FIELDS.join(', ')}, brand_onboarded_at FROM crm_clients WHERE id = ?`).get(req.params.id);
     res.json({ success: true, ...updated });
   } catch (err) {
     console.error('[CLIENTS] Save onboarding error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * POST /api/clients/:id/onboarding/generate
- * Render BRAND.md, VOICE.md and persona.json from the saved onboarding
- * fields. Written to this server's local data/client-brand/<id>/ — this
- * backend runs on EC2, not on the Mac where the claude-blog project root
- * and Vault live, so these still need a manual copy to the client's project
- * root (same EC2/Mac split as the existing blog-audio handoff).
- */
-router.post('/:id/onboarding/generate', authorize('admin'), (req, res) => {
-  try {
-    const client = db.prepare(`SELECT id, name, website_url, ${ONBOARDING_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(req.params.id);
-    if (!client) return res.status(404).json({ error: 'Client not found' });
-
-    const { files } = generateOnboardingFiles(client);
-    const generatedAt = new Date().toISOString();
-    db.prepare('UPDATE crm_clients SET brand_files_generated_at = ?, updated_at = ? WHERE id = ?').run(generatedAt, generatedAt, req.params.id);
-
-    logAction({
-      actorId: req.user.id,
-      actorEmail: req.user.email,
-      action: 'client_onboarding_generate',
-      entityType: 'client',
-      entityId: parseInt(req.params.id),
-      diff: { brand_files_generated_at: generatedAt },
-      ip: req.ip,
-    });
-
-    res.json({ success: true, generated_at: generatedAt, files });
-  } catch (err) {
-    console.error('[CLIENTS] Generate onboarding files error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * GET /api/clients/:id/onboarding/files/:filename
- * Re-fetch one already-generated file's content (BRAND.md, VOICE.md or
- * persona.json) without re-rendering.
- */
-router.get('/:id/onboarding/files/:filename', authorize('admin'), (req, res) => {
-  try {
-    const content = readGeneratedFile(req.params.id, req.params.filename);
-    if (content === null) return res.status(404).json({ error: 'File not found — generate it first' });
-    res.json({ filename: req.params.filename, content });
-  } catch (err) {
-    console.error('[CLIENTS] Read onboarding file error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

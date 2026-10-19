@@ -20,8 +20,8 @@ const EMPTY_ONBOARDING_FIELDS = {
 };
 
 // Line-delimited textarea <-> stored JSON-array-as-string convention shared
-// with the backend (src/services/clientOnboarding.js renders these back into
-// BRAND.md/VOICE.md/persona.json).
+// with the backend. Nothing here is rendered to a file — a blog skill run
+// pulls these same columns live via GET /api/clients/:id/onboarding.
 const linesToArray = (text) => (text || '').split('\n').map(s => s.trim()).filter(Boolean);
 const arrayToLines = (json) => {
   try {
@@ -256,9 +256,8 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [onboardingClient, setOnboardingClient] = useState(null);
   const [onboardingForm, setOnboardingForm] = useState(EMPTY_ONBOARDING_FIELDS);
-  const [onboardingMeta, setOnboardingMeta] = useState({ brand_onboarded_at: null, brand_files_generated_at: null });
+  const [onboardingMeta, setOnboardingMeta] = useState({ brand_onboarded_at: null });
   const [onboardingSaving, setOnboardingSaving] = useState(false);
-  const [onboardingGenerating, setOnboardingGenerating] = useState(false);
 
   const openOnboardingModal = async (client) => {
     setOnboardingClient(client);
@@ -288,7 +287,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
         brand_niche_keywords: arrayToLines(data.brand_niche_keywords),
         brand_publishing_cadence: data.brand_publishing_cadence || ''
       });
-      setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at, brand_files_generated_at: data.brand_files_generated_at });
+      setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at });
     } catch (err) {
       showToast(err.message, 'error');
       setShowOnboardingModal(false);
@@ -314,31 +313,12 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save onboarding');
-      setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at, brand_files_generated_at: data.brand_files_generated_at });
+      setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at });
       showToast('Onboarding saved', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
       setOnboardingSaving(false);
-    }
-  };
-
-  const generateOnboardingFiles = async () => {
-    setOnboardingGenerating(true);
-    try {
-      await saveOnboarding();
-      const res = await fetch(`${API_BASE}/api/clients/${onboardingClient.id}/onboarding/generate`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate files');
-      setOnboardingMeta(prev => ({ ...prev, brand_files_generated_at: data.generated_at }));
-      showToast('BRAND.md, VOICE.md and persona.json generated on the server — copy them into the project root manually (EC2 cannot write to the Vault).', 'success');
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      setOnboardingGenerating(false);
     }
   };
 
@@ -850,13 +830,11 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
           <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '760px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2>Onboarding — {onboardingClient.name}</h2>
             <p style={{ margin: '4px 0 16px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Captured once here, this feeds BRAND.md + a persona file that every blog post for this
-              client reuses automatically — same pattern as the Blog/SEO/Ads flags above.
+              Captured once here, then pulled live by the blog pipeline whenever it needs this
+              client's brand/voice — same pattern as the Blog/SEO/Ads flags above. Nothing is
+              generated to a file, so it's always current with whatever's saved here.
               {onboardingMeta.brand_onboarded_at && (
                 <> Last saved {new Date(onboardingMeta.brand_onboarded_at).toLocaleString()}.</>
-              )}
-              {onboardingMeta.brand_files_generated_at && (
-                <> Files last generated {new Date(onboardingMeta.brand_files_generated_at).toLocaleString()}.</>
               )}
             </p>
 
@@ -968,11 +946,8 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
               </button>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowOnboardingModal(false)}>Close</button>
-                <button type="button" className="btn btn-secondary" disabled={onboardingSaving} onClick={saveOnboarding}>
+                <button type="button" className="btn btn-primary" disabled={onboardingSaving} onClick={saveOnboarding}>
                   {onboardingSaving ? 'Saving...' : 'Save'}
-                </button>
-                <button type="button" className="btn btn-primary" disabled={onboardingGenerating} onClick={generateOnboardingFiles}>
-                  {onboardingGenerating ? 'Generating...' : 'Save + Generate Files'}
                 </button>
               </div>
             </div>
