@@ -268,9 +268,8 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   }, [chatMessages, activeTab, selectedChatClient]);
 
-  // Reset job assignments page and clear unseen counts when active client or active tab changes
+  // Clear unseen counts when active client or active tab changes
   useEffect(() => {
-    setAssignmentsPage(1);
     if (selectedChatClient && activeTab === 'client-workspaces') {
       setUnseenCounts(prev => {
         const nextCounts = { ...prev, [selectedChatClient.id]: 0 };
