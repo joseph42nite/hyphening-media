@@ -322,11 +322,16 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 }
 .port-video-fr iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
 
-/* — chapter II: blog preview, same card language as the portfolio grid
-   below but with real cover images (the portfolio cards punch through
-   to the live three.js canvas via data-view, which only exists for the
-   6 fixed portfolio slots — blog posts get their own lightweight card) */
-.blog-preview{ margin-top:clamp(40px,6vw,80px); }
+/* — standalone blog preview section, directly after Trusted Growth
+   Partners. Same card language as the portfolio grid in chapter II, but
+   with real cover images (the portfolio cards punch through to the live
+   three.js canvas via data-view, which only exists for the 6 fixed
+   portfolio slots — blog posts get their own lightweight card). */
+.blog-preview-wrapper{
+  position:relative; width:100%; max-width:var(--max-w);
+  margin:clamp(40px, 7vh, 90px) auto clamp(60px, 10vh, 120px) auto;
+  padding:0 var(--pad); z-index:2;
+}
 .blog-cards{
   display:grid; grid-template-columns:repeat(3,1fr);
   gap:clamp(18px,2.4vw,38px) clamp(12px,1.6vw,24px);
@@ -1950,24 +1955,6 @@ html.in-iframe #nav{
       <iframe src="about:blank" title="Hyphening Media — Case Study Reel" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     </div>
   </div>
-
-  <!-- Blog preview — populated client-side from /api/blog, gated by the
-       blog_enabled flag on Hyphening Media's own crm_clients row (same
-       on/off switch 007 uses to pause client blogs). Stays hidden by
-       default; JS only reveals it once the flag check comes back on. -->
-  <div class="blog-preview" id="blogPreview" data-rv="up" style="display:none">
-    <div class="sec-head" data-rv="fade">
-      <span class="k"><b>02b</b> — From The Blog</span><span class="rule"></span><span class="k jp">記事</span>
-    </div>
-    <div class="blog-cards" id="blogCards"></div>
-    <div class="blog-cta-row">
-      <a class="cta" href="#eternity" data-cursor>
-        <span>Contact Us</span>
-        <svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="currentColor" stroke-width="1.3"/></svg>
-        <i></i>
-      </a>
-    </div>
-  </div>
 </section>
 
 <!-- ============================================================ chapter III -->
@@ -2389,6 +2376,28 @@ html.in-iframe #nav{
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Blog preview — sits directly after Trusted Growth Partners, as its own
+     section (not inside the #pathways 3D scene). Populated client-side from
+     /api/blog, gated by the blog_enabled flag on Hyphening Media's own
+     crm_clients row (same on/off switch 007 uses to pause client blogs).
+     Stays hidden by default; JS only reveals it once the flag check comes
+     back on. -->
+<div class="blog-preview-wrapper">
+  <div class="blog-preview" id="blogPreview" data-rv="up" style="display:none">
+    <div class="sec-head" data-rv="fade">
+      <span class="k"><b>04</b> — From The Blog</span><span class="rule"></span><span class="k jp">記事</span>
+    </div>
+    <div class="blog-cards" id="blogCards"></div>
+    <div class="blog-cta-row">
+      <a class="cta" href="#eternity" data-cursor>
+        <span>Contact Us</span>
+        <svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="currentColor" stroke-width="1.3"/></svg>
+        <i></i>
+      </a>
     </div>
   </div>
 </div>
