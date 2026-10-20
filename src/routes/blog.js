@@ -149,6 +149,23 @@ router.get('/sitemap', (req, res) => {
 });
 
 /**
+ * GET /api/blog/landing-flag
+ * Public. Reads Hyphening Media's own blog_enabled flag (crm_clients row
+ * for the agency itself, same on/off switch used to pause client blogs)
+ * so the public landing page can show/hide its Blog section without a
+ * redeploy, same pattern as the per-client pipeline gates.
+ */
+router.get('/landing-flag', (req, res) => {
+  try {
+    const client = db.prepare("SELECT blog_enabled FROM crm_clients WHERE name = 'Hyphening Media'").get();
+    res.json({ blog_enabled: !!(client && client.blog_enabled) });
+  } catch (err) {
+    console.error('[BLOG] Landing flag error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/blog/admin/all
  * Auth-protected. Returns all posts including drafts.
  */
