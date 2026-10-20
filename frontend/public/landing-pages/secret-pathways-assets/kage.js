@@ -2662,6 +2662,7 @@ function buildCardCloth() {
   if (COARSE) return;                     /* no pointer to brush it with */
   const frames = $$('.cards .card-fr, #cur .les-media');
   frames.forEach(fr => {
+    if (fr.classList.contains('on-cloth')) return; /* already wrapped — re-entrant-safe so callers can re-run this once content loaded after the first pass (e.g. dynamic case-study cards) without doubling up canvases/listeners */
     let url = (getComputedStyle(fr).backgroundImage.match(/url\(["']?([^"')]+)/) || [])[1];
     if (!url) {
       const imgEl = fr.querySelector('img');
@@ -3781,6 +3782,7 @@ const JOBS = [
   ['Raising the mist', () => { buildAtmosphere(); buildLeafFall(); buildWisps(); }],
   ['Polishing the water', () => {
     initPost(); buildCards(); buildCardCloth();
+    window.__rebuildCardCloth = buildCardCloth; /* lets late DOM content (e.g. dynamically-filled case-study cards) re-run cloth-wrapping once their real image is in place; buildCardCloth is re-entrant-safe */
     WORLD.fg.forEach(m => m.layers.set(1));
     WORD.glyphs.forEach(m => m.layers.set(2));
     if (WORLD.rain) WORLD.rain.layers.set(1);
