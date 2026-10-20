@@ -21,7 +21,9 @@
         var fr = slot.querySelector('.card-fr');
         var glow = slot.querySelector('.glow');
         var lab = slot.querySelector('.card-lab');
+        var labTag = lab && lab.querySelector('.card-tag');
         var labB = lab && lab.querySelector('b');
+        var labClient = lab && lab.querySelector('.card-client');
         var labJp = lab && lab.querySelector('.jp');
         var meta = slot.querySelector('.card-meta');
         var metaLeft = meta && meta.children[0];
@@ -32,9 +34,12 @@
           ? ('linear-gradient(180deg,rgba(3,6,9,.05) 36%,rgba(3,6,9,.74) 100%), url(\'' + cs.cover_image_url + '\') center / cover no-repeat')
           : 'linear-gradient(150deg,#101a1d,#0a0d10 62%,#1a0c0b)';
         if (glow) glow.remove();
+        if (labTag) labTag.textContent = 'Case Study ' + String(i + 1).padStart(2, '0');
         if (labB) labB.textContent = esc(cs.title);
+        var clientText = cs.client_name || (cs.written_by ? ('By ' + esc(cs.written_by)) : '');
+        if (labClient) labClient.textContent = clientText;
         if (labJp) labJp.remove();
-        if (metaLeft) metaLeft.textContent = cs.client_name || (cs.written_by ? ('By ' + esc(cs.written_by)) : '');
+        if (metaLeft) metaLeft.textContent = '';
         if (metaRight) metaRight.textContent = String(i + 1).padStart(2, '0') + ' / ' + String(studies.length).padStart(2, '0');
       });
 
