@@ -41,6 +41,7 @@ import portalRoutes from './src/routes/portal.js';
 import artistRoutes from './src/routes/artists.js';
 import webhookRoutes from './src/routes/webhooks.js';
 import blogRoutes from './src/routes/blog.js';
+import caseStudiesRoutes from './src/routes/caseStudies.js';
 import integrationsRoutes from './src/routes/integrations.js';
 import { publicGigConfirmRoute } from './src/routes/artists.js';
 import seoRoutes, { queueRouter as seoQueueRoutes } from './src/routes/seo.js';
@@ -261,6 +262,7 @@ app.use('/api/notifications', notificationRoutes);
 
 // Blog (public + admin)
 app.use('/api/blog', blogRoutes);
+app.use('/api/case-studies', caseStudiesRoutes);
 
 // Composio Social Integrations
 app.use('/api', integrationsRoutes);

@@ -4,7 +4,7 @@ import { API_BASE, authFetch } from '../api.js';
 import logoImg from '../assets/logo.png';
 import {
   Users, Folder, Calendar, Shield, LogOut, FileSpreadsheet,
-  X, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus
+  X, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus, Award
 } from 'lucide-react';
 
 import LeadsTab from '../components/dashboard/LeadsTab.jsx';
@@ -17,6 +17,7 @@ import AuditLogsTab from '../components/dashboard/AuditLogsTab.jsx';
 import ChatTab from '../components/dashboard/ChatTab.jsx';
 import ContentModal from '../components/dashboard/ContentModal.jsx';
 import BlogTab from '../components/dashboard/BlogTab.jsx';
+import CaseStudiesTab from '../components/dashboard/CaseStudiesTab.jsx';
 import ClientsTab from '../components/dashboard/ClientsTab.jsx';
 import SeoMonitorTab from '../components/dashboard/SeoMonitorTab.jsx';
 import AdsMonitorTab from '../components/dashboard/AdsMonitorTab.jsx';
@@ -1063,6 +1064,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
+        {/* 7b. Case Studies */}
+        {isAdmin && (
+          <button onClick={() => handleTabClick('casestudies')} className={`btn ${activeTab === 'casestudies' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }}>
+            <Award size={16} /> Case Studies
+          </button>
+        )}
+
         {/* 8. Clients */}
         {isAdmin && (
           <button onClick={() => handleTabClick('clients')} className={`btn ${activeTab === 'clients' ? 'btn-primary' : 'btn-secondary'}`}>
@@ -1229,6 +1237,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* BLOG TAB */}
         {activeTab === 'blog' && (
           <BlogTab showToast={showToast} />
+        )}
+
+        {/* CASE STUDIES TAB */}
+        {activeTab === 'casestudies' && (
+          <CaseStudiesTab showToast={showToast} />
         )}
 
         {/* SEO MONITOR TAB */}

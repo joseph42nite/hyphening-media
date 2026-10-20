@@ -10,6 +10,7 @@ import Toast from './components/Toast.jsx';
 // Lazy-load Landing page — never fetched on mobile (saves ~60KB + game canvas)
 const Landing = React.lazy(() => import('./views/Landing.jsx'));
 const Blog = React.lazy(() => import('./views/Blog.jsx'));
+const CaseStudies = React.lazy(() => import('./views/CaseStudies.jsx'));
 
 // WebViews need HashRouter — no server-side routing fallback for client-side routes
 const Router = isNative ? HashRouter : BrowserRouter;
@@ -126,9 +127,19 @@ function App() {
             path="/blog" 
             element={<React.Suspense fallback={null}><Blog /></React.Suspense>}
           />
-          <Route 
-            path="/blog/:slug" 
+          <Route
+            path="/blog/:slug"
             element={<React.Suspense fallback={null}><Blog /></React.Suspense>}
+          />
+
+          {/* Public Case Studies */}
+          <Route
+            path="/case-studies"
+            element={<React.Suspense fallback={null}><CaseStudies /></React.Suspense>}
+          />
+          <Route
+            path="/case-studies/:slug"
+            element={<React.Suspense fallback={null}><CaseStudies /></React.Suspense>}
           />
 
           {/* Fallback routes */}
