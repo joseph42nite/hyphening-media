@@ -18,11 +18,19 @@ const CINEMATOGRAPHER_ALLOWED = new Set([
 ]);
 
 // api_readonly accounts (external agents) may only list clients and read one
-// client. Anchored patterns, so sub-routes like /api/clients/:id/marketing/...
-// stay denied. Every allowed read and every denied attempt is audit-logged.
+// client, plus read-only SEO/Ads audit and recommendation data. Anchored
+// patterns, so sub-routes like /api/clients/:id/marketing/... stay denied.
+// Every allowed read and every denied attempt is audit-logged.
 const API_READONLY_ALLOWED = [
   /^GET \/api\/clients\/?$/,
   /^GET \/api\/clients\/(\d+)$/,
+  /^GET \/api\/clients\/(\d+)\/seo\/audits$/,
+  /^GET \/api\/clients\/(\d+)\/seo\/audits\/\d+$/,
+  /^GET \/api\/clients\/(\d+)\/seo\/agents\/status$/,
+  /^GET \/api\/clients\/(\d+)\/ads\/audits$/,
+  /^GET \/api\/clients\/(\d+)\/ads\/audits\/\d+$/,
+  /^GET \/api\/clients\/(\d+)\/ads\/agents\/status$/,
+  /^GET \/api\/clients\/(\d+)\/ads\/recommendations$/,
 ];
 
 /**
