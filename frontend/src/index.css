@@ -3924,17 +3924,113 @@ html.dark-theme {
   display: block;
 }
 
-.blog-article-audio-wrap {
+/* Narration player — a styled card, not a bare browser <audio> widget */
+.blog-audio-card {
   margin: 0 0 40px;
-  padding: 14px 18px;
-  border-radius: 14px;
-  border: 1px solid rgba(223, 231, 224, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  padding: 20px 22px;
+  border-radius: 16px;
+  border: 1px solid rgba(224, 35, 28, 0.25);
+  background: linear-gradient(135deg, rgba(224, 35, 28, 0.1) 0%, rgba(14, 19, 25, 0.9) 70%);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
 }
 
-.blog-article-audio {
-  width: 100%;
-  display: block;
+.blog-audio-card-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.blog-audio-play-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  color: #ffffff;
+  background: #e0231c;
+  box-shadow: 0 0 18px rgba(224, 35, 28, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.blog-audio-play-btn:hover {
+  background: #ff3a2e;
+  transform: scale(1.06);
+}
+
+.blog-audio-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.blog-audio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f0a8a4;
+}
+
+.blog-audio-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 14px;
+}
+
+.blog-audio-bar {
+  width: 3px;
+  height: 30%;
+  border-radius: 2px;
+  background: rgba(224, 35, 28, 0.5);
+  transition: height 0.2s ease;
+}
+
+.blog-audio-bars-active .blog-audio-bar {
+  animation: blog-audio-bounce 0.9s ease-in-out infinite;
+  background: #e0231c;
+}
+
+.blog-audio-bars-active .blog-audio-bar:nth-child(1) { animation-delay: 0s; }
+.blog-audio-bars-active .blog-audio-bar:nth-child(2) { animation-delay: 0.15s; }
+.blog-audio-bars-active .blog-audio-bar:nth-child(3) { animation-delay: 0.3s; }
+.blog-audio-bars-active .blog-audio-bar:nth-child(4) { animation-delay: 0.45s; }
+.blog-audio-bars-active .blog-audio-bar:nth-child(5) { animation-delay: 0.6s; }
+
+@keyframes blog-audio-bounce {
+  0%, 100% { height: 30%; }
+  50% { height: 100%; }
+}
+
+.blog-audio-time {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: #8b9b90;
+}
+
+.blog-audio-track {
+  margin-top: 14px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.blog-audio-track-fill {
+  height: 100%;
+  background: #e0231c;
+  border-radius: 999px;
 }
 
 /* Editorial Markdown Body */

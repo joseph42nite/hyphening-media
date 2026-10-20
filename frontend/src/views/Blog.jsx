@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, Search, Sparkles, Share2, Check, ShieldCheck, Link2, Volume2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Clock, Calendar, Tag, Search, Sparkles, Share2, Check, Volume2, Play, Pause, Headphones } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
@@ -64,34 +64,13 @@ function renderMarkdown(md) {
 }
 
 /**
- * Quality signals a post genuinely earns, derived only from data actually
- * stored on it — never a fabricated score. No fact-check/GEO/cannibalization
- * badge exists here because nothing in the pipeline currently verifies those
- * claims per-post; adding a badge for them would be a false trust signal.
+ * "Narrated" is the only reader-facing signal worth showing on a post —
+ * SEO/schema/taxonomy/internal-linking pills were backend jargon that meant
+ * nothing to a reader or prospective client, so they were dropped.
  */
 function qualitySignals(post) {
   if (!post) return [];
-  let hasInternalLinks = false;
-  try {
-    const parsed = JSON.parse(post.internal_links || '[]');
-    hasInternalLinks = Array.isArray(parsed) && parsed.length > 0;
-  } catch (e) { /* malformed/empty — treat as none */ }
-
-  const signals = [];
-  if (post.meta_title && post.meta_description && post.meta_keywords) {
-    signals.push({ key: 'seo', label: 'SEO Optimized', icon: Search });
-  }
-  signals.push({ key: 'schema', label: 'Schema Markup', icon: ShieldCheck });
-  if (post.category && post.tags) {
-    signals.push({ key: 'taxonomy', label: 'Taxonomy Tagged', icon: Tag });
-  }
-  if (hasInternalLinks) {
-    signals.push({ key: 'links', label: 'Internally Linked', icon: Link2 });
-  }
-  if (post.audio_url) {
-    signals.push({ key: 'audio', label: 'Narrated', icon: Volume2 });
-  }
-  return signals;
+  return post.audio_url ? [{ key: 'audio', label: 'Narrated', icon: Volume2 }] : [];
 }
 
 function formatDate(dateStr) {
@@ -382,6 +361,81 @@ function BlogListing() {
 }
 
 // ============================================================
+// NARRATION PLAYER (replaces the bare <audio> widget with a styled card)
+// ============================================================
+
+function formatAudioTime(s) {
+  if (!s || !isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function AudioPlayerCard({ src }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const togglePlay = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) el.pause(); else el.play();
+  };
+
+  const seek = (e) => {
+    const el = audioRef.current;
+    if (!el || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    el.currentTime = pct * duration;
+  };
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div className="blog-audio-card">
+      <div className="blog-audio-card-top">
+        <button
+          type="button"
+          className="blog-audio-play-btn"
+          onClick={togglePlay}
+          aria-label={playing ? 'Pause narration' : 'Play narration'}
+        >
+          {playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+        </button>
+
+        <div className="blog-audio-info">
+          <span className="blog-audio-label">
+            <Headphones size={13} /> Listen to this article
+          </span>
+          <div className={`blog-audio-bars ${playing ? 'blog-audio-bars-active' : ''}`}>
+            {Array.from({ length: 5 }).map((_, i) => <span key={i} className="blog-audio-bar" />)}
+          </div>
+        </div>
+
+        <span className="blog-audio-time">{formatAudioTime(currentTime)} / {formatAudioTime(duration)}</span>
+      </div>
+
+      <div className="blog-audio-track" onClick={seek}>
+        <div className="blog-audio-track-fill" style={{ width: `${pct}%` }} />
+      </div>
+
+      <audio
+        ref={audioRef}
+        preload="none"
+        src={src}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onLoadedMetadata={e => setDuration(e.target.duration)}
+        onTimeUpdate={e => setCurrentTime(e.target.currentTime)}
+      />
+    </div>
+  );
+}
+
+// ============================================================
 // BLOG ARTICLE PAGE
 // ============================================================
 
@@ -592,13 +646,7 @@ function BlogArticle() {
           )}
 
           {/* Narration (only when this post has an audio_url) */}
-          {post.audio_url && (
-            <div className="blog-article-audio-wrap">
-              <audio controls preload="none" className="blog-article-audio" src={post.audio_url}>
-                Your browser does not support the audio element.
-              </audio>
-            </div>
-          )}
+          {post.audio_url && <AudioPlayerCard src={post.audio_url} />}
 
           {/* Article Markdown Content Body */}
           <div
@@ -626,13 +674,13 @@ function BlogArticle() {
               <img src={logoImg} alt="Hyphening Media" />
             </div>
             <div className="blog-author-box-text">
-              <h4>Crafted by Hyphening Media</h4>
+              <h4>Want results like this for your brand?</h4>
               <p>
-                We design and scale high-performance creative engines for D2C, F&B, and healthcare brands.
-                From daily content operations to custom dashboards and automated growth funnels.
+                Hyphening Media designs and scales high-performance creative engines for D2C, F&B, and
+                healthcare brands — content, dashboards, and growth funnels, all in one system.
               </p>
               <Link to="/#contact" className="blog-author-cta-btn">
-                Work With Us <ArrowRight size={14} />
+                Contact Us <ArrowRight size={14} />
               </Link>
             </div>
           </div>
