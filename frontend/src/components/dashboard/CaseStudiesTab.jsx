@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X, Upload } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -15,6 +15,7 @@ export default function CaseStudiesTab({ showToast }) {
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({ ...emptyForm });
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   useEffect(() => { fetchPosts(); }, []);
 
@@ -110,6 +111,37 @@ export default function CaseStudiesTab({ showToast }) {
       fetchPosts();
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  };
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+
+    if (file.type !== 'image/webp') {
+      showToast('Only .webp images are accepted', 'error');
+      return;
+    }
+
+    setUploadingCover(true);
+    try {
+      const body = new FormData();
+      body.append('image', file);
+      const res = await fetch(`${API_BASE}/api/case-studies/upload-image`, {
+        method: 'POST',
+        body,
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      setFormData(f => ({ ...f, cover_image_url: data.url }));
+      showToast('Cover image uploaded', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setUploadingCover(false);
     }
   };
 
@@ -268,8 +300,28 @@ export default function CaseStudiesTab({ showToast }) {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Cover Image URL</label>
-                <input className="form-control" value={formData.cover_image_url} onChange={e => setFormData({ ...formData, cover_image_url: e.target.value })} placeholder="https://images.unsplash.com/..." />
+                <label className="form-label">Cover Image (.webp only)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  {formData.cover_image_url && (
+                    <div style={{ position: 'relative', width: '72px', height: '72px', flexShrink: 0 }}>
+                      <img src={formData.cover_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border-color)' }} />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger"
+                        onClick={() => setFormData({ ...formData, cover_image_url: '' })}
+                        title="Remove cover image"
+                        style={{ position: 'absolute', top: '-8px', right: '-8px', padding: '2px', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
+                  <label className="btn btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: uploadingCover ? 'default' : 'pointer' }}>
+                    <Upload size={13} />
+                    {uploadingCover ? 'Uploading...' : (formData.cover_image_url ? 'Replace image' : 'Upload image')}
+                    <input type="file" accept="image/webp" onChange={handleCoverUpload} disabled={uploadingCover} style={{ display: 'none' }} />
+                  </label>
+                </div>
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>

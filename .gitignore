@@ -10,6 +10,7 @@ data/*
 dist/
 .DS_Store
 *.pem
+public/uploads/
 
 # Android / Capacitor build artifacts
 frontend/android/.gradle/

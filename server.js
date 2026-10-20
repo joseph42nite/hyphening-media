@@ -82,13 +82,13 @@ app.use(helmet({
   contentSecurityPolicy: IS_PROD ? {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       // The landing page's font sheet inlines its woff2 files as base64
       // data: URIs, so data: has to be allowed or every face is blocked.
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "http://localhost", "capacitor://localhost"],
+      connectSrc: ["'self'", "http://localhost", "capacitor://localhost", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com"],
     },
   } : false,
   hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true } : false,
@@ -325,6 +325,16 @@ app.get('/api/audit-logs', (req, res) => {
 // Lives outside frontend/dist so `npm run build` (which wipes dist) never
 // takes it out. Referenced by blog_posts.audio_url, e.g. /audio/<file>.mp3.
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'),
+}));
+
+// ============================================================
+// STATIC FILES — admin-uploaded cover images (case studies, etc.)
+// ============================================================
+// Same rationale as /audio above: lives outside frontend/dist so a rebuild
+// never wipes it. Filenames are content-hashed on upload, so immutable
+// caching is safe.
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads'), {
   setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'),
 }));
 

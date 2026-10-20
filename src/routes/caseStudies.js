@@ -5,8 +5,28 @@
 
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import db from '../../database.js';
 import { logAction } from '../services/auditLogger.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads', 'case-studies');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'image/webp') {
+      return cb(new Error('Only .webp images are accepted'));
+    }
+    cb(null, true);
+  },
+});
 
 const router = Router();
 
@@ -107,6 +127,43 @@ router.get('/:slug', (req, res) => {
 // ============================================================
 // ADMIN ENDPOINTS
 // ============================================================
+
+/**
+ * POST /api/case-studies/upload-image
+ * Auth-protected. Accepts a single .webp file, stores it under
+ * public/uploads/case-studies, and returns its public URL for use as
+ * cover_image_url. Content-hashed filename so re-uploading the same
+ * image is idempotent and caching stays safe (see server.js /uploads route).
+ */
+router.post('/upload-image', requireAdmin, (req, res) => {
+  upload.single('image')(req, res, (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message || 'Upload failed' });
+    handleImageUpload(req, res);
+  });
+});
+
+function handleImageUpload(req, res) {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image file provided' });
+
+    const buf = req.file.buffer;
+    // RIFF....WEBP — verify the actual bytes, not just the client-sent
+    // mimetype, which is trivially spoofable.
+    const isWebp = buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+    if (!isWebp) return res.status(400).json({ error: 'File is not a valid .webp image' });
+
+    const hash = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 20);
+    const filename = `${hash}.webp`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf);
+
+    logAction({ action: 'upload', entityType: 'case_study_image', entityId: filename, userId: req.user.id, diff: { filename, size: buf.length } });
+
+    res.json({ url: `/uploads/case-studies/${filename}` });
+  } catch (err) {
+    console.error('[CASE STUDIES] Image upload error:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+}
 
 /**
  * POST /api/case-studies
