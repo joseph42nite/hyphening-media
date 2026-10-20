@@ -60,7 +60,7 @@ function ensureUniqueSlug(slug, excludeId = null) {
 router.get('/', (req, res) => {
   try {
     const posts = db.prepare(`
-      SELECT id, title, slug, client_name, summary, cover_image_url, published_at, created_at, updated_at
+      SELECT id, title, slug, client_name, summary, cover_image_url, written_by, published_at, created_at, updated_at
       FROM case_studies WHERE status = 'published'
       ORDER BY published_at DESC, created_at DESC
     `).all();
@@ -113,7 +113,7 @@ router.get('/:slug', (req, res) => {
  */
 router.post('/', requireAdmin, (req, res) => {
   try {
-    const { title, client_name, summary, content, cover_image_url, gallery_image_urls, video_embed_urls, status } = req.body;
+    const { title, client_name, summary, content, cover_image_url, gallery_image_urls, video_embed_urls, status, written_by } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({ error: 'title and content are required' });
@@ -124,12 +124,12 @@ router.post('/', requireAdmin, (req, res) => {
     const publishedAt = postStatus === 'published' ? new Date().toISOString() : null;
 
     const result = db.prepare(`
-      INSERT INTO case_studies (title, slug, client_name, summary, content, cover_image_url, gallery_image_urls, video_embed_urls, status, published_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO case_studies (title, slug, client_name, summary, content, cover_image_url, gallery_image_urls, video_embed_urls, status, published_at, written_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title, slug, client_name || null, summary || null, content, cover_image_url || null,
       JSON.stringify(gallery_image_urls || []), JSON.stringify(video_embed_urls || []),
-      postStatus, publishedAt
+      postStatus, publishedAt, written_by || null
     );
 
     logAction({ action: 'create', entityType: 'case_study', entityId: result.lastInsertRowid, userId: req.user.id, diff: { title, slug, status: postStatus } });
@@ -150,7 +150,7 @@ router.patch('/:id', requireAdmin, (req, res) => {
     const post = db.prepare('SELECT * FROM case_studies WHERE id = ?').get(req.params.id);
     if (!post) return res.status(404).json({ error: 'Case study not found' });
 
-    const allowedFields = ['title', 'client_name', 'summary', 'content', 'cover_image_url', 'gallery_image_urls', 'video_embed_urls', 'status'];
+    const allowedFields = ['title', 'client_name', 'summary', 'content', 'cover_image_url', 'gallery_image_urls', 'video_embed_urls', 'status', 'written_by'];
     const updates = {};
 
     for (const field of allowedFields) {

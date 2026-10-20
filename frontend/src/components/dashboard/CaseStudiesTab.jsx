@@ -5,7 +5,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const emptyForm = {
   title: '', client_name: '', summary: '', content: '', cover_image_url: '',
-  gallery_image_urls: '', video_embed_urls: '', status: 'draft'
+  gallery_image_urls: '', video_embed_urls: '', status: 'draft', written_by: ''
 };
 
 export default function CaseStudiesTab({ showToast }) {
@@ -53,7 +53,8 @@ export default function CaseStudiesTab({ showToast }) {
       cover_image_url: post.cover_image_url || '',
       gallery_image_urls: toLines(post.gallery_image_urls),
       video_embed_urls: toLines(post.video_embed_urls),
-      status: post.status || 'draft'
+      status: post.status || 'draft',
+      written_by: post.written_by || ''
     });
     setShowModal(true);
   };
@@ -245,9 +246,15 @@ export default function CaseStudiesTab({ showToast }) {
                 </div>
               </div>
 
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Client Name</label>
-                <input className="form-control" value={formData.client_name} onChange={e => setFormData({ ...formData, client_name: e.target.value })} placeholder="e.g. Acme Skincare" />
+              <div className="form-grid-2 blog-form-header-grid">
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Client Name</label>
+                  <input className="form-control" value={formData.client_name} onChange={e => setFormData({ ...formData, client_name: e.target.value })} placeholder="e.g. Acme Skincare" />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Written By (optional)</label>
+                  <input className="form-control" value={formData.written_by} onChange={e => setFormData({ ...formData, written_by: e.target.value })} placeholder="e.g. Jane Doe" />
+                </div>
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>

@@ -200,6 +200,9 @@ function CaseStudiesListing() {
                     <span className="blog-card-date">
                       <Calendar size={13} /> {formatDate(post.published_at)}
                     </span>
+                    {post.written_by && (
+                      <span className="blog-card-date">By {post.written_by}</span>
+                    )}
                   </div>
 
                   <h2 className="blog-card-title">{post.title}</h2>
@@ -354,8 +357,8 @@ function CaseStudyDetail() {
                 <img src={logoImg} alt="Hyphening Media" />
               </div>
               <div className="blog-author-info">
-                <span className="blog-author-name">Hyphening Media</span>
-                <span className="blog-author-role">Creative Operations Lead</span>
+                <span className="blog-author-name">{post.written_by || 'Hyphening Media'}</span>
+                <span className="blog-author-role">{post.written_by ? 'Contributor' : 'Creative Operations Lead'}</span>
               </div>
             </div>
           </header>
