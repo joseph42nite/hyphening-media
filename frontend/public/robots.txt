@@ -1,8 +1,6 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
-Allow: /blog
-Allow: /blog/*
 Disallow: /dashboard
 Disallow: /portal/
 Disallow: /login

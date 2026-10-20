@@ -94,6 +94,18 @@ app.use(helmet({
   hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true } : false,
 }));
 
+// Helmet 8 dropped its Permissions-Policy helper (the feature list kept
+// changing upstream), so the header is set directly. Nothing on this site
+// uses camera/mic/geolocation/payment/usb, and interest-cohort=() opts out
+// of FLoC-style tracking.
+app.use((req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()'
+  );
+  next();
+});
+
 // 2. CORS — allow frontend origin
 const CAPACITOR_ORIGINS = ['http://localhost', 'capacitor://localhost'];
 app.use(cors({
