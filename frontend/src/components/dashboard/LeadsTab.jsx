@@ -207,7 +207,7 @@ export default function LeadsTab({
     setFormData(prev => ({ ...prev, industry: trimmed }));
     setNewSegmentInput('');
     setIsAddingInlineSegment(false);
-    showToast?.(`Segment "${trimmed}" selected`, 'success');
+    showToast?.(`Industry "${trimmed}" selected`, 'success');
   };
 
   const handleAddSegmentFromModal = () => {
@@ -215,10 +215,10 @@ export default function LeadsTab({
     if (!trimmed) return;
     if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
       setSegments(prev => [...prev, trimmed]);
-      showToast?.(`Segment "${trimmed}" added!`, 'success');
+      showToast?.(`Industry "${trimmed}" added!`, 'success');
       setSegmentModalInput('');
     } else {
-      showToast?.(`Segment "${trimmed}" already exists`, 'info');
+      showToast?.(`Industry "${trimmed}" already exists`, 'info');
     }
   };
 
@@ -490,10 +490,10 @@ export default function LeadsTab({
           <button
             onClick={() => setShowSegmentModal(true)}
             className="btn btn-secondary"
-            style={{ fontSize: '0.8rem', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            title="Manage and add lead segments"
+            style={{ fontSize: '0.8rem', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+            title="Add a new industry name"
           >
-            <Tag size={15} /> Add Segment
+            <Plus size={15} /> Add Industry
           </button>
           <button onClick={openAddModal} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={16} /> Add Lead
@@ -534,7 +534,7 @@ export default function LeadsTab({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Segment:</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Industry:</span>
           <select
             className="form-control"
             value={industryFilter}
@@ -547,12 +547,21 @@ export default function LeadsTab({
             }}
             style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem' }}
           >
-            <option value="all">All Segments</option>
+            <option value="all">All Industries</option>
             {segments.map(seg => (
               <option key={seg} value={seg}>{getSegmentIcon(seg)} {seg}</option>
             ))}
-            <option value="__ADD_NEW__">➕ + Add Segment...</option>
+            <option value="__ADD_NEW__">➕ + Add Industry...</option>
           </select>
+          <button
+            type="button"
+            onClick={() => setShowSegmentModal(true)}
+            className="btn btn-secondary"
+            style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+            title="Add a new industry name"
+          >
+            <Plus size={13} /> Add Industry
+          </button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -587,7 +596,7 @@ export default function LeadsTab({
             <tr>
               <th>Client Name</th>
               <th>Company Name</th>
-              <th>Segment</th>
+              <th>Industry</th>
               <th>Location</th>
               <th>Phone (Click to Call)</th>
               <th>Email</th>
@@ -967,7 +976,7 @@ export default function LeadsTab({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div className="form-group">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label className="form-label" style={{ margin: 0 }}>Segment / Industry</label>
+                    <label className="form-label" style={{ margin: 0 }}>Industry / Sector</label>
                     <button
                       type="button"
                       onClick={() => setIsAddingInlineSegment(prev => !prev)}
@@ -975,16 +984,16 @@ export default function LeadsTab({
                         background: 'none',
                         border: 'none',
                         color: 'var(--color-primary, #60a5fa)',
-                        fontSize: '0.76rem',
+                        fontSize: '0.78rem',
                         cursor: 'pointer',
                         padding: 0,
                         fontWeight: 600,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '3px'
+                        gap: '4px'
                       }}
                     >
-                      <Plus size={13} /> Add segment
+                      <Plus size={13} /> Add Industry
                     </button>
                   </div>
 
@@ -1001,7 +1010,7 @@ export default function LeadsTab({
                       <input
                         type="text"
                         className="form-control"
-                        placeholder="e.g. Interior Designers"
+                        placeholder="Enter industry name (e.g. Interior Designers)"
                         value={newSegmentInput}
                         onChange={e => setNewSegmentInput(e.target.value)}
                         onKeyDown={e => {
@@ -1046,13 +1055,13 @@ export default function LeadsTab({
                       }
                     }}
                   >
-                    <option value="">-- Select Segment / Industry --</option>
+                    <option value="">-- Select Industry --</option>
                     {segments.map(seg => (
                       <option key={seg} value={seg}>
                         {getSegmentIcon(seg)} {seg}
                       </option>
                     ))}
-                    <option value="__ADD_NEW__">➕ + Add New Segment...</option>
+                    <option value="__ADD_NEW__">➕ + Add Industry...</option>
                   </select>
                 </div>
 
@@ -1152,7 +1161,7 @@ export default function LeadsTab({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Tag size={18} style={{ color: '#60a5fa' }} /> Lead Segments
+                <Plus size={18} style={{ color: '#60a5fa' }} /> Add Industry / Segment
               </h4>
               <button 
                 className="btn-icon" 
@@ -1166,13 +1175,13 @@ export default function LeadsTab({
             </div>
 
             <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Add and organize industry segments (e.g. Interior Designers, Healthcare, FnB) to categorize your sales leads.
+              Add a new industry name (e.g. Interior Designers, Healthcare, FnB, Real Estate) to categorize your sales leads.
             </p>
 
-            {/* Current Segments List */}
+            {/* Current Industries List */}
             <div style={{ marginBottom: '18px' }}>
               <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '8px', display: 'block' }}>
-                Active Segments ({segments.length})
+                Active Industries ({segments.length})
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {segments.map(seg => (
@@ -1196,16 +1205,16 @@ export default function LeadsTab({
               </div>
             </div>
 
-            {/* Add New Segment Input */}
+            {/* Add New Industry Input */}
             <div style={{ marginBottom: '18px' }}>
               <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '6px', display: 'block' }}>
-                Add New Segment
+                Industry Name
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="e.g. Interior Designers, Real Estate..."
+                  placeholder="Enter industry name (e.g. Interior Designers)"
                   value={segmentModalInput}
                   onChange={e => setSegmentModalInput(e.target.value)}
                   onKeyDown={e => {
@@ -1222,7 +1231,7 @@ export default function LeadsTab({
                   onClick={handleAddSegmentFromModal}
                   style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <Plus size={15} /> Add
+                  <Plus size={15} /> Add Industry
                 </button>
               </div>
             </div>
