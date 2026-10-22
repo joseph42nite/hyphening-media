@@ -2,9 +2,75 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Search, Phone, Mail, Globe, MapPin, Calendar, Clock, 
   Bell, BellOff, Volume2, VolumeX, Trash2, Edit3, CheckCircle2, 
-  AlertCircle, ExternalLink, RefreshCw, X 
+  AlertCircle, ExternalLink, RefreshCw, X, Tag 
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../api.js';
+
+// Segment / Industry icon helper
+function getSegmentIcon(segment) {
+  const s = (segment || '').toLowerCase();
+  if (s.includes('interior') || s.includes('design') || s.includes('decor') || s.includes('furniture')) return '🛋️';
+  if (s.includes('fnb') || s.includes('food') || s.includes('restaurant') || s.includes('cafe') || s.includes('beverage')) return '🍽️';
+  if (s.includes('health') || s.includes('medical') || s.includes('clinic') || s.includes('hospital') || s.includes('doctor')) return '🏥';
+  if (s.includes('real estate') || s.includes('property') || s.includes('realty') || s.includes('builder')) return '🏢';
+  if (s.includes('tech') || s.includes('software') || s.includes('saas') || s.includes('digital') || s.includes('it')) return '💻';
+  if (s.includes('fashion') || s.includes('apparel') || s.includes('clothing') || s.includes('boutique')) return '👗';
+  if (s.includes('fit') || s.includes('gym') || s.includes('yoga') || s.includes('sport')) return '🏋️';
+  if (s.includes('law') || s.includes('legal') || s.includes('attorney')) return '⚖️';
+  if (s.includes('edu') || s.includes('school') || s.includes('academy')) return '🎓';
+  if (s.includes('beauty') || s.includes('salon') || s.includes('spa') || s.includes('cosmetic')) return '✨';
+  if (s.includes('auto') || s.includes('car') || s.includes('motor')) return '🚗';
+  return '🏷️';
+}
+
+// Segment / Industry badge color styling helper
+function getSegmentBadgeStyle(segment) {
+  const s = (segment || '').toLowerCase();
+  if (s.includes('fnb') || s.includes('food') || s.includes('restaurant') || s.includes('beverage')) {
+    return {
+      background: 'rgba(249, 115, 22, 0.14)',
+      color: '#fb923c',
+      border: '1px solid rgba(249, 115, 22, 0.35)'
+    };
+  }
+  if (s.includes('health') || s.includes('medical') || s.includes('clinic') || s.includes('hospital')) {
+    return {
+      background: 'rgba(14, 165, 233, 0.14)',
+      color: '#38bdf8',
+      border: '1px solid rgba(14, 165, 233, 0.35)'
+    };
+  }
+  if (s.includes('interior') || s.includes('design') || s.includes('decor')) {
+    return {
+      background: 'rgba(168, 85, 247, 0.16)',
+      color: '#c084fc',
+      border: '1px solid rgba(168, 85, 247, 0.35)'
+    };
+  }
+  if (s.includes('real estate') || s.includes('property')) {
+    return {
+      background: 'rgba(16, 185, 129, 0.14)',
+      color: '#34d399',
+      border: '1px solid rgba(16, 185, 129, 0.35)'
+    };
+  }
+  if (s.includes('tech') || s.includes('software')) {
+    return {
+      background: 'rgba(59, 130, 246, 0.14)',
+      color: '#60a5fa',
+      border: '1px solid rgba(59, 130, 246, 0.35)'
+    };
+  }
+  const palettes = [
+    { background: 'rgba(236, 72, 153, 0.14)', color: '#f472b6', border: '1px solid rgba(236, 72, 153, 0.35)' },
+    { background: 'rgba(234, 179, 8, 0.14)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.35)' },
+    { background: 'rgba(20, 184, 166, 0.14)', color: '#2dd4bf', border: '1px solid rgba(20, 184, 166, 0.35)' },
+    { background: 'rgba(129, 140, 248, 0.14)', color: '#a5b4fc', border: '1px solid rgba(129, 140, 248, 0.35)' }
+  ];
+  let sum = 0;
+  for (let i = 0; i < s.length; i++) sum += s.charCodeAt(i);
+  return palettes[sum % palettes.length];
+}
 
 // Web Audio synthesizer chime for 12 PM follow-up reminder
 function playChimeSound() {
@@ -61,6 +127,17 @@ export default function LeadsTab({
   const [dueFilter, setDueFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
 
+  // Segments state (defaults include FnB, Healthcare, and Interior Designers)
+  const [segments, setSegments] = useState([
+    'FnB',
+    'Healthcare',
+    'Interior Designers'
+  ]);
+  const [isAddingInlineSegment, setIsAddingInlineSegment] = useState(false);
+  const [newSegmentInput, setNewSegmentInput] = useState('');
+  const [showSegmentModal, setShowSegmentModal] = useState(false);
+  const [segmentModalInput, setSegmentModalInput] = useState('');
+
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
@@ -98,6 +175,9 @@ export default function LeadsTab({
       if (!res.ok) throw new Error('Failed to fetch leads');
       const data = await res.json();
       setLeads(data.leads || []);
+      if (Array.isArray(data.industries) && data.industries.length > 0) {
+        setSegments(prev => Array.from(new Set([...prev, ...data.industries])));
+      }
     } catch (err) {
       showToast?.(err.message, 'error');
     } finally {
@@ -116,6 +196,31 @@ export default function LeadsTab({
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Segment handlers
+  const handleAddInlineSegment = () => {
+    const trimmed = (newSegmentInput || '').trim();
+    if (!trimmed) return;
+    if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+      setSegments(prev => [...prev, trimmed]);
+    }
+    setFormData(prev => ({ ...prev, industry: trimmed }));
+    setNewSegmentInput('');
+    setIsAddingInlineSegment(false);
+    showToast?.(`Segment "${trimmed}" selected`, 'success');
+  };
+
+  const handleAddSegmentFromModal = () => {
+    const trimmed = (segmentModalInput || '').trim();
+    if (!trimmed) return;
+    if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+      setSegments(prev => [...prev, trimmed]);
+      showToast?.(`Segment "${trimmed}" added!`, 'success');
+      setSegmentModalInput('');
+    } else {
+      showToast?.(`Segment "${trimmed}" already exists`, 'info');
+    }
+  };
 
   // Calculate follow-up reminders due today at 12 PM
   const todayStr = new Date().toLocaleDateString('en-CA');
@@ -162,6 +267,8 @@ export default function LeadsTab({
 
   const openAddModal = () => {
     setEditingLead(null);
+    setIsAddingInlineSegment(false);
+    setNewSegmentInput('');
     setFormData({
       client_name: '',
       company_name: '',
@@ -179,6 +286,11 @@ export default function LeadsTab({
 
   const openEditModal = (lead) => {
     setEditingLead(lead);
+    setIsAddingInlineSegment(false);
+    setNewSegmentInput('');
+    if (lead.industry && !segments.some(s => s.toLowerCase() === lead.industry.toLowerCase())) {
+      setSegments(prev => [...prev, lead.industry]);
+    }
     setFormData({
       client_name: lead.client_name || '',
       company_name: lead.company_name || '',
@@ -375,6 +487,14 @@ export default function LeadsTab({
             {soundEnabled ? <Volume2 size={15} style={{ color: '#4ade80' }} /> : <VolumeX size={15} style={{ color: '#f87171' }} />}
             {soundEnabled ? 'Sound On' : 'Sound Off'}
           </button>
+          <button
+            onClick={() => setShowSegmentModal(true)}
+            className="btn btn-secondary"
+            style={{ fontSize: '0.8rem', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="Manage and add lead segments"
+          >
+            <Tag size={15} /> Add Segment
+          </button>
           <button onClick={openAddModal} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={16} /> Add Lead
           </button>
@@ -414,16 +534,24 @@ export default function LeadsTab({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Industry:</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Segment:</span>
           <select
             className="form-control"
             value={industryFilter}
-            onChange={e => setIndustryFilter(e.target.value)}
+            onChange={e => {
+              if (e.target.value === '__ADD_NEW__') {
+                setShowSegmentModal(true);
+              } else {
+                setIndustryFilter(e.target.value);
+              }
+            }}
             style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem' }}
           >
-            <option value="all">All Industries</option>
-            <option value="FnB">🍽️ FnB</option>
-            <option value="Healthcare">🏥 Healthcare</option>
+            <option value="all">All Segments</option>
+            {segments.map(seg => (
+              <option key={seg} value={seg}>{getSegmentIcon(seg)} {seg}</option>
+            ))}
+            <option value="__ADD_NEW__">➕ + Add Segment...</option>
           </select>
         </div>
 
@@ -459,7 +587,7 @@ export default function LeadsTab({
             <tr>
               <th>Client Name</th>
               <th>Company Name</th>
-              <th>Industry</th>
+              <th>Segment</th>
               <th>Location</th>
               <th>Phone (Click to Call)</th>
               <th>Email</th>
@@ -506,15 +634,13 @@ export default function LeadsTab({
                       {lead.company_name || <span style={{ color: 'var(--text-muted)' }}>-</span>}
                     </td>
 
-                    {/* Industry */}
+                    {/* Segment / Industry */}
                     <td>
-                      {lead.industry === 'FnB' ? (
+                      {lead.industry ? (
                         <span 
                           className="badge" 
                           style={{ 
-                            background: 'rgba(249, 115, 22, 0.14)', 
-                            color: '#fb923c', 
-                            border: '1px solid rgba(249, 115, 22, 0.35)', 
+                            ...getSegmentBadgeStyle(lead.industry),
                             fontWeight: 700, 
                             fontSize: '0.74rem',
                             padding: '3px 8px',
@@ -524,25 +650,7 @@ export default function LeadsTab({
                             gap: '4px'
                           }}
                         >
-                          🍽️ FnB
-                        </span>
-                      ) : lead.industry === 'Healthcare' ? (
-                        <span 
-                          className="badge" 
-                          style={{ 
-                            background: 'rgba(14, 165, 233, 0.14)', 
-                            color: '#38bdf8', 
-                            border: '1px solid rgba(14, 165, 233, 0.35)', 
-                            fontWeight: 700, 
-                            fontSize: '0.74rem',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          🏥 Healthcare
+                          {getSegmentIcon(lead.industry)} {lead.industry}
                         </span>
                       ) : (
                         <span style={{ color: 'var(--text-muted)' }}>-</span>
@@ -858,15 +966,93 @@ export default function LeadsTab({
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div className="form-group">
-                  <label className="form-label">Industry / Sector</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Segment / Industry</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingInlineSegment(prev => !prev)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-primary, #60a5fa)',
+                        fontSize: '0.76rem',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}
+                    >
+                      <Plus size={13} /> Add segment
+                    </button>
+                  </div>
+
+                  {isAddingInlineSegment && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '6px',
+                      marginBottom: '8px',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)'
+                    }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="e.g. Interior Designers"
+                        value={newSegmentInput}
+                        onChange={e => setNewSegmentInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddInlineSegment();
+                          }
+                        }}
+                        style={{ fontSize: '0.82rem', padding: '6px 10px' }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleAddInlineSegment}
+                        style={{ fontSize: '0.78rem', padding: '6px 12px', whiteSpace: 'nowrap' }}
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setIsAddingInlineSegment(false);
+                          setNewSegmentInput('');
+                        }}
+                        style={{ fontSize: '0.78rem', padding: '6px 8px' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
                   <select
                     className="form-control"
                     value={formData.industry || ''}
-                    onChange={e => setFormData({ ...formData, industry: e.target.value })}
+                    onChange={e => {
+                      if (e.target.value === '__ADD_NEW__') {
+                        setIsAddingInlineSegment(true);
+                      } else {
+                        setFormData({ ...formData, industry: e.target.value });
+                      }
+                    }}
                   >
-                    <option value="">-- Select Industry --</option>
-                    <option value="FnB">🍽️ FnB (Food & Beverage / Hospitality)</option>
-                    <option value="Healthcare">🏥 Healthcare (Clinics / Hospitals / Wellness)</option>
+                    <option value="">-- Select Segment / Industry --</option>
+                    {segments.map(seg => (
+                      <option key={seg} value={seg}>
+                        {getSegmentIcon(seg)} {seg}
+                      </option>
+                    ))}
+                    <option value="__ADD_NEW__">➕ + Add New Segment...</option>
                   </select>
                 </div>
 
@@ -927,6 +1113,132 @@ export default function LeadsTab({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage / Add Segments Modal */}
+      {showSegmentModal && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => {
+            setShowSegmentModal(false);
+            setSegmentModalInput('');
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px'
+          }}
+        >
+          <div 
+            className="modal-content glass-premium"
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              borderRadius: '16px',
+              padding: '24px',
+              border: '1px solid rgba(223, 231, 224, 0.18)',
+              background: 'rgba(10, 14, 20, 0.98)',
+              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Tag size={18} style={{ color: '#60a5fa' }} /> Lead Segments
+              </h4>
+              <button 
+                className="btn-icon" 
+                onClick={() => {
+                  setShowSegmentModal(false);
+                  setSegmentModalInput('');
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Add and organize industry segments (e.g. Interior Designers, Healthcare, FnB) to categorize your sales leads.
+            </p>
+
+            {/* Current Segments List */}
+            <div style={{ marginBottom: '18px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '8px', display: 'block' }}>
+                Active Segments ({segments.length})
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {segments.map(seg => (
+                  <span
+                    key={seg}
+                    className="badge"
+                    style={{
+                      ...getSegmentBadgeStyle(seg),
+                      fontSize: '0.8rem',
+                      padding: '5px 10px',
+                      borderRadius: '8px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>{getSegmentIcon(seg)}</span>
+                    <span style={{ fontWeight: 600 }}>{seg}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Add New Segment Input */}
+            <div style={{ marginBottom: '18px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '6px', display: 'block' }}>
+                Add New Segment
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. Interior Designers, Real Estate..."
+                  value={segmentModalInput}
+                  onChange={e => setSegmentModalInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddSegmentFromModal();
+                    }
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleAddSegmentFromModal}
+                  style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Plus size={15} /> Add
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowSegmentModal(false);
+                  setSegmentModalInput('');
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

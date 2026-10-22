@@ -60,7 +60,16 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
     query += ' ORDER BY CASE WHEN follow_up_date IS NULL THEN 1 ELSE 0 END, follow_up_date ASC, created_at DESC';
 
     const leads = db.prepare(query).all(...params);
-    res.json({ leads });
+
+    const dbIndustries = db.prepare(
+      'SELECT DISTINCT industry FROM leads WHERE industry IS NOT NULL AND TRIM(industry) != "" ORDER BY industry ASC'
+    ).all().map(r => r.industry);
+
+    // Default segments/industries including Interior Designers
+    const defaultIndustries = ['FnB', 'Healthcare', 'Interior Designers'];
+    const allIndustries = Array.from(new Set([...defaultIndustries, ...dbIndustries]));
+
+    res.json({ leads, industries: allIndustries });
   } catch (err) {
     console.error('[LEADS] List error:', err);
     res.status(500).json({ error: 'Failed to fetch leads' });
@@ -109,12 +118,15 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
       notes,
       follow_up_date,
       status = 'New',
-      industry
+      industry,
+      segment
     } = req.body;
 
     if (!client_name || !client_name.trim()) {
       return res.status(400).json({ error: 'Client name is required' });
     }
+
+    const finalIndustry = (industry !== undefined ? industry : segment)?.trim() || null;
 
     const info = db.prepare(`
       INSERT INTO leads (
@@ -130,7 +142,7 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
       notes?.trim() || null,
       follow_up_date?.trim() || null,
       status || 'New',
-      industry?.trim() || null,
+      finalIndustry,
       req.user.id
     );
 
@@ -142,7 +154,7 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
       action: 'create_lead',
       entityType: 'lead',
       entityId: info.lastInsertRowid,
-      diff: { client_name, company_name, follow_up_date, industry },
+      diff: { client_name, company_name, follow_up_date, industry: finalIndustry },
       ip: req.ip,
     });
 
@@ -175,8 +187,11 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_e
       notes,
       follow_up_date,
       status,
-      industry
+      industry,
+      segment
     } = req.body;
+
+    const leadIndustry = industry !== undefined ? industry : segment;
 
     const updated = {
       client_name: client_name !== undefined ? client_name.trim() : existing.client_name,
@@ -188,7 +203,7 @@ router.patch('/:id', authorize('admin', 'ops_social_media_manager', 'ops_video_e
       notes: notes !== undefined ? (notes?.trim() || null) : existing.notes,
       follow_up_date: follow_up_date !== undefined ? (follow_up_date?.trim() || null) : existing.follow_up_date,
       status: status !== undefined ? status : existing.status,
-      industry: industry !== undefined ? (industry?.trim() || null) : existing.industry,
+      industry: leadIndustry !== undefined ? (leadIndustry?.trim() || null) : existing.industry,
     };
 
     if (!updated.client_name) {
