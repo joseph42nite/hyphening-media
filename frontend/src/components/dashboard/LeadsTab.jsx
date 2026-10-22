@@ -479,15 +479,6 @@ export default function LeadsTab({
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
-            onClick={toggleSound}
-            className="btn btn-secondary"
-            style={{ fontSize: '0.8rem', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            title={soundEnabled ? 'Alert chime is ON for 12 PM reminders' : 'Alert chime is MUTED'}
-          >
-            {soundEnabled ? <Volume2 size={15} style={{ color: '#4ade80' }} /> : <VolumeX size={15} style={{ color: '#f87171' }} />}
-            {soundEnabled ? 'Sound On' : 'Sound Off'}
-          </button>
-          <button
             onClick={() => setShowSegmentModal(true)}
             className="btn btn-secondary"
             style={{ fontSize: '0.8rem', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
@@ -553,15 +544,6 @@ export default function LeadsTab({
             ))}
             <option value="__ADD_NEW__">➕ + Add Industry...</option>
           </select>
-          <button
-            type="button"
-            onClick={() => setShowSegmentModal(true)}
-            className="btn btn-secondary"
-            style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
-            title="Add a new industry name"
-          >
-            <Plus size={13} /> Add Industry
-          </button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
