@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS leads (
   notes TEXT,
   follow_up_date TEXT, -- YYYY-MM-DD format
   status TEXT NOT NULL DEFAULT 'New', -- 'New', 'Follow Up', 'Contacted', 'Proposal Sent', 'Converted', 'Lost'
-  industry TEXT, -- 'FnB', 'Healthcare', 'Interior Designers', etc.
   created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))

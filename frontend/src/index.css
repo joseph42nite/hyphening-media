@@ -671,6 +671,9 @@ tr:hover td {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(224, 35, 28, 0.1) !important;
   width: 100%;
   max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
   backdrop-filter: blur(28px) !important;
   -webkit-backdrop-filter: blur(28px) !important;

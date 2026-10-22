@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Search, Phone, Mail, Globe, MapPin, Calendar, Clock, 
-  Bell, BellOff, Volume2, VolumeX, Trash2, Edit3, CheckCircle2, 
-  AlertCircle, ExternalLink, RefreshCw, X, Tag 
+  Bell, Volume2, VolumeX, Trash2, Edit3, CheckCircle2, 
+  ExternalLink, X, Settings2
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../api.js';
 
@@ -122,6 +122,7 @@ export default function LeadsTab({
 
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dueFilter, setDueFilter] = useState('all');
@@ -135,8 +136,15 @@ export default function LeadsTab({
   ]);
   const [isAddingInlineSegment, setIsAddingInlineSegment] = useState(false);
   const [newSegmentInput, setNewSegmentInput] = useState('');
+  
+  // Manage Industries Modal state
   const [showSegmentModal, setShowSegmentModal] = useState(false);
   const [segmentModalInput, setSegmentModalInput] = useState('');
+  const [editingSegment, setEditingSegment] = useState(null); // { oldName: '', newName: '' }
+
+  // Inline industry edit within Add/Edit Lead modal
+  const [isEditingInlineSegment, setIsEditingInlineSegment] = useState(false);
+  const [inlineEditSegmentInput, setInlineEditSegmentInput] = useState('');
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -176,7 +184,7 @@ export default function LeadsTab({
       const data = await res.json();
       setLeads(data.leads || []);
       if (Array.isArray(data.industries) && data.industries.length > 0) {
-        setSegments(prev => Array.from(new Set([...prev, ...data.industries])));
+        setSegments(data.industries);
       }
     } catch (err) {
       showToast?.(err.message, 'error');
@@ -197,28 +205,161 @@ export default function LeadsTab({
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Segment handlers
-  const handleAddInlineSegment = () => {
+  // Add new industry handler (from Add/Edit Lead modal inline adder)
+  const handleAddInlineSegment = async () => {
     const trimmed = (newSegmentInput || '').trim();
     if (!trimmed) return;
-    if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
-      setSegments(prev => [...prev, trimmed]);
+    
+    try {
+      const res = await authFetch(`${API_BASE}/api/leads/industries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+      });
+      const data = await res.json();
+      if (data.industries) {
+        setSegments(data.industries);
+      } else if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+        setSegments(prev => [...prev, trimmed]);
+      }
+    } catch (err) {
+      if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+        setSegments(prev => [...prev, trimmed]);
+      }
     }
+
     setFormData(prev => ({ ...prev, industry: trimmed }));
     setNewSegmentInput('');
     setIsAddingInlineSegment(false);
     showToast?.(`Industry "${trimmed}" selected`, 'success');
   };
 
-  const handleAddSegmentFromModal = () => {
+  // Add new industry handler (from Manage Industries modal)
+  const handleAddSegmentFromModal = async () => {
     const trimmed = (segmentModalInput || '').trim();
     if (!trimmed) return;
-    if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
-      setSegments(prev => [...prev, trimmed]);
+
+    try {
+      const res = await authFetch(`${API_BASE}/api/leads/industries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+      });
+      const data = await res.json();
+      if (data.industries) {
+        setSegments(data.industries);
+      } else if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+        setSegments(prev => [...prev, trimmed]);
+      }
       showToast?.(`Industry "${trimmed}" added!`, 'success');
       setSegmentModalInput('');
-    } else {
-      showToast?.(`Industry "${trimmed}" already exists`, 'info');
+    } catch (err) {
+      if (!segments.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+        setSegments(prev => [...prev, trimmed]);
+        showToast?.(`Industry "${trimmed}" added!`, 'success');
+        setSegmentModalInput('');
+      } else {
+        showToast?.(`Industry "${trimmed}" already exists`, 'info');
+      }
+    }
+  };
+
+  // Rename/Edit an existing industry
+  const handleRenameIndustry = async (oldName, newName) => {
+    const oldTrimmed = (oldName || '').trim();
+    const newTrimmed = (newName || '').trim();
+
+    if (!newTrimmed) {
+      showToast?.('Industry name cannot be empty', 'error');
+      return;
+    }
+
+    if (oldTrimmed.toLowerCase() === newTrimmed.toLowerCase() && oldTrimmed === newTrimmed) {
+      setEditingSegment(null);
+      setIsEditingInlineSegment(false);
+      return;
+    }
+
+    try {
+      const res = await authFetch(`${API_BASE}/api/leads/industries`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_name: oldTrimmed, new_name: newTrimmed })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update industry name');
+
+      if (data.industries) {
+        setSegments(data.industries);
+      } else {
+        setSegments(prev => prev.map(s => s.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : s));
+      }
+
+      // Update leads in local state immediately
+      setLeads(prev => prev.map(lead => {
+        if (lead.industry && lead.industry.toLowerCase() === oldTrimmed.toLowerCase()) {
+          return { ...lead, industry: newTrimmed };
+        }
+        return lead;
+      }));
+
+      // Update active filters and form if matching
+      if (industryFilter.toLowerCase() === oldTrimmed.toLowerCase()) {
+        setIndustryFilter(newTrimmed);
+      }
+      if (formData.industry.toLowerCase() === oldTrimmed.toLowerCase()) {
+        setFormData(prev => ({ ...prev, industry: newTrimmed }));
+      }
+
+      setEditingSegment(null);
+      setIsEditingInlineSegment(false);
+      showToast?.(`Industry renamed to "${newTrimmed}"`, 'success');
+    } catch (err) {
+      showToast?.(err.message, 'error');
+    }
+  };
+
+  // Delete an existing industry
+  const handleDeleteIndustry = async (industryName) => {
+    const trimmed = (industryName || '').trim();
+    if (!trimmed) return;
+
+    if (!window.confirm(`Are you sure you want to remove the industry "${trimmed}"?\nAny leads assigned to this industry will have their industry reset to None.`)) {
+      return;
+    }
+
+    try {
+      const res = await authFetch(`${API_BASE}/api/leads/industries`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete industry');
+
+      if (data.industries) {
+        setSegments(data.industries);
+      } else {
+        setSegments(prev => prev.filter(s => s.toLowerCase() !== trimmed.toLowerCase()));
+      }
+
+      setLeads(prev => prev.map(lead => {
+        if (lead.industry && lead.industry.toLowerCase() === trimmed.toLowerCase()) {
+          return { ...lead, industry: null };
+        }
+        return lead;
+      }));
+
+      if (industryFilter.toLowerCase() === trimmed.toLowerCase()) {
+        setIndustryFilter('all');
+      }
+      if (formData.industry.toLowerCase() === trimmed.toLowerCase()) {
+        setFormData(prev => ({ ...prev, industry: '' }));
+      }
+
+      showToast?.(`Industry "${trimmed}" removed`, 'info');
+    } catch (err) {
+      showToast?.(err.message, 'error');
     }
   };
 
@@ -227,25 +368,21 @@ export default function LeadsTab({
   const currentHour = new Date().getHours();
   const isAfter12PM = currentHour >= 12;
 
-  // Reminders are active if follow_up_date <= today and lead is not Converted/Lost
-  // and time is 12 PM or later (or overdue from earlier day)
   const pendingReminders = leads.filter(l => {
     if (!l.follow_up_date || ['Converted', 'Lost'].includes(l.status)) return false;
-    if (l.follow_up_date < todayStr) return true; // Overdue from prior day
-    if (l.follow_up_date === todayStr) return isAfter12PM; // Due today at/after 12 PM
+    if (l.follow_up_date < todayStr) return true;
+    if (l.follow_up_date === todayStr) return isAfter12PM;
     return false;
   });
 
   const pendingCount = pendingReminders.length;
 
-  // Sync count to parent tab badge
   useEffect(() => {
     if (onRemindersCountChange) {
       onRemindersCountChange(pendingCount);
     }
   }, [pendingCount, onRemindersCountChange]);
 
-  // Play alert sound if there are pending reminders and sound is enabled
   useEffect(() => {
     if (pendingCount > 0 && !remindersDismissed && soundEnabled && !hasPlayedSoundRef.current) {
       playChimeSound();
@@ -268,6 +405,7 @@ export default function LeadsTab({
   const openAddModal = () => {
     setEditingLead(null);
     setIsAddingInlineSegment(false);
+    setIsEditingInlineSegment(false);
     setNewSegmentInput('');
     setFormData({
       client_name: '',
@@ -279,7 +417,7 @@ export default function LeadsTab({
       notes: '',
       follow_up_date: '',
       status: 'New',
-      industry: ''
+      industry: industryFilter !== 'all' ? industryFilter : ''
     });
     setShowModal(true);
   };
@@ -287,6 +425,7 @@ export default function LeadsTab({
   const openEditModal = (lead) => {
     setEditingLead(lead);
     setIsAddingInlineSegment(false);
+    setIsEditingInlineSegment(false);
     setNewSegmentInput('');
     if (lead.industry && !segments.some(s => s.toLowerCase() === lead.industry.toLowerCase())) {
       setSegments(prev => [...prev, lead.industry]);
@@ -308,6 +447,31 @@ export default function LeadsTab({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Allow user to supply either client_name or company_name
+    const resolvedClient = (formData.client_name || '').trim() || (formData.company_name || '').trim();
+    if (!resolvedClient) {
+      showToast?.('Please enter a Client Name or Company Name', 'error');
+      return;
+    }
+
+    // If user typed into the inline add industry field and directly submitted the form
+    let finalIndustry = formData.industry;
+    if (isAddingInlineSegment && newSegmentInput.trim()) {
+      finalIndustry = newSegmentInput.trim();
+      if (!segments.some(s => s.toLowerCase() === finalIndustry.toLowerCase())) {
+        setSegments(prev => [...prev, finalIndustry]);
+      }
+    }
+
+    const payload = {
+      ...formData,
+      client_name: resolvedClient,
+      company_name: (formData.company_name || '').trim() || null,
+      industry: finalIndustry || null
+    };
+
+    setSubmitting(true);
     try {
       const url = editingLead ? `${API_BASE}/api/leads/${editingLead.id}` : `${API_BASE}/api/leads`;
       const method = editingLead ? 'PATCH' : 'POST';
@@ -315,16 +479,28 @@ export default function LeadsTab({
       const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save lead');
 
       showToast?.(editingLead ? 'Lead updated successfully' : 'Lead created successfully', 'success');
       setShowModal(false);
+
+      if (data.industries && Array.isArray(data.industries)) {
+        setSegments(data.industries);
+      }
+
+      // If the user added a lead with an industry different from active filter, switch filter to 'all' so it's immediately seen
+      if (!editingLead && industryFilter !== 'all' && finalIndustry && finalIndustry.toLowerCase() !== industryFilter.toLowerCase()) {
+        setIndustryFilter('all');
+      }
+
       fetchLeads();
     } catch (err) {
       showToast?.(err.message, 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -473,18 +649,21 @@ export default function LeadsTab({
             )}
           </h3>
           <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            Track client prospects, 1-click phone calls, websites, notes, and 12:00 PM follow-up reminders.
+            Track client prospects, 1-click direct dialing, company websites, notes, and 12:00 PM follow-up reminders.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
-            onClick={() => setShowSegmentModal(true)}
+            onClick={() => {
+              setEditingSegment(null);
+              setShowSegmentModal(true);
+            }}
             className="btn btn-secondary"
             style={{ fontSize: '0.8rem', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
-            title="Add a new industry name"
+            title="Manage, edit or add industry names"
           >
-            <Plus size={15} /> Add Industry
+            <Settings2 size={15} style={{ color: '#60a5fa' }} /> Manage Industries
           </button>
           <button onClick={openAddModal} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={16} /> Add Lead
@@ -530,7 +709,8 @@ export default function LeadsTab({
             className="form-control"
             value={industryFilter}
             onChange={e => {
-              if (e.target.value === '__ADD_NEW__') {
+              if (e.target.value === '__MANAGE__') {
+                setEditingSegment(null);
                 setShowSegmentModal(true);
               } else {
                 setIndustryFilter(e.target.value);
@@ -542,7 +722,7 @@ export default function LeadsTab({
             {segments.map(seg => (
               <option key={seg} value={seg}>{getSegmentIcon(seg)} {seg}</option>
             ))}
-            <option value="__ADD_NEW__">➕ + Add Industry...</option>
+            <option value="__MANAGE__">⚙️ Manage / Edit Industries...</option>
           </select>
         </div>
 
@@ -638,8 +818,13 @@ export default function LeadsTab({
                             borderRadius: '6px',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '4px',
+                            cursor: 'pointer'
                           }}
+                          onClick={() => {
+                            setIndustryFilter(lead.industry);
+                          }}
+                          title={`Filter by ${lead.industry}`}
                         >
                           {getSegmentIcon(lead.industry)} {lead.industry}
                         </span>
@@ -867,49 +1052,64 @@ export default function LeadsTab({
             className="modal-content glass-premium"
             onClick={e => e.stopPropagation()}
             style={{
-              maxWidth: '600px',
+              maxWidth: '620px',
               width: '92%',
-              padding: '26px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              padding: '24px 26px',
               background: 'rgba(10, 14, 20, 0.96)',
               border: '1px solid rgba(223, 231, 224, 0.18)',
               borderRadius: '14px',
               boxShadow: '0 24px 64px rgba(0,0,0,0.85)',
-              backdropFilter: 'blur(32px)'
+              backdropFilter: 'blur(32px)',
+              boxSizing: 'border-box'
             }}
           >
-            <h3 style={{ margin: '0 0 18px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {editingLead ? 'Edit Lead' : 'Add New Client Lead'}
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {editingLead ? 'Edit Lead' : 'Add New Client Lead'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
             <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div className="form-group">
-                  <label className="form-label">Client Name *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Client Name *</label>
                   <input
                     type="text"
                     className="form-control"
                     placeholder="e.g. John Doe"
                     value={formData.client_name}
                     onChange={e => setFormData({ ...formData, client_name: e.target.value })}
-                    required
                   />
+                  <small style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Person name or primary contact</small>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Company Name</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Company Name</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. Acme Corp"
+                    placeholder="e.g. Studio Luxe"
                     value={formData.company_name}
                     onChange={e => setFormData({ ...formData, company_name: e.target.value })}
                   />
+                  <small style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Business / Brand / Studio</small>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div className="form-group">
-                  <label className="form-label">Location / City</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Location / City</label>
                   <input
                     type="text"
                     className="form-control"
@@ -919,8 +1119,8 @@ export default function LeadsTab({
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Phone Number (Direct Call)</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Phone Number (Direct Call)</label>
                   <input
                     type="tel"
                     className="form-control"
@@ -931,11 +1131,11 @@ export default function LeadsTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div className="form-group">
-                  <label className="form-label">Email Address</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Email Address</label>
                   <input
-                    type="email"
+                    type="text"
                     className="form-control"
                     placeholder="e.g. contact@client.com"
                     value={formData.email}
@@ -943,8 +1143,8 @@ export default function LeadsTab({
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Company Website</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Company Website</label>
                   <input
                     type="text"
                     className="form-control"
@@ -955,30 +1155,61 @@ export default function LeadsTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <label className="form-label" style={{ margin: 0 }}>Industry / Sector</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingInlineSegment(prev => !prev)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-primary, #60a5fa)',
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Plus size={13} /> Add Industry
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {formData.industry && !isEditingInlineSegment && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInlineEditSegmentInput(formData.industry);
+                            setIsEditingInlineSegment(true);
+                            setIsAddingInlineSegment(false);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#38bdf8',
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}
+                          title="Rename this selected industry"
+                        >
+                          <Edit3 size={11} /> Edit
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingInlineSegment(prev => !prev);
+                          setIsEditingInlineSegment(false);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--color-primary, #60a5fa)',
+                          fontSize: '0.74rem',
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px'
+                        }}
+                      >
+                        <Plus size={12} /> Add
+                      </button>
+                    </div>
                   </div>
 
+                  {/* Inline Add Industry Input */}
                   {isAddingInlineSegment && (
                     <div style={{
                       display: 'flex',
@@ -1008,7 +1239,7 @@ export default function LeadsTab({
                         type="button"
                         className="btn btn-primary"
                         onClick={handleAddInlineSegment}
-                        style={{ fontSize: '0.78rem', padding: '6px 12px', whiteSpace: 'nowrap' }}
+                        style={{ fontSize: '0.75rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
                       >
                         Add
                       </button>
@@ -1019,9 +1250,54 @@ export default function LeadsTab({
                           setIsAddingInlineSegment(false);
                           setNewSegmentInput('');
                         }}
-                        style={{ fontSize: '0.78rem', padding: '6px 8px' }}
+                        style={{ fontSize: '0.75rem', padding: '6px 8px' }}
                       >
-                        <X size={14} />
+                        <X size={13} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Inline Edit Industry Input */}
+                  {isEditingInlineSegment && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '6px',
+                      marginBottom: '8px',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      background: 'rgba(56, 189, 248, 0.08)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)'
+                    }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Edit industry name"
+                        value={inlineEditSegmentInput}
+                        onChange={e => setInlineEditSegmentInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleRenameIndustry(formData.industry, inlineEditSegmentInput);
+                          }
+                        }}
+                        style={{ fontSize: '0.82rem', padding: '6px 10px' }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleRenameIndustry(formData.industry, inlineEditSegmentInput)}
+                        style={{ fontSize: '0.75rem', padding: '6px 10px', whiteSpace: 'nowrap' }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setIsEditingInlineSegment(false)}
+                        style={{ fontSize: '0.75rem', padding: '6px 8px' }}
+                      >
+                        <X size={13} />
                       </button>
                     </div>
                   )}
@@ -1032,8 +1308,12 @@ export default function LeadsTab({
                     onChange={e => {
                       if (e.target.value === '__ADD_NEW__') {
                         setIsAddingInlineSegment(true);
+                        setIsEditingInlineSegment(false);
+                      } else if (e.target.value === '__MANAGE__') {
+                        setShowSegmentModal(true);
                       } else {
                         setFormData({ ...formData, industry: e.target.value });
+                        setIsEditingInlineSegment(false);
                       }
                     }}
                   >
@@ -1044,11 +1324,12 @@ export default function LeadsTab({
                       </option>
                     ))}
                     <option value="__ADD_NEW__">➕ + Add Industry...</option>
+                    <option value="__MANAGE__">⚙️ Manage / Edit Industries...</option>
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Status</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Status</label>
                   <select
                     className="form-control"
                     value={formData.status}
@@ -1064,9 +1345,9 @@ export default function LeadsTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px', marginBottom: '14px' }}>
-                <div className="form-group">
-                  <label className="form-label">Follow-Up Date (12:00 PM Reminder)</label>
+              <div style={{ marginBottom: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ marginBottom: '4px' }}>Follow-Up Date (12:00 PM Reminder)</label>
                   <input
                     type="date"
                     className="form-control"
@@ -1076,22 +1357,23 @@ export default function LeadsTab({
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label className="form-label">Notes & Interaction History</label>
+              <div className="form-group" style={{ marginBottom: '18px' }}>
+                <label className="form-label" style={{ marginBottom: '4px' }}>Notes & Interaction History</label>
                 <textarea
                   className="form-control"
-                  rows={4}
+                  rows={3}
                   placeholder="Record call discussions, client requirements, pricing quotes, etc..."
                   value={formData.notes}
                   onChange={e => setFormData({ ...formData, notes: e.target.value })}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid rgba(223, 231, 224, 0.1)' }}>
                 <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={() => setShowModal(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
@@ -1099,8 +1381,9 @@ export default function LeadsTab({
                   type="submit"
                   className="btn btn-primary"
                   style={{ fontWeight: 700 }}
+                  disabled={submitting}
                 >
-                  {editingLead ? 'Update Lead' : 'Save Lead'}
+                  {submitting ? 'Saving...' : (editingLead ? 'Update Lead' : 'Save Lead')}
                 </button>
               </div>
             </form>
@@ -1108,19 +1391,20 @@ export default function LeadsTab({
         </div>
       )}
 
-      {/* Manage / Add Segments Modal */}
+      {/* Manage Industries / Segments Modal */}
       {showSegmentModal && (
         <div 
           className="modal-overlay" 
           onClick={() => {
             setShowSegmentModal(false);
             setSegmentModalInput('');
+            setEditingSegment(null);
           }}
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(6px)',
+            background: 'rgba(0, 0, 0, 0.78)',
+            backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1133,70 +1417,48 @@ export default function LeadsTab({
             onClick={e => e.stopPropagation()}
             style={{
               width: '100%',
-              maxWidth: '480px',
+              maxWidth: '520px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               borderRadius: '16px',
               padding: '24px',
               border: '1px solid rgba(223, 231, 224, 0.18)',
               background: 'rgba(10, 14, 20, 0.98)',
-              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85)'
+              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85)',
+              boxSizing: 'border-box'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Plus size={18} style={{ color: '#60a5fa' }} /> Add Industry / Segment
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
+                <Settings2 size={18} style={{ color: '#60a5fa' }} /> Manage Industries
               </h4>
               <button 
                 className="btn-icon" 
                 onClick={() => {
                   setShowSegmentModal(false);
                   setSegmentModalInput('');
+                  setEditingSegment(null);
                 }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Add a new industry name (e.g. Interior Designers, Healthcare, FnB, Real Estate) to categorize your sales leads.
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.45 }}>
+              Add new industry names or edit/rename existing ones. Renaming an industry updates all leads currently tagged with it automatically.
             </p>
 
-            {/* Current Industries List */}
-            <div style={{ marginBottom: '18px' }}>
-              <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '8px', display: 'block' }}>
-                Active Industries ({segments.length})
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {segments.map(seg => (
-                  <span
-                    key={seg}
-                    className="badge"
-                    style={{
-                      ...getSegmentBadgeStyle(seg),
-                      fontSize: '0.8rem',
-                      padding: '5px 10px',
-                      borderRadius: '8px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <span>{getSegmentIcon(seg)}</span>
-                    <span style={{ fontWeight: 600 }}>{seg}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-
             {/* Add New Industry Input */}
-            <div style={{ marginBottom: '18px' }}>
-              <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '6px', display: 'block' }}>
-                Industry Name
+            <div style={{ marginBottom: '20px', padding: '14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
+              <label className="form-label" style={{ fontSize: '0.78rem', marginBottom: '6px', display: 'block' }}>
+                Add New Industry
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Enter industry name (e.g. Interior Designers)"
+                  placeholder="e.g. Interior Designers, Real Estate..."
                   value={segmentModalInput}
                   onChange={e => setSegmentModalInput(e.target.value)}
                   onKeyDown={e => {
@@ -1205,29 +1467,123 @@ export default function LeadsTab({
                       handleAddSegmentFromModal();
                     }
                   }}
-                  autoFocus
+                  style={{ fontSize: '0.84rem' }}
                 />
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={handleAddSegmentFromModal}
-                  style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 14px' }}
                 >
-                  <Plus size={15} /> Add Industry
+                  <Plus size={15} /> Add
                 </button>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            {/* Saved Industries List with Edit Options */}
+            <div style={{ marginBottom: '18px' }}>
+              <label className="form-label" style={{ fontSize: '0.78rem', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Saved Industries ({segments.length})</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'none' }}>Click pencil to edit name</span>
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {segments.map(seg => {
+                  const isEditingThis = editingSegment && editingSegment.oldName === seg;
+                  return (
+                    <div
+                      key={seg}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: isEditingThis ? 'rgba(56, 189, 248, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+                        border: isEditingThis ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(223, 231, 224, 0.08)'
+                      }}
+                    >
+                      {isEditingThis ? (
+                        <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={editingSegment.newName}
+                            onChange={e => setEditingSegment({ ...editingSegment, newName: e.target.value })}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleRenameIndustry(editingSegment.oldName, editingSegment.newName);
+                              } else if (e.key === 'Escape') {
+                                setEditingSegment(null);
+                              }
+                            }}
+                            autoFocus
+                            style={{ fontSize: '0.82rem', padding: '6px 10px' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => handleRenameIndustry(editingSegment.oldName, editingSegment.newName)}
+                            style={{ fontSize: '0.76rem', padding: '6px 12px', whiteSpace: 'nowrap' }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setEditingSegment(null)}
+                            style={{ fontSize: '0.76rem', padding: '6px 8px' }}
+                            title="Cancel"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1rem' }}>{getSegmentIcon(seg)}</span>
+                            <span style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-primary)' }}>{seg}</span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => setEditingSegment({ oldName: seg, newName: seg })}
+                              style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              title={`Edit industry name "${seg}"`}
+                            >
+                              <Edit3 size={12} style={{ color: '#38bdf8' }} /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => handleDeleteIndustry(seg)}
+                              style={{ padding: '4px 8px', fontSize: '0.72rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                              title={`Delete industry "${seg}"`}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid rgba(223, 231, 224, 0.1)' }}>
               <button
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => {
                   setShowSegmentModal(false);
                   setSegmentModalInput('');
+                  setEditingSegment(null);
                 }}
               >
-                Close
+                Done
               </button>
             </div>
           </div>
