@@ -251,14 +251,9 @@ app.use('/api/artists', artistRoutes);
 // Public gig confirmation endpoint (no auth)
 app.get('/api/public/gigs/confirm/:token', publicGigConfirmRoute);
 
-// Signed webhook for automation clients: OpenClaw (blogs, ops writes) and the
-// local SEO worker.
-//
-// The path stays /api/openclaw even though the file no longer does. Both
-// callers POST to it with an HMAC signature, so changing it means coordinating
-// a cutover with OpenClaw and redeploying the worker — churn with no benefit,
-// since the path is a wire format rather than something anyone reads.
-app.use('/api/openclaw', webhookRoutes);
+// Signed webhook for automation clients and agent workers
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/openclaw', webhookRoutes); // Backward-compatible alias
 
 // SEO & Audit integration routes
 app.use('/api/clients', seoRoutes);

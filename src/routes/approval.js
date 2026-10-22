@@ -15,7 +15,7 @@ router.get('/pending', authorize('admin'), (req, res) => {
   try {
     const pending = db.prepare(`
       SELECT p.*, c.name AS client_name
-      FROM openclaw_pending_actions p
+      FROM pending_actions p
       LEFT JOIN crm_clients c ON p.client_id = c.id
       WHERE p.status = 'pending'
       ORDER BY p.created_at DESC
@@ -47,7 +47,7 @@ router.get('/history', authorize('admin'), (req, res) => {
   try {
     const history = db.prepare(`
       SELECT p.*, c.name AS client_name, u.email AS requester_email
-      FROM openclaw_pending_actions p
+      FROM pending_actions p
       LEFT JOIN crm_clients c ON p.client_id = c.id
       LEFT JOIN users u ON p.requested_by = u.id
       WHERE p.status IN ('accepted', 'rejected', 'auto_approved')
@@ -80,7 +80,7 @@ router.get('/history', authorize('admin'), (req, res) => {
 router.post('/:actionId/approve', authorize('admin'), (req, res) => {
   try {
     const actionId = req.params.actionId;
-    const action = db.prepare('SELECT * FROM openclaw_pending_actions WHERE id = ? AND status = ?').get(actionId, 'pending');
+    const action = db.prepare('SELECT * FROM pending_actions WHERE id = ? AND status = ?').get(actionId, 'pending');
     if (!action) return res.status(404).json({ error: 'Pending action not found' });
 
     let payload = {};
@@ -110,14 +110,14 @@ router.post('/:actionId/approve', authorize('admin'), (req, res) => {
     }
 
     // Mark as accepted
-    db.prepare('UPDATE openclaw_pending_actions SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?')
+    db.prepare('UPDATE pending_actions SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?')
       .run('accepted', req.user.email, new Date().toISOString(), actionId);
 
     logAction({
       actorId: req.user.id,
       actorEmail: req.user.email,
-      action: 'openclaw_action_approved',
-      entityType: 'openclaw_action',
+      action: 'agent_action_approved',
+      entityType: 'pending_action',
       entityId: actionId,
       diff: { agentType: payload.agentType, model: payload.model, client_id: action.client_id, runId: run.id }
     });
@@ -136,18 +136,18 @@ router.post('/:actionId/approve', authorize('admin'), (req, res) => {
 router.post('/:actionId/reject', authorize('admin'), (req, res) => {
   try {
     const actionId = req.params.actionId;
-    const action = db.prepare('SELECT * FROM openclaw_pending_actions WHERE id = ? AND status = ?').get(actionId, 'pending');
+    const action = db.prepare('SELECT * FROM pending_actions WHERE id = ? AND status = ?').get(actionId, 'pending');
     if (!action) return res.status(404).json({ error: 'Pending action not found' });
 
     // Mark as rejected
-    db.prepare('UPDATE openclaw_pending_actions SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?')
+    db.prepare('UPDATE pending_actions SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?')
       .run('rejected', req.user.email, new Date().toISOString(), actionId);
 
     logAction({
       actorId: req.user.id,
       actorEmail: req.user.email,
-      action: 'openclaw_action_rejected',
-      entityType: 'openclaw_action',
+      action: 'agent_action_rejected',
+      entityType: 'pending_action',
       entityId: actionId
     });
 

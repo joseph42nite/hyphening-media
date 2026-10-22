@@ -656,7 +656,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
 
   // Fetch initial activity log history on mount
   useEffect(() => {
-    fetch(`${API_BASE}/api/openclaw/activity?limit=30`, { credentials: 'include' })
+    fetch(`${API_BASE}/api/webhooks/activity?limit=30`, { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (data?.logs && Array.isArray(data.logs)) {
@@ -682,10 +682,12 @@ export default function SeoMonitorTab({ clients, showToast }) {
       }
     });
 
-    eventSource.addEventListener('openclaw_webhook', (e) => {
+    const handleWebhookEvent = (e) => {
       const data = JSON.parse(e.data);
-      setConsoleLogs(prev => [...prev, { type: 'openclaw_webhook', data, timestamp: new Date() }]);
-    });
+      setConsoleLogs(prev => [...prev, { type: 'agent_webhook', data, timestamp: new Date() }]);
+    };
+    eventSource.addEventListener('agent_webhook', handleWebhookEvent);
+    eventSource.addEventListener('openclaw_webhook', handleWebhookEvent);
 
     eventSource.addEventListener('seo_agent_status', (e) => {
       const data = JSON.parse(e.data);
@@ -1822,7 +1824,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
                   {visibleLogs.map((logEntry, idx) => (
                     <div key={idx} style={{ marginBottom: '2px', wordBreak: 'break-word' }}>
                       <span style={{ color: '#64748b' }}>{new Date(logEntry.timestamp).toLocaleTimeString()}</span>{' '}
-                      {logEntry.type === 'openclaw_webhook' && (
+                      {(logEntry.type === 'agent_webhook' || logEntry.type === 'openclaw_webhook') && (
                         <span>
                           <span style={{ color: '#c084fc', fontWeight: 'bold' }}>[WEBHOOK INGESTED]</span>{' '}
                           <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{logEntry.data.event_type}</span>{' '}

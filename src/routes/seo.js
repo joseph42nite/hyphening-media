@@ -214,14 +214,14 @@ function skillNameForAuditType(agentType) {
  */
 function skillStateFor(agentType) {
   const skillName = skillNameForAuditType(agentType);
-  const anyReport = db.prepare('SELECT COUNT(*) AS n FROM openclaw_skills').get().n > 0;
+  const anyReport = db.prepare('SELECT COUNT(*) AS n FROM agent_skills').get().n > 0;
   if (!anyReport) return { enforced: false, ok: true, skillName };
 
-  const row = db.prepare('SELECT * FROM openclaw_skills WHERE name = ?').get(skillName);
+  const row = db.prepare('SELECT * FROM agent_skills WHERE name = ?').get(skillName);
   if (!row) {
     return {
       enforced: true, ok: false, skillName,
-      reason: `OpenClaw has no skill named '${skillName}' installed`,
+      reason: `Agent runner has no skill named '${skillName}' installed`,
       reportedAt: null,
     };
   }
@@ -661,7 +661,7 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
     if (userRole === 'admin' || userRole === 'super_admin') {
       // Auto-approved
       const actionResult = db.prepare(`
-        INSERT INTO openclaw_pending_actions (client_id, action_type, action_payload, requested_by, requested_role, status)
+        INSERT INTO pending_actions (client_id, action_type, action_payload, requested_by, requested_role, status)
         VALUES (?, 'run_seo_agent', ?, ?, ?, 'auto_approved')
       `).run(clientId, payload, req.user.id, userRole);
 
@@ -1063,18 +1063,18 @@ queueRouter.use(authenticate);
 queueRouter.get('/skills', (req, res) => {
   try {
     const report = db.prepare(
-      'SELECT * FROM openclaw_skill_reports ORDER BY id DESC LIMIT 1'
+      'SELECT * FROM agent_skill_reports ORDER BY id DESC LIMIT 1'
     ).get();
 
     if (!report) {
       return res.json({
         reported: false,
-        message: 'OpenClaw has not reported a skill inventory yet. Skill health checks are not being enforced.',
+        message: 'Agent runner has not reported a skill inventory yet. Skill health checks are not being enforced.',
         skills: [],
       });
     }
 
-    const skills = db.prepare('SELECT * FROM openclaw_skills ORDER BY name ASC').all();
+    const skills = db.prepare('SELECT * FROM agent_skills ORDER BY name ASC').all();
 
     // Which audit types the dashboard can actually run, decided by the same
     // rule the trigger route applies, so the UI cannot disagree with it.

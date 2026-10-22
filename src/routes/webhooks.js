@@ -102,16 +102,16 @@ function checkReplay(timestamp, nonce) {
   }
 
   // Check nonce uniqueness
-  const existing = db.prepare('SELECT nonce FROM openclaw_nonces WHERE nonce = ?').get(nonce);
+  const existing = db.prepare('SELECT nonce FROM webhook_nonces WHERE nonce = ?').get(nonce);
   if (existing) {
     return { valid: false, reason: 'Duplicate nonce — possible replay attack' };
   }
 
   // Store nonce
-  db.prepare('INSERT INTO openclaw_nonces (nonce) VALUES (?)').run(nonce);
+  db.prepare('INSERT INTO webhook_nonces (nonce) VALUES (?)').run(nonce);
 
   // Clean up old nonces (older than 10 minutes)
-  db.prepare("DELETE FROM openclaw_nonces WHERE received_at < datetime('now', '-10 minutes')").run();
+  db.prepare("DELETE FROM webhook_nonces WHERE received_at < datetime('now', '-10 minutes')").run();
 
   return { valid: true };
 }
@@ -197,21 +197,23 @@ router.post('/webhook', (req, res) => {
     const result = executeEvent(event_type, payload);
     
     logAction({
-      action: 'openclaw_executed',
-      entityType: 'openclaw',
+      action: 'webhook_executed',
+      entityType: 'webhook',
       diff: { event_type, payload_keys: Object.keys(payload || {}), success: result.success },
     });
 
-    // Broadcast incoming OpenClaw webhook event to frontend in real-time
+    // Broadcast incoming webhook event to frontend in real-time
     import('../../server.js').then(({ broadcastEvent }) => {
-      broadcastEvent('openclaw_webhook', {
+      const payloadData = {
         event_type,
         success: result.success,
         summary: result.summary,
         payload_keys: Object.keys(payload || {}),
         timestamp: new Date().toISOString()
-      });
-    }).catch(err => console.error('[OPENCLAW] Broadcast openclaw_webhook failed:', err));
+      };
+      broadcastEvent('agent_webhook', payloadData);
+      broadcastEvent('openclaw_webhook', payloadData); // backward-compatible alias
+    }).catch(err => console.error('[WEBHOOK] Broadcast agent_webhook failed:', err));
 
     if (!result.success) {
       return res.status(500).json({
@@ -506,7 +508,7 @@ function handleSkillInventoryReport(payload) {
 
   const store = db.transaction(() => {
     const reportId = db.prepare(`
-      INSERT INTO openclaw_skill_reports (
+      INSERT INTO agent_skill_reports (
         reported_at, trigger, runner_model, skill_count, unhealthy_count,
         missing_skills, unexpected_skills
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -520,10 +522,10 @@ function handleSkillInventoryReport(payload) {
       JSON.stringify(payload.unexpected_skills || [])
     ).lastInsertRowid;
 
-    db.prepare('DELETE FROM openclaw_skills').run();
+    db.prepare('DELETE FROM agent_skills').run();
 
     const insert = db.prepare(`
-      INSERT INTO openclaw_skills (
+      INSERT INTO agent_skills (
         report_id, name, version, dirname, byte_size, sha256, lines,
         frontmatter_parsed, frontmatter_error, bom_present, has_references,
         has_templates, has_assets, webhook_pointer_present, last_modified,
@@ -551,9 +553,9 @@ function handleSkillInventoryReport(payload) {
 
   const missing = payload.missing_skills || [];
   if (unhealthy.length || missing.length) {
-    console.warn(`[OPENCLAW] Skill inventory #${reportId}: ${unhealthy.length} unhealthy${unhealthy.length ? ` (${unhealthy.join(', ')})` : ''}, ${missing.length} missing${missing.length ? ` (${missing.join(', ')})` : ''}.`);
+    console.warn(`[AGENT] Skill inventory #${reportId}: ${unhealthy.length} unhealthy${unhealthy.length ? ` (${unhealthy.join(', ')})` : ''}, ${missing.length} missing${missing.length ? ` (${missing.join(', ')})` : ''}.`);
   } else {
-    console.log(`[OPENCLAW] Skill inventory #${reportId}: ${payload.skills.length} skills, all healthy.`);
+    console.log(`[AGENT] Skill inventory #${reportId}: ${payload.skills.length} skills, all healthy.`);
   }
 
   return {
@@ -569,14 +571,14 @@ function handleAgentActivityLog(payload) {
   }
 
   db.prepare(`
-    INSERT INTO openclaw_activity_log (action, status, summary, client, details)
+    INSERT INTO agent_activity_log (action, status, summary, client, details)
     VALUES (?, ?, ?, ?, ?)
   `).run(action, status, summary, client || null, details ? JSON.stringify(details) : null);
 
   // Broadcast activity log to frontend in real-time
   import('../../server.js').then(({ broadcastEvent }) => {
     broadcastEvent('agent_activity_log', payload);
-  }).catch(err => console.error('[OPENCLAW] Broadcast agent_activity_log failed:', err));
+  }).catch(err => console.error('[WEBHOOK] Broadcast agent_activity_log failed:', err));
 
   return { success: true, summary: `Logged activity: ${summary}` };
 }
@@ -1217,7 +1219,7 @@ function handleSendChatMessage(payload) {
 function handleUpdateKnowledge(payload) {
   if (!payload?.key || !payload?.content) return { success: false, summary: 'key and content are required' };
   db.prepare(`
-    INSERT INTO openclaw_operational_knowledge (key, knowledge_type, content)
+    INSERT INTO agent_operational_knowledge (key, knowledge_type, content)
     VALUES (?, ?, ?)
     ON CONFLICT(key) DO UPDATE SET
       knowledge_type = excluded.knowledge_type,
@@ -1225,7 +1227,7 @@ function handleUpdateKnowledge(payload) {
       updated_at = datetime('now')
   `).run(payload.key, payload.knowledge_type || 'general', JSON.stringify(payload.content));
 
-  logAction({ action: 'upsert', entityType: 'knowledge', diff: { key: payload.key, source: 'openclaw' } });
+  logAction({ action: 'upsert', entityType: 'knowledge', diff: { key: payload.key, source: 'agent' } });
   return { success: true, summary: `Knowledge "${payload.key}" saved.` };
 }
 
@@ -1859,29 +1861,25 @@ router.get('/pending', authenticate, authorize('admin'), (req, res) => {
       params.push(status);
     }
 
-    const query = `SELECT * FROM openclaw_pending_actions WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC LIMIT 50`;
+    const query = `SELECT * FROM pending_actions WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC LIMIT 50`;
 
     const actions = db.prepare(query).all(...params);
     res.json({ pending_actions: actions });
   } catch (err) {
-    console.error('[OPENCLAW] Pending list error:', err);
+    console.error('[WEBHOOK] Pending list error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 /**
- * GET /api/openclaw/activity
+ * GET /api/webhooks/activity (and /api/openclaw/activity)
  * List all activity logs.
- *
- * Was unauthenticated. The SEO Monitor tab already sends credentials on this
- * fetch, so any logged-in staff member works here — not admin-only like
- * /pending, since this feed is a normal part of that tab for every role.
  */
 router.get('/activity', authenticate, (req, res) => {
   try {
     const { limit = 50, offset = 0, action } = req.query;
 
-    let query = 'SELECT * FROM openclaw_activity_log';
+    let query = 'SELECT * FROM agent_activity_log';
     const params = [];
 
     if (action) {
@@ -1896,7 +1894,7 @@ router.get('/activity', authenticate, (req, res) => {
     const logs = db.prepare(query).all(...params);
     
     // Also get total count for pagination
-    let countQuery = 'SELECT COUNT(*) as count FROM openclaw_activity_log';
+    let countQuery = 'SELECT COUNT(*) as count FROM agent_activity_log';
     if (action) {
       countQuery += ' WHERE action = ?';
       const countResult = db.prepare(countQuery).get(action);
@@ -1907,7 +1905,7 @@ router.get('/activity', authenticate, (req, res) => {
     }
 
   } catch (err) {
-    console.error('[OPENCLAW] Activity log fetch error:', err);
+    console.error('[WEBHOOK] Activity log fetch error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

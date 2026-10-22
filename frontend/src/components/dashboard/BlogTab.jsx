@@ -141,7 +141,7 @@ export default function BlogTab({ showToast }) {
       ) : posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', background: 'var(--bg-card)', border: '2px solid var(--border-color)', borderRadius: '12px' }}>
           <p style={{ fontWeight: 700, fontSize: '1rem' }}>No blog posts yet</p>
-          <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>Create your first post or let OpenClaw generate one automatically.</p>
+          <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>Create your first post or let the AI agent generate one automatically.</p>
         </div>
       ) : (
         <>
