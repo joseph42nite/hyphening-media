@@ -35,7 +35,7 @@ try {
  */
 function getAllIndustries() {
   const dbLeadIndustries = db.prepare(
-    'SELECT DISTINCT TRIM(industry) as industry FROM leads WHERE industry IS NOT NULL AND TRIM(industry) != ""'
+    'SELECT DISTINCT TRIM(industry) as industry FROM leads WHERE industry IS NOT NULL AND LENGTH(TRIM(industry)) > 0'
   ).all().map(r => r.industry);
 
   if (dbLeadIndustries.length > 0) {
