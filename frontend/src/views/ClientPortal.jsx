@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   TrendingUp, BarChart2, Check, X, Send, Lock, Calendar, PlayCircle, ExternalLink,
@@ -1269,6 +1269,7 @@ export default function ClientPortal({ showToast }) {
   // Add Lead Modal state
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
   const [submittingLead, setSubmittingLead] = useState(false);
+  const isSubmittingLeadRef = useRef(false);
   const [newLeadData, setNewLeadData] = useState({
     name: '',
     phone: '',
@@ -1879,11 +1880,14 @@ export default function ClientPortal({ showToast }) {
 
   const handleAddManualLead = async (e) => {
     e.preventDefault();
+    if (isSubmittingLeadRef.current || submittingLead) return;
+
     if (!newLeadData.name.trim() || !newLeadData.phone.trim()) {
       showToast('Name and Phone are required fields', 'error');
       return;
     }
 
+    isSubmittingLeadRef.current = true;
     setSubmittingLead(true);
     try {
       const response = await fetch(`${API_BASE}/api/portal/${token}/leads`, {
@@ -1924,7 +1928,10 @@ export default function ClientPortal({ showToast }) {
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
-      setSubmittingLead(false);
+      setTimeout(() => {
+        isSubmittingLeadRef.current = false;
+        setSubmittingLead(false);
+      }, 500);
     }
   };
 

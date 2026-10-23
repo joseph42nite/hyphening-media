@@ -123,6 +123,7 @@ export default function LeadsTab({
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dueFilter, setDueFilter] = useState('all');
@@ -448,12 +449,18 @@ export default function LeadsTab({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Prevent double submissions on rapid clicks or double clicks
+    if (isSubmittingRef.current || submitting) return;
+
     // Allow user to supply either client_name or company_name
     const resolvedClient = (formData.client_name || '').trim() || (formData.company_name || '').trim();
     if (!resolvedClient) {
       showToast?.('Please enter a Client Name or Company Name', 'error');
       return;
     }
+
+    isSubmittingRef.current = true;
+    setSubmitting(true);
 
     // If user typed into the inline add industry field and directly submitted the form
     let finalIndustry = formData.industry;
@@ -471,7 +478,6 @@ export default function LeadsTab({
       industry: finalIndustry || null
     };
 
-    setSubmitting(true);
     try {
       const url = editingLead ? `${API_BASE}/api/leads/${editingLead.id}` : `${API_BASE}/api/leads`;
       const method = editingLead ? 'PATCH' : 'POST';
@@ -500,7 +506,11 @@ export default function LeadsTab({
     } catch (err) {
       showToast?.(err.message, 'error');
     } finally {
-      setSubmitting(false);
+      // Keep lock active briefly to prevent queued rapid events from triggering a secondary POST
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+        setSubmitting(false);
+      }, 500);
     }
   };
 
@@ -665,7 +675,7 @@ export default function LeadsTab({
           >
             <Settings2 size={15} style={{ color: '#60a5fa' }} /> Manage Industries
           </button>
-          <button onClick={openAddModal} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={openAddModal} disabled={submitting} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={16} /> Add Lead
           </button>
         </div>
@@ -1063,7 +1073,8 @@ export default function LeadsTab({
               borderRadius: '14px',
               boxShadow: '0 24px 64px rgba(0,0,0,0.85)',
               backdropFilter: 'blur(32px)',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              pointerEvents: submitting ? 'none' : 'auto'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

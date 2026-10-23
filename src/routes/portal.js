@@ -463,6 +463,22 @@ router.post('/:token/leads', portalAuth, (req, res) => {
       return res.status(400).json({ error: 'Name and Phone are required fields' });
     }
 
+    const cleanName = name.trim();
+    const cleanPhone = phone.trim();
+
+    // 15-second duplicate protection: prevent saving the same lead twice on double clicks or network retries
+    const existingRecentLead = db.prepare(`
+      SELECT * FROM campaign_leads
+      WHERE client_id = ? 
+        AND (phone = ? OR LOWER(TRIM(name)) = LOWER(TRIM(?)))
+        AND created_at >= datetime('now', '-15 seconds')
+      ORDER BY id DESC LIMIT 1
+    `).get(req.portalClient.id, cleanPhone, cleanName);
+
+    if (existingRecentLead) {
+      return res.status(200).json({ success: true, lead: existingRecentLead, deduplicated: true });
+    }
+
     const cleanPlatform = ['YouTube', 'Meta', 'Google', 'Other'].includes(platform) ? platform : 'Other';
     const cleanSource = ['form', 'call'].includes(source) ? source : 'form';
     const cleanQual = ['Pending', 'Qualified', 'Disqualified'].includes(qualification_status) ? qualification_status : 'Pending';

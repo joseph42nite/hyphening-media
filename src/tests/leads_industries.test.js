@@ -44,6 +44,19 @@ describe('Leads and Industry Management Tests', () => {
     expect(indCheck).toBeDefined();
     expect(indCheck.name).toBe('Test Segment Renamed');
 
+    // 4. Test 15-second duplicate protection: identical lead should match
+    const duplicateCheck = db.prepare(`
+      SELECT * FROM leads 
+      WHERE (
+        (? IS NOT NULL AND phone = ?) OR
+        (LOWER(TRIM(client_name)) = LOWER(TRIM(?)) AND COALESCE(LOWER(TRIM(company_name)), '') = COALESCE(LOWER(TRIM(?)), ''))
+      ) AND created_at >= datetime('now', '-15 seconds')
+      ORDER BY id DESC LIMIT 1
+    `).get('+91 9123456780', '+91 9123456780', 'Jane Doe', 'Alpha Design');
+
+    expect(duplicateCheck).toBeDefined();
+    expect(duplicateCheck.id).toBe(leadId);
+
     // Cleanup
     db.prepare('DELETE FROM leads WHERE id = ?').run(leadId);
     db.prepare("DELETE FROM lead_industries WHERE name = 'Test Segment Renamed'").run();

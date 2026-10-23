@@ -345,9 +345,28 @@ router.post('/', authorize('admin', 'ops_social_media_manager', 'ops_video_edito
 
     const cleanClientName = (client_name || '').trim() || (company_name || '').trim();
     const cleanCompanyName = (company_name || '').trim() || null;
+    const cleanPhone = phone?.trim() || null;
 
     if (!cleanClientName) {
       return res.status(400).json({ error: 'Client name or Company name is required' });
+    }
+
+    // 15-second duplicate protection: prevent saving the same lead twice on double clicks or rapid retries
+    const duplicateLead = db.prepare(`
+      SELECT * FROM leads 
+      WHERE (
+        (? IS NOT NULL AND phone = ?) OR
+        (LOWER(TRIM(client_name)) = LOWER(TRIM(?)) AND COALESCE(LOWER(TRIM(company_name)), '') = COALESCE(LOWER(TRIM(?)), ''))
+      ) AND created_at >= datetime('now', '-15 seconds')
+      ORDER BY id DESC LIMIT 1
+    `).get(cleanPhone, cleanPhone, cleanClientName, cleanCompanyName);
+
+    if (duplicateLead) {
+      return res.status(200).json({
+        lead: duplicateLead,
+        industries: getAllIndustries(),
+        deduplicated: true
+      });
     }
 
     const rawIndustry = (industry !== undefined ? industry : segment)?.trim() || null;
