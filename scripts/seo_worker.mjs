@@ -140,10 +140,24 @@ function buildPrompt(job) {
   ].filter(Boolean).join('\n');
 }
 
-/** Runs the CLI and returns its stdout. Identical to ads_worker.mjs. */
+/**
+ * Runs the CLI and returns its stdout.
+ *
+ * `-p` has no TTY to answer a tool-permission prompt, so every prompt
+ * auto-denies (WebFetch, the render_page.py Bash call, any Task sub-agent)
+ * instead of waiting — the audit then comes back with empty findings. This
+ * run is already admin-gated, budget-checked, and freshness-checked by the
+ * Ops Center before being queued (see buildPrompt's comment above), so there
+ * is no further approval for a human to give here; bypassPermissions is the
+ * correct mode for that, not a workaround. An explicit --allowedTools list
+ * was ruled out: audit types route through different claude-seo skills/agents
+ * (content via Bash+render_page.py, flow via WebFetch, others via Task
+ * sub-agents with their own tool sets), so a fixed allowlist would keep
+ * breaking as audit types change.
+ */
 function runClaude(promptFile, model) {
   return new Promise((resolve, reject) => {
-    const args = ['-p', '--output-format', 'text'];
+    const args = ['-p', '--output-format', 'text', '--permission-mode', 'bypassPermissions'];
     if (model) args.push('--model', model);
 
     const proc = spawn(CLAUDE_BIN, args, { stdio: ['pipe', 'pipe', 'pipe'] });
