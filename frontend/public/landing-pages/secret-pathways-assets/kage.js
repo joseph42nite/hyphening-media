@@ -3251,9 +3251,23 @@ function wireNav() {
 
 function wireFocus() {
   const set = i => { RIG.focus = i; };
+  const targets = ['#gate', '#pathways', '#lessons', '#blogPreview', '#faq'];
   $$('[data-chip]').forEach(el => {
     el.addEventListener('mouseenter', () => { set(+el.dataset.chip); $$('[data-chip]').forEach(o => o.classList.toggle('on', o === el)); });
     el.addEventListener('mouseleave', () => { set(-1); el.classList.remove('on'); });
+    el.addEventListener('click', () => {
+      const idx = +el.dataset.chip;
+      const targetSelector = targets[idx];
+      if (targetSelector) {
+        let t = document.querySelector(targetSelector);
+        if (targetSelector === '#blogPreview' && (!t || t.style.display === 'none')) {
+          t = document.querySelector('.blog-preview-wrapper') || document.querySelector('#faq');
+        }
+        if (t) {
+          scrollTo({ top: t.offsetTop - 40, behavior: REDUCE ? 'auto' : 'smooth' });
+        }
+      }
+    });
   });
   $$('[data-les]').forEach(el => {
     el.addEventListener('mouseenter', () => set(+el.dataset.les % 4));
