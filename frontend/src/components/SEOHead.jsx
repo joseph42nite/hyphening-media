@@ -10,7 +10,7 @@ const SITE_URL = 'https://hypheningmedia.com';
  */
 export default function SEOHead({
   title = 'Hyphening Media | Creative Operations & Marketing Performance Agency',
-  description = 'Hyphening Media is a creative operations and marketing agency scaling D2C, F&B, and healthcare brands. We build high-performance content calendars, videos, web apps, and automated marketing dashboards.',
+  description = 'Hyphening Media is a creative operations and marketing agency scaling D2C, B2B, F&B, and healthcare brands. We build high-performance content calendars, videos, web apps, and automated marketing dashboards.',
   canonicalUrl,
   ogImage = 'https://hypheningmedia.com/favicon.png',
   ogType = 'website',

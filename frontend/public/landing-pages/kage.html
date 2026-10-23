@@ -13,7 +13,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>HYPHEN—ING — Creative Operations & Marketing Performance</title>
-<meta name="description" content="Hyphening Media is a creative operations and marketing performance agency scaling D2C, F&B, and healthcare brands through data-driven content engines.">
+<meta name="description" content="Hyphening Media is a creative operations and marketing performance agency scaling D2C, B2B, F&B, and healthcare brands through data-driven content engines.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070a'/%3E%3Ccircle cx='16' cy='17' r='8' fill='%23e0231c'/%3E%3Crect x='4' y='8' width='24' height='2.6' fill='%23dfe7e0'/%3E%3Crect x='7' y='13' width='18' height='2' fill='%23dfe7e0'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="secret-pathways-assets/fonts.css">
 <style>
@@ -799,6 +799,16 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
   display:flex;
   align-items:center;
 }
+.ticker-cat-d2c .cat-icon{
+  color:#10b981;
+  display:flex;
+  align-items:center;
+}
+.ticker-cat-b2b .cat-icon{
+  color:#a855f7;
+  display:flex;
+  align-items:center;
+}
 .ticker-category-label span{
   font-size:11px;
   font-weight:600;
@@ -892,6 +902,32 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
   border-color:rgba(245,158,11,0.55);
   color:#fffbeb;
 }
+.card-d2c:hover{
+  border-color:rgba(16,185,129,0.55);
+  background:rgba(10,24,18,0.92);
+  box-shadow:0 8px 28px rgba(16,185,129,0.22), 0 0 16px rgba(16,185,129,0.12), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+.card-d2c:hover .card-brand{
+  color:#ffffff;
+}
+.card-d2c:hover .tag-d2c{
+  background:rgba(16,185,129,0.22);
+  border-color:rgba(16,185,129,0.55);
+  color:#ecfdf5;
+}
+.card-b2b:hover{
+  border-color:rgba(168,85,247,0.55);
+  background:rgba(22,14,32,0.92);
+  box-shadow:0 8px 28px rgba(168,85,247,0.22), 0 0 16px rgba(168,85,247,0.12), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+.card-b2b:hover .card-brand{
+  color:#ffffff;
+}
+.card-b2b:hover .tag-b2b{
+  background:rgba(168,85,247,0.22);
+  border-color:rgba(168,85,247,0.55);
+  color:#faf5ff;
+}
 .card-beacon{
   width:7px;
   height:7px;
@@ -922,6 +958,30 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
   border-radius:50%;
   border:1px solid rgba(245,158,11,0.45);
   animation:beaconPulse 2.4s infinite ease-out 1.2s;
+}
+.beacon-emerald{
+  background:#10b981;
+  box-shadow:0 0 10px rgba(16,185,129,0.85);
+}
+.beacon-emerald::after{
+  content:'';
+  position:absolute;
+  inset:-3px;
+  border-radius:50%;
+  border:1px solid rgba(16,185,129,0.45);
+  animation:beaconPulse 2.4s infinite ease-out 0.6s;
+}
+.beacon-purple{
+  background:#a855f7;
+  box-shadow:0 0 10px rgba(168,85,247,0.85);
+}
+.beacon-purple::after{
+  content:'';
+  position:absolute;
+  inset:-3px;
+  border-radius:50%;
+  border:1px solid rgba(168,85,247,0.45);
+  animation:beaconPulse 2.4s infinite ease-out 1.8s;
 }
 @keyframes beaconPulse{
   0%{ transform:scale(0.8); opacity:1; }
@@ -954,6 +1014,16 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
   background:rgba(245,158,11,0.10);
   color:#fcd34d;
   border:1px solid rgba(245,158,11,0.22);
+}
+.tag-d2c{
+  background:rgba(16,185,129,0.10);
+  color:#6ee7b7;
+  border:1px solid rgba(16,185,129,0.22);
+}
+.tag-b2b{
+  background:rgba(168,85,247,0.10);
+  color:#c084fc;
+  border:1px solid rgba(168,85,247,0.22);
 }
 @keyframes tickerMarquee{
   0%{ transform:translateX(0); }
@@ -1816,7 +1886,7 @@ html.in-iframe #nav{
       <span class="mask-line"><span>scales into</span></span>
       <span class="mask-line"><span>performance.</span></span>
     </h1>
-    <p class="hero-sub body" data-rv="up">Hyphening Media bridges cinematic storytelling with algorithmic momentum for scaling D2C, F&B, and healthcare brands.</p>
+    <p class="hero-sub body" data-rv="up">Hyphening Media bridges cinematic storytelling with algorithmic momentum for scaling D2C, B2B, F&B, and healthcare brands.</p>
   </div>
 
   <div class="hero-spacer"></div>
@@ -1827,11 +1897,11 @@ html.in-iframe #nav{
       <div class="chip" data-chip="0" data-rv="up" data-cursor><span class="num">01</span>
         <span class="tx"><b>Our Story</b><p>Turn fleeting attention into timeless brand craft.</p></span></div>
       <div class="chip" data-chip="1" data-rv="up" data-cursor><span class="num">02</span>
-        <span class="tx"><b>Portfolio</b><p>Work across healthcare, D2C and F&B brands.</p></span></div>
+        <span class="tx"><b>Portfolio</b><p>1.2B+ views & 2X+ ROAS across D2C, B2B, healthcare & F&B.</p></span></div>
       <div class="chip" data-chip="2" data-rv="up" data-cursor><span class="num">03</span>
         <span class="tx"><b>Capabilities</b><p>End-to-end creative ops from reels to apps.</p></span></div>
       <div class="chip" data-chip="3" data-rv="up" data-cursor><span class="num">04</span>
-        <span class="tx"><b>Partners & FAQ</b><p>Trusted by premier healthcare & F&B brands.</p></span></div>
+        <span class="tx"><b>Partners & FAQ</b><p>Trusted across D2C, B2B, healthcare & F&B sectors.</p></span></div>
     </div>
   </div>
 
@@ -1864,7 +1934,7 @@ html.in-iframe #nav{
     <h2 class="display h-sec" data-rv="up">Treasure every moment, turning momentary inspiration into timeless craft.</h2>
     <div class="gate-copy">
       <p class="lead" data-rv="up">Hyphening Media begins where conventional marketing stops: bridging creative obsession with performance operations. The hype cycle is not the goal. Enduring brand equity is.</p>
-      <p class="body" data-rv="up">We operate as an embedded creative engine for ambitious D2C, F&B, and healthcare brands — scripting, shooting, producing, and optimizing campaigns that turn fleeting viewer attention into loyal customers.</p>
+      <p class="body" data-rv="up">We operate as an embedded creative engine for ambitious D2C, B2B, F&B, and healthcare brands — scripting, shooting, producing, and optimizing campaigns that turn fleeting viewer attention into loyal customers.</p>
       <a class="arrowlink" href="#pathways" data-rv="fade" data-cursor>
         <span>Explore Client Results</span>
         <span class="ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
@@ -1872,8 +1942,10 @@ html.in-iframe #nav{
     </div>
   </div>
   <div class="gate-stats" data-rv="up">
-    <div><b>8</b><span>Active Clients</span></div>
-    <div><b>3</b><span>Verticals</span></div>
+    <div><b>1.2B+</b><span>Views Gained</span></div>
+    <div><b>2X+</b><span>ROAS Generated</span></div>
+    <div><b>20+</b><span>Active Partners</span></div>
+    <div><b>4</b><span>Core Verticals</span></div>
   </div>
 </section>
 
@@ -2367,6 +2439,186 @@ html.in-iframe #nav{
         </div>
       </div>
     </div>
+
+    <!-- Direct-To-Consumer & E-Commerce Row -->
+    <div class="ticker-row-wrap">
+      <div class="ticker-category-label ticker-cat-d2c">
+        <span class="cat-icon">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+        </span>
+        <span>Direct-To-Consumer & E-Commerce Brands</span>
+        <span class="cat-jp jp">直販・EC</span>
+      </div>
+      <div class="ticker-marquee-track">
+        <div class="ticker-marquee-inner">
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">D2C Beverage Co.</span>
+            <span class="card-tag tag-d2c">Functional Drink</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">Aura Organics</span>
+            <span class="card-tag tag-d2c">Clean Living</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">Kinetic Apparel Studio</span>
+            <span class="card-tag tag-d2c">Activewear D2C</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">PureGlow Botanicals</span>
+            <span class="card-tag tag-d2c">Personal Care</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">SoundWave Labs</span>
+            <span class="card-tag tag-d2c">Consumer Audio</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">D2C Beverage Co.</span>
+            <span class="card-tag tag-d2c">Functional Drink</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">Aura Organics</span>
+            <span class="card-tag tag-d2c">Clean Living</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">Kinetic Apparel Studio</span>
+            <span class="card-tag tag-d2c">Activewear D2C</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">PureGlow Botanicals</span>
+            <span class="card-tag tag-d2c">Personal Care</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">SoundWave Labs</span>
+            <span class="card-tag tag-d2c">Consumer Audio</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">D2C Beverage Co.</span>
+            <span class="card-tag tag-d2c">Functional Drink</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">Aura Organics</span>
+            <span class="card-tag tag-d2c">Clean Living</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">Kinetic Apparel Studio</span>
+            <span class="card-tag tag-d2c">Activewear D2C</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">PureGlow Botanicals</span>
+            <span class="card-tag tag-d2c">Personal Care</span>
+          </div>
+          <div class="ticker-card card-d2c">
+            <span class="card-beacon beacon-emerald"></span>
+            <span class="card-brand">SoundWave Labs</span>
+            <span class="card-tag tag-d2c">Consumer Audio</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B2B & Enterprise Solutions Row -->
+    <div class="ticker-row-wrap">
+      <div class="ticker-category-label ticker-cat-b2b">
+        <span class="cat-icon">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </span>
+        <span>B2B, SaaS & Enterprise Solutions</span>
+        <span class="cat-jp jp">法人・SaaS</span>
+      </div>
+      <div class="ticker-marquee-track">
+        <div class="ticker-marquee-inner ticker-marquee-reverse">
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">RevenueOps Cloud</span>
+            <span class="card-tag tag-b2b">B2B SaaS</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">DataPulse Analytics</span>
+            <span class="card-tag tag-b2b">Data Intelligence</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">WorkflowAI</span>
+            <span class="card-tag tag-b2b">Operations AI</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">CloudScale Systems</span>
+            <span class="card-tag tag-b2b">Cloud Platform</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">Nexus B2B Logistics</span>
+            <span class="card-tag tag-b2b">Supply Chain Tech</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">RevenueOps Cloud</span>
+            <span class="card-tag tag-b2b">B2B SaaS</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">DataPulse Analytics</span>
+            <span class="card-tag tag-b2b">Data Intelligence</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">WorkflowAI</span>
+            <span class="card-tag tag-b2b">Operations AI</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">CloudScale Systems</span>
+            <span class="card-tag tag-b2b">Cloud Platform</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">Nexus B2B Logistics</span>
+            <span class="card-tag tag-b2b">Supply Chain Tech</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">RevenueOps Cloud</span>
+            <span class="card-tag tag-b2b">B2B SaaS</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">DataPulse Analytics</span>
+            <span class="card-tag tag-b2b">Data Intelligence</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">WorkflowAI</span>
+            <span class="card-tag tag-b2b">Operations AI</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">CloudScale Systems</span>
+            <span class="card-tag tag-b2b">Cloud Platform</span>
+          </div>
+          <div class="ticker-card card-b2b">
+            <span class="card-beacon beacon-purple"></span>
+            <span class="card-brand">Nexus B2B Logistics</span>
+            <span class="card-tag tag-b2b">Supply Chain Tech</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2411,7 +2663,7 @@ html.in-iframe #nav{
   </div>
   <div class="eyebrow" data-rv="fade">Trusted Partners · Partnership Inquiry</div>
   <h2 class="display" data-rv="up">Ready to Scale With Us?</h2>
-  <p class="body-lg" data-rv="up">Join our roster of high-growth brands in Healthcare and Food & Beverage. Complete the brief below to connect directly with our leadership team.</p>
+  <p class="body-lg" data-rv="up">Join our roster of high-growth brands across D2C, B2B, Healthcare, and Food & Beverage. Complete the brief below to connect directly with our leadership team.</p>
   
   <div class="partner-form-wrap" data-rv="fade">
     <form class="partner-form" id="partnerForm">
@@ -2428,7 +2680,7 @@ html.in-iframe #nav{
       <div class="partner-form-row">
         <div class="partner-form-group">
           <label class="partner-form-label" for="pBrand">Brand / Company <span class="req">*</span></label>
-          <input class="partner-form-input" type="text" id="pBrand" name="brand" placeholder="Acme Healthcare / FnB Co." required>
+          <input class="partner-form-input" type="text" id="pBrand" name="brand" placeholder="Your Brand (D2C / B2B / Healthcare / F&B)" required>
         </div>
         <div class="partner-form-group">
           <label class="partner-form-label" for="pService">Area of Focus</label>
@@ -2465,7 +2717,7 @@ html.in-iframe #nav{
         <h3>What is Hyphening Media?</h3>
         <span class="faq-icon"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l4 4 4-4"/></svg></span>
       </div>
-      <p class="faq-a">Hyphening Media is a creative operations and marketing agency that scales D2C, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development.</p>
+      <p class="faq-a">Hyphening Media is a creative operations and marketing agency that scales D2C, B2B, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development.</p>
     </div>
 
     <div class="faq-card" data-cursor>
@@ -2478,10 +2730,10 @@ html.in-iframe #nav{
 
     <div class="faq-card" data-cursor>
       <div class="faq-q">
-        <h3>How does Hyphening Media scale D2C and F&B brands?</h3>
+        <h3>How does Hyphening Media scale D2C, B2B, and F&B brands?</h3>
         <span class="faq-icon"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l4 4 4-4"/></svg></span>
       </div>
-      <p class="faq-a">Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, and operational automation dashboards. We focus on real performance metrics like CTR, conversions, and organic views rather than vanity metrics.</p>
+      <p class="faq-a">Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, multi-channel performance funnels, and operational automation dashboards. We focus on real performance metrics like 2X+ ROAS, CTR, conversions, and organic views rather than vanity metrics.</p>
     </div>
 
     <div class="faq-card" data-cursor>
@@ -2512,7 +2764,7 @@ html.in-iframe #nav{
     <div class="foot-brand">
       <img src="secret-pathways-assets/hyphening-logo.png" alt="Hyphening Media"
            width="422" height="166" loading="lazy" decoding="async">
-      <p>Hyphening Media is a creative operations and marketing performance agency scaling D2C, F&B, and healthcare brands through data-driven content engines, video production, and bespoke web apps.</p>
+      <p>Hyphening Media is a creative operations and marketing performance agency scaling D2C, B2B, F&B, and healthcare brands through data-driven content engines, video production, and bespoke web apps.</p>
     </div>
     <div><h4>Navigation</h4><ul>
       <li><a href="#gate" data-cursor>Our Story</a></li>
@@ -2521,16 +2773,15 @@ html.in-iframe #nav{
       <li><a href="#eternity" data-cursor>Partnership</a></li>
       <li><a href="#faq" data-cursor>FAQ</a></li>
     </ul></div>
-    <div><h4>Clients</h4><ul>
+    <div><h4>Clients & Sectors</h4><ul>
       <li><span style="color:#8b9b90">Dr Divya Sharma MD</span></li>
       <li><span style="color:#8b9b90">DentAlchemy Dental</span></li>
       <li><span style="color:#8b9b90">Inspiron Well-being</span></li>
       <li><span style="color:#8b9b90">Aurea Skin Clinic</span></li>
-      <li><span style="color:#8b9b90">TBC HSR Layout</span></li>
-      <li><span style="color:#8b9b90">TBC Kadubesanahalli</span></li>
-      <li><span style="color:#8b9b90">Zaffran Fine Dine</span></li>
-      <li><span style="color:#8b9b90">Vesparo</span></li>
-      <li><span style="color:#8b9b90">I Do! Wedding & Event</span></li>
+      <li><span style="color:#8b9b90">TBC HSR & Kadubesanahalli</span></li>
+      <li><span style="color:#8b9b90">Zaffran Fine Dine · Vesparo</span></li>
+      <li><span style="color:#8b9b90">D2C E-Commerce & Retail</span></li>
+      <li><span style="color:#8b9b90">B2B SaaS & Enterprise Tech</span></li>
     </ul></div>
     <div><h4>Connect</h4><ul>
       <li><a href="https://www.instagram.com/hypheningmedia/" target="_blank" rel="noopener noreferrer" data-cursor>Instagram</a></li>

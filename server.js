@@ -395,9 +395,9 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
   ];
 
   const FAQS = [
-    ['What is Hyphening Media?', 'Hyphening Media is a creative operations and marketing agency that scales D2C, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development.'],
+    ['What is Hyphening Media?', 'Hyphening Media is a creative operations and marketing agency that scales D2C, B2B, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development.'],
     ['What services does Hyphening Media offer?', 'Hyphening Media offers comprehensive services including content strategy, short and long form video production, multi-platform social media operations, custom high-performance web development, mobile app development, performance analytics, conversion-optimized campaign management, visual brand identity development, and news media PR.'],
-    ['How does Hyphening Media scale D2C and F&B brands?', 'Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, and operational automation dashboards. We focus on real performance metrics like CTR, conversions, and organic views rather than vanity metrics.'],
+    ['How does Hyphening Media scale D2C and F&B brands?', 'Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, and operational automation dashboards. We focus on real performance metrics like 2X+ ROAS, CTR, conversions, and organic views rather than vanity metrics.'],
     ['Does Hyphening Media provide custom analytics and client portals?', 'Yes, Hyphening Media provides all client partners with an automated secure Client Portal where they can review marketing scripts, track active video and design tasks in real-time, view platform-specific performance analytics, and manage creative campaigns.'],
     ['Do you work with healthcare brands, and how do you handle advertising rules?', 'Yes. For clinics and dental practices we publish educational content only: no testimonials, no before-and-after images, no outcome promises, and no superlatives. Every claim is tied to a source, and qualifications appear only with a real registration number.'],
     ['How is a content engine different from a content calendar?', "A calendar lists what will be posted and when. A content engine documents what performs, converts it into scripts and hooks, and uses each month's results to plan the next. We build the second one."],
@@ -436,8 +436,8 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
 
     return `<noscript>
       <main>
-        <h1>Hyphening Media: Creative Operations and Marketing Performance for D2C, F&amp;B and Healthcare Brands</h1>
-        <p class="lead">Hyphening Media is a creative operations agency for brands that want content to produce customers, not just views. We script, shoot, produce and measure the work ourselves, so a campaign and its numbers sit under one roof. For healthcare brands, every piece is built inside advertising rules, not around them.</p>
+        <h1>Hyphening Media: Creative Operations and Marketing Performance for D2C, B2B, F&amp;B and Healthcare Brands</h1>
+        <p class="lead">Hyphening Media is a creative operations agency for ambitious D2C, B2B, F&B, and healthcare brands that want content to produce customers, not just views. We script, shoot, produce and measure the work ourselves, so a campaign and its numbers sit under one roof. For healthcare brands, every piece is built inside advertising rules, not around them.</p>
         <p>A follower count and a bank balance have one thing in common: neither tells you why it changed. We report CTR, conversions and organic reach, and we leave out the numbers that only look good.</p>
 
         ${servicesHtml}
@@ -450,7 +450,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         <p><strong>Deepanjan Sarkar, COO.</strong> Deepanjan is a computer engineer with an MBA in marketing and finance from IIM. He runs day-to-day operations and client delivery, bringing an engineer's process discipline and a finance-minded view of campaign returns.</p>
 
         <h2>Trusted By</h2>
-        <p>Eight active clients across healthcare, food and beverage, and artist curation.</p>
+        <p>High-growth client partners across healthcare, food and beverage, D2C, and B2B growth sectors.</p>
 
         <h2>From the Blog</h2>
         <ul>
