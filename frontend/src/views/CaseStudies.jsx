@@ -18,7 +18,7 @@ function renderMarkdown(md) {
   let text = md.replace(/\r/g, '');
   text = text.replace(/^(?:https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=[a-zA-Z0-9_-]+|shorts\/[a-zA-Z0-9_-]+|embed\/[a-zA-Z0-9_-]+|live\/[a-zA-Z0-9_-]+)|youtu\.be\/[a-zA-Z0-9_-]+)[^\s]*)$/gm, (match) => {
     const embed = toEmbedUrl(match.trim());
-    return embed ? `\n\n<div class="cs-video-embed"><iframe src="${embed}" title="Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>\n\n` : match;
+    return embed ? `\n\n<div class="cs-video-embed"><iframe src="${embed}" title="Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div>\n\n` : match;
   });
 
   let html = text
@@ -457,6 +457,7 @@ function CaseStudyDetail() {
                       title={`${post.title} - video ${i + 1}`}
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
                       allowFullScreen
                       loading="lazy"
                     />
