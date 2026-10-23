@@ -126,72 +126,10 @@ function Landing() {
         </SceneErrorBoundary>
       </section>
 
-      {/* JSON-LD Structured Data Schema for SEO & AEO */}
-      <script 
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@graph": [
-              {
-                "@type": "FAQPage",
-                "@id": "https://hypheningmedia.com/#faq",
-                "mainEntity": [
-                  {
-                    "@type": "Question",
-                    "name": "What is Hyphening Media?",
-                    "acceptedAnswer": {
-                      "@type": "Answer",
-                      "text": "Hyphening Media is a premium creative operations and marketing agency that scales D2C, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development."
-                    }
-                  },
-                  {
-                    "@type": "Question",
-                    "name": "What services does Hyphening Media offer?",
-                    "acceptedAnswer": {
-                      "@type": "Answer",
-                      "text": "Hyphening Media offers comprehensive services including content strategy, short and long form video production, multi-platform social media operations, custom high-performance web development, mobile app development, performance analytics, conversion-optimized campaign management, visual brand identity development, and news media PR."
-                    }
-                  },
-                  {
-                    "@type": "Question",
-                    "name": "How does Hyphening Media scale D2C and F&B brands?",
-                    "acceptedAnswer": {
-                      "@type": "Answer",
-                      "text": "Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, and operational automation dashboards. We focus on real performance metrics like CTR, conversions, and organic views rather than vanity metrics."
-                    }
-                  },
-                  {
-                    "@type": "Question",
-                    "name": "Does Hyphening Media provide custom analytics and client portals?",
-                    "acceptedAnswer": {
-                      "@type": "Answer",
-                      "text": "Yes, Hyphening Media provides all client partners with an automated secure Client Portal where they can review marketing scripts, track active video and design tasks in real-time, view platform-specific performance analytics, and manage creative campaigns."
-                    }
-                  }
-                ]
-              },
-              {
-                "@type": "ProfessionalService",
-                "@id": "https://hypheningmedia.com/#organization",
-                "name": "Hyphening Media",
-                "url": "https://hypheningmedia.com",
-                "image": "https://hypheningmedia.com/favicon.png",
-                "address": {
-                  "@type": "PostalAddress",
-                  "addressLocality": "Mumbai",
-                  "addressRegion": "Maharashtra",
-                  "addressCountry": "IN"
-                },
-                "sameAs": [
-                  "https://www.instagram.com/hypheningmedia/",
-                  "https://www.linkedin.com/company/104980691/"
-                ]
-              }
-            ]
-          })
-        }}
-      />
+      {/* ProfessionalService JSON-LD now lives in frontend/index.html (server-rendered,
+          sitewide). FAQPage JSON-LD + the crawlable content summary are injected
+          server-side for "/" only in server.js's SPA-fallback handler, so non-JS
+          crawlers see them in the raw HTML instead of only after this component mounts. */}
     </div>
   );
 }

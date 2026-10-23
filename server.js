@@ -376,6 +376,106 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
     },
   }));
   
+  // Escapes text pulled from the DB (blog titles) before it goes into the
+  // server-rendered homepage HTML below.
+  const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+
+  // Service copy for the H2 sections below. Sourced from Vesper's verified
+  // copy pack (seo-audit-304-homepage-copy.md) — no invented facts or stats.
+  const SERVICES = [
+    ['Content Strategy and Creation', 'Most brands have a content calendar. Few have a content engine. A calendar says what posts when. An engine documents what works, turns it into scripts and hooks, and feeds the result back into the next month. We build monthly plans with scripts, hooks and posting schedules, then produce short-form and long-form video from script to final edit.'],
+    ['Healthcare Marketing', "Clinics, dental practices and wellness brands can't say what other advertisers say. Outcome claims, testimonials, before-and-after images and superlatives are restricted for doctors and dentists in India. We write educational, factual content, source every claim, and keep qualifications on the page only when a real registration number is supplied. The goal is a patient who understands the treatment, not one who was promised a result."],
+    ['Lead Generation and Campaign Management', 'Reach is not revenue. We run organic and paid campaigns with audience targeting, A/B testing and conversion-focused funnels, and we measure them against enquiries, bookings and cost per acquisition. If a campaign produces views and no leads, the report says so.'],
+    ['Social Media Operations', 'Daily management across Instagram, YouTube and LinkedIn: posting, engagement, creator and influencer collaborations, and a weekly view of what is moving. Brands that need a single owner for the channel get one.'],
+    ['Web and App Development', "A booking page that loads fast and converts is worth more than another post. We build custom websites and web apps, and mobile apps, for brands whose Instagram traffic has nowhere useful to land."],
+    ['Performance Analytics and Client Portal', "Every client gets a secure portal to review scripts, track video and design tasks, and see platform-level performance in near real time. Monthly PDFs arrive too late to change a campaign. A live dashboard doesn't."],
+    ['Brand Development and PR', 'Visual identity systems, positioning and tone-of-voice guides, plus news-media placements that build authority. A brand identity is a system for making decisions, not a logo.'],
+  ];
+
+  const FAQS = [
+    ['What is Hyphening Media?', 'Hyphening Media is a creative operations and marketing agency that scales D2C, F&B, and healthcare brands through data-driven content strategy, video production, social media operations, and full-stack web and app development.'],
+    ['What services does Hyphening Media offer?', 'Hyphening Media offers comprehensive services including content strategy, short and long form video production, multi-platform social media operations, custom high-performance web development, mobile app development, performance analytics, conversion-optimized campaign management, visual brand identity development, and news media PR.'],
+    ['How does Hyphening Media scale D2C and F&B brands?', 'Hyphening Media scales brands using a data-driven content engine, creator and influencer collaborations, and operational automation dashboards. We focus on real performance metrics like CTR, conversions, and organic views rather than vanity metrics.'],
+    ['Does Hyphening Media provide custom analytics and client portals?', 'Yes, Hyphening Media provides all client partners with an automated secure Client Portal where they can review marketing scripts, track active video and design tasks in real-time, view platform-specific performance analytics, and manage creative campaigns.'],
+    ['Do you work with healthcare brands, and how do you handle advertising rules?', 'Yes. For clinics and dental practices we publish educational content only: no testimonials, no before-and-after images, no outcome promises, and no superlatives. Every claim is tied to a source, and qualifications appear only with a real registration number.'],
+    ['How is a content engine different from a content calendar?', "A calendar lists what will be posted and when. A content engine documents what performs, converts it into scripts and hooks, and uses each month's results to plan the next. We build the second one."],
+  ];
+
+  // Server-rendered homepage content for non-JS clients and crawlers. The 3D
+  // "Kage" experience (frontend/public/landing-pages/kage.html) carries this
+  // same copy for JS users; wrapping it in <noscript> means it never shows to
+  // a browser that already ran the experience, only to a crawler or non-JS
+  // client reading the raw HTML — same facts, same wording as the live site.
+  function buildHomepageNoscript() {
+    let blogLinks = [];
+    try {
+      blogLinks = db.prepare(
+        `SELECT slug, title FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 5`
+      ).all();
+    } catch (e) {
+      console.error('[SSR noscript] blog_posts query failed:', e.message);
+    }
+    const blogLinksHtml = blogLinks.length
+      ? blogLinks.map(p => `<li><a href="/blog/${encodeURIComponent(p.slug)}">${escapeHtml(p.title)}</a></li>`).join('\n          ')
+      : '';
+
+    const servicesHtml = SERVICES.map(([name, desc]) =>
+      `<h2>${escapeHtml(name)}</h2>\n          <p>${escapeHtml(desc)}</p>`
+    ).join('\n          ');
+
+    const faqItemsHtml = FAQS.map(([q, a]) =>
+      `<div itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <h3 itemprop="name">${escapeHtml(q)}</h3>
+            <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">${escapeHtml(a)}</p>
+            </div>
+          </div>`
+    ).join('\n          ');
+
+    return `<noscript>
+      <main>
+        <h1>Hyphening Media: Creative Operations and Marketing Performance for D2C, F&amp;B and Healthcare Brands</h1>
+        <p class="lead">Hyphening Media is a creative operations agency for brands that want content to produce customers, not just views. We script, shoot, produce and measure the work ourselves, so a campaign and its numbers sit under one roof. For healthcare brands, every piece is built inside advertising rules, not around them.</p>
+        <p>A follower count and a bank balance have one thing in common: neither tells you why it changed. We report CTR, conversions and organic reach, and we leave out the numbers that only look good.</p>
+
+        ${servicesHtml}
+
+        <h2>How We Work</h2>
+        <p>Every engagement starts with the number you want to move, not the platform you want to post on. We document the brand's audience and voice once, plan the month's scripts and hooks, produce the content, and review the results with you in the portal. What performed gets repeated. What did not gets dropped. There are no surprise invoices for vanity reach, because the report leads with the metrics tied to your business.</p>
+
+        <h2>Trusted By</h2>
+        <p>Eight active clients across healthcare, food and beverage, and artist curation.</p>
+
+        <h2>From the Blog</h2>
+        <ul>
+          ${blogLinksHtml}
+          <li><a href="/blog">All articles</a></li>
+          <li><a href="/case-studies">Case studies</a></li>
+        </ul>
+
+        <h2>Frequently Asked Questions</h2>
+        <div itemscope itemtype="https://schema.org/FAQPage">
+          ${faqItemsHtml}
+        </div>
+
+        <h2>D2C Content Operations</h2>
+        <p><strong>Why do D2C brands need a content engine, not a content calendar?</strong> Because a calendar schedules output and an engine learns from it. A brand posting on a calendar repeats what it planned. A brand running an engine repeats what worked, and drops what did not. The difference shows up in cost per acquisition, not in post counts.</p>
+        <p><strong>What should D2C founders track instead of likes?</strong> Track the metrics that sit next to revenue: click-through rate, conversion rate, cost per acquisition and repeat purchase. Likes and views describe attention. They do not say whether attention turned into a customer, which is why we report both and lead with the second set.</p>
+        <p><strong>Why does retention matter more than acquisition spend?</strong> Keeping a customer you already paid to win usually costs less than winning a new one, so brands that only fund acquisition keep re-buying the same customers. See our <a href="/blog/retention-economics-why-d2c-brands-keep-paying-to-re-acquire-customers-they-already-have">retention economics breakdown</a> for the sourced numbers.</p>
+
+        <h2>Start a Conversation</h2>
+        <p>Tell us the brand, the channel that is underperforming, and the number you want to move.</p>
+        <address>
+          <a href="mailto:deepanjan@hypheningmedia.com">deepanjan@hypheningmedia.com</a><br>
+          <a href="https://www.instagram.com/hypheningmedia/">Instagram</a> ·
+          <a href="https://www.linkedin.com/company/104980691/">LinkedIn</a>
+        </address>
+      </main>
+    </noscript>`;
+  }
+
   // SPA fallback — serve index.html for all non-API routes with dynamic canonical injection & 301 trailing slash normalization
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
@@ -403,7 +503,10 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         return res.sendFile(indexPath);
       }
       const canonicalTag = `<link rel="canonical" href="${canonicalUrl}" />`;
-      const updatedHtml = html.replace('</head>', `  ${canonicalTag}\n</head>`);
+      let updatedHtml = html.replace('</head>', `  ${canonicalTag}\n</head>`);
+      if (cleanPath === '/') {
+        updatedHtml = updatedHtml.replace('</body>', `  ${buildHomepageNoscript()}\n  </body>`);
+      }
       res.header('Content-Type', 'text/html');
       res.send(updatedHtml);
     });
