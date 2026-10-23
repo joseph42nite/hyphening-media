@@ -450,7 +450,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         <p><strong>Deepanjan Sarkar, COO.</strong> Deepanjan is a computer engineer with an MBA in marketing and finance from IIM. He runs day-to-day operations and client delivery, bringing an engineer's process discipline and a finance-minded view of campaign returns.</p>
 
         <h2>Trusted By</h2>
-        <p>High-growth client partners across healthcare, food and beverage, D2C, and B2B growth sectors.</p>
+        <p>Client partners including Dr. Divya Sharma Skin and Hair Solutions, DentAlchemy Dental Clinic, TBC HSR Layout, TBC Kadubesanahalli, Zaffran Fine Dine, Jango Cafe and Brewery, F16s E-Freight Solutions, Ventura Capitals, and Muse-ing.</p>
 
         <h2>From the Blog</h2>
         <ul>
