@@ -374,6 +374,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
     // injects, so the homepage — the one page that most needs one — shipped
     // without any. Letting "/" fall through gives every route the same tag.
     index: false,
+    redirect: false,
     setHeaders: (res, filePath) => {
       const hashed = filePath.includes(`${path.sep}assets${path.sep}`);
       if (hashed || VENDOR.test(filePath) || IMMUTABLE.test(filePath)) {
