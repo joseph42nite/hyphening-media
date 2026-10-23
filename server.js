@@ -89,6 +89,13 @@ app.use(helmet({
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "http://localhost", "capacitor://localhost", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com"],
+      frameSrc: [
+        "'self'",
+        "https://www.youtube.com",
+        "https://www.youtube-nocookie.com",
+        "https://player.vimeo.com",
+        "https://www.loom.com",
+      ],
     },
   } : false,
   hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true } : false,

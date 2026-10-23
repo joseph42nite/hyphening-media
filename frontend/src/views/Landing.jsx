@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import SEOHead from '../components/SEOHead';
 import Scene from '../components/Scene';
@@ -39,6 +39,18 @@ class SceneErrorBoundary extends React.Component {
    ========================================================================== */
 function Landing() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Listen for navigation requests posted from inside the 3D scene iframe
+  useEffect(() => {
+    const handleMessage = (e) => {
+      if (e.data && e.data.type === 'NAVIGATE_ROUTE' && e.data.url) {
+        navigate(e.data.url);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [navigate]);
 
   // Ensure body and root take full viewport without outer window scrollbar
   useEffect(() => {

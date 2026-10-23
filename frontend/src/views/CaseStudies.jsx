@@ -13,8 +13,15 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
  */
 function renderMarkdown(md) {
   if (!md) return '';
-  let html = md
-    .replace(/\r/g, '')
+
+  // Convert standalone video URLs on their own line into responsive embed containers
+  let text = md.replace(/\r/g, '');
+  text = text.replace(/^(?:https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=[a-zA-Z0-9_-]+|shorts\/[a-zA-Z0-9_-]+|embed\/[a-zA-Z0-9_-]+|live\/[a-zA-Z0-9_-]+)|youtu\.be\/[a-zA-Z0-9_-]+)[^\s]*)$/gm, (match) => {
+    const embed = toEmbedUrl(match.trim());
+    return embed ? `\n\n<div class="cs-video-embed"><iframe src="${embed}" title="Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>\n\n` : match;
+  });
+
+  let html = text
     .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="blog-pre"><code class="blog-code blog-lang-$1">$2</code></pre>')
     .replace(/`([^`]+)`/g, '<code class="blog-inline-code">$1</code>')
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<div class="blog-img-frame"><img src="$2" alt="$1" class="blog-content-img" loading="lazy" /><span class="blog-img-caption">$1</span></div>')
@@ -41,7 +48,7 @@ function renderMarkdown(md) {
   html = html.replace(/<p class="blog-p">(<blockquote)/g, '$1').replace(/(<\/blockquote>)<\/p>/g, '$1');
   html = html.replace(/<p class="blog-p">(<pre)/g, '$1').replace(/(<\/pre>)<\/p>/g, '$1');
   html = html.replace(/<p class="blog-p">(<ul|<ol)/g, '$1').replace(/(<\/ul>|<\/ol>)<\/p>/g, '$1');
-  html = html.replace(/<p class="blog-p">(<hr \/>|<div class="blog-img-frame")/g, '$1').replace(/(<\/div>)<\/p>/g, '$1');
+  html = html.replace(/<p class="blog-p">(<hr \/>|<div class="blog-img-frame"|<div class="cs-video-embed")/g, '$1').replace(/(<\/div>)<\/p>/g, '$1');
 
   return html;
 }
@@ -54,30 +61,84 @@ function formatDate(dateStr) {
 }
 
 /**
- * Converts a YouTube/Vimeo/Loom share link into its embeddable iframe src.
- * Unrecognized links are returned as-is so the iframe still attempts to load them.
+ * Converts any YouTube/Vimeo/Loom link (watch, shorts, embed, youtu.be, live, or raw iframe)
+ * into a safe, responsive embeddable iframe src using youtube-nocookie.com.
  */
-function toEmbedUrl(url) {
+export function toEmbedUrl(url) {
   if (!url) return null;
+  let str = String(url).trim();
+  if (!str) return null;
+
+  // Extract from markdown link e.g. [title](url) or <url>
+  const mdLinkMatch = str.match(/^\[.*?\]\((https?:\/\/[^\s)]+)\)$/i);
+  if (mdLinkMatch) str = mdLinkMatch[1];
+  str = str.replace(/^<|>$/g, '');
+
+  // Extract src if an iframe tag was pasted
+  const iframeMatch = str.match(/src=["']([^"']+)["']/i);
+  if (iframeMatch) {
+    str = iframeMatch[1].trim();
+  }
+
+  // Ensure protocol
+  if (!/^https?:\/\//i.test(str)) {
+    str = 'https://' + str;
+  }
+
   try {
-    const u = new URL(url);
-    if (u.hostname.includes('youtube.com')) {
-      const id = u.searchParams.get('v');
-      return id ? `https://www.youtube.com/embed/${id}` : url;
+    const u = new URL(str);
+    const host = u.hostname.toLowerCase();
+
+    // YouTube
+    if (host.includes('youtube.com') || host.includes('youtu.be')) {
+      let videoId = null;
+
+      if (host.includes('youtu.be')) {
+        // e.g. https://youtu.be/VIDEO_ID?si=...
+        videoId = u.pathname.replace(/^\/+/, '').split('/')[0];
+      } else if (u.pathname.includes('/shorts/')) {
+        // e.g. https://www.youtube.com/shorts/VIDEO_ID
+        const m = u.pathname.match(/\/shorts\/([a-zA-Z0-9_-]+)/);
+        if (m) videoId = m[1];
+      } else if (u.pathname.includes('/live/')) {
+        // e.g. https://www.youtube.com/live/VIDEO_ID
+        const m = u.pathname.match(/\/live\/([a-zA-Z0-9_-]+)/);
+        if (m) videoId = m[1];
+      } else if (u.pathname.includes('/embed/')) {
+        // e.g. https://www.youtube.com/embed/VIDEO_ID
+        const m = u.pathname.match(/\/embed\/([a-zA-Z0-9_-]+)/);
+        if (m) videoId = m[1];
+      } else {
+        // e.g. https://www.youtube.com/watch?v=VIDEO_ID
+        videoId = u.searchParams.get('v');
+      }
+
+      if (videoId) {
+        videoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
+        let embed = `https://www.youtube-nocookie.com/embed/${videoId}`;
+        const timeParam = u.searchParams.get('t') || u.searchParams.get('start');
+        if (timeParam) {
+          let seconds = parseInt(timeParam, 10);
+          if (!isNaN(seconds)) embed += `?start=${seconds}`;
+        }
+        return embed;
+      }
     }
-    if (u.hostname === 'youtu.be') {
-      return `https://www.youtube.com/embed/${u.pathname.slice(1)}`;
+
+    // Vimeo
+    if (host.includes('vimeo.com')) {
+      const match = u.pathname.match(/\/(\d+)/);
+      if (match) return `https://player.vimeo.com/video/${match[1]}`;
     }
-    if (u.hostname.includes('vimeo.com')) {
-      const id = u.pathname.split('/').filter(Boolean).pop();
-      return id ? `https://player.vimeo.com/video/${id}` : url;
+
+    // Loom
+    if (host.includes('loom.com')) {
+      return str.replace('/share/', '/embed/');
     }
-    if (u.hostname.includes('loom.com')) {
-      return url.replace('/share/', '/embed/');
-    }
-    return url;
+
+    return str;
   } catch (e) {
-    return url;
+    return str;
   }
 }
 
@@ -388,13 +449,14 @@ function CaseStudyDetail() {
             <div className="cs-video-list">
               {videoEmbeds.map((url, i) => {
                 const embed = toEmbedUrl(url);
+                if (!embed) return null;
                 return (
                   <div key={i} className="cs-video-embed">
                     <iframe
                       src={embed}
                       title={`${post.title} - video ${i + 1}`}
                       frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
                       loading="lazy"
                     />
