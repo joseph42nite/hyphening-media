@@ -5152,22 +5152,24 @@ html.dark-theme {
 }
 
 .landing-root .landing-footer-detailed .footer-desc {
-  color: #8b9b90 !important;
+  color: #dfe7e0 !important;
+  font-size: 0.95rem !important;
+  line-height: 1.6 !important;
 }
 
 .landing-root .landing-footer-detailed .links-col a,
 .landing-root .landing-footer-detailed .social-col a {
-  color: #8b9b90 !important;
+  color: #b5c2ba !important;
 }
 
 .landing-root .landing-footer-detailed .links-col a:hover,
 .landing-root .landing-footer-detailed .social-col a:hover {
-  color: #e0231c !important;
+  color: #ffffff !important;
 }
 
 .landing-root .landing-footer-detailed .footer-bottom {
   border-top: 1px solid rgba(223, 231, 224, 0.08) !important;
-  color: #6b7770 !important;
+  color: #9aa79f !important;
 }
 
 /* Kyoto Dark Theme for Client Portal */
