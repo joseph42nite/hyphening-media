@@ -445,6 +445,10 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         <h2>How We Work</h2>
         <p>Every engagement starts with the number you want to move, not the platform you want to post on. We document the brand's audience and voice once, plan the month's scripts and hooks, produce the content, and review the results with you in the portal. What performed gets repeated. What did not gets dropped. There are no surprise invoices for vanity reach, because the report leads with the metrics tied to your business.</p>
 
+        <h2>Leadership</h2>
+        <p><strong>Joseph George, CEO.</strong> Joseph founded Hyphening Media and leads its strategy, client partnerships and technology. He runs the agency's content, healthcare marketing and lead generation work, with a background in artist curation.</p>
+        <p><strong>Deepanjan Sarkar, COO.</strong> Deepanjan is a computer engineer with an MBA in marketing and finance from IIM. He runs day-to-day operations and client delivery, bringing an engineer's process discipline and a finance-minded view of campaign returns.</p>
+
         <h2>Trusted By</h2>
         <p>Eight active clients across healthcare, food and beverage, and artist curation.</p>
 
@@ -468,9 +472,11 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         <h2>Start a Conversation</h2>
         <p>Tell us the brand, the channel that is underperforming, and the number you want to move.</p>
         <address>
+          Nikoo, Bharatiya City, Bengaluru 560064<br>
           <a href="mailto:deepanjan@hypheningmedia.com">deepanjan@hypheningmedia.com</a><br>
+          <a href="tel:+917278178402">+91 72781 78402</a><br>
           <a href="https://www.instagram.com/hypheningmedia/">Instagram</a> ·
-          <a href="https://www.linkedin.com/company/104980691/">LinkedIn</a>
+          <a href="https://www.linkedin.com/company/are-you-hyphening/">LinkedIn</a>
         </address>
       </main>
     </noscript>`;
