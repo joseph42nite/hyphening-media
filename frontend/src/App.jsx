@@ -11,6 +11,7 @@ import Toast from './components/Toast.jsx';
 const Landing = React.lazy(() => import('./views/Landing.jsx'));
 const Blog = React.lazy(() => import('./views/Blog.jsx'));
 const CaseStudies = React.lazy(() => import('./views/CaseStudies.jsx'));
+const Capabilities = React.lazy(() => import('./views/Capabilities.jsx'));
 
 // WebViews need HashRouter — no server-side routing fallback for client-side routes
 const Router = isNative ? HashRouter : BrowserRouter;
@@ -140,6 +141,16 @@ function App() {
           <Route
             path="/case-studies/:slug"
             element={<React.Suspense fallback={null}><CaseStudies /></React.Suspense>}
+          />
+
+          {/* Public Capabilities / Nine Pillars */}
+          <Route
+            path="/capabilities"
+            element={<React.Suspense fallback={null}><Capabilities /></React.Suspense>}
+          />
+          <Route
+            path="/capabilities/:slug"
+            element={<React.Suspense fallback={null}><Capabilities /></React.Suspense>}
           />
 
           {/* Fallback routes */}

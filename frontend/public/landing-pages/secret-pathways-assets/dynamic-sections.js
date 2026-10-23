@@ -51,7 +51,7 @@
   }
 
   function wireCardClicks() {
-    var cards = document.querySelectorAll('#cards > .card');
+    var cards = document.querySelectorAll('#cards > .card, #cur > .card, .cur-cards > .card');
     cards.forEach(function (card) {
       if (card.__wiredClick) return;
       card.__wiredClick = true;

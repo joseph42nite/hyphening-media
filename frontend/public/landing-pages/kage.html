@@ -383,10 +383,10 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 @media (max-width:600px){
   .cards{ grid-template-columns:1fr; gap:20px; }
 }
-.card{ position:relative; cursor:pointer; }
+.card{ position:relative; cursor:pointer; text-decoration:none; }
 @media (min-width:921px){
-  .card:nth-child(2), .card:nth-child(5){ transform:translateY(clamp(16px,2.5vw,34px)); }
-  .card:nth-child(3), .card:nth-child(6){ transform:translateY(clamp(32px,5vw,68px)); }
+  .card:nth-child(3n+2){ transform:translateY(clamp(16px,2.5vw,34px)); }
+  .card:nth-child(3n){ transform:translateY(clamp(32px,5vw,68px)); }
 }
 /* the frame is a hole punched in the page — the scene is rendered straight
    into this rectangle with a scissored viewport, so each card is a live
@@ -397,32 +397,32 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
   transition:outline-color .5s var(--ease);
 }
 .card:hover .card-fr{ outline-color:rgba(223,231,224,.30); }
-.card:nth-child(1) .card-fr{
+#cards > .card:nth-child(1) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.04) 36%,rgba(3,6,9,.72) 100%),
     url('secret-pathways-assets/generated/kage-approach.webp') center / cover no-repeat;
 }
-.card:nth-child(2) .card-fr{
+#cards > .card:nth-child(2) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.06) 36%,rgba(3,6,9,.74) 100%),
     url('secret-pathways-assets/generated/kage-lantern-court.webp') center / cover no-repeat;
 }
-.card:nth-child(3) .card-fr{
+#cards > .card:nth-child(3) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.05) 36%,rgba(3,6,9,.74) 100%),
     url('secret-pathways-assets/generated/kage-moonwater.webp') center / cover no-repeat;
 }
-.card:nth-child(4) .card-fr{
+#cards > .card:nth-child(4) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.04) 36%,rgba(3,6,9,.74) 100%),
     url('secret-pathways-assets/generated/kage-sanmon-preview.webp') center / cover no-repeat;
 }
-.card:nth-child(5) .card-fr{
+#cards > .card:nth-child(5) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.06) 36%,rgba(3,6,9,.74) 100%),
     url('/media/background.webp') center / cover no-repeat;
 }
-.card:nth-child(6) .card-fr{
+#cards > .card:nth-child(6) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.05) 36%,rgba(3,6,9,.74) 100%),
     url('secret-pathways-assets/generated/kage-lantern-court.webp') center / cover no-repeat;
@@ -523,7 +523,8 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 /* — chapter III: curriculum */
 .cur-head{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.72fr); gap:clamp(28px,5vw,90px); align-items:end; margin-bottom:clamp(34px,6vh,72px); }
 .cur-head h2{ max-width:13ch; }
-.cur{ border-top:1px solid var(--line-soft); }
+.cur{ border-top:none; margin-top:clamp(24px, 3.5vw, 48px); }
+.cur-cards{ margin-top:clamp(24px, 3.5vw, 48px); }
 .les{
   position:relative; display:grid; align-items:center;
   grid-template-columns:64px minmax(0,1.05fr) minmax(0,1.25fr) 86px;
@@ -2061,150 +2062,87 @@ html.in-iframe #nav{
     <h2 class="display h-sec" data-rv="up">Nine Pillars. Full-Spectrum Execution. Real ROI.</h2>
     <p class="body-lg" data-rv="up">Nine core disciplines engineered for full-spectrum execution, viral distribution, and real enterprise ROI — from cinema production to custom software.</p>
   </div>
-  <div class="cur" id="cur">
-    <div class="les" data-les="0" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/content-strategy.webp" alt="Content Strategy" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">01</span>
+  <div class="cards cur-cards" id="cur">
+    <a class="card" data-rv="up" data-cursor href="/capabilities/content-strategy" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/content-strategy.webp') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow" style="--gx:78%; --gy:26%; --gr:20%; --gt:6.1s; --gt2:9.7s; --gc1:rgba(255,142,108,.50); --gc2:rgba(212,56,38,.24)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 01</span><b>Content Strategy</b><span class="card-client">Viral Hooks &amp; Scheduling</span></div><span class="jp">戦略</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>Content Strategy<em class="jp">戦略</em></h3>
-          <span class="t">Viral Hooks & Sched</span>
-        </div>
-        <p>We build monthly content calendars with scripts, hooks, and posting schedules engineered for maximum reach.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Viral Hooks &amp; Sched</span><span>01 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="1" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/video-production.png" alt="Video Production" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">02</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/video-production" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/video-production.png') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow glow--flame" style="--gx:70%; --gy:44%; --gr:16%; --gt:3.7s; --gt2:5.3s; --gc1:rgba(255,198,124,.62); --gc2:rgba(226,118,40,.30)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 02</span><b>Video Production</b><span class="card-client">Cinema &amp; High-Retention Edit</span></div><span class="jp">映像</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>Video Production<em class="jp">映像</em></h3>
-          <span class="t">Cinema & 4K Edit</span>
-        </div>
-        <p>End-to-end short-form and long-form video creation — from script to shoot to final edit, delivered on time.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Cinema &amp; 4K Edit</span><span>02 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="2" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/social-media-ops.webp" alt="Social Media Ops" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">03</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/social-media-ops" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/social-media-ops.webp') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow" style="--gx:50%; --gy:20%; --gr:19%; --gt:7.1s; --gt2:11.0s; --gc1:rgba(255,138,104,.52); --gc2:rgba(208,54,36,.24)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 03</span><b>Social Media Ops</b><span class="card-client">Daily Engagement &amp; Growth</span></div><span class="jp">運用</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>Social Media Ops<em class="jp">運用</em></h3>
-          <span class="t">Daily Engagement</span>
-        </div>
-        <p>Multi-platform management across Instagram, YouTube, TikTok, and LinkedIn with daily engagement tracking.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Daily Engagement</span><span>03 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="3" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/web-development.webp" alt="Web Development" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">04</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/web-development" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/web-development.webp') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow glow--flame" style="--gx:64%; --gy:36%; --gr:18%; --gt:4.2s; --gt2:7.1s; --gc1:rgba(255,180,90,.58); --gc2:rgba(224,90,30,.26)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 04</span><b>Web Development</b><span class="card-client">Next.js, WebGL &amp; Custom Apps</span></div><span class="jp">開発</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>Web Development<em class="jp">開発</em></h3>
-          <span class="t">Next.js & Full-Stack</span>
-        </div>
-        <p>Custom, high-performance websites and web applications built with modern technologies to drive conversions.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Next.js &amp; Full-Stack</span><span>04 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="4" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/app-development.webp" alt="App Development" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">05</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/app-development" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/app-development.webp') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow" style="--gx:72%; --gy:30%; --gr:20%; --gt:5.8s; --gt2:8.9s; --gc1:rgba(255,142,108,.50); --gc2:rgba(212,56,38,.24)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 05</span><b>App Development</b><span class="card-client">iOS &amp; Android Ecosystems</span></div><span class="jp">応用</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>App Development<em class="jp">応用</em></h3>
-          <span class="t">iOS & Android Apps</span>
-        </div>
-        <p>Native and cross-platform mobile applications designed for seamless user experiences and engagement.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>iOS &amp; Android Apps</span><span>05 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="5" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/performance-analytics.webp" alt="Performance Analytics" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">06</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/performance-analytics" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/performance-analytics.webp') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow glow--flame" style="--gx:52%; --gy:24%; --gr:17%; --gt:4.9s; --gt2:6.8s; --gc1:rgba(255,198,124,.62); --gc2:rgba(226,118,40,.30)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 06</span><b>Performance Analytics</b><span class="card-client">Real Attribution &amp; Funnel ROI</span></div><span class="jp">解析</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>Performance Analytics<em class="jp">解析</em></h3>
-          <span class="t">Real Conversion Data</span>
-        </div>
-        <p>Data-driven growth reports with real CTR, impressions, and audience metrics — no vanity numbers.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Real Conversion Data</span><span>06 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="6" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/campaign-management.png" alt="Campaign Management" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">07</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/campaign-management" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/campaign-management.png') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow" style="--gx:66%; --gy:32%; --gr:19%; --gt:6.4s; --gt2:9.3s; --gc1:rgba(255,142,108,.50); --gc2:rgba(212,56,38,.24)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 07</span><b>Campaign Management</b><span class="card-client">Paid &amp; Organic Funnels</span></div><span class="jp">統合</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>Campaign Management<em class="jp">統合</em></h3>
-          <span class="t">Paid & Organic Funnels</span>
-        </div>
-        <p>Organic and paid campaign execution with A/B testing, audience targeting, and conversion-optimized funnels.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Paid &amp; Organic Funnels</span><span>07 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="7" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/brand-development.webp" alt="Brand Development" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">08</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/brand-development" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/brand-development.webp') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow glow--flame" style="--gx:58%; --gy:40%; --gr:16%; --gt:4.1s; --gt2:6.5s; --gc1:rgba(255,198,124,.62); --gc2:rgba(226,118,40,.30)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 08</span><b>Brand Development</b><span class="card-client">Identity Systems &amp; Guidelines</span></div><span class="jp">確立</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>Brand Development<em class="jp">確立</em></h3>
-          <span class="t">Identity & Guidelines</span>
-        </div>
-        <p>Visual identity systems, positioning strategy, and tone-of-voice guides that make your brand unmistakable.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Identity &amp; Guidelines</span><span>08 / 09</span></div>
+    </a>
 
-    <div class="les" data-les="8" data-cursor>
-      <div class="les-media">
-        <img src="/capabilities/news-media-pr.webp" alt="News Media Coverage & PR" width="640" height="360" loading="lazy" decoding="async">
-        <div class="les-media-overlay"></div>
-        <span class="les-badge">09</span>
+    <a class="card" data-rv="up" data-cursor href="/capabilities/news-media-pr" target="_top">
+      <div class="card-fr" data-frame style="background: linear-gradient(180deg,rgba(3,6,9,.08) 36%,rgba(3,6,9,.84) 100%), url('/capabilities/news-media-pr.webp') center / cover no-repeat;">
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow" style="--gx:74%; --gy:28%; --gr:21%; --gt:6.8s; --gt2:10.2s; --gc1:rgba(255,142,108,.50); --gc2:rgba(212,56,38,.24)"></i>
+        <div class="card-lab"><div class="card-lab-main"><span class="card-tag">Pillar 09</span><b>News Media Coverage &amp; PR</b><span class="card-client">Editorial &amp; Earned Media</span></div><span class="jp">広報</span></div>
       </div>
-      <div class="les-content">
-        <div class="les-top">
-          <h3>News Media Coverage & PR<em class="jp">広報</em></h3>
-          <span class="t">Editorial & Press</span>
-        </div>
-        <p>Strategic public relations and news media placements to amplify your brand presence and establish industry authority.</p>
-      </div>
-      <i class="bar"></i>
-    </div>
+      <div class="card-meta"><span>Editorial &amp; Press</span><span>09 / 09</span></div>
+    </a>
   </div>
 </section>
 
