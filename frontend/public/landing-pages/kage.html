@@ -258,10 +258,14 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
           mask-image:linear-gradient(transparent, #000 44%);
 }
 #pathways::before{ background:radial-gradient(108% 64% at 50% 50%, rgba(4,7,10,.70), rgba(4,7,10,.44) 50%, rgba(4,7,10,0)); }
-#eternity::before{ background:radial-gradient(82% 58% at 50% 46%, rgba(4,7,10,.26), rgba(4,7,10,.66) 56%, rgba(4,7,10,.90) 82%, rgba(4,7,10,0)); }
+#eternity::before{
+  inset:-22% -4% 0 -4%;
+  background:radial-gradient(82% 58% at 50% 46%, rgba(4,7,10,.26), rgba(4,7,10,.66) 56%, rgba(4,7,10,.90) 82%, rgba(4,7,10,0));
+  -webkit-mask-image:linear-gradient(to bottom, transparent, #000 44%, #000 75%, transparent 100%);
+          mask-image:linear-gradient(to bottom, transparent, #000 44%, #000 75%, transparent 100%);
+}
 .foot::before{
-  content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
-  background:linear-gradient(rgba(4,7,10,.55), rgba(4,7,10,.94) 40%, rgba(4,7,10,.98));
+  display:none;
 }
 .sec-head{ display:flex; align-items:baseline; gap:16px; margin-bottom:clamp(30px,5vh,66px); }
 .sec-head .k{ font-size:10px; font-weight:500; letter-spacing:.24em; text-transform:uppercase; color:var(--muted); }
@@ -1565,7 +1569,7 @@ body[data-layout-closing="b"] .fin p{
 
 /* — footer B · manifesto: the statement leads, the navigation becomes a
      compact ruled index beneath it. */
-body[data-layout-footer="b"] .foot-grid{ grid-template-columns:repeat(3,1fr); }
+body[data-layout-footer="b"] .foot-grid{ grid-template-columns:repeat(2,1fr); }
 body[data-layout-footer="b"] .foot-brand{
   grid-column:1 / -1; display:grid; grid-template-columns:140px minmax(0,1fr); align-items:center;
   gap:clamp(18px, 2.5vw, 36px);
@@ -2646,17 +2650,7 @@ html.in-iframe #nav{
       <li><a href="#faq" data-cursor>FAQ</a></li>
       <li><a href="#eternity" data-cursor>Partnership</a></li>
     </ul></div>
-    <div><h4>Clients & Partners</h4><ul>
-      <li><span style="color:#8b9b90">Dr Divya Sharma MD</span></li>
-      <li><span style="color:#8b9b90">DentAlchemy Dental</span></li>
-      <li><span style="color:#8b9b90">TBC HSR Layout</span></li>
-      <li><span style="color:#8b9b90">TBC Kadubesanahalli</span></li>
-      <li><span style="color:#8b9b90">Zaffran Fine Dine</span></li>
-      <li><span style="color:#8b9b90">Jango Cafe and Brewery</span></li>
-      <li><span style="color:#8b9b90">F16s E-Freight Solutions</span></li>
-      <li><span style="color:#8b9b90">Ventura Capitals</span></li>
-      <li><span style="color:#8b9b90">Muse-ing (D2C)</span></li>
-    </ul></div>
+
     <div><h4>Connect</h4><ul>
       <li><a href="https://www.instagram.com/hypheningmedia/" target="_blank" rel="noopener noreferrer" data-cursor>Instagram</a></li>
       <li><a href="https://www.linkedin.com/company/are-you-hyphening/" target="_blank" rel="noopener noreferrer" data-cursor>LinkedIn</a></li>
