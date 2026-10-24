@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import { MarkdownBlock, ReportValue, parseReportJson } from './SeoMonitorTab.jsx';
+import AdsModeToggle from './AdsModeToggle.jsx';
 
 const IN_FLIGHT = ['queued', 'running'];
 
@@ -436,6 +437,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
 
   return (
     <div>
+      <AdsModeToggle showToast={showToast} />
       {/* ---------------- All clients: the monitoring surface ---------------- */}
       {overview && (
         <div className="card glass-premium" style={{ ...panel, marginBottom: 20, padding: '18px 20px' }}>
