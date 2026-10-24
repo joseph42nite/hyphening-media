@@ -7,6 +7,7 @@ import { runMetricSyncWorker } from './metricSyncWorker.js';
 import { runDailyCommentSync } from './dailyCommentSync.js';
 import { runDailyAdsWatch, runWeeklyAdsSweep } from './adsScheduler.js';
 import { syncAllClients } from './adsSyncWorker.js';
+import { getMode } from './automationMode.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +41,7 @@ export function initScheduler() {
   // Three months back each time: platforms restate conversions for weeks, so a
   // sync that only fetched the current month would leave the restatements out.
   cron.schedule('0 6 * * *', () => {
+    if (getMode('ads') !== 'auto') return;
     console.log('[SCHEDULER] Running daily Google Ads sync...');
     syncAllClients({ monthsBack: 3 }).catch(err => console.error('[SCHEDULER] Ads sync failed:', err.message));
   });
@@ -48,6 +50,7 @@ export function initScheduler() {
   // already analysed by the time anyone opens the dashboard. Only clients with
   // more than one month of spend are queued; the rest have nothing to compare.
   cron.schedule('30 6 * * *', () => {
+    if (getMode('ads') !== 'auto') return;
     console.log('[SCHEDULER] Running daily ads anomaly watch...');
     runDailyAdsWatch();
   });
@@ -56,6 +59,7 @@ export function initScheduler() {
   // neglected account catches up over a month rather than in one expensive
   // night. Everything else in the fleet stays manual.
   cron.schedule('0 7 * * 1', () => {
+    if (getMode('ads') !== 'auto') return;
     console.log('[SCHEDULER] Running weekly ads sweep...');
     runWeeklyAdsSweep();
   });

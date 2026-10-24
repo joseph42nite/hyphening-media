@@ -23,6 +23,7 @@
 import db from '../../database.js';
 import { buildFactPack, checkRequirements } from './adsFacts.js';
 import { createRun, getActiveRunsForClient } from './adsRuns.js';
+import { getMode } from './automationMode.js';
 
 // Per client, per weekly sweep. Twelve agents exist; queueing at most three at
 // a time means a fully-neglected client catches up over a month rather than in
@@ -76,6 +77,7 @@ function maybeQueue(client, conf, available, activeRuns) {
  * data point, which is the failure mode this whole design avoids.
  */
 export function runDailyAdsWatch() {
+  if (getMode('ads') !== 'auto') return { queued: 0, skipped: 'manual' };
   const conf = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'monitor'`).get();
   if (!conf) return { queued: 0 };
 
@@ -105,6 +107,7 @@ export function runDailyAdsWatch() {
  * budget on whichever agent happened to sort first alphabetically.
  */
 export function runWeeklyAdsSweep() {
+  if (getMode('ads') !== 'auto') return { queued: 0, perClient: [], skipped: 'manual' };
   const configs = db.prepare(`
     SELECT * FROM ads_agent_config
     WHERE agent_type != 'monitor' AND static_block IS NULL

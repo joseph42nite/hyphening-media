@@ -20,6 +20,7 @@ import {
   createRun, cancelRun, getActiveRunsForClient, listQueue,
 } from '../services/adsRuns.js';
 import { syncClient, syncAllClients } from '../services/adsSyncWorker.js';
+import { getMode, setMode, MODES } from '../services/automationMode.js';
 
 // Each agent owns one score column; the rest read the fallback. Same shape as
 // the SEO route's map, and for the same reason: a creative score and a pacing
@@ -559,6 +560,34 @@ router.get('/:id/ads/sync/history', (req, res) => {
  */
 export const queueRouter = Router();
 queueRouter.use(authenticate);
+
+/** GET /api/ads/automation — 'manual' or 'auto' for the ads fleet. */
+queueRouter.get('/automation', (req, res) => {
+  res.json({ scope: 'ads', mode: getMode('ads') });
+});
+
+/** PUT /api/ads/automation — { mode: 'manual' | 'auto' }. Admins only: auto spends tokens unattended. */
+queueRouter.put('/automation', (req, res) => {
+  try {
+    const role = req.user.role;
+    if (role !== 'admin' && role !== 'super_admin') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    const { mode } = req.body || {};
+    if (!MODES.includes(mode)) return res.status(400).json({ error: `mode must be one of: ${MODES.join(', ')}` });
+    const previous = getMode('ads');
+    const current = setMode('ads', mode);
+    logAction({
+      actorId: req.user.id, actorEmail: req.user.email,
+      action: 'ads_automation_mode_changed', entityType: 'automation_mode',
+      entityId: 'ads', diff: { from: previous, to: current },
+    });
+    res.json({ scope: 'ads', mode: current });
+  } catch (err) {
+    console.error('[ADS ROUTE] Automation mode error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 /** POST /api/ads/sync-all — sync every client that has a customer ID. */
 queueRouter.post('/sync-all', async (req, res) => {

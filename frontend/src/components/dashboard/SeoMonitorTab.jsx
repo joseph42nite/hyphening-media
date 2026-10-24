@@ -343,6 +343,11 @@ export default function SeoMonitorTab({ clients, showToast }) {
   const [setupGaps, setSetupGaps] = useState([]);
 
   const [competitors, setCompetitors] = useState([]);
+
+  // Ads fleet run mode. Manual unless someone switches it: the scheduler reads
+  // the same value and queues nothing while it is manual.
+  const [adsMode, setAdsMode] = useState(null);
+  const [adsModeSaving, setAdsModeSaving] = useState(false);
   // Which approved competitor the backlink_gap card compares against. Held here
   // rather than in the card so the choice survives the status poll re-render.
   const [gapCompetitor, setGapCompetitor] = useState('');
@@ -875,6 +880,35 @@ export default function SeoMonitorTab({ clients, showToast }) {
     }
   };
 
+  useEffect(() => {
+    fetch(`${API_BASE}/api/ads/automation`, { credentials: 'include' })
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('load failed'))))
+      .then(data => setAdsMode(data.mode))
+      .catch(() => setAdsMode(null));
+  }, []);
+
+  const toggleAdsMode = async () => {
+    const next = adsMode === 'auto' ? 'manual' : 'auto';
+    if (next === 'auto' && !window.confirm('Turn the Ads fleet to AUTO? Scheduled ads runs will start queueing on their own and spend API tokens without you clicking anything.')) return;
+    setAdsModeSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/ads/automation`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mode: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not change mode');
+      setAdsMode(data.mode);
+      showToast(`Ads fleet set to ${data.mode}`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setAdsModeSaving(false);
+    }
+  };
+
   // Toggle Recommendation Status directly
   const toggleRecStatus = async (recId, currentStatus) => {
     try {
@@ -1035,7 +1069,23 @@ export default function SeoMonitorTab({ clients, showToast }) {
             <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
             <p style={{ margin: '4px 0 0', color: 'rgba(223, 231, 224, 0.65)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
           </div>
-          <div className="seo-command-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+            <button
+              onClick={toggleAdsMode}
+              disabled={adsMode === null || adsModeSaving}
+              className={`btn ${adsMode === 'auto' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '8px 16px', fontWeight: 700, borderRadius: '8px', border: '1px solid rgba(223, 231, 224, 0.15)', background: adsMode === 'auto' ? 'rgba(74, 222, 128, 0.18)' : 'rgba(255, 255, 255, 0.05)', color: adsMode === 'auto' ? '#4ade80' : 'var(--text-primary)', whiteSpace: 'nowrap' }}
+              title={adsMode === 'auto'
+                ? 'Ads runs on schedule. Click to return to manual.'
+                : 'Ads runs only when you click them. Click to let the schedule run them.'}
+            >
+              {adsModeSaving ? 'Saving…' : adsMode === null ? 'Ads: …' : `Ads: ${adsMode === 'auto' ? 'Auto' : 'Manual'}`}
+            </button>
+            <span style={{ fontSize: '0.72rem', color: 'rgba(223, 231, 224, 0.55)' }}>
+              {adsMode === 'auto' ? 'Scheduled ads runs are on' : 'Ads run only when clicked'}
+            </span>
+          </div>
+          <div className="seo-command-actions"style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 600, fontSize: '0.88rem', flexShrink: 0, color: 'var(--text-primary)' }}>Active Client:</span>
               <select
