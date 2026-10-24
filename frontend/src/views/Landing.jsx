@@ -123,9 +123,10 @@ function Landing() {
     // height comes from .landing-root so the 100vh→100svh fallback applies;
     // an inline height would win over it and reintroduce the mobile wobble
     <div className="landing-root" style={{ width: '100%', overflow: 'hidden', position: 'relative' }}>
-      <SEOHead 
-        title="Hyphening Media | Creative Operations & Marketing Performance Agency" 
-        canonicalUrl="https://hypheningmedia.com/" 
+      <SEOHead
+        title="Hyphening Media | Creative Ops & Marketing Agency in Bengaluru"
+        description="Hyphening Media is a Bengaluru-based creative operations agency scaling D2C, B2B, F&B, and healthcare brands with high-performance content, video, web apps, and automated marketing dashboards."
+        canonicalUrl="https://hypheningmedia.com/"
       />
 
       {/* ===== Fixed Navigation ===== */}
