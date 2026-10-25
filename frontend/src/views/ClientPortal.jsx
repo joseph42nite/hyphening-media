@@ -2228,9 +2228,9 @@ export default function ClientPortal({ showToast }) {
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <Link to="/" style={{ display: 'inline-block', marginBottom: '16px' }} title="Return Home">
+            <a href="https://hypheningmedia.com/" style={{ display: 'inline-block', marginBottom: '16px' }} title="Return Home">
               <img src={logoImg} alt="Hyphening Media" style={{ height: '64px', width: 'auto', margin: '0 auto' }} />
-            </Link>
+            </a>
             <div style={{ display: 'inline-flex', padding: '14px', background: 'rgba(224, 35, 28, 0.12)', color: '#e0231c', border: '1px solid rgba(224, 35, 28, 0.3)', borderRadius: '50%', marginBottom: '16px', boxShadow: '0 0 24px rgba(224, 35, 28, 0.25)' }}>
               <Lock size={28} />
             </div>
@@ -2294,9 +2294,9 @@ export default function ClientPortal({ showToast }) {
         {/* Portal Header */}
         <header className="portal-header-banner">
           <div className="portal-header-brand-row">
-            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} title="Hyphening Media">
+            <a href="https://hypheningmedia.com/" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} title="Hyphening Media">
               <img src={logoImg} alt="Hyphening Media" style={{ height: '64px', maxHeight: '72px', width: 'auto', objectFit: 'contain' }} />
-            </Link>
+            </a>
             <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="portal-header-tag">
                 <span className="portal-header-tag-dot" />

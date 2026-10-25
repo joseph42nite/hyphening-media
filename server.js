@@ -68,7 +68,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 const ADMIN_HOST = (process.env.ADMIN_HOST || '').toLowerCase();
 const PUBLIC_HOST = (process.env.PUBLIC_HOST || 'hypheningmedia.com').toLowerCase();
 const ADMIN_ORIGIN = ADMIN_HOST ? `https://${ADMIN_HOST}` : null;
-const INTERNAL_PAGE_RE = /^\/(login|dashboard)(\/|$)/;
+const INTERNAL_PAGE_RE = /^\/(login|dashboard|portal)(\/|$)/;
 
 // ============================================================
 // MIDDLEWARE STACK (ordered as per spec)
@@ -137,9 +137,6 @@ if (ADMIN_HOST) {
     if (host === PUBLIC_HOST || host === `www.${PUBLIC_HOST}`) {
       if (INTERNAL_PAGE_RE.test(req.path)) {
         return res.redirect(301, `${ADMIN_ORIGIN}${req.originalUrl}`);
-      }
-      if (req.path.startsWith('/portal/')) {
-        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
     }
     next();
