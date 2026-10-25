@@ -3,7 +3,6 @@ User-agent: *
 Allow: /
 Disallow: /dashboard
 Disallow: /portal/
-Disallow: /login
 Disallow: /api/
 
 Sitemap: https://hypheningmedia.com/sitemap.xml

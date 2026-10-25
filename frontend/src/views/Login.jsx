@@ -76,10 +76,11 @@ export default function Login({ setAuth, showToast }) {
 
   return (
     <div className="landing-root login-view-wrapper">
-      <SEOHead 
-        title="Sign In — Hyphening Media | Ops Command Center" 
+      <SEOHead
+        title="Sign In — Hyphening Media | Ops Command Center"
         description="Authorized access for Hyphening Media operational personnel and campaign managers."
         canonicalUrl="https://hypheningmedia.com/login"
+        robots="noindex, follow"
       />
 
       {/* Atmospheric Background Lights */}

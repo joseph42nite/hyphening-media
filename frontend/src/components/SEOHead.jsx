@@ -14,7 +14,8 @@ export default function SEOHead({
   canonicalUrl,
   ogImage = 'https://hypheningmedia.com/favicon.png',
   ogType = 'website',
-  keywords
+  keywords,
+  robots
 }) {
   const location = useLocation();
 
@@ -67,6 +68,7 @@ export default function SEOHead({
     // 4. Update primary meta tags
     setMeta('name', 'description', description);
     if (keywords) setMeta('name', 'keywords', keywords);
+    setMeta('name', 'robots', robots || 'index, follow');
 
     // 5. Update OpenGraph tags
     setMeta('property', 'og:title', title);
@@ -81,7 +83,7 @@ export default function SEOHead({
     setMeta('name', 'twitter:url', fullCanonical);
     setMeta('name', 'twitter:image', ogImage);
 
-  }, [title, description, canonicalUrl, ogImage, ogType, keywords, location.pathname]);
+  }, [title, description, canonicalUrl, ogImage, ogType, keywords, robots, location.pathname]);
 
   return null;
 }
