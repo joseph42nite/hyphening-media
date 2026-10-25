@@ -6,6 +6,7 @@
 
 import { Router } from 'express';
 import db from '../../database.js';
+import { DUPLICATE_POST_REDIRECTS } from '../data/blogDuplicateRedirects.js';
 
 const router = Router();
 
@@ -108,8 +109,11 @@ router.get('/sitemap.xml', (req, res) => {
       xml += `  </url>\n`;
     }
 
-    // Dynamic blog posts
+    // Dynamic blog posts — superseded duplicates (rec 1961) 301 to their
+    // canonical slug, so they drop out of the sitemap instead of listing a
+    // URL that immediately redirects.
     for (const post of posts) {
+      if (DUPLICATE_POST_REDIRECTS[post.slug]) continue;
       const rawDate = post.updated_at || post.published_at || today;
       const lastmod = new Date(rawDate).toISOString().split('T')[0];
       xml += `  <url>\n`;

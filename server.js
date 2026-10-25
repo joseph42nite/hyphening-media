@@ -50,6 +50,7 @@ import approvalRoutes from './src/routes/approval.js';
 import usageRoutes from './src/routes/usage.js';
 import notificationRoutes from './src/routes/notifications.js';
 import sitemapRoutes from './src/routes/sitemap.js';
+import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
@@ -142,6 +143,13 @@ if (ADMIN_HOST) {
       }
       // /login and /dashboard are not acknowledged on the public host at all.
       if (/^\/(login|dashboard)(\/|$)/.test(req.path)) return res.status(404).type('text/plain').send('Not found');
+      // Superseded duplicate blog posts (rec 1961) 301 to their canonical
+      // slug on the public host only — the ops host serves raw content for
+      // editing and shouldn't redirect out from under an editor.
+      const blogSlugMatch = req.path.match(/^\/blog\/([^/]+)\/?$/);
+      if (blogSlugMatch && DUPLICATE_POST_REDIRECTS[blogSlugMatch[1]]) {
+        return res.redirect(301, `/blog/${DUPLICATE_POST_REDIRECTS[blogSlugMatch[1]]}`);
+      }
       // Existing client portal links keep working via redirect to ops.
       if (/^\/portal(\/|$)/.test(req.path)) {
         return res.redirect(301, `${ADMIN_ORIGIN}${req.originalUrl}`);
