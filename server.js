@@ -64,6 +64,11 @@ app.set('broadcastEvent', broadcastEvent);
 const PORT = process.env.PORT || 3000;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const IS_PROD = process.env.NODE_ENV === 'production';
+// Internal-tool host (CRM login/dashboard). Unset = single-host behaviour (dev).
+const ADMIN_HOST = (process.env.ADMIN_HOST || '').toLowerCase();
+const PUBLIC_HOST = (process.env.PUBLIC_HOST || 'hypheningmedia.com').toLowerCase();
+const ADMIN_ORIGIN = ADMIN_HOST ? `https://${ADMIN_HOST}` : null;
+const INTERNAL_PAGE_RE = /^\/(login|dashboard)(\/|$)/;
 
 // ============================================================
 // MIDDLEWARE STACK (ordered as per spec)
@@ -114,11 +119,38 @@ app.use((req, res, next) => {
   next();
 });
 
+// 1b. Host split — ops host is the internal tool and is never indexed;
+// the public host serves marketing pages only (internal pages redirect to ops).
+// /api/* and /ws/* stay reachable on both (client portal + Mac connector).
+if (ADMIN_HOST) {
+  app.use((req, res, next) => {
+    const host = (req.hostname || '').toLowerCase();
+    if (host === ADMIN_HOST) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      if (req.path === '/robots.txt') {
+        return res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+      }
+      if (req.path === '/sitemap.xml') return res.status(404).end();
+      if (req.path === '/') return res.redirect(302, '/login');
+      return next();
+    }
+    if (host === PUBLIC_HOST || host === `www.${PUBLIC_HOST}`) {
+      if (INTERNAL_PAGE_RE.test(req.path)) {
+        return res.redirect(301, `${ADMIN_ORIGIN}${req.originalUrl}`);
+      }
+      if (req.path.startsWith('/portal/')) {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      }
+    }
+    next();
+  });
+}
+
 // 2. CORS — allow frontend origin
 const CAPACITOR_ORIGINS = ['http://localhost', 'capacitor://localhost'];
 app.use(cors({
   origin: IS_PROD 
-    ? [FRONTEND_ORIGIN, ...CAPACITOR_ORIGINS] 
+    ? [FRONTEND_ORIGIN, ...(ADMIN_ORIGIN ? [ADMIN_ORIGIN] : []), ...CAPACITOR_ORIGINS] 
     : [FRONTEND_ORIGIN, 'http://localhost:3000', 'http://localhost:5173', ...CAPACITOR_ORIGINS],
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -511,13 +543,14 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
 
     // Dynamically inject exact single canonical tag for requested path
     const cleanPath = req.path === '/' ? '/' : req.path.replace(/\/$/, '');
-    const canonicalUrl = `https://hypheningmedia.com${cleanPath}`;
+    const onAdminHost = ADMIN_HOST && (req.hostname || '').toLowerCase() === ADMIN_HOST;
+    const canonicalUrl = `https://${PUBLIC_HOST}${cleanPath}`;
 
     fs.readFile(indexPath, 'utf8', (err, html) => {
       if (err) {
         return res.sendFile(indexPath);
       }
-      const canonicalTag = `<link rel="canonical" href="${canonicalUrl}" />`;
+      const canonicalTag = onAdminHost ? '' : `<link rel="canonical" href="${canonicalUrl}" />`;
       let updatedHtml = html.replace('</head>', `  ${canonicalTag}\n</head>`);
       if (cleanPath === '/') {
         updatedHtml = updatedHtml.replace('</body>', `  ${buildHomepageNoscript()}\n  </body>`);

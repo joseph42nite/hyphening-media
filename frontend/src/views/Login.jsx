@@ -79,7 +79,7 @@ export default function Login({ setAuth, showToast }) {
       <SEOHead
         title="Sign In — Hyphening Media | Ops Command Center"
         description="Authorized access for Hyphening Media operational personnel and campaign managers."
-        canonicalUrl="https://hypheningmedia.com/login"
+        canonicalUrl="https://ops.hypheningmedia.com/login"
         robots="noindex, follow"
       />
 
