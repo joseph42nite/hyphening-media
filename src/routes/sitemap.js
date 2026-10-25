@@ -116,9 +116,7 @@ router.get('/robots.txt', (req, res) => {
     const robots = [
       'User-agent: *',
       'Allow: /',
-      'Disallow: /dashboard',
       'Disallow: /portal/',
-      'Disallow: /login',
       'Disallow: /api/',
       '',
       `Sitemap: ${baseUrl}/sitemap.xml`,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 export default function Navbar() {
@@ -137,16 +137,6 @@ export default function Navbar() {
             >
               Blog
             </Link>
-
-            <div className="landing-drawer-divider" />
-
-            <button 
-              className="btn btn-primary" 
-              onClick={() => { setMenuOpen(false); navigate('/login'); }} 
-              style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}
-            >
-              Sign In <ArrowRight size={14} />
-            </button>
           </div>
         </div>
       </div>
