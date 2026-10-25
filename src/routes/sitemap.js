@@ -9,6 +9,28 @@ import db from '../../database.js';
 
 const router = Router();
 
+// The 9 public capability/pillar pages (frontend/src/data/pillarsData.js) are
+// real routes (/capabilities/:slug) but were missing from the sitemap entirely.
+// Keep this list in sync with that file's slugs.
+const CAPABILITY_SLUGS = [
+  'content-strategy',
+  'video-production',
+  'social-media-ops',
+  'web-development',
+  'app-development',
+  'performance-analytics',
+  'campaign-management',
+  'brand-development',
+  'news-media-pr',
+];
+
+// lastmod for the static marketing pages. Using `new Date()` per-request made
+// every static <url> show the current server date instead of when the page's
+// content actually last changed, which read to crawlers as a build timestamp.
+// Bump these only when the page's own copy changes.
+const HOME_LASTMOD = '2026-10-24';
+const CAPABILITIES_LASTMOD = '2026-10-08';
+
 function escapeXml(str) {
   if (!str) return '';
   return str
@@ -57,12 +79,22 @@ router.get('/sitemap.xml', (req, res) => {
       console.warn('[SITEMAP] Could not fetch case studies from DB:', err.message);
     }
 
+    // Most recent post/case-study update stands in for the listing page's own
+    // lastmod — that's the real reason the listing's content changed, not the
+    // date the server happened to render the response.
+    const latestPostDate = posts[0]?.updated_at || posts[0]?.published_at;
+    const latestCaseStudyDate = caseStudies[0]?.updated_at || caseStudies[0]?.published_at;
+    const blogLastmod = latestPostDate ? new Date(latestPostDate).toISOString().split('T')[0] : HOME_LASTMOD;
+    const caseStudiesLastmod = latestCaseStudyDate ? new Date(latestCaseStudyDate).toISOString().split('T')[0] : HOME_LASTMOD;
+
     // changefreq/priority are hints Google has said for years it ignores; lastmod
     // is the one signal crawlers actually use, so that's all each <url> carries.
     const staticRoutes = [
-      { url: '/', lastmod: today },
-      { url: '/blog', lastmod: today },
-      { url: '/case-studies', lastmod: today },
+      { url: '/', lastmod: HOME_LASTMOD },
+      { url: '/blog', lastmod: blogLastmod },
+      { url: '/case-studies', lastmod: caseStudiesLastmod },
+      { url: '/capabilities', lastmod: CAPABILITIES_LASTMOD },
+      ...CAPABILITY_SLUGS.map((slug) => ({ url: `/capabilities/${slug}`, lastmod: CAPABILITIES_LASTMOD })),
     ];
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
