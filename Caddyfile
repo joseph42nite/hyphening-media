@@ -1,6 +1,13 @@
 # Hyphening Ops Center — Caddy Configuration
 # Replace yourdomain.com with your actual domain name pointing to the EC2 elastic IP
 
+# www is also pointed at this box in DNS; redirect it to the apex so Caddy
+# never forwards it to the app. server.js now redirects www -> apex too, but
+# doing it here as well means a flipped DNS target can't resurrect the split.
+www.yourdomain.com {
+    redir https://yourdomain.com{uri} 301
+}
+
 yourdomain.com {
     reverse_proxy localhost:3000
     

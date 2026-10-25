@@ -134,6 +134,12 @@ if (ADMIN_HOST) {
       return next();
     }
     if (host === PUBLIC_HOST || host === `www.${PUBLIC_HOST}`) {
+      // www and apex were both serving (and both indexable), splitting signals
+      // across two URLs. /api and /ws stay reachable on either host so the
+      // portal and Mac connector don't break; everything else collapses to apex.
+      if (host === `www.${PUBLIC_HOST}` && !/^\/(api|ws)(\/|$)/.test(req.path)) {
+        return res.redirect(301, `https://${PUBLIC_HOST}${req.originalUrl}`);
+      }
       // /login and /dashboard are not acknowledged on the public host at all.
       if (/^\/(login|dashboard)(\/|$)/.test(req.path)) return res.status(404).type('text/plain').send('Not found');
       // Existing client portal links keep working via redirect to ops.
