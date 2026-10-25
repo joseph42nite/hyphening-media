@@ -37,6 +37,13 @@
   --ease-io:cubic-bezier(.65,0,.35,1);
 }
 *,*::before,*::after{box-sizing:border-box}
+/* Visible to screen readers and crawlers only — the H1's animated display
+   copy carries the tagline, not the brand name, which left "Hyphening Media"
+   out of the page's one strongest entity signal. Same fact, not new text. */
+.sr-only{
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
 /* overflow-x lived on body alone. With html left visible, body's value is what
    propagates to the viewport — and hidden propagated that way is the case iOS
    Safari leaks, letting a finger pan sideways onto overhanging art even though
@@ -1890,6 +1897,7 @@ html.in-iframe #nav{
   <div class="hero-top">
     <div class="eyebrow" data-rv="fade"><span class="dot"></span> Chapter 00 — Creative Operations</div>
     <h1 class="display h-hero">
+      <span class="sr-only">Hyphening Media — </span>
       <span class="mask-line"><span>Where craft</span></span>
       <span class="mask-line"><span>scales into</span></span>
       <span class="mask-line"><span>performance.</span></span>
