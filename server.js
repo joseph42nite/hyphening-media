@@ -542,6 +542,14 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
       return res.status(404).json({ error: 'Not found', path: req.path });
     }
 
+    // /services, /about, /contact were never built as pages (rec 1962) — only
+    // in-page anchors (/#services, /#contact) on the homepage exist. Falling
+    // through to the SPA shell below would 200 them with a self-referencing
+    // canonical, inviting crawlers to index thin duplicate-of-homepage content.
+    if (/^\/(services|about|contact)(\/|$)/.test(req.path)) {
+      return res.status(404).type('text/plain').send('Not found');
+    }
+
     // 301 Redirect trailing slashes on non-root paths (prevents "Page with redirect" & duplicate URL issues)
     if (req.path.length > 1 && req.path.endsWith('/')) {
       const query = req.url.slice(req.path.length);
