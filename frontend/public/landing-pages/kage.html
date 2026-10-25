@@ -754,33 +754,24 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
   backdrop-filter:blur(12px);
   -webkit-backdrop-filter:blur(12px);
 }
-.live-pulse-dot{
-  position:relative;
-  width:7px;
-  height:7px;
-  background:#10b981;
-  border-radius:50%;
-  box-shadow:0 0 10px #10b981;
-  flex-shrink:0;
-}
-.live-pulse-dot::after{
-  content:'';
-  position:absolute;
-  inset:-4px;
-  border-radius:50%;
-  border:1.5px solid rgba(16, 185, 129, 0.6);
-  animation:radarRipple 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
-}
-@keyframes radarRipple{
-  0%{ transform:scale(0.6); opacity:1; }
-  100%{ transform:scale(2.4); opacity:0; }
-}
 .ticker-title-pill .ticker-kanji{
   color:var(--vermilion);
   font-size:11px;
   font-weight:400;
   letter-spacing:.08em;
   margin-left:4px;
+}
+@media (max-width:600px){
+  .ticker-title-pill{
+    max-width:100%;
+    padding:8px 16px;
+    gap:6px;
+    line-height:1.4;
+    letter-spacing:.16em;
+    text-align:center;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
 }
 .ticker-row-wrap{
   margin-bottom:20px;
@@ -2180,7 +2171,6 @@ html.in-iframe #nav{
   <div class="client-ticker-block" data-rv="fade">
     <div class="ticker-header">
       <div class="ticker-title-pill">
-        <span class="live-pulse-dot"></span>
         <span>Trusted Growth Partners · Client Roster</span>
         <span class="ticker-kanji jp">実績一覧</span>
       </div>
