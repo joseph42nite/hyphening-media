@@ -551,6 +551,11 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
       }
       const canonicalTag = onAdminHost ? '' : `<link rel="canonical" href="${canonicalUrl}" />`;
       let updatedHtml = html.replace('</head>', `  ${canonicalTag}\n</head>`);
+      // Client portal links are shared with clients, so their previews show the
+      // plain logo rather than the red brand card used for the public site.
+      if (cleanPath.startsWith('/portal/')) {
+        updatedHtml = updatedHtml.replaceAll('/assets/og-image.png', '/assets/portal-share.png');
+      }
       if (cleanPath === '/') {
         updatedHtml = updatedHtml.replace('</body>', `  ${buildHomepageNoscript()}\n  </body>`);
       }
