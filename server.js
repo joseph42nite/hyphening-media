@@ -386,9 +386,16 @@ app.get('/api/audit-logs', (req, res) => {
 // ============================================================
 // Lives outside frontend/dist so `npm run build` (which wipes dist) never
 // takes it out. Referenced by blog_posts.audio_url, e.g. /audio/<file>.mp3.
-app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), {
+// AUDIO_DIR (outside the repo, e.g. /home/ubuntu/hyphening-audio) is checked
+// first so new mp3s can be scp'd in without a git push or pm2 restart; the
+// in-repo public/audio stays as a fallback for files already committed.
+const audioStaticOpts = {
   setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'),
-}));
+};
+if (process.env.AUDIO_DIR) {
+  app.use('/audio', express.static(process.env.AUDIO_DIR, audioStaticOpts));
+}
+app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), audioStaticOpts));
 
 // ============================================================
 // STATIC FILES — admin-uploaded cover images (case studies, etc.)
