@@ -50,6 +50,7 @@ import approvalRoutes from './src/routes/approval.js';
 import usageRoutes from './src/routes/usage.js';
 import notificationRoutes from './src/routes/notifications.js';
 import sitemapRoutes from './src/routes/sitemap.js';
+import statusRoutes from './src/routes/status.js';
 import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 
 // Import services
@@ -289,6 +290,7 @@ app.use('/api/auth', authRoutes);
 
 // Core data
 app.use('/api/clients', clientRoutes);
+app.use('/api/status', statusRoutes);
 app.use('/api/clients', csvExportRoutes);
 app.use('/api/clients', marketingRoutes);
 app.use('/api/freelancers', freelancerRoutes);

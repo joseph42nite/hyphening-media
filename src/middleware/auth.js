@@ -22,6 +22,7 @@ const CINEMATOGRAPHER_ALLOWED = new Set([
 // patterns, so sub-routes like /api/clients/:id/marketing/... stay denied.
 // Every allowed read and every denied attempt is audit-logged.
 const API_READONLY_ALLOWED = [
+  /^GET \/api\/status\/clients\/?$/,
   /^GET \/api\/clients\/?$/,
   /^GET \/api\/clients\/(\d+)$/,
   /^GET \/api\/clients\/(\d+)\/seo\/audits$/,
