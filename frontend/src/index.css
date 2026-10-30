@@ -3851,6 +3851,11 @@ html.dark-theme {
   margin-bottom: 18px;
 }
 
+/* The badge is absolutely positioned for image cards; keep it inline here */
+.blog-article-meta-tags .blog-card-category-badge {
+  position: static;
+}
+
 .blog-article-meta-item {
   display: flex;
   align-items: center;
