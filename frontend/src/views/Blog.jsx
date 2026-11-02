@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import logoImg from '../assets/logo.png';
+import { articleSchema, authorByline, wasUpdated } from '../data/blogAuthors';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -527,19 +528,12 @@ function BlogArticle() {
 
   const readTime = post.read_time || Math.max(1, Math.round((post.content || '').split(/\s+/).length / 200));
 
-  // Build structured data
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    "headline": post.meta_title || post.title,
-    "description": post.meta_description || post.excerpt || '',
-    "image": post.cover_image_url || '',
-    "author": { "@type": "Organization", "name": post.author || 'Hyphening Media' },
-    "publisher": { "@type": "Organization", "name": "Hyphening Media", "url": "https://hypheningmedia.com" },
-    "datePublished": post.published_at,
-    "dateModified": post.updated_at,
-    "mainEntityOfPage": { "@type": "WebPage", "@id": `https://hypheningmedia.com/blog/${post.slug}` }
-  };
+  const structuredData = articleSchema(post);
+  const byline = authorByline(post.author);
+  // On a direct load the server already put this post's JSON-LD in <head>
+  // for non-JS crawlers; don't emit a second copy.
+  const serverJsonLd = typeof document !== 'undefined' && document.getElementById('article-jsonld');
+  const hasServerJsonLd = serverJsonLd && serverJsonLd.dataset.slug === post.slug;
 
   return (
     <div className="landing-root blog-root blog-article-root">
@@ -552,7 +546,9 @@ function BlogArticle() {
         ogImage={post.cover_image_url}
         ogType="article"
       />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      {!hasServerJsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      )}
 
       {/* Atmospheric Background Lights */}
       <div className="blog-ambient-mesh" />
@@ -599,8 +595,13 @@ function BlogArticle() {
             <div className="blog-article-meta-tags">
               <span className="blog-card-category-badge">{post.category}</span>
               <span className="blog-article-meta-item">
-                <Calendar size={13} /> {formatDate(post.published_at)}
+                <Calendar size={13} /> <time dateTime={structuredData.datePublished}>{formatDate(post.published_at)}</time>
               </span>
+              {wasUpdated(post) && (
+                <span className="blog-article-meta-item">
+                  Updated <time dateTime={structuredData.dateModified}>{formatDate(structuredData.dateModified)}</time>
+                </span>
+              )}
               <span className="blog-article-meta-item">
                 <Clock size={13} /> {readTime} min read
               </span>
@@ -628,8 +629,8 @@ function BlogArticle() {
                 <img src={logoImg} alt="Hyphening Media" />
               </div>
               <div className="blog-author-info">
-                <span className="blog-author-name">{post.author || 'Hyphening Editorial'}</span>
-                <span className="blog-author-role">Creative Operations Lead · Hyphening Media</span>
+                <span className="blog-author-name">By {byline.name}</span>
+                <span className="blog-author-role">{byline.role}</span>
               </div>
             </div>
           </header>

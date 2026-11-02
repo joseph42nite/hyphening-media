@@ -16,6 +16,7 @@
 
 import db from '../../database.js';
 import { PILLARS_LIST, PILLARS_BY_SLUG } from '../../frontend/src/data/pillarsData.js';
+import { articleSchema, authorByline, wasUpdated } from '../../frontend/src/data/blogAuthors.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -95,12 +96,12 @@ function blogPost(slug) {
   ).get(slug), 'blog post');
   if (!p) return null;
   const published = isoDate(p.published_at);
-  const updated = isoDate(p.updated_at);
+  const updated = isoDate(articleSchema(p).dateModified);
   return wrap(`<article>
 <h1>${escapeHtml(p.title)}</h1>
-<p>By ${escapeHtml(p.author || 'Hyphening Media')}${p.category ? ` · ${escapeHtml(p.category)}` : ''}`
+<p>By ${escapeHtml(authorByline(p.author).name)}${p.category ? ` · ${escapeHtml(p.category)}` : ''}`
     + `${published ? ` · Published <time datetime="${published}">${published}</time>` : ''}`
-    + `${updated && updated !== published ? ` · Updated <time datetime="${updated}">${updated}</time>` : ''}</p>
+    + `${wasUpdated(p) ? ` · Updated <time datetime="${updated}">${updated}</time>` : ''}</p>
 ${p.excerpt ? `<p><strong>${escapeHtml(p.excerpt)}</strong></p>\n` : ''}${markdownToHtml(p.content)}
 </article>
 <p><a href="/blog">More articles from Hyphening Media</a></p>`);
@@ -181,6 +182,29 @@ export function isKnownPath(pathname) {
     console.error(`[prerender] ${m[1]} slug check failed:`, e.message);
     return true;
   }
+}
+
+/**
+ * BlogPosting JSON-LD for a published post, as a <script> tag for <head>, or
+ * '' when there's no such post. JSON-LD inside <noscript> isn't read, so this
+ * goes in <head>; the React view sees the id and skips its own copy.
+ */
+export function blogPostJsonLd(pathname) {
+  const m = pathname.match(/^\/blog\/([^/]+)$/);
+  if (!m) return '';
+  let slug;
+  try {
+    slug = decodeURIComponent(m[1]);
+  } catch {
+    return '';
+  }
+  const p = safeQuery(() => db.prepare(
+    `SELECT slug, title, excerpt, author, meta_title, meta_description, cover_image_url, published_at, updated_at FROM blog_posts WHERE slug = ? AND status = 'published'`
+  ).get(slug), 'blog post json-ld');
+  if (!p) return '';
+  // Escape "<" so post text can't close the script tag.
+  const json = JSON.stringify(articleSchema(p)).replace(/</g, '\\u003c');
+  return `<script type="application/ld+json" id="article-jsonld" data-slug="${escapeHtml(p.slug)}">${json}</script>`;
 }
 
 /**
