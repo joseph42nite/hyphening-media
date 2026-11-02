@@ -58,8 +58,33 @@ function runWorker(kind) {
 
 let stopping = false;
 
+// Heartbeat: a socket killed while the laptop slept (or by a server restart)
+// never fires 'close' on this side, so ping regularly and terminate on a
+// missed pong. A timer-drift check also catches wake-from-sleep right away.
+const PING_MS = 20000;
+const WAKE_GAP_MS = 45000;
+
 function connect() {
   const socket = new WebSocket(WS_URL);
+  let alive = true;
+  let lastTick = Date.now();
+  let retryScheduled = false;
+
+  const heartbeat = setInterval(() => {
+    const now = Date.now();
+    const slept = now - lastTick > WAKE_GAP_MS;
+    lastTick = now;
+    if (socket.readyState !== WebSocket.OPEN) return;
+    if (slept || !alive) {
+      console.log(`[MAC CONNECTOR] ${slept ? 'Woke from sleep' : 'Missed pong'}, reconnecting...`);
+      socket.terminate();
+      return;
+    }
+    alive = false;
+    socket.ping();
+  }, PING_MS / 4);
+
+  socket.on('pong', () => { alive = true; });
 
   socket.on('open', () => {
     console.log('[MAC CONNECTOR] Connected to Ops Center.');
@@ -78,7 +103,9 @@ function connect() {
   });
 
   socket.on('close', () => {
-    if (stopping) return;
+    clearInterval(heartbeat);
+    if (stopping || retryScheduled) return;
+    retryScheduled = true;
     console.log('[MAC CONNECTOR] Disconnected, retrying in 5s...');
     setTimeout(connect, 5000);
   });
