@@ -82,7 +82,7 @@ router.use(authenticate);
  */
 router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
-    const { status, q, due, industry } = req.query;
+    const { status, q, due, industry, include_spam } = req.query;
 
     let query = 'SELECT * FROM leads WHERE 1=1';
     const params = [];
@@ -90,8 +90,9 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
     if (status && status !== 'all') {
       query += ' AND status = ?';
       params.push(status);
-    } else {
-      // Bot-flagged website submissions only show when 'Spam' is picked explicitly.
+    } else if (include_spam !== '1') {
+      // Bot-flagged website submissions are left out unless asked for
+      // (the Leads tab asks, to fill its Spam sub-tab).
       query += " AND status != 'Spam'";
     }
 

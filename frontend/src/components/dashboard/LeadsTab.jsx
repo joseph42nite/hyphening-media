@@ -72,16 +72,29 @@ function getSegmentBadgeStyle(segment) {
   return palettes[sum % palettes.length];
 }
 
-// Web Audio synthesizer chime for 12 PM follow-up reminder
 const LEADS_PAGE_SIZE = 25;
-const CLOSED_STATUSES = ['Converted', 'Lost'];
 
-// A lead belongs on the Follow Ups tab once someone has scheduled a follow-up
-// for it (date set or status 'Follow Up') and it isn't closed. Everything else
-// — fresh website enquiries included — sits on the New tab, newest first.
-function isFollowUpLead(lead) {
-  if (CLOSED_STATUSES.includes(lead.status)) return false;
-  return Boolean(lead.follow_up_date) || lead.status === 'Follow Up';
+// One sub-tab per lead status (replaces the old Status dropdown). A lead lives
+// on exactly one tab; changing its status moves it.
+const STATUS_TABS = [
+  { status: 'New', label: 'New Leads', empty: 'No new leads. Website enquiries land here first.' },
+  { status: 'Follow Up', label: 'Follow Ups', empty: 'No leads waiting on a follow-up.' },
+  { status: 'Contacted', label: 'Contacted', empty: 'No contacted leads.' },
+  { status: 'Proposal Sent', label: 'Proposal Sent', empty: 'No proposals out.' },
+  { status: 'Converted', label: 'Converted', empty: 'No converted leads yet.' },
+  { status: 'Lost', label: 'Lost', empty: 'No lost leads.' },
+  { status: 'Spam', label: 'Spam', empty: 'No website submissions flagged as spam.' },
+];
+
+// New leads read newest first; every other tab is worked by follow-up date
+// (earliest/overdue first, undated last).
+function sortLeadsForTab(status, list) {
+  const newestFirst = (a, b) => (b.created_at || '').localeCompare(a.created_at || '');
+  if (status === 'New' || status === 'Spam') return [...list].sort(newestFirst);
+  return [...list].sort((a, b) => {
+    if (!a.follow_up_date !== !b.follow_up_date) return a.follow_up_date ? -1 : 1;
+    return (a.follow_up_date || '').localeCompare(b.follow_up_date || '') || newestFirst(a, b);
+  });
 }
 
 const WEBSITE_FORM_LABELS = {
@@ -89,6 +102,7 @@ const WEBSITE_FORM_LABELS = {
   'website:kage': 'Kage partner form',
 };
 
+// Web Audio synthesizer chime for 12 PM follow-up reminder
 function playChimeSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -141,10 +155,9 @@ export default function LeadsTab({
   const [submitting, setSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [dueFilter, setDueFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
-  const [leadView, setLeadView] = useState('new'); // 'new' | 'followups'
+  const [leadView, setLeadView] = useState('New'); // a STATUS_TABS status
   const [page, setPage] = useState(1);
 
   // Segments state (defaults include FnB, Healthcare, and Interior Designers)
@@ -192,8 +205,8 @@ export default function LeadsTab({
   const fetchLeads = async () => {
     setLoading(true);
     try {
-      let url = `${API_BASE}/api/leads?`;
-      if (statusFilter !== 'all') url += `status=${encodeURIComponent(statusFilter)}&`;
+      // All statuses (spam included) in one fetch; the sub-tabs split them.
+      let url = `${API_BASE}/api/leads?include_spam=1&`;
       if (industryFilter !== 'all') url += `industry=${encodeURIComponent(industryFilter)}&`;
       if (search.trim()) url += `q=${encodeURIComponent(search.trim())}&`;
       if (dueFilter !== 'all') url += `due=${encodeURIComponent(dueFilter)}&`;
@@ -214,7 +227,7 @@ export default function LeadsTab({
 
   useEffect(() => {
     fetchLeads();
-  }, [statusFilter, dueFilter, industryFilter]);
+  }, [dueFilter, industryFilter]);
 
   // Debounced search
   useEffect(() => {
@@ -396,25 +409,20 @@ export default function LeadsTab({
 
   const pendingCount = pendingReminders.length;
 
-  // New / Follow Ups split + pagination (client-side; filters above still apply server-side)
-  const newLeads = leads
-    .filter(l => !isFollowUpLead(l))
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-  const followUpLeads = leads
-    .filter(isFollowUpLead)
-    .sort((a, b) => {
-      if (!a.follow_up_date !== !b.follow_up_date) return a.follow_up_date ? -1 : 1;
-      return (a.follow_up_date || '').localeCompare(b.follow_up_date || '') ||
-        (b.created_at || '').localeCompare(a.created_at || '');
-    });
-  const viewLeads = leadView === 'new' ? newLeads : followUpLeads;
+  // Status sub-tabs + pagination (client-side; search/industry/date filters apply server-side)
+  const leadsByStatus = Object.fromEntries(STATUS_TABS.map(t => [t.status, []]));
+  for (const l of leads) (leadsByStatus[l.status] || leadsByStatus.New).push(l);
+  const dueByStatus = {};
+  for (const l of pendingReminders) dueByStatus[l.status] = (dueByStatus[l.status] || 0) + 1;
+  const activeTab = STATUS_TABS.find(t => t.status === leadView) || STATUS_TABS[0];
+  const viewLeads = sortLeadsForTab(activeTab.status, leadsByStatus[activeTab.status]);
   const totalPages = Math.max(1, Math.ceil(viewLeads.length / LEADS_PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageLeads = viewLeads.slice((currentPage - 1) * LEADS_PAGE_SIZE, currentPage * LEADS_PAGE_SIZE);
 
   useEffect(() => {
     setPage(1);
-  }, [leadView, statusFilter, dueFilter, industryFilter, search]);
+  }, [leadView, dueFilter, industryFilter, search]);
 
   useEffect(() => {
     if (onRemindersCountChange) {
@@ -734,25 +742,6 @@ export default function LeadsTab({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Status:</span>
-          <select
-            className="form-control"
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem' }}
-          >
-            <option value="all">All Statuses</option>
-            <option value="New">New</option>
-            <option value="Follow Up">Follow Up Needed</option>
-            <option value="Contacted">Contacted</option>
-            <option value="Proposal Sent">Proposal Sent</option>
-            <option value="Converted">Converted</option>
-            <option value="Lost">Lost</option>
-            <option value="Spam">Spam (website bots)</option>
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Industry:</span>
           <select
             className="form-control"
@@ -789,9 +778,9 @@ export default function LeadsTab({
           </select>
         </div>
 
-        {(search || statusFilter !== 'all' || dueFilter !== 'all' || industryFilter !== 'all') && (
+        {(search || dueFilter !== 'all' || industryFilter !== 'all') && (
           <button
-            onClick={() => { setSearch(''); setStatusFilter('all'); setDueFilter('all'); setIndustryFilter('all'); }}
+            onClick={() => { setSearch(''); setDueFilter('all'); setIndustryFilter('all'); }}
             className="btn btn-secondary"
             style={{ padding: '6px 12px', fontSize: '0.78rem' }}
           >
@@ -800,13 +789,11 @@ export default function LeadsTab({
         )}
       </div>
 
-      {/* New / Follow Ups sub-tabs */}
-      <div role="tablist" style={{ display: 'flex', gap: '6px', marginBottom: '12px', borderBottom: '1px solid var(--border, rgba(255,255,255,0.1))' }}>
-        {[
-          { key: 'new', label: 'New Leads', count: newLeads.length },
-          { key: 'followups', label: 'Follow Ups', count: followUpLeads.length, alert: pendingCount },
-        ].map(t => {
-          const active = leadView === t.key;
+      {/* Status sub-tabs */}
+      <div role="tablist" style={{ display: 'flex', gap: '6px', marginBottom: '12px', borderBottom: '1px solid var(--border, rgba(255,255,255,0.1))', overflowX: 'auto' }}>
+        {STATUS_TABS.map(tab => {
+          const t = { key: tab.status, label: tab.label, count: leadsByStatus[tab.status].length, alert: dueByStatus[tab.status] || 0 };
+          const active = activeTab.status === t.key;
           return (
             <button
               key={t.key}
@@ -825,7 +812,8 @@ export default function LeadsTab({
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                whiteSpace: 'nowrap'
               }}
             >
               {t.label}
@@ -866,9 +854,7 @@ export default function LeadsTab({
             ) : pageLeads.length === 0 ? (
               <tr>
                 <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                  {leadView === 'new'
-                    ? 'No new leads. Website enquiries and leads without a follow-up date appear here.'
-                    : 'No follow-ups. Set a follow-up date on a lead to move it here.'}
+                  {activeTab.empty}
                 </td>
               </tr>
             ) : (
