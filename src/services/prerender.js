@@ -152,6 +152,61 @@ ${markdownToHtml(p.editorial)}
 <p><a href="/capabilities">All capabilities</a> · <a href="/">Hyphening Media home</a></p>`);
 }
 
+const SLUG_EXISTS_SQL = {
+  blog: `SELECT 1 FROM blog_posts WHERE slug = ? AND status = 'published'`,
+  'case-studies': `SELECT 1 FROM case_studies WHERE slug = ? AND status = 'published'`,
+};
+
+/**
+ * Whether a path is a real page the SPA can render (rec 1972). Everything
+ * else used to fall through to index.html with a 200, so any typo URL — and
+ * /llms.txt — answered as a duplicate of the homepage. A DB error counts as
+ * known, so an outage never 404s real posts.
+ */
+export function isKnownPath(pathname) {
+  if (/^\/(blog|case-studies|capabilities|login|dashboard)?$/.test(pathname)) return true;
+  if (/^\/portal\/[^/]+$/.test(pathname)) return true;
+  const m = pathname.match(/^\/(blog|case-studies|capabilities)\/([^/]+)$/);
+  if (!m) return false;
+  let slug;
+  try {
+    slug = decodeURIComponent(m[2]);
+  } catch {
+    return false;
+  }
+  if (m[1] === 'capabilities') return Boolean(PILLARS_BY_SLUG[slug]);
+  try {
+    return Boolean(db.prepare(SLUG_EXISTS_SQL[m[1]]).get(slug));
+  } catch (e) {
+    console.error(`[prerender] ${m[1]} slug check failed:`, e.message);
+    return true;
+  }
+}
+
+/**
+ * Plain HTML body for a true 404. Not the SPA shell: the app's catch-all
+ * route would just bounce the visitor to "/", which reads to a crawler as a
+ * soft 404 again.
+ */
+export const NOT_FOUND_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Page not found | Hyphening Media</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0a0a0a;color:#eee;font:16px/1.6 system-ui,sans-serif;text-align:center;padding:24px}a{color:#e0231c}</style>
+</head>
+<body>
+<main>
+<h1>Page not found</h1>
+<p>This page doesn't exist on hypheningmedia.com.</p>
+<p><a href="/">Home</a> · <a href="/blog">Blog</a> · <a href="/capabilities">Capabilities</a> · <a href="/case-studies">Case studies</a></p>
+</main>
+</body>
+</html>
+`;
+
 /**
  * Crawler HTML for a public path, or null when the path has no server-rendered
  * content (unknown slug, or a route not covered here). "/" is handled by

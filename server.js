@@ -56,7 +56,7 @@ import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
 import { attachMacConnector } from './src/services/macConnector.js';
-import { prerenderPath } from './src/services/prerender.js';
+import { prerenderPath, isKnownPath, NOT_FOUND_HTML } from './src/services/prerender.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -575,6 +575,12 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
     // Dynamically inject exact single canonical tag for requested path
     const cleanPath = req.path === '/' ? '/' : req.path.replace(/\/$/, '');
     const onAdminHost = ADMIN_HOST && (req.hostname || '').toLowerCase() === ADMIN_HOST;
+
+    // Unknown paths and unpublished slugs get a real 404 on the public host
+    // instead of the SPA shell with a 200 (rec 1972).
+    if (!onAdminHost && !isKnownPath(cleanPath)) {
+      return res.status(404).type('html').send(NOT_FOUND_HTML);
+    }
     const canonicalUrl = `https://${PUBLIC_HOST}${cleanPath}`;
 
     fs.readFile(indexPath, 'utf8', (err, html) => {
