@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Search, Phone, Mail, Globe, MapPin, Calendar, Clock, 
   Bell, Volume2, VolumeX, Trash2, Edit3, CheckCircle2, 
-  ExternalLink, X, Settings2
+  ExternalLink, X, Settings2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../api.js';
 
@@ -73,6 +73,22 @@ function getSegmentBadgeStyle(segment) {
 }
 
 // Web Audio synthesizer chime for 12 PM follow-up reminder
+const LEADS_PAGE_SIZE = 25;
+const CLOSED_STATUSES = ['Converted', 'Lost'];
+
+// A lead belongs on the Follow Ups tab once someone has scheduled a follow-up
+// for it (date set or status 'Follow Up') and it isn't closed. Everything else
+// — fresh website enquiries included — sits on the New tab, newest first.
+function isFollowUpLead(lead) {
+  if (CLOSED_STATUSES.includes(lead.status)) return false;
+  return Boolean(lead.follow_up_date) || lead.status === 'Follow Up';
+}
+
+const WEBSITE_FORM_LABELS = {
+  'website:footer': 'Homepage contact form',
+  'website:kage': 'Kage partner form',
+};
+
 function playChimeSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -128,6 +144,8 @@ export default function LeadsTab({
   const [statusFilter, setStatusFilter] = useState('all');
   const [dueFilter, setDueFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
+  const [leadView, setLeadView] = useState('new'); // 'new' | 'followups'
+  const [page, setPage] = useState(1);
 
   // Segments state (defaults include FnB, Healthcare, and Interior Designers)
   const [segments, setSegments] = useState([
@@ -377,6 +395,26 @@ export default function LeadsTab({
   });
 
   const pendingCount = pendingReminders.length;
+
+  // New / Follow Ups split + pagination (client-side; filters above still apply server-side)
+  const newLeads = leads
+    .filter(l => !isFollowUpLead(l))
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  const followUpLeads = leads
+    .filter(isFollowUpLead)
+    .sort((a, b) => {
+      if (!a.follow_up_date !== !b.follow_up_date) return a.follow_up_date ? -1 : 1;
+      return (a.follow_up_date || '').localeCompare(b.follow_up_date || '') ||
+        (b.created_at || '').localeCompare(a.created_at || '');
+    });
+  const viewLeads = leadView === 'new' ? newLeads : followUpLeads;
+  const totalPages = Math.max(1, Math.ceil(viewLeads.length / LEADS_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageLeads = viewLeads.slice((currentPage - 1) * LEADS_PAGE_SIZE, currentPage * LEADS_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [leadView, statusFilter, dueFilter, industryFilter, search]);
 
   useEffect(() => {
     if (onRemindersCountChange) {
@@ -762,8 +800,46 @@ export default function LeadsTab({
         )}
       </div>
 
+      {/* New / Follow Ups sub-tabs */}
+      <div role="tablist" style={{ display: 'flex', gap: '6px', marginBottom: '12px', borderBottom: '1px solid var(--border, rgba(255,255,255,0.1))' }}>
+        {[
+          { key: 'new', label: 'New Leads', count: newLeads.length },
+          { key: 'followups', label: 'Follow Ups', count: followUpLeads.length, alert: pendingCount },
+        ].map(t => {
+          const active = leadView === t.key;
+          return (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setLeadView(t.key)}
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: `2px solid ${active ? 'var(--accent, #e0231c)' : 'transparent'}`,
+                color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                padding: '8px 14px',
+                marginBottom: '-1px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {t.label}
+              <span style={{ fontSize: '0.72rem', padding: '1px 7px', borderRadius: '9999px', background: 'rgba(255,255,255,0.08)' }}>{t.count}</span>
+              {t.alert > 0 && (
+                <span title={`${t.alert} due or overdue`} style={{ fontSize: '0.7rem', padding: '1px 7px', borderRadius: '9999px', background: '#ef4444', color: '#fff' }}>{t.alert} due</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Leads Table */}
-      <div className="table-container table-scrollable-y" style={{ marginBottom: '24px' }}>
+      <div className="table-container table-scrollable-y" style={{ marginBottom: '12px' }}>
         <table>
           <thead>
             <tr>
@@ -787,14 +863,16 @@ export default function LeadsTab({
                   Loading leads...
                 </td>
               </tr>
-            ) : leads.length === 0 ? (
+            ) : pageLeads.length === 0 ? (
               <tr>
                 <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                  No leads found. Click "+ Add Lead" to record a new client inquiry.
+                  {leadView === 'new'
+                    ? 'No new leads. Website enquiries and leads without a follow-up date appear here.'
+                    : 'No follow-ups. Set a follow-up date on a lead to move it here.'}
                 </td>
               </tr>
             ) : (
-              leads.map(lead => {
+              pageLeads.map(lead => {
                 const isDueToday = lead.follow_up_date === todayStr;
                 const isOverdue = lead.follow_up_date && lead.follow_up_date < todayStr && !['Converted', 'Lost'].includes(lead.status);
                 const hasReminder = (isDueToday && isAfter12PM) || isOverdue;
@@ -806,9 +884,35 @@ export default function LeadsTab({
                       background: hasReminder ? 'rgba(245, 158, 11, 0.05)' : undefined
                     }}
                   >
-                    {/* Client Name */}
+                    {/* Client Name (+ website form badge) */}
                     <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                       {lead.client_name}
+                      {lead.source?.startsWith('website:') && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                          <span
+                            title={`Submitted via ${WEBSITE_FORM_LABELS[lead.source] || 'website form'} on ${lead.created_at} UTC`}
+                            style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(56, 189, 248, 0.14)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)' }}
+                          >
+                            <Globe size={11} /> Website form
+                          </span>
+                          {lead.status !== 'Spam' && (
+                            lead.notified_at ? (
+                              <span title={`Email alert sent ${lead.notified_at} UTC`} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.12)', color: '#34d399' }}>
+                                ✓ Emailed
+                              </span>
+                            ) : lead.notify_error ? (
+                              <span title={`Email alert failed: ${lead.notify_error}`} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>
+                                Email not sent
+                              </span>
+                            ) : null
+                          )}
+                          {lead.spam_reason && (
+                            <span title={lead.spam_reason} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>
+                              Spam: {lead.spam_reason}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
 
                     {/* Company Name */}
@@ -1002,6 +1106,7 @@ export default function LeadsTab({
                         <option value="Proposal Sent">Proposal Sent</option>
                         <option value="Converted">Converted</option>
                         <option value="Lost">Lost</option>
+                        <option value="Spam">Spam</option>
                       </select>
                     </td>
 
@@ -1055,6 +1160,38 @@ export default function LeadsTab({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {viewLeads.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '24px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <span>
+            Showing {(currentPage - 1) * LEADS_PAGE_SIZE + 1}–{Math.min(currentPage * LEADS_PAGE_SIZE, viewLeads.length)} of {viewLeads.length}
+          </span>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+                style={{ padding: '4px 10px', display: 'inline-flex', alignItems: 'center' }}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <span>Page {currentPage} of {totalPages}</span>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                style={{ padding: '4px 10px', display: 'inline-flex', alignItems: 'center' }}
+                aria-label="Next page"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add / Edit Lead Modal */}
       {showModal && (
@@ -1353,6 +1490,7 @@ export default function LeadsTab({
                     <option value="Proposal Sent">Proposal Sent</option>
                     <option value="Converted">Converted</option>
                     <option value="Lost">Lost</option>
+                    <option value="Spam">Spam</option>
                   </select>
                 </div>
               </div>
