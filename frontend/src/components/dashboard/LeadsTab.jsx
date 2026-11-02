@@ -710,6 +710,7 @@ export default function LeadsTab({
             <option value="Proposal Sent">Proposal Sent</option>
             <option value="Converted">Converted</option>
             <option value="Lost">Lost</option>
+            <option value="Spam">Spam (website bots)</option>
           </select>
         </div>
 

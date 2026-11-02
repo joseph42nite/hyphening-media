@@ -3362,7 +3362,21 @@ function wirePartnerForm() {
   const status = document.getElementById('partnerStatus');
   if (!form || !status) return;
 
-  form.addEventListener('submit', function(e) {
+  // Signed load-time token; the server flags forms submitted too fast after it.
+  let formToken = null;
+  fetch('/api/public/leads/token')
+    .then(r => r.json())
+    .then(d => { formToken = d.token; })
+    .catch(() => {});
+
+  const submitBtn = form.querySelector('.partner-form-submit');
+  const showStatus = (html, isError) => {
+    status.className = 'partner-form-status active';
+    status.style.borderColor = isError ? '#e0231c' : '';
+    status.innerHTML = html;
+  };
+
+  form.addEventListener('submit', async function(e) {
     e.preventDefault();
     const name = (document.getElementById('pName')?.value || '').trim();
     const email = (document.getElementById('pEmail')?.value || '').trim();
@@ -3371,50 +3385,39 @@ function wirePartnerForm() {
     const message = (document.getElementById('pMessage')?.value || '').trim();
 
     if (!name || !email || !brand || !message) {
-      status.className = 'partner-form-status active';
-      status.style.borderColor = '#e0231c';
-      status.innerHTML = '<span style="color:#e0231c;">Please fill out all required fields marked with *.</span>';
+      showStatus('<span style="color:#e0231c;">Please fill out all required fields marked with *.</span>', true);
       return;
     }
 
-    const recipient = 'deepanjan@hypheningmedia.com';
-    const subject = `[Hyphening Inquiry] ${brand} - ${name}`;
-    const bodyLines = [
-      'Hello Deepanjan,',
-      '',
-      'A new partnership inquiry was submitted from the Hyphening Media website:',
-      '',
-      '----------------------------------------',
-      `• Name: ${name}`,
-      `• Work Email: ${email}`,
-      `• Brand / Company: ${brand}`,
-      `• Area of Focus: ${service || 'Full-Spectrum Creative Operations'}`,
-      '----------------------------------------',
-      '',
-      'Project Brief & Goals:',
-      message,
-      '',
-      '----------------------------------------',
-      'Sent via Hyphening Media Website (Trusted Partners)'
-    ];
-    const body = bodyLines.join('\n');
-    const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    if (submitBtn) submitBtn.disabled = true;
+    showStatus('<div style="color:rgba(223,231,224,0.7);">Sending…</div>');
 
-    status.className = 'partner-form-status active';
-    status.innerHTML = `
-      <div style="font-weight:600; color:#dfe7e0; margin-bottom:6px;">✓ Dispatching Inquiry to ${recipient}</div>
-      <div style="color:rgba(223,231,224,0.7); font-size:12px;">Opening your email client to send to Deepanjan. If it did not open automatically, <a href="${mailtoUrl}">click here to email directly</a>.</div>
-    `;
-
-    // Trigger email client
-    const a = document.createElement('a');
-    a.href = mailtoUrl;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      if (document.body.contains(a)) document.body.removeChild(a);
-    }, 1000);
+    try {
+      const res = await fetch('/api/public/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name, email, company: brand, focus: service, message,
+          source: 'kage',
+          token: formToken,
+          website_url: document.getElementById('pWebsiteUrl')?.value || '',
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Could not send.');
+      }
+      form.reset();
+      showStatus(`
+        <div style="font-weight:600; color:#dfe7e0; margin-bottom:6px;">✓ Inquiry received</div>
+        <div style="color:rgba(223,231,224,0.7); font-size:12px;">Thank you, ${name.replace(/[<>&"]/g, '')}. Our leadership team will reach out within 24 hours.</div>
+      `);
+    } catch (err) {
+      const msg = String(err.message || 'Could not send.').replace(/[<>&"]/g, '');
+      showStatus(`<span style="color:#e0231c;">${msg} You can also email <a href="mailto:deepanjan@hypheningmedia.com">deepanjan@hypheningmedia.com</a>.</span>`, true);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
 }
 

@@ -35,6 +35,7 @@ import clientRoutes from './src/routes/clients.js';
 import freelancerRoutes from './src/routes/freelancers.js';
 import taskRoutes from './src/routes/tasks.js';
 import leadRoutes from './src/routes/leads.js';
+import publicLeadRoutes from './src/routes/publicLeads.js';
 import csvExportRoutes from './src/routes/csvExport.js';
 import marketingRoutes from './src/routes/marketing.js';
 import portalRoutes from './src/routes/portal.js';
@@ -306,6 +307,9 @@ app.use('/api/artists', artistRoutes);
 
 // Public gig confirmation endpoint (no auth)
 app.get('/api/public/gigs/confirm/:token', publicGigConfirmRoute);
+
+// Public website enquiry forms (no auth; bot-checked + rate limited)
+app.use('/api/public/leads', publicLeadRoutes);
 
 // Signed webhook for automation clients and agent workers
 app.use('/api/webhooks', webhookRoutes);

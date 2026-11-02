@@ -44,6 +44,20 @@ export const portalLimiter = rateLimit({
 });
 
 /**
+ * Public lead form limiter: 5 submissions per hour per IP.
+ * A real visitor sends one enquiry; anything past a handful is a bot or a loop.
+ * Only POSTs count, so fetching the form token never uses up the allowance.
+ */
+export const leadFormLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'POST',
+  message: { error: 'Too many submissions. Please email us directly at deepanjan@hypheningmedia.com.' },
+});
+
+/**
  * Webhook rate limiter: 300 requests per minute per IP
  */
 export const webhookLimiter = rateLimit({

@@ -90,6 +90,9 @@ router.get('/', authorize('admin', 'ops_social_media_manager', 'ops_video_editor
     if (status && status !== 'all') {
       query += ' AND status = ?';
       params.push(status);
+    } else {
+      // Bot-flagged website submissions only show when 'Spam' is picked explicitly.
+      query += " AND status != 'Spam'";
     }
 
     if (industry && industry !== 'all') {

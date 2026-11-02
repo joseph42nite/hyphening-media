@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import logoImg from '../assets/logo.png';
@@ -65,11 +65,42 @@ export default function Footer({ showCta = true }) {
   const isHomePage = location.pathname === '/';
 
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [formError, setFormError] = useState('');
   const [formData, setFormData] = useState({ name: '', email: '', company: '', message: '' });
+  // Honeypot — off-screen field only bots fill. Must match HONEYPOT_FIELD in src/services/leadSpam.js.
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  // Signed load-time token; the server rejects forms submitted too fast after it.
+  const formToken = useRef(null);
 
-  const handleFormSubmit = (e) => {
+  useEffect(() => {
+    if (!showCta) return;
+    fetch('/api/public/leads/token')
+      .then(r => r.json())
+      .then(d => { formToken.current = d.token; })
+      .catch(() => {});
+  }, [showCta]);
+
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSending(true);
+    setFormError('');
+    try {
+      const res = await fetch('/api/public/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, source: 'footer', token: formToken.current, website_url: websiteUrl }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Could not send. Please email deepanjan@hypheningmedia.com.');
+      }
+      setSubmitted(true);
+    } catch (err) {
+      setFormError(err.message || 'Could not send. Please email deepanjan@hypheningmedia.com.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleNavClick = (sectionId) => {
@@ -261,9 +292,21 @@ export default function Footer({ showCta = true }) {
                   }}
                 />
               </div>
-              
+
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: '1px', height: '1px', overflow: 'hidden' }}>
+                <label>
+                  Leave this field empty
+                  <input type="text" name="website_url" tabIndex={-1} autoComplete="off" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} />
+                </label>
+              </div>
+
+              {formError && (
+                <div role="alert" style={{ color: '#ff5a3c', fontSize: '0.88rem' }}>{formError}</div>
+              )}
+
               <button
                 type="submit"
+                disabled={sending}
                 style={{
                   width: '100%',
                   padding: '14px',
@@ -279,7 +322,8 @@ export default function Footer({ showCta = true }) {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '10px',
-                  cursor: 'pointer',
+                  cursor: sending ? 'wait' : 'pointer',
+                  opacity: sending ? 0.7 : 1,
                   boxShadow: '0 0 24px rgba(224, 35, 28, 0.45)',
                   transition: 'all 0.2s ease'
                 }}
@@ -294,7 +338,7 @@ export default function Footer({ showCta = true }) {
                   e.currentTarget.style.transform = 'none';
                 }}
               >
-                Submit Details <ArrowRight size={16} />
+                {sending ? 'Sending…' : <>Submit Details <ArrowRight size={16} /></>}
               </button>
             </form>
           )}

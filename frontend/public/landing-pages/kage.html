@@ -2611,6 +2611,10 @@ html.in-iframe #nav{
         <label class="partner-form-label" for="pMessage">Project Brief & Goals <span class="req">*</span></label>
         <textarea class="partner-form-textarea" id="pMessage" name="message" rows="4" placeholder="Tell us about your brand, current timeline, and growth objectives..." required></textarea>
       </div>
+      <!-- honeypot: off-screen, bots fill it, humans never see it -->
+      <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">
+        <label>Leave this field empty <input type="text" id="pWebsiteUrl" name="website_url" tabindex="-1" autocomplete="off"></label>
+      </div>
       <button class="partner-form-submit" type="submit" data-cursor>
         <span>Send Partnership Inquiry</span>
         <svg viewBox="0 0 14 14" fill="none" width="13" height="13">
