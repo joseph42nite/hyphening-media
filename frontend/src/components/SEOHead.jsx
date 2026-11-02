@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const SITE_URL = 'https://hypheningmedia.com';
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-card.png`;
 
 /**
  * Dynamic SEO Head Component
@@ -12,7 +13,7 @@ export default function SEOHead({
   title = 'Hyphening Media | Creative Operations & Marketing Performance Agency',
   description = 'Hyphening Media is a creative operations and marketing agency scaling D2C, B2B, F&B, and healthcare brands. We build high-performance content calendars, videos, web apps, and automated marketing dashboards.',
   canonicalUrl,
-  ogImage = 'https://hypheningmedia.com/favicon.png',
+  ogImage = DEFAULT_OG_IMAGE,
   ogType = 'website',
   keywords,
   robots
@@ -75,6 +76,14 @@ export default function SEOHead({
     setMeta('property', 'og:description', description);
     setMeta('property', 'og:url', fullCanonical);
     setMeta('property', 'og:image', ogImage);
+    // Dimensions are only known for the default 1200x630 card; drop them for
+    // per-page images (blog/case-study covers) rather than advertise wrong sizes
+    if (ogImage === DEFAULT_OG_IMAGE) {
+      setMeta('property', 'og:image:width', '1200');
+      setMeta('property', 'og:image:height', '630');
+    } else {
+      document.querySelectorAll('meta[property="og:image:width"], meta[property="og:image:height"], meta[property="og:image:type"]').forEach((el) => el.remove());
+    }
     setMeta('property', 'og:type', ogType);
 
     // 6. Update Twitter Card tags
