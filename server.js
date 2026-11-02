@@ -501,7 +501,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
     return `<noscript>
       <main>
         <h1>Hyphening Media: Creative Operations and Marketing Performance for D2C, B2B, F&amp;B and Healthcare Brands</h1>
-        <p class="lead">Hyphening Media is a creative operations agency for ambitious D2C, B2B, F&B, and healthcare brands that want content to produce customers, not just views. We script, shoot, produce and measure the work ourselves, so a campaign and its numbers sit under one roof. For healthcare brands, every piece is built inside advertising rules, not around them.</p>
+        <p class="lead">Hyphening Media is a Bengaluru-based creative operations agency for ambitious D2C, B2B, F&B, and healthcare brands that want content to produce customers, not just views. We script, shoot, produce and measure the work ourselves, so a campaign and its numbers sit under one roof. For healthcare brands, every piece is built inside advertising rules, not around them.</p>
         <p>A follower count and a bank balance have one thing in common: neither tells you why it changed. We report CTR, conversions and organic reach, and we leave out the numbers that only look good.</p>
 
         ${servicesHtml}
