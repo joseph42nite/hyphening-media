@@ -56,6 +56,7 @@ import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
 import { attachMacConnector } from './src/services/macConnector.js';
+import { prerenderPath } from './src/services/prerender.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -584,6 +585,10 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
       let updatedHtml = html.replace('</head>', `  ${canonicalTag}\n</head>`);
       if (cleanPath === '/') {
         updatedHtml = updatedHtml.replace('</body>', `  ${buildHomepageNoscript()}\n  </body>`);
+      } else if (!onAdminHost) {
+        // Blog, case study and capability bodies for non-JS crawlers (rec 1968).
+        const crawlerHtml = prerenderPath(cleanPath);
+        if (crawlerHtml) updatedHtml = updatedHtml.replace('</body>', `  ${crawlerHtml}\n  </body>`);
       }
       res.header('Content-Type', 'text/html');
       res.send(updatedHtml);
