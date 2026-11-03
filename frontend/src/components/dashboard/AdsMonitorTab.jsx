@@ -437,7 +437,9 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
 
   return (
     <div>
-      <FleetModeToggle scope="ads" showToast={showToast} confirmText="Turn the Ads fleet to AUTO? Scheduled ads runs will start queueing on their own and spend API tokens without you clicking anything." />
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <FleetModeToggle scope="ads" showToast={showToast} confirmText="Turn the Ads fleet to AUTO? Scheduled ads runs will start queueing on their own and spend API tokens without you clicking anything." />
+      </div>
       {/* ---------------- All clients: the monitoring surface ---------------- */}
       {overview && (
         <div className="card glass-premium" style={{ ...panel, marginBottom: 20, padding: '18px 20px' }}>
