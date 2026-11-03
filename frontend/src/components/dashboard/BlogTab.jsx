@@ -4,6 +4,8 @@ import FleetModeToggle from './FleetModeToggle.jsx';
 import BlogNightPanel from './BlogNightPanel.jsx';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+// Public posts live on the main site, not the ops subdomain this dashboard runs on
+const SITE_URL = 'https://hypheningmedia.com';
 
 const CATEGORIES = ['General', 'Social Media', 'Branding', 'Growth', 'Tech', 'Content Strategy', 'SEO', 'Case Study'];
 
@@ -189,7 +191,7 @@ export default function BlogTab({ showToast }) {
                     <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {post.status === 'published' && (
-                          <a href={`/blog/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live">
+                          <a href={`${SITE_URL}/blog/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live">
                             <ExternalLink size={13} />
                           </a>
                         )}
@@ -231,7 +233,7 @@ export default function BlogTab({ showToast }) {
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                   {post.status === 'published' && (
-                    <a href={`/blog/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                    <a href={`${SITE_URL}/blog/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
                       <ExternalLink size={12} style={{ marginRight: '4px' }} /> View
                     </a>
                   )}

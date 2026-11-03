@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X, Upload } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+// Public posts live on the main site, not the ops subdomain this dashboard runs on
+const SITE_URL = 'https://hypheningmedia.com';
 
 const emptyForm = {
   title: '', client_name: '', summary: '', content: '', cover_image_url: '',
@@ -198,7 +200,7 @@ export default function CaseStudiesTab({ showToast }) {
                     <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {post.status === 'published' && (
-                          <a href={`/case-studies/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live">
+                          <a href={`${SITE_URL}/case-studies/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live">
                             <ExternalLink size={13} />
                           </a>
                         )}
@@ -238,7 +240,7 @@ export default function CaseStudiesTab({ showToast }) {
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                   {post.status === 'published' && (
-                    <a href={`/case-studies/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                    <a href={`${SITE_URL}/case-studies/${post.slug}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" title="View live" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
                       <ExternalLink size={12} style={{ marginRight: '4px' }} /> View
                     </a>
                   )}
