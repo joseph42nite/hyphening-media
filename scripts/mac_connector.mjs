@@ -41,6 +41,7 @@ if (!SECRET) {
 const WORKERS = {
   seo: { cmd: 'node', args: ['scripts/seo_worker.mjs', '--once'] },
   ads: { cmd: 'node', args: ['plugins/hyphening-ads/scripts/ads_worker.mjs', '--once'] },
+  blog: { cmd: 'node', args: ['scripts/blog_worker.mjs', '--once'] },
 };
 
 function runWorker(kind) {
@@ -49,12 +50,23 @@ function runWorker(kind) {
     console.error(`[MAC CONNECTOR] Unknown run kind: ${kind}`);
     return;
   }
+  // The blog worker drains the whole queue and can run for hours, so a second
+  // signal while it's busy is already covered; starting another would race it
+  // for Claude and the Kokoro lock.
+  if (kind === 'blog' && blogWorkerRunning) {
+    console.log('[MAC CONNECTOR] blog worker already running; it will pick the new run up.');
+    return;
+  }
   console.log(`[MAC CONNECTOR] Running ${kind} worker...`);
   const child = spawn(spec.cmd, spec.args, { cwd: REPO_ROOT, stdio: 'inherit' });
+  if (kind === 'blog') blogWorkerRunning = true;
   child.on('exit', (code) => {
+    if (kind === 'blog') blogWorkerRunning = false;
     console.log(`[MAC CONNECTOR] ${kind} worker exited with code ${code}.`);
   });
 }
+
+let blogWorkerRunning = false;
 
 let stopping = false;
 
@@ -91,6 +103,7 @@ function connect() {
     // Catch up anything queued while we were offline.
     runWorker('seo');
     runWorker('ads');
+    runWorker('blog');
   });
 
   socket.on('message', (data) => {

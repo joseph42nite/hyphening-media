@@ -9,6 +9,7 @@ import {
 import { API_BASE } from '../api.js';
 import logoImg from '../assets/logo.png';
 import SEOHead from '../components/SEOHead.jsx';
+import PortalBlogReviews from '../components/PortalBlogReviews.jsx';
 
 const PRESET_REASON_OPTIONS = [
   'Out of Budget',
@@ -2825,6 +2826,7 @@ export default function ClientPortal({ showToast }) {
         {/* Content Tab (3rd Tab) */}
         {activeTab === 'content' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <PortalBlogReviews token={token} showToast={showToast} />
             <h2 style={{ fontSize: '1.05rem', margin: '4px 0', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Monthly Content Plans</h2>
             <p style={{ color: '#8b9b90', fontSize: '0.85rem', marginBottom: '8px', fontWeight: 400 }}>
               Read the finalized scripts and concepts prepared for your brand. Approve items or request changes with a comment.

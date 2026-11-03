@@ -132,15 +132,17 @@ def manifest_check(repo):
         return WARN, "deploy manifest has an unknown deploy.type"
     return OK, f"deploy manifest OK ({m['deploy']['type']})"
 
-def blog_config(cid):
-    """GET /api/clients/:id/blog-config with the session from the login above.
+def portal_get(path):
+    """GET a read-only portal endpoint with the session from the login above.
     None when the portal doesn't serve it (not deployed yet) or the call fails."""
     try:
-        r = subprocess.run(["curl", "-sf", "--max-time", "20", "-b", jar, f"{base}/api/clients/{cid}/blog-config"],
+        r = subprocess.run(["curl", "-sf", "--max-time", "20", "-b", jar, f"{base}{path}"],
                            capture_output=True, text=True)
         return json.loads(r.stdout) if r.returncode == 0 else None
     except Exception:
         return None
+
+blog_config = lambda cid: portal_get(f"/api/clients/{cid}/blog-config")
 
 # ---- clients and readiness --------------------------------------------------
 clients = {c["id"]: c for c in data["clients"]} if data else {}
@@ -214,6 +216,15 @@ if data and not first_run:
                     changes.append(f"client {cid} {b['name']}: {f.split('_')[0]} switched {'ON' if b[f] else 'off'}")
                 else:
                     changes.append(f"client {cid} {b['name']}: {f} {a.get(f) or 'unknown'} -> {b.get(f) or 'unknown'}")
+
+# ---- night blog pipeline ----------------------------------------------------
+blog = portal_get("/api/blog-runs/summary") if data else None
+blog_line = None
+if blog:
+    blog_line = (f"Blog fleet {blog['automation']}: {blog['ready']} ready to approve, "
+                 f"{blog['client_review']} with clients, {blog['failed_last_24h']} failed in the last 24h, "
+                 f"{blog['running']} queued/running, {blog['approved_unpublished']} approved but not published")
+    system.append((WARN if blog["failed_last_24h"] else OK, "Night blog", blog_line))
 
 overall = BLOCKED if any(l == BLOCKED for l, *_ in system) else \
           WARN if any(l == WARN for l, *_ in system) or any(r[1] == WARN for r in readiness) else OK

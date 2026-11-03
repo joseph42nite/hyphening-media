@@ -14,6 +14,8 @@ import { fetchPostComments, replyToComment } from '../services/commentSync.js';
 import { countableLeadSql } from '../services/leadFilters.js';
 import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS, parseJsonArrayInput } from '../services/onboardingFields.js';
 import { PREFERENCE_FIELDS, validatePreferenceInput } from '../services/blogPipeline.js';
+import { serializeRun, clientApproveBlogRun, rejectBlogRun } from '../services/blogRuns.js';
+import { markdownToHtml } from '../services/markdown.js';
 
 const router = Router();
 
@@ -1304,6 +1306,42 @@ router.put('/:token/blog-preferences', portalAuth, (req, res) => {
     console.error('[PORTAL] Save blog preferences error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+/**
+ * GET /api/portal/:token/blog-reviews
+ * Posts waiting for this client's (or their clinician's) review, when the
+ * client's pipeline says review is required. Approving sends a post on to
+ * Hyphening for final approval; it doesn't publish anything by itself.
+ */
+router.get('/:token/blog-reviews', portalAuth, (req, res) => {
+  try {
+    const rows = db.prepare("SELECT * FROM blog_agent_runs WHERE client_id = ? AND status = 'client_review' ORDER BY id").all(req.portalClient.id);
+    res.json({
+      // Escaped HTML, not the raw draft: it's model output.
+      posts: rows.map(serializeRun).map(({ id, title, excerpt, content, cover_image_url, cover_alt, meta_description, finished_at }) => (
+        { id, title, excerpt, html: markdownToHtml(content), cover_image_url, cover_alt, meta_description, finished_at }
+      )),
+    });
+  } catch (err) {
+    console.error('[PORTAL] Get blog reviews error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** POST /api/portal/:token/blog-reviews/:id/approve — { note? } */
+router.post('/:token/blog-reviews/:id/approve', portalAuth, (req, res) => {
+  const r = clientApproveBlogRun(parseInt(req.params.id, 10), req.portalClient.id, req.body?.note);
+  res.status(r.status).json(r.status === 200 ? { success: true } : { error: r.error });
+});
+
+/** POST /api/portal/:token/blog-reviews/:id/changes — { note }: send it back to be redrafted. */
+router.post('/:token/blog-reviews/:id/changes', portalAuth, (req, res) => {
+  const run = db.prepare('SELECT client_id, status FROM blog_agent_runs WHERE id = ?').get(req.params.id);
+  if (!run || run.client_id !== req.portalClient.id) return res.status(404).json({ error: 'Post not found' });
+  if (run.status !== 'client_review') return res.status(409).json({ error: 'This post is not waiting for your review' });
+  const r = rejectBlogRun(parseInt(req.params.id, 10), req.body?.note, null, { by: 'client' });
+  res.status(r.status).json(r.status === 200 ? { success: true } : { error: r.error });
 });
 
 /**

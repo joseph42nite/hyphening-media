@@ -18,6 +18,7 @@ import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
+import { claimBlogRuns, submitBlogDraft, failBlogRun, attachBlogAudio, addBlogTopics } from '../services/blogRuns.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
 // webhook no longer clears them directly — doing so unconditionally used to
 // disarm the timer of a live run when a cancelled run's late result arrived.
@@ -185,7 +186,9 @@ router.post('/webhook', (req, res) => {
       'create_blog_post', 'update_blog_post', 'create_seo_audit',
       'agent_activity_log', 'skill_inventory_report', 'claim_seo_runs',
       'seo_run_log', 'report_competitors',
-      'claim_ads_runs', 'create_ads_audit', 'ads_run_log'
+      'claim_ads_runs', 'create_ads_audit', 'ads_run_log',
+      'claim_blog_runs', 'submit_blog_draft', 'fail_blog_run', 'attach_blog_audio',
+      'add_blog_topics', 'blog_run_log'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -282,6 +285,12 @@ function executeEvent(eventType, payload) {
       case 'claim_ads_runs': return handleClaimAdsRuns(payload);
       case 'create_ads_audit': return handleCreateAdsAudit(payload);
       case 'ads_run_log': return handleAdsRunLog(payload);
+      case 'claim_blog_runs': return handleClaimBlogRuns(payload);
+      case 'submit_blog_draft': return submitBlogDraft(payload);
+      case 'fail_blog_run': return failBlogRun(payload);
+      case 'attach_blog_audio': return attachBlogAudio(payload);
+      case 'add_blog_topics': return handleAddBlogTopics(payload);
+      case 'blog_run_log': return handleBlogRunLog(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -331,6 +340,35 @@ function safeSummarisePayload(payload) {
  * Not persisted, matching the existing terminal behaviour: this is a live view,
  * and the durable record is the audit plus the artifacts on the worker.
  */
+// ============================================================
+// NIGHT BLOG PIPELINE (src/services/blogRuns.js)
+// ============================================================
+
+/** The Mac's blog worker claims tonight's queued posts, with each client's blog-config. */
+function handleClaimBlogRuns(payload) {
+  const limit = Math.min(parseInt(payload?.limit, 10) || 1, 5);
+  const runs = claimBlogRuns(payload?.worker_id || 'local', limit);
+  if (runs.length) console.log(`[OPENCLAW] Blog worker '${payload?.worker_id || 'local'}' claimed ${runs.length} run(s): ${runs.map(r => `#${r.run_id}`).join(', ')}`);
+  return { success: true, summary: `Claimed ${runs.length} blog run(s)`, data: { runs } };
+}
+
+/** A bot loads a client's approved calendar: { client_id, topics: [{ topic, target_keyword?, planned_for?, notes? }] }. */
+function handleAddBlogTopics(payload) {
+  const result = addBlogTopics(parseInt(payload?.client_id, 10), payload?.topics, payload?.created_by || 'agent');
+  if (result.error) return { success: false, summary: result.error };
+  return { success: true, summary: `Added ${result.ids.length} blog topic(s)`, data: { ids: result.ids } };
+}
+
+/** Progress lines from the blog worker, relayed live to the Blog tab. */
+function handleBlogRunLog(payload) {
+  const runId = parseInt(payload?.run_id, 10);
+  const line = typeof payload?.log === 'string' ? payload.log.slice(0, 1000) : null;
+  if (!runId || !line) return { success: false, summary: 'run_id and log are required' };
+  import('../../server.js').then(({ broadcastEvent }) => broadcastEvent('blog_run_log', { run_id: runId, log: line }))
+    .catch(() => { /* a lost log line must not fail the call */ });
+  return { success: true, summary: `Relayed log for blog run #${runId}` };
+}
+
 function handleSeoRunLog(payload) {
   const runId = parseInt(payload?.run_id, 10);
   const line = typeof payload?.log === 'string' ? payload.log : null;

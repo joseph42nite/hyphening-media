@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X, Volume2 } from 'lucide-react';
 import FleetModeToggle from './FleetModeToggle.jsx';
+import BlogNightPanel from './BlogNightPanel.jsx';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -137,6 +138,8 @@ export default function BlogTab({ showToast }) {
           <Plus size={14} /> New Post
         </button>
       </div>
+
+      <BlogNightPanel showToast={showToast} />
 
       {loading ? (
         <p style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading posts...</p>

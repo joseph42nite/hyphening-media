@@ -26,6 +26,7 @@ const API_READONLY_ALLOWED = [
   /^GET \/api\/clients\/?$/,
   /^GET \/api\/clients\/(\d+)$/,
   /^GET \/api\/clients\/(\d+)\/blog-config$/,
+  /^GET \/api\/blog-runs\/summary$/,
   /^GET \/api\/clients\/(\d+)\/seo\/audits$/,
   /^GET \/api\/clients\/(\d+)\/seo\/audits\/\d+$/,
   /^GET \/api\/clients\/(\d+)\/seo\/agents\/status$/,
