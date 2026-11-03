@@ -42,6 +42,8 @@ const WORKERS = {
   seo: { cmd: 'node', args: ['scripts/seo_worker.mjs', '--once'] },
   ads: { cmd: 'node', args: ['plugins/hyphening-ads/scripts/ads_worker.mjs', '--once'] },
   blog: { cmd: 'node', args: ['scripts/blog_worker.mjs', '--once'] },
+  seo_fix: { cmd: 'node', args: ['scripts/seo_fix_worker.mjs', '--once'] },
+  deploy: { cmd: 'node', args: ['scripts/deploy_worker.mjs', '--once'] },
 };
 
 function runWorker(kind) {
@@ -53,20 +55,23 @@ function runWorker(kind) {
   // The blog worker drains the whole queue and can run for hours, so a second
   // signal while it's busy is already covered; starting another would race it
   // for Claude and the Kokoro lock.
-  if (kind === 'blog' && blogWorkerRunning) {
-    console.log('[MAC CONNECTOR] blog worker already running; it will pick the new run up.');
+  // The same goes for the fix and deploy workers: each drains its whole queue,
+  // and two of them at once would fight over the same git worktrees.
+  if (SINGLE_RUN.has(kind) && running.has(kind)) {
+    console.log(`[MAC CONNECTOR] ${kind} worker already running; it will pick the new run up.`);
     return;
   }
   console.log(`[MAC CONNECTOR] Running ${kind} worker...`);
   const child = spawn(spec.cmd, spec.args, { cwd: REPO_ROOT, stdio: 'inherit' });
-  if (kind === 'blog') blogWorkerRunning = true;
+  if (SINGLE_RUN.has(kind)) running.add(kind);
   child.on('exit', (code) => {
-    if (kind === 'blog') blogWorkerRunning = false;
+    running.delete(kind);
     console.log(`[MAC CONNECTOR] ${kind} worker exited with code ${code}.`);
   });
 }
 
-let blogWorkerRunning = false;
+const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy']);
+const running = new Set();
 
 let stopping = false;
 
@@ -104,6 +109,8 @@ function connect() {
     runWorker('seo');
     runWorker('ads');
     runWorker('blog');
+    runWorker('seo_fix');
+    runWorker('deploy');
   });
 
   socket.on('message', (data) => {

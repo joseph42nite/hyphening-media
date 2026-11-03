@@ -54,6 +54,7 @@ import sitemapRoutes from './src/routes/sitemap.js';
 import statusRoutes from './src/routes/status.js';
 import automationRoutes from './src/routes/automation.js';
 import blogRunRoutes from './src/routes/blogRuns.js';
+import seoNightRoutes from './src/routes/seoNight.js';
 import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 
 // Import services
@@ -327,6 +328,7 @@ app.use('/api/clients', adsRoutes);
 app.use('/api/ads', adsQueueRoutes);
 app.use('/api/automation', automationRoutes);
 app.use('/api/blog-runs', blogRunRoutes);
+app.use('/api/seo-night', seoNightRoutes);
 app.use('/api/approval', approvalRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/notifications', notificationRoutes);

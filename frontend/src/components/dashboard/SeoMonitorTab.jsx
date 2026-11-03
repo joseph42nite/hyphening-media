@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Terminal, AlertTriangle, Loader2, ChevronUp, ChevronDown, XCircle, Users, Check, X } from 'lucide-react';
 import { API_BASE } from '../../api.js';
-import FleetModeToggle from './FleetModeToggle.jsx';
+import SeoNightPanel from './SeoNightPanel.jsx';
 
 const IN_FLIGHT_STATUSES = ['queued', 'running'];
 
@@ -1029,15 +1029,14 @@ export default function SeoMonitorTab({ clients, showToast }) {
 
   return (
     <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
+      <SeoNightPanel showToast={showToast} />
+
       {/* Dropdown selector panel */}
       <div className="card glass-premium" style={{ marginBottom: '20px', padding: '18px 20px', border: '1px solid rgba(223, 231, 224, 0.12)', background: 'rgba(12, 16, 24, 0.85)', backdropFilter: 'blur(20px)', borderRadius: '12px' }}>
         <div className="seo-command-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.25rem', color: 'var(--text-primary)', fontFamily: 'Space Grotesk, sans-serif' }}>SEO &amp; GMB Co-Pilot Command Center</h3>
             <p style={{ margin: '4px 0 0', color: 'rgba(223, 231, 224, 0.65)', fontSize: '0.85rem' }}>Select a workspace client to audit metadata, track freshness cadences, and review live output stream drawers.</p>
-          </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <FleetModeToggle scope="seo" showToast={showToast} scheduleReady={false} confirmText="Turn the SEO fleet to AUTO? Once the night schedule is built, due SEO skills will run overnight for every client with SEO on, and safe fixes will be committed for the morning Deploy button." />
           </div>
           <div className="seo-command-actions"style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', flexWrap: 'wrap' }}>

@@ -125,7 +125,7 @@ function latestCapability(clientId, read) {
  * The single place both the trigger routes and the dashboard ask. Replaces
  * three copies of a Map that had already drifted out of sync with each other.
  */
-function unavailableReason(agentType, clientId = null) {
+export function unavailableReason(agentType, clientId = null) {
   const stat = UNAVAILABLE_SKILLS.get(agentType);
   if (stat) return stat;
 
@@ -212,7 +212,7 @@ function skillNameForAuditType(agentType) {
  * `enforced` is false until an inventory has been received at all, so a fresh
  * install does not have every agent disabled by an empty table.
  */
-function skillStateFor(agentType) {
+export function skillStateFor(agentType) {
   const skillName = skillNameForAuditType(agentType);
   const anyReport = db.prepare('SELECT COUNT(*) AS n FROM agent_skills').get().n > 0;
   if (!anyReport) return { enforced: false, ok: true, skillName };
@@ -271,7 +271,7 @@ function detectDataGap(auditType, audit) {
   return `Ran without ${required.label}, so this audit reports the outage rather than the site.`;
 }
 
-function resolveAuditScore(audit) {
+export function resolveAuditScore(audit) {
   if (!audit) return null;
   const preferred = SCORE_COLUMN_BY_TYPE[audit.audit_type];
   if (preferred && audit[preferred] != null) return audit[preferred];

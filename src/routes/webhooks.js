@@ -20,6 +20,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { claimBlogRuns, submitBlogDraft, failBlogRun, attachBlogAudio, addBlogTopics, queueBlogRuns, listBlogRunsForAgents, getBlogRunForAgent, reviewBlogRun, retryBlogRun } from '../services/blogRuns.js';
 import { pushRunSignal } from '../services/macConnector.js';
+import { queueNightAudits, queueSeoFixes, claimSeoFixBatches, submitSeoTriage, submitSeoFixBatch, claimSeoDeploys, finishSeoDeploy, nightSummaryText } from '../services/seoNight.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
 // webhook no longer clears them directly — doing so unconditionally used to
 // disarm the timer of a live run when a cancelled run's late result arrived.
@@ -190,7 +191,9 @@ router.post('/webhook', (req, res) => {
       'claim_ads_runs', 'create_ads_audit', 'ads_run_log',
       'claim_blog_runs', 'submit_blog_draft', 'fail_blog_run', 'attach_blog_audio',
       'add_blog_topics', 'blog_run_log',
-      'queue_blog_runs', 'list_blog_runs', 'get_blog_run', 'review_blog_run', 'retry_blog_run'
+      'queue_blog_runs', 'list_blog_runs', 'get_blog_run', 'review_blog_run', 'retry_blog_run',
+      'queue_seo_night', 'queue_seo_fixes', 'seo_night_summary',
+      'claim_seo_fix_batches', 'submit_seo_triage', 'submit_seo_fix_batch', 'claim_seo_deploys', 'finish_seo_deploy'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -298,6 +301,14 @@ function executeEvent(eventType, payload) {
       case 'get_blog_run': return handleGetBlogRun(payload);
       case 'review_blog_run': return reviewBlogRun(payload);
       case 'retry_blog_run': return handleRetryBlogRun(payload);
+      case 'queue_seo_night': return handleQueueSeoNight(payload);
+      case 'queue_seo_fixes': return handleQueueSeoFixes(payload);
+      case 'seo_night_summary': return { success: true, summary: nightSummaryText(), data: { text: nightSummaryText() } };
+      case 'claim_seo_fix_batches': { const batches = claimSeoFixBatches(payload?.worker); return { success: true, summary: `Claimed ${batches.length} fix batch(es)`, data: { batches } }; }
+      case 'submit_seo_triage': return submitSeoTriage(payload);
+      case 'submit_seo_fix_batch': return submitSeoFixBatch(payload);
+      case 'claim_seo_deploys': { const deploys = claimSeoDeploys(payload?.worker); return { success: true, summary: `Claimed ${deploys.length} deploy(s)`, data: { deploys } }; }
+      case 'finish_seo_deploy': return finishSeoDeploy(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -380,6 +391,34 @@ function handleQueueBlogRuns(payload) {
       ? `Queued ${queued.length} post(s): ${queued.map(q => q.client_name).join(', ')}`
       : 'Nothing queued (Blog fleet on Manual, or no client has Blog on, posts left this month and a planned topic)',
     data: { queued },
+  };
+}
+
+/** Tanner, 01:15 IST: queue each SEO-on client's overdue skills (SEO fleet on Auto only). */
+function handleQueueSeoNight(payload) {
+  const { queued, skipped } = queueNightAudits({ by: payload?.by || 'agent' });
+  if (queued.length) pushRunSignal('seo');
+  const why = skipped.map(s => (s.client_name ? `${s.client_name}: ${s.reason}` : s.reason)).join('; ');
+  return {
+    success: true,
+    summary: queued.length
+      ? `Queued ${queued.length} skill run(s): ${queued.map(q => `${q.client_name} ${q.agent_type}`).join(', ')}${why ? ` (skipped: ${why})` : ''}`
+      : `Nothing queued${why ? ` (${why})` : ''}`,
+    data: { queued, skipped },
+  };
+}
+
+/** Boothroyd, 03:30 IST: one fix batch per SEO-on client with a site repo, then wake the fix worker. */
+function handleQueueSeoFixes(payload) {
+  const { queued, skipped } = queueSeoFixes({ by: payload?.by || 'agent' });
+  if (queued.length) pushRunSignal('seo_fix');
+  const why = skipped.map(s => (s.client_name ? `${s.client_name}: ${s.reason}` : s.reason)).join('; ');
+  return {
+    success: true,
+    summary: queued.length
+      ? `Queued fixes for ${queued.map(q => q.client_name).join(', ')}${why ? ` (skipped: ${why})` : ''}`
+      : `Nothing queued${why ? ` (${why})` : ''}`,
+    data: { queued, skipped },
   };
 }
 

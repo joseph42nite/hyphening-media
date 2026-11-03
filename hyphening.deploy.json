@@ -1,0 +1,46 @@
+{
+  "client_id": 10,
+  "repo": "joseph42nite/hyphening-media",
+  "branch": "main",
+  "checks": [
+    "node --check server.js",
+    "node --check src/routes/sitemap.js",
+    "npm --prefix frontend run build"
+  ],
+  "deploy": {
+    "type": "ssh_pull_build",
+    "host_alias": "hyphening",
+    "dir": "/home/ubuntu/hyphening",
+    "path_prefix": "$HOME/.nvm/versions/node/v20.20.2/bin",
+    "commands": [
+      "node scripts/backup-db.mjs",
+      "git pull --ff-only",
+      "npm --prefix frontend run build",
+      "pm2 restart hyphening-ops --update-env"
+    ]
+  },
+  "health_check": [
+    "https://hypheningmedia.com/",
+    "https://hypheningmedia.com/api/health",
+    "https://hypheningmedia.com/sitemap.xml"
+  ],
+  "rollback": "git_revert",
+  "blog": { "type": "hyphening_webhook" },
+  "seo_fixes": {
+    "enabled": true,
+    "paths": [
+      "frontend/index.html",
+      "frontend/public/landing-pages/",
+      "frontend/public/robots.txt",
+      "frontend/public/llms.txt",
+      "frontend/public/sitemap.xml",
+      "server.js",
+      "src/routes/sitemap.js"
+    ],
+    "never_touch": [
+      "src/migrations/",
+      "src/middleware/",
+      "frontend/src/components/dashboard/"
+    ]
+  }
+}
