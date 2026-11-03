@@ -13,7 +13,7 @@ import { pushRunSignal } from '../services/macConnector.js';
 import { markdownToHtml } from '../services/markdown.js';
 import {
   getRunRow, serializeRun, queueBlogRuns, approveBlogRun, approveAllReady, retryPublish,
-  rejectBlogRun, addBlogTopics, blogRunSummary,
+  rejectBlogRun, addBlogTopics, blogRunSummary, sendBlogRunToClient,
 } from '../services/blogRuns.js';
 
 const router = Router();
@@ -150,6 +150,12 @@ router.post('/:id/retry-publish', authorize('admin'), async (req, res) => {
     console.error('[BLOG RUNS] Retry error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+/** POST /api/blog-runs/:id/send-to-client — into the client's portal for their review (portal only, no email). */
+router.post('/:id/send-to-client', authorize('admin'), (req, res) => {
+  const r = sendBlogRunToClient(parseInt(req.params.id, 10), req.user);
+  res.status(r.status).json(r.status === 200 ? { run: r.run } : { error: r.error });
 });
 
 /** POST /api/blog-runs/:id/reject — { reason }. The topic goes back in the queue with the reason. */

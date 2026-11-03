@@ -155,6 +155,47 @@ describe('review, rejection and failure', () => {
   });
 });
 
+describe('the bots\' side and send to client', () => {
+  const readyRun = () => {
+    const c = makeClient();
+    runs.addBlogTopics(c, [{ topic: 'Bot topic' }]);
+    const [q] = runs.queueBlogRuns({ clientId: c, force: true });
+    runs.claimBlogRuns('test', 1);
+    runs.submitBlogDraft(draft(q.run_id));
+    return { c, q };
+  };
+
+  it('stores Vesper\'s review without changing the status', () => {
+    const { q } = readyRun();
+    expect(runs.reviewBlogRun({ run_id: q.run_id, recommendation: 'approve' }).success).toBe(false);
+    expect(runs.reviewBlogRun({ run_id: q.run_id, recommendation: 'publish', note: 'x' }).success).toBe(false);
+    expect(runs.reviewBlogRun({ run_id: q.run_id, recommendation: 'needs-007', note: 'Check the tax claim', by: 'Vesper' }).success).toBe(true);
+    const run = runs.getRunRow(q.run_id);
+    expect([run.status, run.agent_recommendation, run.agent_reviewed_by]).toEqual(['ready', 'needs_007', 'Vesper']);
+    expect(runs.listBlogRunsForAgents(['ready']).some(r => r.id === q.run_id && !('content' in r))).toBe(true);
+    expect(runs.getBlogRunForAgent(q.run_id).content).toMatch(/A test post/);
+  });
+
+  it('sends a ready post to the client only when they have a portal', () => {
+    const { c, q } = readyRun();
+    expect(runs.sendBlogRunToClient(q.run_id, null).status).toBe(409);
+    db.prepare("UPDATE crm_clients SET portal_token = 'test-token' WHERE id = ?").run(c);
+    expect(runs.sendBlogRunToClient(q.run_id, null).status).toBe(200);
+    expect(runs.getRunRow(q.run_id).status).toBe('client_review');
+  });
+
+  it('retries a failed run on the same topic', () => {
+    const c = makeClient();
+    runs.addBlogTopics(c, [{ topic: 'Retry me' }, { topic: 'Not this one' }]);
+    const [q] = runs.queueBlogRuns({ clientId: c, force: true });
+    runs.failBlogRun({ run_id: q.run_id, error: 'boom' });
+    const r = runs.retryBlogRun({ run_id: q.run_id, by: 'Q' });
+    expect(r.success).toBe(true);
+    expect(r.data.queued[0].topic_id).toBe(q.topic_id);
+    runs.failBlogRun({ run_id: r.data.queued[0].run_id, error: 'test cleanup' });
+  });
+});
+
 describe('audio and markdown', () => {
   it('only accepts an mp3', () => {
     const c = makeClient();

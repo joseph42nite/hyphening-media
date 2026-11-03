@@ -4,7 +4,7 @@ import { API_BASE, authFetch } from '../api.js';
 import logoImg from '../assets/logo.png';
 import {
   Users, Folder, Calendar, Shield, LogOut, FileSpreadsheet,
-  X, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus, Award
+  X, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus, Award, ClipboardCheck
 } from 'lucide-react';
 
 import LeadsTab from '../components/dashboard/LeadsTab.jsx';
@@ -17,6 +17,7 @@ import AuditLogsTab from '../components/dashboard/AuditLogsTab.jsx';
 import ChatTab from '../components/dashboard/ChatTab.jsx';
 import ContentModal from '../components/dashboard/ContentModal.jsx';
 import BlogTab from '../components/dashboard/BlogTab.jsx';
+import BlogMonitorTab from '../components/dashboard/BlogMonitorTab.jsx';
 import CaseStudiesTab from '../components/dashboard/CaseStudiesTab.jsx';
 import ClientsTab from '../components/dashboard/ClientsTab.jsx';
 import SeoMonitorTab from '../components/dashboard/SeoMonitorTab.jsx';
@@ -1064,6 +1065,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
+        {/* 7a. Blog Monitor — the night pipeline for every client */}
+        {isAdmin && (
+          <button onClick={() => handleTabClick('blogmonitor')} className={`btn ${activeTab === 'blogmonitor' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.blogmonitor ? `${tabCounts.blogmonitor} post(s) waiting for you` : undefined}>
+            <ClipboardCheck size={16} /> Blog Monitor
+            <TabBadge count={getTabBadgeCount('blogmonitor', tabCounts.blogmonitor)} />
+          </button>
+        )}
+
         {/* 7b. Case Studies */}
         {isAdmin && (
           <button onClick={() => handleTabClick('casestudies')} className={`btn ${activeTab === 'casestudies' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }}>
@@ -1237,6 +1246,11 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* BLOG TAB */}
         {activeTab === 'blog' && (
           <BlogTab showToast={showToast} />
+        )}
+
+        {/* BLOG MONITOR TAB */}
+        {activeTab === 'blogmonitor' && isAdmin && (
+          <BlogMonitorTab showToast={showToast} />
         )}
 
         {/* CASE STUDIES TAB */}

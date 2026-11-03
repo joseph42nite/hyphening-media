@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, XCircle, Eye, Download, RefreshCw, Plus, Trash2, SkipForward, Play, X } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, Download, RefreshCw, Plus, Trash2, SkipForward, Play, X, Send } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 
 /**
@@ -78,6 +78,10 @@ export default function BlogNightPanel({ showToast }) {
 
   const approve = (run) => act(`a${run.id}`, () => api(`/api/blog-runs/${run.id}/approve`, { method: 'POST' }),
     `"${run.title}" approved`);
+  const sendToClient = (run) => {
+    if (!window.confirm(`Send "${run.title}" to ${run.client_name} for review? It appears under "Posts to review" in their portal (no email). When they approve, it comes back here for your OK.`)) return;
+    act(`c${run.id}`, () => api(`/api/blog-runs/${run.id}/send-to-client`, { method: 'POST' }), `Sent to ${run.client_name}'s portal`);
+  };
   const retry = (run) => act(`a${run.id}`, () => api(`/api/blog-runs/${run.id}/retry-publish`, { method: 'POST' }), 'Published');
   const reject = (run) => {
     const reason = window.prompt(`What should change in "${run.title}"? The topic goes back in the queue and the next draft gets this note.`);
@@ -128,7 +132,7 @@ export default function BlogNightPanel({ showToast }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase' }}>Ready to approve {readyCount > 0 && `(${readyCount})`}</h3>
-            <span style={muted}>Drafted overnight by the Mac. Approve publishes to the client's site; Reject sends it back for a redraft.</span>
+            <span style={muted}>Approve publishes to the client's site. Reject sends it back for a redraft with your note. Send to client puts it in their portal first.</span>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button className="btn btn-secondary" onClick={loadRuns} title="Refresh"><RefreshCw size={14} /></button>
@@ -160,6 +164,14 @@ export default function BlogNightPanel({ showToast }) {
                 </ul>
               )}
               {run.error && <div style={{ fontSize: '0.78rem', color: '#fca5a5', marginTop: '4px' }}>{run.error}</div>}
+              {run.agent_recommendation && (
+                <div style={{ fontSize: '0.8rem', marginTop: '6px', padding: '6px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)' }}>
+                  <strong style={{ color: { approve: '#4ade80', reject: '#f87171', needs_007: '#facc15' }[run.agent_recommendation] }}>
+                    {run.agent_reviewed_by || 'Bot'} recommends: {{ approve: 'approve', reject: 'reject', needs_007: 'your call' }[run.agent_recommendation]}
+                  </strong>{' '}
+                  <span style={{ color: 'var(--text-muted)' }}>{run.agent_review}</span>
+                </div>
+              )}
               {run.reject_reason && <div style={muted}>Sent back: {run.reject_reason}</div>}
               {run.client_review_note && <div style={muted}>Client: {run.client_review_note}</div>}
               {run.published_url && <a href={run.published_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8rem' }}>{run.published_url}</a>}
@@ -173,6 +185,7 @@ export default function BlogNightPanel({ showToast }) {
                 <>
                   <button className="btn btn-primary" disabled={busy === `a${run.id}`} onClick={() => approve(run)}><CheckCircle size={14} /> Approve</button>
                   <button className="btn btn-secondary" disabled={busy === `r${run.id}`} onClick={() => reject(run)}><XCircle size={14} /> Reject</button>
+                  <button className="btn btn-secondary" disabled={busy === `c${run.id}`} onClick={() => sendToClient(run)} title="Send to the client's portal for their review"><Send size={14} /> Send to client</button>
                 </>
               )}
               {run.status === 'approved' && run.error && (
@@ -187,7 +200,7 @@ export default function BlogNightPanel({ showToast }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase' }}>Topic queue</h3>
-            <span style={muted}>The 01:00 schedule drafts the next planned topic, one per client per night.</span>
+            <span style={muted}>When Leiter starts the night (01:00 IST, Blog on Auto), the next planned topic is drafted, one per client.</span>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <select className="form-control" value={clientId} onChange={e => setClientId(e.target.value)} style={{ minWidth: '200px' }}>

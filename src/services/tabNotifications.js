@@ -167,6 +167,24 @@ function countDraftPosts(since) {
 }
 
 /**
+ * Night-pipeline posts waiting for 007 in the Blog Monitor: ready to approve,
+ * or approved but failed to publish. Keyed on when the draft was finished, so
+ * the badge restarts with each night's batch.
+ */
+function countBlogRunsWaiting(since) {
+  try {
+    const row = db.prepare(`
+      SELECT COUNT(*) AS n FROM blog_agent_runs
+      WHERE (status = 'ready' OR (status = 'approved' AND error IS NOT NULL))
+        AND ${NORM('COALESCE(finished_at, updated_at)')} > ?
+    `).get(since);
+    return row.n;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Ads actions waiting to be dealt with.
  *
  * Counted on the recommendation, not on the audit. A finished ads run is not
@@ -202,6 +220,7 @@ const COUNTERS = {
   scripts: countScriptResponses,
   tasks: countOverdueTasks,
   blog: countDraftPosts,
+  blogmonitor: countBlogRunsWaiting,
 };
 
 /** Tab ids that carry a badge, so callers can reject anything else. */

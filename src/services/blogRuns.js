@@ -54,7 +54,7 @@ export function serializeRun(run) {
  * flight today. `force` (a manual "Draft now" from the Blog tab) skips the
  * automation-mode check but none of the others.
  */
-export function queueBlogRuns({ clientId = null, requestedBy = 'schedule', force = false } = {}) {
+export function queueBlogRuns({ clientId = null, requestedBy = 'schedule', force = false, topicId = null } = {}) {
   if (!force && getMode('blog') !== 'auto') return [];
 
   const clients = db.prepare(`
@@ -79,10 +79,12 @@ export function queueBlogRuns({ clientId = null, requestedBy = 'schedule', force
     `).get(client.id, client.id, ...LIVE_STATUSES).n;
     if (today > 0) return null;
 
-    const topic = db.prepare(`
-      SELECT id FROM blog_topics WHERE client_id = ? AND status = 'planned'
-      ORDER BY planned_for IS NULL, planned_for, id LIMIT 1
-    `).get(client.id);
+    const topic = topicId
+      ? db.prepare("SELECT id FROM blog_topics WHERE id = ? AND client_id = ? AND status = 'planned'").get(topicId, client.id)
+      : db.prepare(`
+          SELECT id FROM blog_topics WHERE client_id = ? AND status = 'planned'
+          ORDER BY planned_for IS NULL, planned_for, id LIMIT 1
+        `).get(client.id);
     if (!topic) return null;
 
     const res = db.prepare(`
@@ -329,6 +331,77 @@ export function clientApproveBlogRun(id, clientId, note) {
   db.prepare("UPDATE blog_agent_runs SET status = 'ready', client_review_note = ?, client_reviewed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
     .run(note ? String(note).slice(0, 2000) : null, run.id);
   return { status: 200 };
+}
+
+/**
+ * 007 sends a ready post to the client (or their clinician) from the Blog
+ * Monitor. Portal only: it appears under "Posts to review" in their portal;
+ * nothing is emailed. Their approval brings it back to 'ready' for 007.
+ */
+export function sendBlogRunToClient(id, actor) {
+  const run = getRunRow(id);
+  if (!run) return { status: 404, error: 'Blog run not found' };
+  if (run.status !== 'ready') return { status: 409, error: `Run is ${run.status}, not ready` };
+  const client = db.prepare('SELECT portal_token FROM crm_clients WHERE id = ?').get(run.client_id);
+  if (!client?.portal_token) return { status: 409, error: 'This client has no portal link yet. Generate one in the Clients tab first.' };
+  db.prepare("UPDATE blog_agent_runs SET status = 'client_review', client_review_note = NULL, updated_at = datetime('now') WHERE id = ?").run(run.id);
+  logAction({ actorId: actor?.id, actorEmail: actor?.email, action: 'blog_run_sent_to_client', entityType: 'blog_run', entityId: run.id, diff: {} });
+  return { status: 200, run: serializeRun(getRunRow(run.id)) };
+}
+
+// ------------------------------------------------- the OpenMausBot team's side
+// Called through the signed webhook by scripts/blog-runs.mjs, the bots' tool.
+
+const AGENT_STATUSES = ['queued', 'running', 'client_review', 'ready', 'approved', 'published', 'rejected', 'failed'];
+
+/** Short list for the bots: no post bodies. */
+export function listBlogRunsForAgents(statuses = ['ready', 'failed', 'client_review', 'running', 'queued'], sinceHours = 72) {
+  const wanted = statuses.filter((s) => AGENT_STATUSES.includes(s));
+  if (wanted.length === 0) return [];
+  return db.prepare(`
+    SELECT r.id, r.status, r.client_id, c.name AS client_name, t.topic, r.title, r.quality_score, r.quality_bar,
+           r.blockers, r.error, r.audio_url, r.agent_recommendation, r.reject_reason, r.client_review_note, r.finished_at
+    FROM blog_agent_runs r JOIN crm_clients c ON c.id = r.client_id LEFT JOIN blog_topics t ON t.id = r.topic_id
+    WHERE r.status IN (${wanted.map(() => '?').join(',')}) AND r.updated_at >= datetime('now', ?)
+    ORDER BY r.id
+  `).all(...wanted, `-${Math.max(1, Math.min(720, sinceHours))} hours`).map((r) => ({
+    ...r, blockers: (() => { try { return JSON.parse(r.blockers || '[]'); } catch { return []; } })(),
+  }));
+}
+
+/** One draft in full, for Vesper's review. */
+export function getBlogRunForAgent(id) {
+  const run = serializeRun(getRunRow(id));
+  if (!run) return null;
+  const { id: runId, status, client_name, publish_target, title, slug, excerpt, content, meta_title, meta_description,
+    cover_image_url, cover_alt, audio_url, quality_score, quality_bar, passes_bar, blockers, evidence, agent_recommendation, agent_review } = run;
+  return { id: runId, status, client_name, publish_target, title, slug, excerpt, content, meta_title, meta_description,
+    cover_image_url, cover_alt, audio_url, quality_score, quality_bar, passes_bar, blockers, evidence, agent_recommendation, agent_review };
+}
+
+/** Vesper's recommendation, shown next to the post in the Blog Monitor. Never changes the status. */
+export function reviewBlogRun(payload) {
+  const run = getRunRow(payload?.run_id);
+  if (!run) return { success: false, summary: `Blog run #${payload?.run_id} not found` };
+  if (!['ready', 'client_review'].includes(run.status)) return { success: false, summary: `Blog run #${run.id} is ${run.status}; only drafts waiting for approval can be reviewed` };
+  const rec = String(payload.recommendation || '').replace('-', '_');
+  if (!['approve', 'reject', 'needs_007'].includes(rec)) return { success: false, summary: 'recommendation must be approve, reject or needs_007' };
+  const note = String(payload.note || '').trim();
+  if (!note) return { success: false, summary: 'note is required: say why' };
+  db.prepare("UPDATE blog_agent_runs SET agent_recommendation = ?, agent_review = ?, agent_reviewed_by = ?, agent_reviewed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+    .run(rec, note.slice(0, 2000), String(payload.by || 'agent').slice(0, 60), run.id);
+  return { success: true, summary: `Review stored on blog run #${run.id}: ${rec}` };
+}
+
+/** Q puts a failed run's topic straight back in the queue, whatever the Blog switch says (like Draft now). */
+export function retryBlogRun(payload) {
+  const run = getRunRow(payload?.run_id);
+  if (!run) return { success: false, summary: `Blog run #${payload?.run_id} not found` };
+  if (run.status !== 'failed') return { success: false, summary: `Blog run #${run.id} is ${run.status}, not failed` };
+  if (!run.topic_id) return { success: false, summary: `Blog run #${run.id} has no topic to retry` };
+  const queued = queueBlogRuns({ clientId: run.client_id, topicId: run.topic_id, requestedBy: payload.by || 'agent retry', force: true });
+  if (queued.length === 0) return { success: false, summary: 'Not queued: Blog may be off for this client, posts per month used up, or another run is already in flight today' };
+  return { success: true, summary: `Retry queued as blog run #${queued[0].run_id}`, data: { queued } };
 }
 
 /** Counts for the health check, the morning brief and the Blog tab badge. */

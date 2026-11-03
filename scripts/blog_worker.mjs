@@ -158,7 +158,7 @@ function buildPrompt(job, livePosts) {
     '8. `blog-geo`: answer-first sections and a short FAQ from real questions people ask.',
     `9. \`blog-schema\`: BlogPosting JSON-LD${healthcare ? ' (with the reviewer if given)' : ''}; FAQPage only if the FAQ is real.`,
     '10. Cover: one Unsplash photo URL (https://images.unsplash.com/photo-...?w=1200&q=80) that fits the post, not used by a live post below, with alt text.',
-    p.blog_audio_enabled ? '11. Audio: a spoken summary of the post, 230-300 words (under two minutes), plain sentences, no headings or URLs.' : '',
+    p.blog_audio_enabled ? '11. Audio: a spoken summary of the post, 180-230 words (the narrator refuses anything over two minutes), plain sentences, no headings or URLs.' : '',
     '',
     '## Live posts (for duplicates and internal links)',
     livePosts.length ? livePosts.map(l => `- ${l.title} — ${l.url}`).join('\n') : `(none listed: fetch ${p.blog_site_url || c.website_url} yourself to find them)`,
@@ -220,6 +220,17 @@ async function checkCover(url, livePosts) {
   }
 }
 
+/** The first sentences of `text` that fit in `max` words. */
+function trimToWords(text, max) {
+  const sentences = text.replace(/\s+/g, ' ').trim().match(/[^.!?]+[.!?]+(\s|$)/g) || [text];
+  let out = '';
+  for (const sentence of sentences) {
+    if ((out + sentence).split(/\s+/).filter(Boolean).length > max) break;
+    out += sentence;
+  }
+  return out.trim() || text.split(/\s+/).slice(0, max).join(' ');
+}
+
 /** Kokoro narration via the vault's audio queue. Returns { mp3 } or { problem }. */
 async function renderAudio(clientName, slug, script) {
   if (!existsSync(KOKORO)) return { problem: 'audio skipped: Kokoro renderer not installed' };
@@ -239,7 +250,7 @@ async function appendNightReport(line) {
     if (!existsSync(NIGHT_REPORT)) {
       await writeFile(NIGHT_REPORT, '---\ntype: night-report\ncompany: "Hyphening"\n---\n# Hyphening: night report\n\n'
         + 'Appended by `scripts/blog_worker.mjs` (and later the SEO worker), newest at the bottom. Do not hand-edit. '
-        + 'Approve posts in the portal\'s Blog tab.\n\n', 'utf8');
+        + 'Approve posts in the portal\'s Blog Monitor tab.\n\n', 'utf8');
     }
     await appendFile(NIGHT_REPORT, `- ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · ${line}\n`, 'utf8');
   } catch (err) {
@@ -318,7 +329,13 @@ async function runJob(job) {
         await log(job.run_id, 'No audio script written; post saved without audio.');
       } else {
         await log(job.run_id, 'Rendering narration with Kokoro...');
-        const audio = await renderAudio(name, slug, script);
+        let audio = await renderAudio(name, slug, script);
+        // The renderer refuses scripts over ~120 s. Trim at a sentence end to
+        // about 230 words and try once more rather than lose the narration.
+        if (!audio.mp3 && /too long/i.test(audio.problem || '')) {
+          await log(job.run_id, 'Script too long for the narrator; trimming and rendering again...');
+          audio = await renderAudio(name, slug, trimToWords(script, 230));
+        }
         if (audio.mp3) {
           await hook('attach_blog_audio', { run_id: job.run_id, mp3_base64: audio.mp3.toString('base64') });
           await log(job.run_id, 'Narration attached.');

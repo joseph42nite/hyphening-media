@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X, Volume2 } from 'lucide-react';
-import FleetModeToggle from './FleetModeToggle.jsx';
-import BlogNightPanel from './BlogNightPanel.jsx';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 // Public posts live on the main site, not the ops subdomain this dashboard runs on
@@ -135,13 +133,10 @@ export default function BlogTab({ showToast }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ fontSize: '1.1rem', textTransform: 'uppercase', fontWeight: 900 }}>Blog Posts</h2>
-        <FleetModeToggle scope="blog" showToast={showToast} scheduleReady={false} confirmText="Turn the Blog fleet to AUTO? Once the night schedule is built, posts will be drafted overnight for every client with Blog on and wait in the morning list for your approval." />
         <button className="btn btn-primary" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={14} /> New Post
         </button>
       </div>
-
-      <BlogNightPanel showToast={showToast} />
 
       {loading ? (
         <p style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading posts...</p>

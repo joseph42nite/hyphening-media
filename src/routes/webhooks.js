@@ -18,7 +18,8 @@ import db from '../../database.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { claimBlogRuns, submitBlogDraft, failBlogRun, attachBlogAudio, addBlogTopics } from '../services/blogRuns.js';
+import { claimBlogRuns, submitBlogDraft, failBlogRun, attachBlogAudio, addBlogTopics, queueBlogRuns, listBlogRunsForAgents, getBlogRunForAgent, reviewBlogRun, retryBlogRun } from '../services/blogRuns.js';
+import { pushRunSignal } from '../services/macConnector.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
 // webhook no longer clears them directly — doing so unconditionally used to
 // disarm the timer of a live run when a cancelled run's late result arrived.
@@ -188,7 +189,8 @@ router.post('/webhook', (req, res) => {
       'seo_run_log', 'report_competitors',
       'claim_ads_runs', 'create_ads_audit', 'ads_run_log',
       'claim_blog_runs', 'submit_blog_draft', 'fail_blog_run', 'attach_blog_audio',
-      'add_blog_topics', 'blog_run_log'
+      'add_blog_topics', 'blog_run_log',
+      'queue_blog_runs', 'list_blog_runs', 'get_blog_run', 'review_blog_run', 'retry_blog_run'
     ];
 
     if (!knownEvents.includes(event_type)) {
@@ -291,6 +293,11 @@ function executeEvent(eventType, payload) {
       case 'attach_blog_audio': return attachBlogAudio(payload);
       case 'add_blog_topics': return handleAddBlogTopics(payload);
       case 'blog_run_log': return handleBlogRunLog(payload);
+      case 'queue_blog_runs': return handleQueueBlogRuns(payload);
+      case 'list_blog_runs': return handleListBlogRuns(payload);
+      case 'get_blog_run': return handleGetBlogRun(payload);
+      case 'review_blog_run': return reviewBlogRun(payload);
+      case 'retry_blog_run': return handleRetryBlogRun(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
@@ -357,6 +364,43 @@ function handleAddBlogTopics(payload) {
   const result = addBlogTopics(parseInt(payload?.client_id, 10), payload?.topics, payload?.created_by || 'agent');
   if (result.error) return { success: false, summary: result.error };
   return { success: true, summary: `Added ${result.ids.length} blog topic(s)`, data: { ids: result.ids } };
+}
+
+/**
+ * Leiter's 01:00 IST routine starts the night: one post per client with Blog
+ * on, only while the Blog fleet is on Auto (the switch in the Blog Monitor),
+ * then wakes the Mac's blog worker.
+ */
+function handleQueueBlogRuns(payload) {
+  const queued = queueBlogRuns({ requestedBy: payload?.by || 'agent' });
+  if (queued.length) pushRunSignal('blog');
+  return {
+    success: true,
+    summary: queued.length
+      ? `Queued ${queued.length} post(s): ${queued.map(q => q.client_name).join(', ')}`
+      : 'Nothing queued (Blog fleet on Manual, or no client has Blog on, posts left this month and a planned topic)',
+    data: { queued },
+  };
+}
+
+/** The bots' list of drafts (no bodies): { statuses?: [...], since_hours? }. */
+function handleListBlogRuns(payload) {
+  const runs = listBlogRunsForAgents(Array.isArray(payload?.statuses) && payload.statuses.length ? payload.statuses : undefined, parseInt(payload?.since_hours, 10) || 72);
+  return { success: true, summary: `${runs.length} blog run(s)`, data: { runs } };
+}
+
+/** One draft in full, for Vesper's review: { run_id }. */
+function handleGetBlogRun(payload) {
+  const run = getBlogRunForAgent(parseInt(payload?.run_id, 10));
+  if (!run) return { success: false, summary: `Blog run #${payload?.run_id} not found` };
+  return { success: true, summary: `Blog run #${run.id}`, data: { run } };
+}
+
+/** Q retries a failed run: { run_id, by }. */
+function handleRetryBlogRun(payload) {
+  const result = retryBlogRun(payload);
+  if (result.success) pushRunSignal('blog');
+  return result;
 }
 
 /** Progress lines from the blog worker, relayed live to the Blog tab. */

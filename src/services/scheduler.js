@@ -8,8 +8,6 @@ import { runDailyCommentSync } from './dailyCommentSync.js';
 import { runDailyAdsWatch, runWeeklyAdsSweep } from './adsScheduler.js';
 import { syncAllClients } from './adsSyncWorker.js';
 import { getMode } from './automationMode.js';
-import { queueBlogRuns } from './blogRuns.js';
-import { pushRunSignal } from './macConnector.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,15 +64,10 @@ export function initScheduler() {
     runWeeklyAdsSweep();
   });
 
-  // Night blog pipeline — 01:00 India time (the server runs on UTC). One post
-  // per client with Blog on, if the Blog fleet is on Auto; the Mac's blog
-  // worker drafts them overnight and they wait for 007 in the morning.
-  cron.schedule('0 1 * * *', () => {
-    if (getMode('blog') !== 'auto') return;
-    const queued = queueBlogRuns({ requestedBy: 'schedule' });
-    console.log(`[SCHEDULER] Night blog queue: ${queued.length} post(s)${queued.length ? ` (${queued.map(q => q.client_name).join(', ')})` : ''}.`);
-    if (queued.length) pushRunSignal('blog');
-  }, { timezone: 'Asia/Kolkata' });
+  // The night blog pipeline has no timer here on purpose: Leiter's 01:00 IST
+  // routine in OpenMausBot starts it (queue_blog_runs webhook), so the night
+  // is run, and visible, by the bots. The Blog fleet's Auto/Manual switch
+  // still decides whether that start queues anything.
 
   // Clean expired sessions — daily at 3 AM
   cron.schedule('0 3 * * *', () => {
