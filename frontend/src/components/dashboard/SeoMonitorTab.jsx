@@ -1038,7 +1038,6 @@ export default function SeoMonitorTab({ clients, showToast }) {
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <FleetModeToggle scope="seo" showToast={showToast} scheduleReady={false} confirmText="Turn the SEO fleet to AUTO? Once the night schedule is built, due SEO skills will run overnight for every client with SEO on, and safe fixes will be committed for the morning Deploy button." />
-            <FleetModeToggle scope="ads" showToast={showToast} confirmText="Turn the Ads fleet to AUTO? Scheduled ads runs will start queueing on their own and spend API tokens without you clicking anything." />
           </div>
           <div className="seo-command-actions"style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', flexWrap: 'wrap' }}>
