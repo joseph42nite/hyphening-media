@@ -12,7 +12,7 @@ import { API_BASE } from '../../api.js';
  */
 const LABELS = { ads: 'Ads', seo: 'SEO', blog: 'Blog' };
 
-export default function FleetModeToggle({ scope, showToast, confirmText, scheduleReady = true }) {
+export default function FleetModeToggle({ scope, showToast, confirmText, scheduleReady = true, onChange }) {
   const [mode, setMode] = useState(null);
   const [saving, setSaving] = useState(false);
   const label = LABELS[scope] || scope;
@@ -38,6 +38,7 @@ export default function FleetModeToggle({ scope, showToast, confirmText, schedul
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not change mode');
       setMode(data.mode);
+      onChange?.(data.mode);
       showToast?.(`${label} fleet set to ${data.mode}`, 'success');
     } catch (err) {
       showToast?.(err.message, 'error');

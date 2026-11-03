@@ -40,12 +40,53 @@ export function serializeRun(run) {
     try { out[f] = run[f] ? JSON.parse(run[f]) : (f === 'evidence' ? {} : []); } catch { out[f] = []; }
   }
   try { out.schema_json = run.schema_json ? JSON.parse(run.schema_json) : null; } catch { /* keep the string */ }
-  const client = db.prepare('SELECT name, blog_publish_target, blog_publish_mode, blog_review_required FROM crm_clients WHERE id = ?').get(run.client_id);
+  const client = db.prepare('SELECT name, blog_publish_target, blog_publish_mode, blog_review_required, blog_audio_enabled FROM crm_clients WHERE id = ?').get(run.client_id);
   out.client_name = client?.name;
+  out.audio_expected = !!client?.blog_audio_enabled;
   out.publish_target = client?.blog_publish_target;
   out.publish_mode = client?.blog_publish_mode;
   out.passes_bar = run.quality_score != null && run.quality_bar != null && run.quality_score >= run.quality_bar;
   return out;
+}
+
+/**
+ * "Coming up" in the Blog Monitor: every client with Blog on, its next
+ * planned topic, and whether tonight's start would draft it (same checks as
+ * queueBlogRuns, read-only) or why not.
+ */
+export function blogOutlook() {
+  const placeholders = LIVE_STATUSES.map(() => '?').join(',');
+  const clients = db.prepare(`
+    SELECT id, name, blog_posts_per_month, blog_audio_enabled FROM crm_clients
+    WHERE is_active = 1 AND blog_enabled = 1 ORDER BY name
+  `).all();
+  const auto = getMode('blog') === 'auto';
+  return clients.map((c) => {
+    const used = db.prepare(`
+      SELECT COUNT(*) AS n FROM blog_agent_runs
+      WHERE client_id = ? AND status IN (${placeholders}) AND created_at >= date('now', 'start of month')
+    `).get(c.id, ...LIVE_STATUSES).n;
+    const inFlight = db.prepare(`
+      SELECT COUNT(*) AS n FROM blog_agent_runs
+      WHERE (client_id = ? AND status IN ('queued', 'running'))
+         OR (client_id = ? AND status IN (${placeholders}) AND created_at >= date('now'))
+    `).get(c.id, c.id, ...LIVE_STATUSES).n;
+    const planned = db.prepare(`
+      SELECT id, topic, target_keyword, planned_for FROM blog_topics WHERE client_id = ? AND status = 'planned'
+      ORDER BY planned_for IS NULL, planned_for, id
+    `).all(c.id);
+    let blocked = null;
+    if (c.blog_posts_per_month <= 0) blocked = 'Posts per month is 0';
+    else if (used >= c.blog_posts_per_month) blocked = `Month used up (${used}/${c.blog_posts_per_month})`;
+    else if (inFlight > 0) blocked = 'Already drafted today';
+    else if (planned.length === 0) blocked = 'No planned topic';
+    else if (!auto) blocked = 'Blog is on Manual';
+    return {
+      client_id: c.id, client_name: c.name, posts_per_month: c.blog_posts_per_month, used_this_month: used,
+      audio: !!c.blog_audio_enabled, next_topic: planned[0] || null, planned_count: planned.length,
+      tonight: blocked === null, blocked,
+    };
+  });
 }
 
 /**

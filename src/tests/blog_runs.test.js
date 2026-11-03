@@ -53,6 +53,22 @@ describe('router', () => {
   });
 });
 
+describe('outlook', () => {
+  it('shows each client\'s next topic and whether tonight drafts it, read-only', () => {
+    const id = makeClient({ name: `Outlook client ${Math.random()}` });
+    runs.addBlogTopics(id, [{ topic: 'Later', planned_for: '2026-12-01' }, { topic: 'Sooner', planned_for: '2026-11-10' }]);
+    setMode('blog', 'manual');
+    let row = runs.blogOutlook().find(c => c.client_id === id);
+    expect(row).toMatchObject({ tonight: false, blocked: 'Blog is on Manual', planned_count: 2 });
+    expect(row.next_topic.topic).toBe('Sooner');
+    setMode('blog', 'auto');
+    row = runs.blogOutlook().find(c => c.client_id === id);
+    expect(row).toMatchObject({ tonight: true, blocked: null });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM blog_agent_runs WHERE client_id = ?").get(id).n).toBe(0);
+    db.prepare('UPDATE crm_clients SET blog_enabled = 0 WHERE id = ?').run(id);
+  });
+});
+
 describe('queueing', () => {
   it('does nothing while the Blog fleet is on manual, unless forced', () => {
     setMode('blog', 'manual');

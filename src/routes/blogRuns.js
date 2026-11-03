@@ -13,7 +13,7 @@ import { pushRunSignal } from '../services/macConnector.js';
 import { markdownToHtml } from '../services/markdown.js';
 import {
   getRunRow, serializeRun, queueBlogRuns, approveBlogRun, approveAllReady, retryPublish,
-  rejectBlogRun, addBlogTopics, blogRunSummary, sendBlogRunToClient,
+  rejectBlogRun, addBlogTopics, blogRunSummary, sendBlogRunToClient, blogOutlook,
 } from '../services/blogRuns.js';
 
 const router = Router();
@@ -27,6 +27,16 @@ router.get('/summary', authorize('admin', 'api_readonly'), (req, res) => {
     res.json(blogRunSummary());
   } catch (err) {
     console.error('[BLOG RUNS] Summary error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** GET /api/blog-runs/outlook — each Blog-on client's next topic and whether tonight drafts it. */
+router.get('/outlook', authorize('admin'), (req, res) => {
+  try {
+    res.json({ clients: blogOutlook() });
+  } catch (err) {
+    console.error('[BLOG RUNS] Outlook error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

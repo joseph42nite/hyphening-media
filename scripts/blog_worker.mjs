@@ -175,7 +175,8 @@ function buildPrompt(job, livePosts) {
       cover_image_url: 'https://images.unsplash.com/...', cover_alt: 'string',
       schema_json: { '@context': 'https://schema.org', '@type': 'BlogPosting' },
       evidence: { serp_urls: ['https://...'], sources_checked: 0, closest_live_posts: ['string'], angle: 'string', skills_run: ['blog-brief'] },
-      blockers: ['anything you could not do or are unsure of, plainly; empty if none'],
+      blockers: ['only what 007 must check or fix before publishing: an unverified claim, a source you could not open, a missing fact; empty if none'],
+      notes: ['how you worked, plainly (tools you could not use, pages you skipped); not problems with the post'],
     }, null, 2),
     '```',
   ].filter(s => s !== '').join('\n');
@@ -319,7 +320,10 @@ async function runJob(job) {
       meta_keywords: meta.meta_keywords, internal_links: meta.internal_links,
       cover_image_url: meta.cover_image_url, cover_alt: meta.cover_alt, schema_json: meta.schema_json,
       quality_score: quality.score, blockers,
-      evidence: { ...(meta.evidence || {}), quality_issues: quality.issues || [], duration_seconds: Math.round((Date.now() - started) / 1000) },
+      evidence: {
+        ...(meta.evidence || {}), quality_issues: quality.issues || [], duration_seconds: Math.round((Date.now() - started) / 1000),
+        worker_notes: Array.isArray(meta.notes) ? meta.notes.filter(Boolean).map(String) : [],
+      },
     });
 
     if (config.pipeline.blog_audio_enabled) {
