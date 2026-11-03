@@ -5823,3 +5823,7 @@ html:has(.client-portal-wrapper) {
   color: #8b9b90;
   margin: 0;
 }
+
+/* Rotating icon for in-progress actions (e.g. Leads → Refresh) */
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 0.9s linear infinite; }

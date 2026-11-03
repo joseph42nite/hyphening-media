@@ -61,7 +61,7 @@ import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
 import { attachMacConnector } from './src/services/macConnector.js';
-import { prerenderPath, isKnownPath, NOT_FOUND_HTML, blogPostJsonLd } from './src/services/prerender.js';
+import { prerenderPath, isKnownPath, NOT_FOUND_HTML, blogPostJsonLd, injectSocialMeta } from './src/services/prerender.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -605,6 +605,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         updatedHtml = updatedHtml.replace('</body>', `  ${buildHomepageNoscript()}\n  </body>`);
       } else if (!onAdminHost) {
         // Blog, case study and capability bodies for non-JS crawlers (rec 1968).
+        updatedHtml = injectSocialMeta(updatedHtml, cleanPath, canonicalUrl);
         const crawlerHtml = prerenderPath(cleanPath);
         if (crawlerHtml) updatedHtml = updatedHtml.replace('</body>', `  ${crawlerHtml}\n  </body>`);
         // Article/Person JSON-LD for blog posts (recs 1970, 1971).

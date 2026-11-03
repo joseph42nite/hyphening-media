@@ -207,6 +207,76 @@ export function blogPostJsonLd(pathname) {
   return `<script type="application/ld+json" id="article-jsonld" data-slug="${escapeHtml(p.slug)}">${json}</script>`;
 }
 
+const SITE_URL = 'https://hypheningmedia.com';
+const absoluteUrl = (url) => {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  return url.startsWith('/') ? `${SITE_URL}${url}` : '';
+};
+
+function pageMeta(pathname) {
+  const m = pathname.match(/^\/(blog|case-studies|capabilities)\/([^/]+)$/);
+  if (!m) return null;
+  let slug;
+  try {
+    slug = decodeURIComponent(m[2]);
+  } catch {
+    return null;
+  }
+  // Same title/description/image the React views pass to SEOHead.
+  if (m[1] === 'capabilities') {
+    const p = PILLARS_BY_SLUG[slug];
+    return p && { title: `${p.title} — Hyphening Media Capabilities`, description: p.summary, image: p.image };
+  }
+  if (m[1] === 'blog') {
+    const p = safeQuery(() => db.prepare(
+      `SELECT title, excerpt, meta_title, meta_description, cover_image_url FROM blog_posts WHERE slug = ? AND status = 'published'`
+    ).get(slug), 'blog post meta');
+    return p && {
+      title: `${p.meta_title || p.title} — Hyphening Media`,
+      description: p.meta_description || p.excerpt,
+      image: p.cover_image_url,
+    };
+  }
+  const c = safeQuery(() => db.prepare(
+    `SELECT title, summary, cover_image_url FROM case_studies WHERE slug = ? AND status = 'published'`
+  ).get(slug), 'case study meta');
+  return c && { title: `${c.title} — Hyphening Media Case Study`, description: c.summary, image: c.cover_image_url };
+}
+
+/**
+ * Rewrites index.html's Open Graph / Twitter tags for a blog post, case study
+ * or capability page. Link unfurlers (WhatsApp, LinkedIn, Slack, X) read only
+ * the served HTML, so without this every shared link previewed as the
+ * homepage card even though SEOHead swaps the tags once React runs.
+ */
+export function injectSocialMeta(html, pathname, canonicalUrl) {
+  const meta = pageMeta(pathname);
+  if (!meta) return html;
+  const set = (attr, key, value) => {
+    if (!value) return;
+    const re = new RegExp(`(<meta ${attr}="${key}" content=")[^"]*"`);
+    html = html.replace(re, (m, head) => `${head}${escapeHtml(value)}"`);
+  };
+  const image = absoluteUrl(meta.image);
+  set('property', 'og:type', 'article');
+  set('property', 'og:url', canonicalUrl);
+  set('property', 'og:title', meta.title);
+  set('property', 'og:description', meta.description);
+  set('name', 'twitter:url', canonicalUrl);
+  set('name', 'twitter:title', meta.title);
+  set('name', 'twitter:description', meta.description);
+  if (image) {
+    set('property', 'og:image', image);
+    set('property', 'og:image:alt', meta.title);
+    set('name', 'twitter:image', image);
+    set('name', 'twitter:image:alt', meta.title);
+    // The type and 1200x630 size describe the default card, not covers.
+    html = html.replace(/\s*<meta property="og:image:(type|width|height)" content="[^"]*" \/>/g, '');
+  }
+  return html;
+}
+
 /**
  * Plain HTML body for a true 404. Not the SPA shell: the app's catch-all
  * route would just bounce the visitor to "/", which reads to a crawler as a

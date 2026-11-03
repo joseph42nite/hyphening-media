@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Search, Phone, Mail, Globe, MapPin, Calendar, Clock, 
   Bell, Volume2, VolumeX, Trash2, Edit3, CheckCircle2, 
-  ExternalLink, X, Settings2, ChevronLeft, ChevronRight
+  ExternalLink, X, Settings2, ChevronLeft, ChevronRight, RefreshCw
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../api.js';
 
@@ -710,6 +710,15 @@ export default function LeadsTab({
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={fetchLeads}
+            disabled={loading}
+            className="btn btn-secondary"
+            style={{ fontSize: '0.8rem', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+            title="Reload leads (picks up new website enquiries)"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : undefined} /> {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
           <button
             onClick={() => {
               setEditingSegment(null);
