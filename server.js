@@ -461,13 +461,13 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
   // Service copy for the H2 sections below. Sourced from Vesper's verified
   // copy pack (seo-audit-304-homepage-copy.md) — no invented facts or stats.
   const SERVICES = [
-    ['Content Strategy and Creation', 'Most brands have a content calendar. Few have a content engine. A calendar says what posts when. An engine documents what works, turns it into scripts and hooks, and feeds the result back into the next month. We build monthly plans with scripts, hooks and posting schedules, then produce short-form and long-form video from script to final edit.'],
+    ['Content Strategy and Creation', 'Most brands have a content calendar. Few have a content engine. A calendar says what posts when. An engine documents what works, turns it into scripts and hooks, and feeds the result back into the next month. We build monthly plans with scripts, hooks and posting schedules, then produce short-form and long-form video from script to final edit.', [['content strategy services', '/capabilities/content-strategy'], ['video production services', '/capabilities/video-production']]],
     ['Healthcare Marketing', "Clinics, dental practices and wellness brands can't say what other advertisers say. Outcome claims, testimonials, before-and-after images and superlatives are restricted for doctors and dentists in India. We write educational, factual content, source every claim, and keep qualifications on the page only when a real registration number is supplied. The goal is a patient who understands the treatment, not one who was promised a result."],
-    ['Lead Generation and Campaign Management', 'Reach is not revenue. We run organic and paid campaigns with audience targeting, A/B testing and conversion-focused funnels, and we measure them against enquiries, bookings and cost per acquisition. If a campaign produces views and no leads, the report says so.'],
-    ['Social Media Operations', 'Daily management across Instagram, YouTube and LinkedIn: posting, engagement, creator and influencer collaborations, and a weekly view of what is moving. Brands that need a single owner for the channel get one.'],
-    ['Web and App Development', "A booking page that loads fast and converts is worth more than another post. We build custom websites and web apps, and mobile apps, for brands whose Instagram traffic has nowhere useful to land."],
-    ['Performance Analytics and Client Portal', "Every client gets a secure portal to review scripts, track video and design tasks, and see platform-level performance in near real time. Monthly PDFs arrive too late to change a campaign. A live dashboard doesn't."],
-    ['Brand Development and PR', 'Visual identity systems, positioning and tone-of-voice guides, plus news-media placements that build authority. A brand identity is a system for making decisions, not a logo.'],
+    ['Lead Generation and Campaign Management', 'Reach is not revenue. We run organic and paid campaigns with audience targeting, A/B testing and conversion-focused funnels, and we measure them against enquiries, bookings and cost per acquisition. If a campaign produces views and no leads, the report says so.', [['campaign management services', '/capabilities/campaign-management']]],
+    ['Social Media Operations', 'Daily management across Instagram, YouTube and LinkedIn: posting, engagement, creator and influencer collaborations, and a weekly view of what is moving. Brands that need a single owner for the channel get one.', [['social media operations services', '/capabilities/social-media-ops']]],
+    ['Web and App Development', "A booking page that loads fast and converts is worth more than another post. We build custom websites and web apps, and mobile apps, for brands whose Instagram traffic has nowhere useful to land.", [['web development services', '/capabilities/web-development'], ['app development services', '/capabilities/app-development']]],
+    ['Performance Analytics and Client Portal', "Every client gets a secure portal to review scripts, track video and design tasks, and see platform-level performance in near real time. Monthly PDFs arrive too late to change a campaign. A live dashboard doesn't.", [['performance analytics and client portal', '/capabilities/performance-analytics']]],
+    ['Brand Development and PR', 'Visual identity systems, positioning and tone-of-voice guides, plus news-media placements that build authority. A brand identity is a system for making decisions, not a logo.', [['brand development services', '/capabilities/brand-development'], ['news media coverage and PR', '/capabilities/news-media-pr']]],
   ];
 
   const FAQS = [
@@ -497,8 +497,23 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
       ? blogLinks.map(p => `<li><a href="/blog/${encodeURIComponent(p.slug)}">${escapeHtml(p.title)}</a></li>`).join('\n          ')
       : '';
 
-    const servicesHtml = SERVICES.map(([name, desc]) =>
-      `<h2>${escapeHtml(name)}</h2>\n          <p>${escapeHtml(desc)}</p>`
+    let caseStudyLinks = [];
+    try {
+      caseStudyLinks = db.prepare(
+        `SELECT slug, title FROM case_studies WHERE status = 'published' ORDER BY published_at DESC LIMIT 3`
+      ).all();
+    } catch (e) {
+      console.error('[SSR noscript] case_studies query failed:', e.message);
+    }
+    const caseStudyLinksHtml = caseStudyLinks
+      .map(c => `<li><a href="/case-studies/${encodeURIComponent(c.slug)}">${escapeHtml(c.title)}</a></li>`)
+      .join('\n          ');
+
+    const servicesHtml = SERVICES.map(([name, desc, links = []]) =>
+      `<h2>${escapeHtml(name)}</h2>\n          <p>${escapeHtml(desc)}</p>` +
+      (links.length
+        ? `\n          <p>Explore our ${links.map(([text, href]) => `<a href="${href}">${escapeHtml(text)}</a>`).join(' and ')}.</p>`
+        : '')
     ).join('\n          ');
 
     const faqItemsHtml = FAQS.map(([q, a]) =>
@@ -532,6 +547,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         <ul>
           ${blogLinksHtml}
           <li><a href="/blog">All articles</a></li>
+          ${caseStudyLinksHtml}
           <li><a href="/case-studies">Case studies</a></li>
         </ul>
 
