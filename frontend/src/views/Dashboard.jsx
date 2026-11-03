@@ -1028,6 +1028,14 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
+        {/* Blog Monitor — the night pipeline for every client */}
+        {isAdmin && (
+          <button onClick={() => handleTabClick('blogmonitor')} className={`btn ${activeTab === 'blogmonitor' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.blogmonitor ? `${tabCounts.blogmonitor} post(s) waiting for you` : undefined}>
+            <ClipboardCheck size={16} /> Blog Monitor
+            <TabBadge count={getTabBadgeCount('blogmonitor', tabCounts.blogmonitor)} />
+          </button>
+        )}
+
         {/* 4. Scripts */}
         {(isAdmin || isSMM) && (
           <button onClick={() => handleTabClick('scripts')} className={`btn ${activeTab === 'scripts' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.scripts ? `${tabCounts.scripts} script change(s) pending review` : undefined}>
@@ -1062,14 +1070,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           <button onClick={() => handleTabClick('blog')} className={`btn ${activeTab === 'blog' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.blog ? `${tabCounts.blog} draft post(s)` : undefined}>
             <FileText size={16} /> Blogs
             <TabBadge count={getTabBadgeCount('blog', tabCounts.blog)} />
-          </button>
-        )}
-
-        {/* 7a. Blog Monitor — the night pipeline for every client */}
-        {isAdmin && (
-          <button onClick={() => handleTabClick('blogmonitor')} className={`btn ${activeTab === 'blogmonitor' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.blogmonitor ? `${tabCounts.blogmonitor} post(s) waiting for you` : undefined}>
-            <ClipboardCheck size={16} /> Blog Monitor
-            <TabBadge count={getTabBadgeCount('blogmonitor', tabCounts.blogmonitor)} />
           </button>
         )}
 
