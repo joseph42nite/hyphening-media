@@ -118,12 +118,15 @@ export function queueSeoFixes({ by = 'agent', clientId = null } = {}) {
   const night = istDate();
   for (const client of clients) {
     if (!client.repo_path) { skipped.push({ client_name: client.name, reason: 'no site repo set (audits only)' }); continue; }
+    // Open, or a failed deploy whose fixes are still waiting for Retry deploy.
     const open = db.prepare(`
-      SELECT id, status FROM seo_fix_batches WHERE client_id = ? AND status IN (${OPEN_BATCH.map(() => '?').join(',')})
-      ORDER BY id DESC LIMIT 1
+      SELECT b.id, b.status FROM seo_fix_batches b WHERE b.client_id = ? AND (
+        b.status IN (${OPEN_BATCH.map(() => '?').join(',')})
+        OR (b.status = 'deploy_failed' AND EXISTS (SELECT 1 FROM seo_recommendations r WHERE r.fix_batch_id = b.id AND r.status = 'ready_to_deploy'))
+      ) ORDER BY b.id DESC LIMIT 1
     `).get(client.id, ...OPEN_BATCH);
     if (open) {
-      skipped.push({ client_name: client.name, reason: open.status === 'ready' ? 'last night\'s fixes are waiting for Deploy or Discard' : `a batch is already ${open.status}` });
+      skipped.push({ client_name: client.name, reason: ['ready', 'deploy_failed'].includes(open.status) ? 'last night\'s fixes are waiting for Deploy or Discard' : `a batch is already ${open.status}` });
       continue;
     }
     const candidates = db.prepare(`
@@ -252,7 +255,8 @@ const recCount = (batchId, status) => db.prepare('SELECT COUNT(*) AS n FROM seo_
 export function requestDeploy(batchId, user) {
   const batch = db.prepare('SELECT * FROM seo_fix_batches WHERE id = ?').get(batchId);
   if (!batch) return { status: 404, error: 'Fix batch not found' };
-  if (batch.status !== 'ready') return { status: 409, error: `This batch is ${batch.status}; only ready fixes can be deployed` };
+  // deploy_failed is retryable when it failed before pushing: its fixes are still ready_to_deploy.
+  if (!['ready', 'deploy_failed'].includes(batch.status)) return { status: 409, error: `This batch is ${batch.status}; only ready fixes can be deployed` };
   if (recCount(batch.id, 'ready_to_deploy') === 0) return { status: 409, error: 'No fixes in this batch are waiting to deploy' };
   db.prepare(`
     UPDATE seo_fix_batches SET status = 'deploy_queued', deploy_requested_by = ?, error = NULL, log = NULL, updated_at = datetime('now') WHERE id = ?
@@ -304,7 +308,10 @@ export function finishSeoDeploy(payload) {
   const apply = db.transaction(() => {
     if (status === 'live') {
       db.prepare("UPDATE seo_recommendations SET status = 'completed' WHERE fix_batch_id = ? AND status = 'ready_to_deploy'").run(batch.id);
-    } else {
+    } else if (!(status === 'deploy_failed' && payload.pushed === false)) {
+      // Rolled back, or failed after the push: those fixes are done for.
+      // Failed before the push: nothing changed anywhere, so they stay ready
+      // and the batch can be retried.
       db.prepare(`
         UPDATE seo_recommendations SET status = 'fix_failed', fix_error = ? WHERE fix_batch_id = ? AND status = 'ready_to_deploy'
       `).run(`${status === 'rolled_back' ? 'Deploy rolled back' : 'Deploy failed'}: ${error || 'see the deploy log'}`, batch.id);
@@ -374,13 +381,14 @@ export function nightReport({ hours = 30 } = {}) {
     if (!c.repo_path) setup = 'Audits only: no site repo is set for this client';
     else if (batch?.status === 'failed' && /manifest/i.test(batch.error || '')) setup = `Audits only: ${batch.error}`;
 
+    const retryable = batch?.status === 'deploy_failed' && ready.some((f) => f.status === 'ready_to_deploy');
     return {
-      client_id: c.id, client_name: c.name, setup, runs, batch,
+      client_id: c.id, client_name: c.name, setup, runs, batch, retryable,
       fixes: ready, failed, needs_007: needs, already_done: alreadyDone, approved_for_tonight: tonight,
     };
   });
 
-  const waiting = (r) => r.batch?.status === 'ready';
+  const waiting = (r) => r.batch?.status === 'ready' || r.retryable;
   return {
     mode: getMode('seo'),
     totals: {

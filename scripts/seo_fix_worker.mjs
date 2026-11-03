@@ -25,11 +25,12 @@
 import os from 'os';
 import path from 'path';
 import { existsSync } from 'fs';
-import { mkdtemp, rm, symlink, readdir, appendFile, writeFile } from 'fs/promises';
+import { mkdtemp, rm, appendFile, writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { hook } from './lib/hook.mjs';
 import { run, git, sh, tail, extractJson } from './lib/proc.mjs';
 import { loadManifest, fixMayTouch } from './lib/deployManifest.mjs';
+import { linkNodeModules } from './lib/worktree.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLAUDE_BIN = process.env.SEO_FIX_CLAUDE_BIN || 'claude';
@@ -66,23 +67,6 @@ async function appendNightReport(line) {
   }
 }
 
-/** node_modules from the real repo, linked into the worktree so the checks can build. */
-async function linkNodeModules(repo, wt) {
-  const linked = [];
-  const dirs = [''];
-  for (const e of await readdir(repo, { withFileTypes: true })) {
-    if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules' && existsSync(path.join(repo, e.name, 'package.json'))) dirs.push(e.name);
-  }
-  for (const d of dirs) {
-    const from = path.join(repo, d, 'node_modules');
-    const to = path.join(wt, d, 'node_modules');
-    if (existsSync(from) && existsSync(path.join(wt, d)) && !existsSync(to)) {
-      await symlink(from, to, 'dir');
-      linked.push(path.join(d, 'node_modules'));
-    }
-  }
-  return linked;
-}
 
 /** Files changed in the worktree, minus our node_modules links. */
 async function changedFiles(wt, linked) {

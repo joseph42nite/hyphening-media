@@ -195,6 +195,34 @@ describe('fix batches, from queue to deploy', () => {
   });
 });
 
+describe('retry after a deploy that failed before pushing', () => {
+  it('keeps the fixes ready, offers Retry deploy, and holds back tonight\'s batch', () => {
+    setMode('seo', 'auto');
+    const id = makeClient();
+    const a = audit(id, 'technical', 1);
+    const r1 = rec(id, a, { metric: 'Title' });
+    const b = night.queueSeoFixes({ clientId: id }).queued[0].batch_id;
+    night.claimSeoFixBatches('test');
+    night.submitSeoFixBatch({ batch_id: b, status: 'ready', branch: 'seo/z', base_commit: 'a', fixes: [{ rec_id: r1, ok: true, commit: 'abc1', summary: 's' }] });
+    night.requestDeploy(b, {});
+    night.claimSeoDeploys('test');
+    night.finishSeoDeploy({ batch_id: b, status: 'deploy_failed', pushed: false, error: 'check failed: vite: command not found' });
+
+    expect(db.prepare('SELECT status FROM seo_recommendations WHERE id = ?').get(r1).status).toBe('ready_to_deploy');
+    const row = night.nightReport().clients.find(c => c.client_id === id);
+    expect(row.retryable).toBe(true);
+    rec(id, a, { metric: 'Something new' });
+    expect(night.queueSeoFixes({ clientId: id }).skipped[0].reason).toMatch(/waiting for Deploy or Discard/);
+    expect(night.requestDeploy(b, {}).status).toBe(200);
+
+    // Failing after the push is different: those fixes are done for.
+    night.claimSeoDeploys('test');
+    night.finishSeoDeploy({ batch_id: b, status: 'deploy_failed', pushed: true, error: 'ROLLBACK PUSH FAILED' });
+    expect(db.prepare('SELECT status FROM seo_recommendations WHERE id = ?').get(r1).status).toBe('fix_failed');
+    expect(night.nightReport().clients.find(c => c.client_id === id).retryable).toBe(false);
+  });
+});
+
 describe('fixes wait for the night audits', () => {
   it('a batch is not claimed while the client has skills queued or running', () => {
     setMode('seo', 'auto');

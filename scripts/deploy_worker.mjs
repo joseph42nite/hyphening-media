@@ -27,6 +27,7 @@ import { fileURLToPath } from 'url';
 import { hook } from './lib/hook.mjs';
 import { run, git, sh, tail, healthCheck } from './lib/proc.mjs';
 import { loadManifest, NIGHT_DEPLOY_TYPES } from './lib/deployManifest.mjs';
+import { linkNodeModules } from './lib/worktree.mjs';
 
 const WORKER = os.hostname();
 const VAULT = process.env.VAULT_DIR || '/Volumes/Mac Valhalla/Vault';
@@ -61,9 +62,12 @@ async function deployStep(manifest, log) {
  */
 export async function deployBatch(job, { hookFn = hook, health = healthCheck } = {}) {
   const lines = [];
+  // Whether anything reached the remote. A failure before the push leaves the
+  // fixes ready, so 007 can press Retry deploy once the cause is fixed.
+  let pushed = false;
   const log = (s) => { const l = `${new Date().toISOString().slice(11, 19)} ${s}`; lines.push(l); console.log(`[deploy] ${l}`); };
   const finish = async (status, extra = {}) => {
-    await hookFn('finish_seo_deploy', { batch_id: job.batch_id, status, log: lines.join('\n'), ...extra });
+    await hookFn('finish_seo_deploy', { batch_id: job.batch_id, status, pushed, log: lines.join('\n'), ...extra });
     await appendNightReport(`DEPLOY ${status.toUpperCase()} · ${job.client.name}${extra.error ? ` · ${extra.error}` : ''}`);
     return { status, ...extra };
   };
@@ -92,6 +96,8 @@ export async function deployBatch(job, { hookFn = hook, health = healthCheck } =
   const wt = await mkdtemp(path.join(os.tmpdir(), 'seo-deploy-'));
   await git(repo, ['worktree', 'add', '--quiet', '--detach', wt, remoteHead]);
   try {
+    // Without these the checks can't build (2026-11-03: "vite: command not found").
+    await linkNodeModules(repo, wt);
     for (const c of job.commits) {
       const pick = await git(wt, ['cherry-pick', c.commit_sha], { allowFail: true });
       if (pick.code !== 0) {
@@ -109,6 +115,7 @@ export async function deployBatch(job, { hookFn = hook, health = healthCheck } =
 
     const push = await git(wt, ['push', '--quiet', 'origin', `HEAD:${target}`], { allowFail: true });
     if (push.code !== 0) return finish('deploy_failed', { error: `push refused: ${tail(push.err, 300)}` });
+    pushed = true;
     const live = await git(wt, ['rev-parse', 'HEAD']);
     log(`pushed ${live.slice(0, 8)}`);
 

@@ -62,9 +62,9 @@ export default function SeoNightDrawer({ client, position, total, busy, onClose,
             {b && <div style={{ ...label, color: BATCH_COLOR[b.status], marginTop: '2px' }}>{BATCH_LABEL[b.status]} · night of {b.night}{b.summary ? ` · ${b.summary}` : ''}</div>}
             {client.setup && <div style={{ fontSize: '0.8rem', color: '#facc15', marginTop: '4px' }}>{client.setup}</div>}
           </div>
-          {b?.status === 'ready' && (
+          {(b?.status === 'ready' || client.retryable) && (
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-primary" disabled={busy === `d${b.id}`} onClick={() => onDeploy(client)}><Rocket size={14} /> Deploy {ready.length} fix{ready.length === 1 ? '' : 'es'}</button>
+              <button className="btn btn-primary" disabled={busy === `d${b.id}`} onClick={() => onDeploy(client)}><Rocket size={14} /> {client.retryable ? 'Retry deploy' : 'Deploy'} {ready.length} fix{ready.length === 1 ? '' : 'es'}</button>
               <button className="btn btn-secondary" disabled={busy === `x${b.id}`} onClick={() => onDiscard(client)}><Trash2 size={14} /> Discard</button>
             </div>
           )}

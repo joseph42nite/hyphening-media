@@ -165,9 +165,9 @@ export default function SeoNightPanel({ showToast }) {
               </div>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button className="btn btn-secondary" onClick={() => setDrawerId(c.client_id)}><Eye size={14} /> Review</button>
-                {b?.status === 'ready' && (
+                {(b?.status === 'ready' || c.retryable) && (
                   <>
-                    <button className="btn btn-primary" disabled={busy === `d${b.id}`} onClick={() => deploy(c)}><Rocket size={14} /> Deploy</button>
+                    <button className="btn btn-primary" disabled={busy === `d${b.id}`} onClick={() => deploy(c)}><Rocket size={14} /> {c.retryable ? 'Retry deploy' : 'Deploy'}</button>
                     <button className="btn btn-secondary" disabled={busy === `x${b.id}`} onClick={() => discard(c)} title="Discard last night's fixes"><Trash2 size={14} /></button>
                   </>
                 )}

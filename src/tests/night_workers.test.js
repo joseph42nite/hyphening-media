@@ -29,8 +29,13 @@ beforeAll(async () => {
   sh(repo, 'config', 'user.email', 'test@example.test');
   fs.writeFileSync(path.join(repo, 'index.html'), '<html><head><title>Old</title></head></html>\n');
   fs.writeFileSync(path.join(repo, 'app.js'), 'console.log("ok");\n');
+  // A package the checks need, installed but not committed, like vite in the
+  // real repo: a worktree without node_modules can't pass the checks.
+  fs.mkdirSync(path.join(repo, 'node_modules', 'leftpad'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'node_modules', 'leftpad', 'index.js'), 'module.exports = (s) => s;\n');
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n');
   fs.writeFileSync(path.join(repo, 'hyphening.deploy.json'), JSON.stringify({
-    client_id: 99, branch: 'main', checks: ['node --check app.js'],
+    client_id: 99, branch: 'main', checks: ['node --check app.js', 'node -e "require(\'leftpad\')"'],
     deploy: { type: 'git_push' }, health_check: ['https://example.test/'], rollback: 'git_revert',
     seo_fixes: { enabled: true, paths: ['index.html', 'app.js'], never_touch: [] },
   }, null, 2));
@@ -112,7 +117,7 @@ describe('deploy_worker', () => {
     const r = await deployWorker.deployBatch(deployJob(ready), { hookFn: fakeHook(calls), health: async () => ({ ok: true }) });
     expect(r.status).toBe('live');
     expect(sh(remote, 'log', '-1', '--format=%s', 'main')).toBe('SEO: Title tag (#1)');
-    expect(calls[0][1]).toMatchObject({ batch_id: 7, status: 'live' });
+    expect(calls[0][1]).toMatchObject({ batch_id: 7, status: 'live', pushed: true });
     expect(sh(repo, 'branch', '--list', ready.branch)).toBe(''); // branch cleaned up
   });
 
@@ -161,6 +166,7 @@ describe('deploy_worker', () => {
       commits: [{ rec_id: 10, commit_sha: sha, metric: 'night title' }] }, { hookFn: fakeHook(calls), health: async () => ({ ok: true }) });
     expect(r.status).toBe('deploy_failed');
     expect(r.error).toMatch(/clashes with newer changes/);
+    expect(calls[0][1].pushed).toBe(false);
     expect(sh(remote, 'rev-parse', 'main')).toBe(before);
   });
 });
