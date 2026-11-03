@@ -28,7 +28,7 @@ import { existsSync } from 'fs';
 import { mkdtemp, rm, appendFile, writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { hook } from './lib/hook.mjs';
-import { run, git, sh, tail, extractJson } from './lib/proc.mjs';
+import { run, git, sh, tail, jsonBetweenTags } from './lib/proc.mjs';
 import { loadManifest, fixMayTouch } from './lib/deployManifest.mjs';
 import { linkNodeModules } from './lib/worktree.mjs';
 
@@ -176,7 +176,7 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
 
     // 1. Sort.
     const t = await claudeFn(triagePrompt(job, manifest), wt, 'Read,Glob,Grep', TRIAGE_TIMEOUT_MS);
-    const sorted = extractJson(t.out);
+    const sorted = jsonBetweenTags(t.out);
     if (!Array.isArray(sorted)) throw new Error(`the sort didn't return a list: ${tail(t.out || t.err, 300)}`);
     await hookFn('submit_seo_triage', { batch_id: job.batch_id, results: sorted });
     const triage = new Map(sorted.map((s) => [s.id, s.triage]));
@@ -186,7 +186,7 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
     for (const rec of todo) {
       console.log(`[seo-fix] ${name} #${rec.id} ${rec.metric}`);
       const res = await claudeFn(fixPrompt(job, manifest, rec), wt, 'Read,Edit,Write,Glob,Grep', FIX_TIMEOUT_MS);
-      const answer = extractJson(res.out) || {};
+      const answer = jsonBetweenTags(res.out) || {};
       const files = await changedFiles(wt, linked);
       if (files.length === 0) {
         fixes.push({ rec_id: rec.id, ok: false, summary: answer.summary, error: `No change made: ${answer.summary || tail(res.out || res.err, 300)}` });

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * The OpenMausBot team's handle on the night blog pipeline. Each command is
- * one signed webhook call (same HMAC channel as the workers), so a bot runs
- * it in one short turn. The secret is read from the repo .env and never
- * printed. Vault: Companies/Hyphening/SOPs/Client blog pipeline.md.
+ * one signed webhook call (scripts/lib/hook.mjs, the workers' HMAC channel),
+ * so a bot runs it in one short turn. The secret is read from the repo .env
+ * and never printed. Vault: Companies/Hyphening/SOPs/Client blog pipeline.md.
  *
  *   node scripts/blog-runs.mjs start                       # Leiter, 01:00 IST: queue tonight's posts (only if Blog is on Auto)
  *   node scripts/blog-runs.mjs list [status,status] [hours] # e.g. list ready  ·  list failed 24
@@ -16,36 +16,10 @@
  * Nothing here approves or publishes; that stays with 007 in the Blog Monitor.
  */
 
-import crypto from 'crypto';
-import path from 'path';
 import { readFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
+import { hook } from './lib/hook.mjs';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(HERE, '../.env') });
-
-const API = (process.env.HYPHENING_API_URL || 'https://hypheningmedia.com').replace(/\/$/, '');
-const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SECRET;
 const BY = process.env.BOT_NAME || 'agent';
-
-async function hook(event_type, payload) {
-  if (!SECRET) throw new Error('HYPHENING_HMAC_SECRET is not set in the repo .env');
-  const body = JSON.stringify({ event_type, payload });
-  const res = await fetch(`${API}/api/openclaw/webhook`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-openclaw-signature': crypto.createHmac('sha256', SECRET).update(body).digest('hex'),
-      'x-openclaw-timestamp': new Date().toISOString(),
-      'x-openclaw-nonce': crypto.randomUUID(),
-    },
-    body,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.message || json.error || `HTTP ${res.status}`);
-  return json;
-}
 
 const line = (r) => `#${r.id} ${r.status.toUpperCase()} · ${r.client_name} · ${r.title || r.topic || '(no title yet)'}`
   + (r.quality_score != null ? ` · ${r.quality_score}/${r.quality_bar}` : '')

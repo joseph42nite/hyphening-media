@@ -54,8 +54,36 @@ export async function healthCheck(urls, { tries = 12, waitMs = 10000 } = {}) {
   return { ok: false, error: last };
 }
 
+/**
+ * The first complete JSON object in a model's answer (a ```json fence first,
+ * then the raw text), matched brace by brace so prose around it is ignored.
+ */
+export function firstJsonObject(text) {
+  const fenced = String(text).match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
+  const candidates = fenced ? [fenced[1], String(text)] : [String(text)];
+  for (const candidate of candidates) {
+    const start = candidate.indexOf('{');
+    if (start === -1) continue;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < candidate.length; i++) {
+      const ch = candidate[i];
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}' && --depth === 0) {
+        try { return JSON.parse(candidate.slice(start, i + 1)); } catch { break; }
+      }
+    }
+  }
+  return null;
+}
+
 /** The JSON between <json> and </json> in a model's answer (the last such block). */
-export function extractJson(text) {
+export function jsonBetweenTags(text) {
   const blocks = [...String(text).matchAll(/<json>([\s\S]*?)<\/json>/g)];
   if (!blocks.length) return null;
   try { return JSON.parse(blocks[blocks.length - 1][1].trim()); } catch { return null; }

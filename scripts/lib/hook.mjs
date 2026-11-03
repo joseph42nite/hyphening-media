@@ -28,6 +28,6 @@ export async function hook(event_type, payload) {
     body,
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.message || json.error || `HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${event_type} -> HTTP ${res.status}: ${json.message || json.error || JSON.stringify(json).slice(0, 300)}`);
   return json;
 }

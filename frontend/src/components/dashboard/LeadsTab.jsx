@@ -881,17 +881,6 @@ export default function LeadsTab({
                           >
                             <Globe size={11} /> Website form
                           </span>
-                          {lead.status !== 'Spam' && (
-                            lead.notified_at ? (
-                              <span title={`Email alert sent ${lead.notified_at} UTC`} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.12)', color: '#34d399' }}>
-                                ✓ Emailed
-                              </span>
-                            ) : lead.notify_error ? (
-                              <span title={`Email alert failed: ${lead.notify_error}`} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>
-                                Email not sent
-                              </span>
-                            ) : null
-                          )}
                           {lead.spam_reason && (
                             <span title={lead.spam_reason} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>
                               Spam: {lead.spam_reason}

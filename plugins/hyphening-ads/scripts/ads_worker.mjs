@@ -24,7 +24,6 @@
  *   node ads_worker.mjs --once     # drain the queue once and exit (for cron)
  */
 
-import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -32,13 +31,14 @@ import { readFile, writeFile, mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
 import dotenv from 'dotenv';
+import { hook, API } from '../../../scripts/lib/hook.mjs';
+import { firstJsonObject } from '../../../scripts/lib/proc.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Explicit path, not dotenv's cwd-relative default: cron's working directory
 // is not guaranteed to be the repo root, but this file's location is fixed.
 dotenv.config({ path: path.resolve(HERE, '../../../.env') });
 const PLUGIN_DIR = process.env.ADS_PLUGIN_DIR || path.resolve(HERE, '..');
-const API = (process.env.HYPHENING_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SECRET;
 const WORKER = process.env.ADS_WORKER_ID || os.hostname();
 const POLL_MS = (Number(process.env.ADS_POLL_SECONDS) || 30) * 1000;
@@ -69,31 +69,6 @@ function skillFor(job) {
   return job.skill_name || (job.agent_type === 'audit' ? 'ads-audit' : `ads-${job.agent_type.replace(/_/g, '-')}`);
 }
 
-/**
- * Signed webhook call.
- *
- * Signs the exact bytes sent, never a re-serialisation of the parsed body.
- * Re-serialising is how a float of 0.0 becomes 0 and breaks a signature that
- * is otherwise correct — a failure that surfaces as a bare 401 indistinguishable
- * from a wrong secret. The Ops Center verifies against its raw body for the
- * same reason.
- */
-async function hook(event_type, payload) {
-  const body = JSON.stringify({ event_type, payload });
-  const res = await fetch(`${API}/api/openclaw/webhook`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-openclaw-signature': crypto.createHmac('sha256', SECRET).update(body).digest('hex'),
-      'x-openclaw-timestamp': new Date().toISOString(),
-      'x-openclaw-nonce': crypto.randomUUID(),
-    },
-    body,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${event_type} -> HTTP ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
-  return json;
-}
 
 /** Progress line into the dashboard console. Never throws: a run must not die
  *  because a log line could not be delivered. */
@@ -177,38 +152,6 @@ function runClaude(promptFile, model) {
   });
 }
 
-/**
- * Pulls the JSON object out of the model's reply.
- *
- * Tolerant on purpose. A run costs real tokens, so a reply wrapped in a code
- * fence or trailed by a sentence is worth recovering rather than discarding —
- * as long as recovery is unambiguous. Brace matching, not a regex: a report
- * body legitimately contains braces, and a greedy match would swallow them.
- */
-function extractJson(text) {
-  const fenced = text.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
-  const candidates = fenced ? [fenced[1], text] : [text];
-
-  for (const candidate of candidates) {
-    const start = candidate.indexOf('{');
-    if (start === -1) continue;
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let i = start; i < candidate.length; i++) {
-      const ch = candidate[i];
-      if (escaped) { escaped = false; continue; }
-      if (ch === '\\') { escaped = true; continue; }
-      if (ch === '"') { inString = !inString; continue; }
-      if (inString) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}' && --depth === 0) {
-        try { return JSON.parse(candidate.slice(start, i + 1)); } catch { break; }
-      }
-    }
-  }
-  return null;
-}
 
 async function runJob(job) {
   const started = Date.now();
@@ -220,7 +163,7 @@ async function runJob(job) {
   try {
     await writeFile(promptFile, await buildPrompt(job), 'utf8');
     const raw = await runClaude(promptFile, MODEL);
-    const parsed = extractJson(raw);
+    const parsed = firstJsonObject(raw);
 
     if (!parsed) {
       // Reported as a failure rather than retried. A reply we cannot parse is

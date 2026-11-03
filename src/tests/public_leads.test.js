@@ -42,7 +42,6 @@ describe('POST /api/public/leads', () => {
   const testEmail = `lead-test-${Date.now()}@example.com`;
 
   beforeAll(async () => {
-    delete process.env.SMTP_HOST; // never send real mail from tests
     const app = express();
     app.use(express.json());
     app.use('/api/public/leads', publicLeadsRouter);

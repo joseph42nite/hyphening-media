@@ -3,17 +3,16 @@
  * No auth. Every website enquiry form posts here.
  *
  *   GET  /api/public/leads/token  → signed load-time token for the form
- *   POST /api/public/leads        → validate, bot-check, save, then email sales
+ *   POST /api/public/leads        → validate, bot-check, save
  *
- * Order matters: the lead is written to the DB before any email is attempted,
- * so an SMTP outage never loses an enquiry. Bot-flagged submissions get the
- * same success response as real ones so a bot can't learn which check caught it.
+ * Leads land in the dashboard's Leads tab; nothing is emailed (007's decision,
+ * 2026-11-03). Bot-flagged submissions get the same success response as real
+ * ones so a bot can't learn which check caught it.
  */
 
 import { Router } from 'express';
 import db from '../../database.js';
 import { leadFormLimiter } from '../middleware/rateLimit.js';
-import { sendLeadNotification, isMailConfigured } from '../services/mailer.js';
 import {
   HONEYPOT_FIELD,
   issueFormToken,
@@ -79,28 +78,11 @@ router.post('/', async (req, res) => {
       return res.json({ ok: true });
     }
 
-    // 5. Email — after the save, and the visitor doesn't wait on SMTP.
     res.json({ ok: true });
-    notify(lead);
   } catch (err) {
     console.error('[PUBLIC LEADS] Save error:', err);
     res.status(500).json({ error: 'Something went wrong. Please email deepanjan@hypheningmedia.com directly.' });
   }
 });
-
-async function notify(lead) {
-  if (!isMailConfigured()) {
-    db.prepare('UPDATE leads SET notify_error = ? WHERE id = ?').run('SMTP not configured', lead.id);
-    console.warn(`[PUBLIC LEADS] Lead #${lead.id} saved; SMTP not configured, no email sent`);
-    return;
-  }
-  try {
-    await sendLeadNotification(lead);
-    db.prepare("UPDATE leads SET notified_at = datetime('now'), notify_error = NULL WHERE id = ?").run(lead.id);
-  } catch (err) {
-    db.prepare('UPDATE leads SET notify_error = ? WHERE id = ?').run(String(err.message).slice(0, 500), lead.id);
-    console.error(`[PUBLIC LEADS] Lead #${lead.id} saved but email failed:`, err.message);
-  }
-}
 
 export default router;

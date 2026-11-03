@@ -21,7 +21,6 @@
  *   node seo_worker.mjs --once     # drain the queue once and exit (for cron)
  */
 
-import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -29,13 +28,14 @@ import { mkdtemp, rm, readFile, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
 import dotenv from 'dotenv';
+import { hook, API } from './lib/hook.mjs';
+import { firstJsonObject } from './lib/proc.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Explicit path, not dotenv's cwd-relative default: cron's working directory
 // is not guaranteed to be the repo root, but this file's location is fixed.
 dotenv.config({ path: path.resolve(HERE, '../.env') });
 
-const API = (process.env.HYPHENING_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SECRET;
 const WORKER = process.env.SEO_WORKER_ID || os.hostname();
 const POLL_MS = (Number(process.env.SEO_POLL_SECONDS) || 30) * 1000;
@@ -64,27 +64,10 @@ function commandFor(job) {
   return job.audit_type === 'full' ? 'audit' : job.audit_type.replace(/_/g, '-');
 }
 
-/** Signed webhook call — identical pattern to ads_worker.mjs's hook(). */
-async function hook(event_type, payload) {
-  const body = JSON.stringify({ event_type, payload });
-  const res = await fetch(`${API}/api/openclaw/webhook`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-openclaw-signature': crypto.createHmac('sha256', SECRET).update(body).digest('hex'),
-      'x-openclaw-timestamp': new Date().toISOString(),
-      'x-openclaw-nonce': crypto.randomUUID(),
-    },
-    body,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${event_type} -> HTTP ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
-  return json;
-}
 
 async function log(runId, line) {
   console.log(`[seo-worker] #${runId} ${line}`);
-  try { await hook('ads_run_log', { run_id: runId, log: line }); } catch { /* ignore — a lost log line must not kill the run */ }
+  try { await hook('seo_run_log', { run_id: runId, log: line }); } catch { /* ignore — a lost log line must not kill the run */ }
 }
 
 /**
@@ -179,29 +162,6 @@ function runClaude(promptFile, model) {
   });
 }
 
-/** Brace-matched JSON extraction. Identical to ads_worker.mjs. */
-function extractJson(text) {
-  const fenced = text.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
-  const candidates = fenced ? [fenced[1], text] : [text];
-
-  for (const candidate of candidates) {
-    const start = candidate.indexOf('{');
-    if (start === -1) continue;
-    let depth = 0, inString = false, escaped = false;
-    for (let i = start; i < candidate.length; i++) {
-      const ch = candidate[i];
-      if (escaped) { escaped = false; continue; }
-      if (ch === '\\') { escaped = true; continue; }
-      if (ch === '"') { inString = !inString; continue; }
-      if (inString) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}' && --depth === 0) {
-        try { return JSON.parse(candidate.slice(start, i + 1)); } catch { break; }
-      }
-    }
-  }
-  return null;
-}
 
 async function runJob(job) {
   const started = Date.now();
@@ -213,7 +173,7 @@ async function runJob(job) {
   try {
     await writeFile(promptFile, buildPrompt(job), 'utf8');
     const raw = await runClaude(promptFile, MODEL);
-    const parsed = extractJson(raw);
+    const parsed = firstJsonObject(raw);
 
     if (!parsed) {
       await hook('create_seo_audit', {

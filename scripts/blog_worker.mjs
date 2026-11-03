@@ -27,20 +27,19 @@
  *                                           # --once is accepted for the connector's sake)
  */
 
-import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { mkdtemp, rm, readFile, writeFile, mkdir, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { spawn } from 'child_process';
 import dotenv from 'dotenv';
+import { hook, API } from './lib/hook.mjs';
+import { run } from './lib/proc.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
 dotenv.config({ path: path.join(REPO, '.env') });
 
-const API = (process.env.HYPHENING_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SECRET;
 const WORKER = process.env.BLOG_WORKER_ID || os.hostname();
 const CLAUDE_BIN = process.env.BLOG_CLAUDE_BIN || 'claude';
@@ -60,44 +59,12 @@ if (!SECRET) {
   process.exit(1);
 }
 
-/** Signed webhook call — same pattern as seo_worker.mjs. */
-async function hook(event_type, payload) {
-  const body = JSON.stringify({ event_type, payload });
-  const res = await fetch(`${API}/api/openclaw/webhook`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-openclaw-signature': crypto.createHmac('sha256', SECRET).update(body).digest('hex'),
-      'x-openclaw-timestamp': new Date().toISOString(),
-      'x-openclaw-nonce': crypto.randomUUID(),
-    },
-    body,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${event_type} -> HTTP ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
-  return json;
-}
 
 async function log(runId, line) {
   console.log(`[blog-worker] #${runId} ${line}`);
   try { await hook('blog_run_log', { run_id: runId, log: line }); } catch { /* a lost log line must not kill the run */ }
 }
 
-/** Run a command; resolves { code, out, err }. Never rejects on a non-zero exit. */
-function run(cmd, args, { input, timeoutMs, cwd } = {}) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
-    let out = '';
-    let err = '';
-    const timer = timeoutMs ? setTimeout(() => { proc.kill('SIGTERM'); err += `\n[timed out after ${Math.round(timeoutMs / 60000)} min]`; }, timeoutMs) : null;
-    proc.stdout.on('data', d => { out += d; });
-    proc.stderr.on('data', d => { err += d; });
-    proc.on('error', reject);
-    proc.on('close', code => { if (timer) clearTimeout(timer); resolve({ code, out, err }); });
-    if (input !== undefined) proc.stdin.write(input);
-    proc.stdin.end();
-  });
-}
 
 /** Published posts on Hyphening's own blog, for duplicates and internal links. */
 async function hypheningLivePosts() {
