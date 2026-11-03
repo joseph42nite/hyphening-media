@@ -10,4 +10,31 @@
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/content-strategy</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/video-production</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/social-media-ops</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/web-development</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/app-development</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/performance-analytics</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/campaign-management</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/brand-development</loc>
+  </url>
+  <url>
+    <loc>https://hypheningmedia.com/capabilities/news-media-pr</loc>
+  </url>
 </urlset>

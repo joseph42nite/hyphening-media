@@ -533,6 +533,20 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
 
         ${servicesHtml}
 
+        <h2>Our Capabilities</h2>
+        <p>Hyphening Media offers nine capabilities, each with its own page covering what we do and how we work. Explore them below, from content strategy and video production to analytics, campaigns, brand development and news media PR, or see our <a href="/case-studies">case studies</a> and <a href="/blog">blog</a> for examples of the work.</p>
+        <ul>
+          <li><a href="/capabilities/content-strategy">Content Strategy</a></li>
+          <li><a href="/capabilities/video-production">Video Production</a></li>
+          <li><a href="/capabilities/social-media-ops">Social Media Ops</a></li>
+          <li><a href="/capabilities/web-development">Web Development</a></li>
+          <li><a href="/capabilities/app-development">App Development</a></li>
+          <li><a href="/capabilities/performance-analytics">Performance Analytics</a></li>
+          <li><a href="/capabilities/campaign-management">Campaign Management</a></li>
+          <li><a href="/capabilities/brand-development">Brand Development</a></li>
+          <li><a href="/capabilities/news-media-pr">News Media Coverage &amp; PR</a></li>
+        </ul>
+
         <h2>How We Work</h2>
         <p>Every engagement starts with the number you want to move, not the platform you want to post on. We document the brand's audience and voice once, plan the month's scripts and hooks, produce the content, and review the results with you in the portal. What performed gets repeated. What did not gets dropped. There are no surprise invoices for vanity reach, because the report leads with the metrics tied to your business.</p>
 
