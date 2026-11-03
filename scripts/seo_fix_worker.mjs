@@ -25,8 +25,9 @@
 import os from 'os';
 import path from 'path';
 import { existsSync } from 'fs';
-import { mkdtemp, rm, appendFile, writeFile } from 'fs/promises';
+import { mkdtemp, rm } from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { appendNightReport } from './lib/nightReport.mjs';
 import { hook } from './lib/hook.mjs';
 import { run, git, sh, tail, jsonBetweenTags } from './lib/proc.mjs';
 import { loadManifest, fixMayTouch } from './lib/deployManifest.mjs';
@@ -36,8 +37,6 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLAUDE_BIN = process.env.SEO_FIX_CLAUDE_BIN || 'claude';
 const MODEL = process.env.SEO_FIX_MODEL || 'claude-sonnet-5-5';
 const WORKER = os.hostname();
-const VAULT = process.env.VAULT_DIR || '/Volumes/Mac Valhalla/Vault';
-const NIGHT_REPORT = path.join(VAULT, 'Companies/Hyphening/Docs/Hyphening - Night Report.md');
 const TRIAGE_TIMEOUT_MS = 10 * 60 * 1000;
 const FIX_TIMEOUT_MS = 12 * 60 * 1000;
 const BRANCH_KEEP_DAYS = 7;
@@ -55,17 +54,6 @@ export const SAFE_LIST = [
   'Open Graph and Twitter card tags',
 ];
 
-async function appendNightReport(line) {
-  try {
-    if (!existsSync(NIGHT_REPORT)) {
-      await writeFile(NIGHT_REPORT, '---\ntype: night-report\ncompany: "Hyphening"\n---\n# Hyphening: night report\n\n'
-        + 'Appended by the night workers, newest at the bottom. Do not hand-edit.\n\n', 'utf8');
-    }
-    await appendFile(NIGHT_REPORT, `- ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · ${line}\n`, 'utf8');
-  } catch (err) {
-    console.error(`[seo-fix] Could not write the night report: ${err.message}`);
-  }
-}
 
 
 /** Files changed in the worktree, minus our node_modules links. */

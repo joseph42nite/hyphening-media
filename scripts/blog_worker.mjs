@@ -30,9 +30,10 @@
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { mkdtemp, rm, readFile, writeFile, mkdir, appendFile } from 'fs/promises';
+import { mkdtemp, rm, readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import dotenv from 'dotenv';
+import { appendNightReport } from './lib/nightReport.mjs';
 import { hook, API } from './lib/hook.mjs';
 import { run } from './lib/proc.mjs';
 
@@ -50,7 +51,6 @@ const PYTHON = process.env.BLOG_PYTHON || path.join(HOME, '.openmausbot/workspac
 const VAULT = process.env.VAULT_DIR || '/Volumes/Mac Valhalla/Vault';
 const AUDIO_QUEUE = path.join(VAULT, 'Companies/Hyphening/Content/_audio-queue');
 const KOKORO = path.join(HOME, '.hyphening-tts/kokoro-render');
-const NIGHT_REPORT = path.join(VAULT, 'Companies/Hyphening/Docs/Hyphening - Night Report.md');
 const ALLOWED_TOOLS = 'WebSearch,WebFetch,Skill,Read,Write,Edit,Glob,Grep';
 const CLAUDE_TIMEOUT_MS = (Number(process.env.BLOG_TIMEOUT_MINUTES) || 45) * 60 * 1000;
 
@@ -213,18 +213,6 @@ async function renderAudio(clientName, slug, script) {
   return { mp3: await readFile(path.join(folder, 'narration.mp3')) };
 }
 
-async function appendNightReport(line) {
-  try {
-    if (!existsSync(NIGHT_REPORT)) {
-      await writeFile(NIGHT_REPORT, '---\ntype: night-report\ncompany: "Hyphening"\n---\n# Hyphening: night report\n\n'
-        + 'Appended by `scripts/blog_worker.mjs` (and later the SEO worker), newest at the bottom. Do not hand-edit. '
-        + 'Approve posts in the portal\'s Blog Monitor tab.\n\n', 'utf8');
-    }
-    await appendFile(NIGHT_REPORT, `- ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · ${line}\n`, 'utf8');
-  } catch (err) {
-    console.error(`[blog-worker] Could not write the night report: ${err.message}`);
-  }
-}
 
 async function runJob(job) {
   const started = Date.now();

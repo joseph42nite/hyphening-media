@@ -1034,7 +1034,6 @@ router.post('/:token/content-plan/script/:scriptId/reject', portalAuth, (req, re
       diff: { client: req.portalClient.name, comment, is_standalone_script: !relation },
     });
 
-    notifyAdmin(`⚠️ *Client Revision Request*\nClient *${req.portalClient.name}* requested changes on script *"${script.title}"*\n\n💬 *Feedback:* ${comment}`);
 
     import('../../server.js').then(({ broadcastEvent }) => {
       broadcastEvent('client_feedback', { client_id: req.portalClient.id, message: `Revision requested on script "${script.title}": ${comment}` });
@@ -1122,7 +1121,6 @@ router.post('/:token/content-plan/:contentId/reject', portalAuth, (req, res) => 
     });
 
     // Send Telegram alert to Ops Manager
-    notifyAdmin(`⚠️ *Client Revision Request*\nClient *${req.portalClient.name}* requested changes on *"${content.title}"*\n\n💬 *Feedback:* ${comment}`);
 
     import('../../server.js').then(({ broadcastEvent }) => {
       broadcastEvent('client_feedback', { client_id: req.portalClient.id, message: `Revision requested on "${content.title}": ${comment}` });
@@ -1148,8 +1146,6 @@ router.post('/:token/feedback', portalAuth, (req, res) => {
     db.prepare('INSERT INTO client_requests (client_id, message) VALUES (?, ?)')
       .run(req.portalClient.id, message);
 
-    // Send Telegram alert
-    notifyAdmin(`💬 *New Client Feedback*\nClient: *${req.portalClient.name}*\n\n📝 *Message:* ${message}`);
 
     import('../../server.js').then(({ broadcastEvent }) => {
       broadcastEvent('client_feedback', { client_id: req.portalClient.id, message });

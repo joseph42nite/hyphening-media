@@ -44,6 +44,7 @@ const WORKERS = {
   blog: { cmd: 'node', args: ['scripts/blog_worker.mjs', '--once'] },
   seo_fix: { cmd: 'node', args: ['scripts/seo_fix_worker.mjs', '--once'] },
   deploy: { cmd: 'node', args: ['scripts/deploy_worker.mjs', '--once'] },
+  outreach: { cmd: 'node', args: ['scripts/outreach_worker.mjs', '--once'] },
 };
 
 function runWorker(kind) {
@@ -70,7 +71,7 @@ function runWorker(kind) {
   });
 }
 
-const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy']);
+const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy', 'outreach']);
 const running = new Set();
 
 let stopping = false;
@@ -111,6 +112,7 @@ function connect() {
     runWorker('blog');
     runWorker('seo_fix');
     runWorker('deploy');
+    runWorker('outreach');
   });
 
   socket.on('message', (data) => {

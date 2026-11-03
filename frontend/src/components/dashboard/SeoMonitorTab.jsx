@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Terminal, AlertTriangle, Loader2, ChevronUp, ChevronDown, XCircle, Users, Check, X } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import SeoNightPanel from './SeoNightPanel.jsx';
+import OutreachPanel from './OutreachPanel.jsx';
 
 const IN_FLIGHT_STATUSES = ['queued', 'running'];
 
@@ -1030,6 +1031,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
   return (
     <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
       <SeoNightPanel showToast={showToast} />
+      <OutreachPanel showToast={showToast} />
 
       {/* Dropdown selector panel */}
       <div className="card glass-premium" style={{ marginBottom: '20px', padding: '18px 20px', border: '1px solid rgba(223, 231, 224, 0.12)', background: 'rgba(12, 16, 24, 0.85)', backdropFilter: 'blur(20px)', borderRadius: '12px' }}>

@@ -22,21 +22,16 @@
 import os from 'os';
 import path from 'path';
 import { existsSync } from 'fs';
-import { mkdtemp, rm, appendFile } from 'fs/promises';
+import { mkdtemp, rm } from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { appendNightReport } from './lib/nightReport.mjs';
 import { hook } from './lib/hook.mjs';
 import { run, git, sh, tail, healthCheck } from './lib/proc.mjs';
 import { loadManifest, NIGHT_DEPLOY_TYPES } from './lib/deployManifest.mjs';
 import { linkNodeModules } from './lib/worktree.mjs';
 
 const WORKER = os.hostname();
-const VAULT = process.env.VAULT_DIR || '/Volumes/Mac Valhalla/Vault';
-const NIGHT_REPORT = path.join(VAULT, 'Companies/Hyphening/Docs/Hyphening - Night Report.md');
 
-async function appendNightReport(line) {
-  if (!existsSync(NIGHT_REPORT)) return;
-  await appendFile(NIGHT_REPORT, `- ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · ${line}\n`, 'utf8').catch(() => {});
-}
 
 function ssh(alias, command) {
   return run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', alias, command], { timeoutMs: 15 * 60 * 1000 });

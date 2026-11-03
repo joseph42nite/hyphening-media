@@ -220,28 +220,6 @@ export function handleCreateSeoAudit(payload) {
       }
     }
 
-    // Backlinks: parse referring domains and upsert into outreach_targets
-    if (payload.audit_type === 'backlinks' && result.report_json) {
-      const report = result.report_json;
-      const targets = report.outreach_targets || report.competitor_gap || [];
-      if (Array.isArray(targets)) {
-        const insertTarget = db.prepare(`
-          INSERT INTO outreach_targets (client_id, site_name, site_url, source, category, domain_authority, vetting_status)
-          VALUES (?, ?, ?, 'seo_backlinks_gap', ?, ?, 'unvetted')
-        `);
-        for (const t of targets) {
-          if (t.site_url) {
-            insertTarget.run(
-              payload.client_id,
-              t.site_name || t.site_url,
-              t.site_url,
-              t.category || 'guest_post',
-              t.domain_authority || t.da || null
-            );
-          }
-        }
-      }
-    }
 
     // Token cost logging
     if (result.token_usage) {

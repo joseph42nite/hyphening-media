@@ -15,6 +15,7 @@ import {
   retryBlogRun,
 } from '../services/blogRuns.js';
 import { pushRunSignal } from '../services/macConnector.js';
+import { queueOutreachRuns } from '../services/outreach.js';
 import { queueNightAudits, queueSeoFixes } from '../services/seoNight.js';
 import { getRun, broadcastRunLog } from '../services/agentRuns.js';
 
@@ -375,4 +376,18 @@ export function handleAgentActivityLog(payload) {
   }).catch(err => console.error('[WEBHOOK] Broadcast agent_activity_log failed:', err));
 
   return { success: true, summary: `Logged activity: ${summary}` };
+}
+
+/** Boothroyd's weekly start: one outreach run per SEO-on client, then wake the Mac's outreach worker. */
+export function handleQueueOutreachRuns(payload) {
+  const { queued, skipped } = queueOutreachRuns({ by: payload?.by || 'agent' });
+  if (queued.length) pushRunSignal('outreach');
+  const why = skipped.map(s => `${s.client_name}: ${s.reason}`).join('; ');
+  return {
+    success: true,
+    summary: queued.length
+      ? `Queued outreach for ${queued.map(q => q.client_name).join(', ')}${why ? ` (skipped: ${why})` : ''}`
+      : `Nothing queued${why ? ` (${why})` : ' (no client has SEO on)'}`,
+    data: { queued, skipped },
+  };
 }

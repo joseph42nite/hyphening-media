@@ -37,12 +37,14 @@ import {
   finishSeoDeploy,
   nightSummaryText,
 } from '../services/seoNight.js';
+import { claimOutreachRuns, submitOutreachResults, failOutreachRun, outreachSummaryText } from '../services/outreach.js';
 import {
   handleClaimBlogRuns,
   handleAddBlogTopics,
   handleQueueBlogRuns,
   handleQueueSeoNight,
   handleQueueSeoFixes,
+  handleQueueOutreachRuns,
   handleListBlogRuns,
   handleGetBlogRun,
   handleRetryBlogRun,
@@ -98,7 +100,8 @@ export const KNOWN_EVENTS = [
   'add_blog_topics', 'blog_run_log',
   'queue_blog_runs', 'list_blog_runs', 'get_blog_run', 'review_blog_run', 'retry_blog_run',
   'queue_seo_night', 'queue_seo_fixes', 'seo_night_summary',
-  'claim_seo_fix_batches', 'submit_seo_triage', 'submit_seo_fix_batch', 'claim_seo_deploys', 'finish_seo_deploy'
+  'claim_seo_fix_batches', 'submit_seo_triage', 'submit_seo_fix_batch', 'claim_seo_deploys', 'finish_seo_deploy',
+  'queue_outreach_runs', 'claim_outreach_runs', 'submit_outreach_results', 'fail_outreach_run', 'outreach_summary'
 ];
 
 const router = Router();
@@ -349,6 +352,11 @@ export function executeEvent(eventType, payload) {
       case 'submit_seo_fix_batch': return submitSeoFixBatch(payload);
       case 'claim_seo_deploys': { const deploys = claimSeoDeploys(payload?.worker); return { success: true, summary: `Claimed ${deploys.length} deploy(s)`, data: { deploys } }; }
       case 'finish_seo_deploy': return finishSeoDeploy(payload);
+      case 'queue_outreach_runs': return handleQueueOutreachRuns(payload);
+      case 'claim_outreach_runs': { const runs = claimOutreachRuns(payload?.worker); return { success: true, summary: `Claimed ${runs.length} outreach run(s)`, data: { runs } }; }
+      case 'submit_outreach_results': return submitOutreachResults(payload);
+      case 'fail_outreach_run': return failOutreachRun(payload);
+      case 'outreach_summary': return { success: true, summary: outreachSummaryText(), data: { text: outreachSummaryText() } };
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }

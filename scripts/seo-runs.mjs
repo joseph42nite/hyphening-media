@@ -6,7 +6,7 @@
  *
  *   node scripts/seo-runs.mjs start    # Tanner, 01:15 IST: queue overdue skills (only if SEO is on Auto)
  *   node scripts/seo-runs.mjs fix      # Boothroyd, 03:30 IST: queue tonight's safe fixes (only if SEO is on Auto)
- *   node scripts/seo-runs.mjs status   # anyone: last night per client (for the morning brief)
+ *   node scripts/seo-runs.mjs status   # anyone: last night per client, plus outreach and DataForSEO (for the morning brief)
  *
  * Who is calling goes into the record: set BOT_NAME (e.g. BOT_NAME=Tanner).
  * Nothing here deploys; that's 007's Deploy button in the SEO Monitor.
@@ -21,7 +21,10 @@ async function main() {
   const cmd = process.argv[2];
   if (cmd === 'start') return console.log((await hook('queue_seo_night', { by: BY })).message);
   if (cmd === 'fix') return console.log((await hook('queue_seo_fixes', { by: BY })).message);
-  if (cmd === 'status') return console.log((await hook('seo_night_summary', {})).data?.text);
+  if (cmd === 'status') {
+    console.log((await hook('seo_night_summary', {})).data?.text);
+    return console.log((await hook('outreach_summary', {})).data?.text);
+  }
   console.log(USAGE);
   process.exitCode = 1;
 }
