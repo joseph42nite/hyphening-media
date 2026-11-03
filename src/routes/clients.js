@@ -10,6 +10,10 @@ import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS, parseJsonArrayInput } from '../services/onboardingFields.js';
+import {
+  PIPELINE_FIELDS, PREFERENCE_FIELDS, validatePipelineInput, validateCredentialInput,
+  saveCredential, getCredentialStatus, testCredential, buildBlogConfig, KeyMissingError,
+} from '../services/blogPipeline.js';
 
 const router = Router();
 
@@ -501,6 +505,160 @@ router.put('/:id/onboarding', authorize('admin'), (req, res) => {
     res.json({ success: true, ...updated });
   } catch (err) {
     console.error('[CLIENTS] Save onboarding error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/clients/:id/blog-config
+ * Everything a blog/SEO worker or bot needs about one client in one read:
+ * flags, automation modes, onboarding, pipeline settings, the client's
+ * requests and the publishing key's status (never the key). Admins and the
+ * api_readonly agent account (allow-listed in auth middleware).
+ */
+router.get('/:id/blog-config', authorize('admin', 'api_readonly'), (req, res) => {
+  try {
+    const config = buildBlogConfig(req.params.id);
+    if (!config) return res.status(404).json({ error: 'Client not found' });
+    res.json(config);
+  } catch (err) {
+    console.error('[CLIENTS] Get blog-config error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/clients/:id/blog-pipeline
+ * The admin-only pipeline settings (migration 094) plus the client's own
+ * requests, for the Onboarding modal.
+ */
+router.get('/:id/blog-pipeline', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare(`SELECT id, ${PIPELINE_FIELDS.join(', ')}, ${PREFERENCE_FIELDS.join(', ')}, blog_prefs_updated_at FROM crm_clients WHERE id = ?`).get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    res.json({ ...client, publish_credential: getCredentialStatus(client.id) });
+  } catch (err) {
+    console.error('[CLIENTS] Get blog-pipeline error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/clients/:id/blog-pipeline
+ * Save what the client's blog pipeline includes. Admin only: it's what was
+ * sold and what gets approved, so the client portal can't change it.
+ */
+router.put('/:id/blog-pipeline', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const { updates, error } = validatePipelineInput(req.body);
+    if (error) return res.status(400).json({ error });
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid blog pipeline fields to update' });
+    }
+
+    const diff = { ...updates };
+    updates.updated_at = new Date().toISOString();
+    const setClauses = Object.keys(updates).map((k) => `${k} = ?`).join(', ');
+    db.prepare(`UPDATE crm_clients SET ${setClauses} WHERE id = ?`).run(...Object.values(updates), req.params.id);
+
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_blog_pipeline_save',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff,
+      ip: req.ip,
+    });
+
+    const updated = db.prepare(`SELECT id, ${PIPELINE_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(req.params.id);
+    res.json({ success: true, ...updated });
+  } catch (err) {
+    console.error('[CLIENTS] Save blog-pipeline error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/clients/:id/publish-credential
+ * Save or replace the client's CMS publishing key, encrypted. Write-only:
+ * the response and every later read carry kind/endpoint/last4 only, and the
+ * audit log never sees the secret.
+ */
+router.put('/:id/publish-credential', authorize('admin'), (req, res) => {
+  try {
+    const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const { value, error } = validateCredentialInput(req.body);
+    if (error) return res.status(400).json({ error });
+
+    const status = saveCredential(client.id, value, req.user.email);
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_publish_credential_save',
+      entityType: 'client',
+      entityId: client.id,
+      diff: { kind: status.kind, endpoint_url: status.endpoint_url, last4: status.last4 },
+      ip: req.ip,
+    });
+    res.json({ success: true, publish_credential: status });
+  } catch (err) {
+    if (err instanceof KeyMissingError) {
+      return res.status(503).json({ error: 'Publishing keys can\'t be stored yet: CLIENT_CREDENTIALS_KEY is not set on the server.' });
+    }
+    console.error('[CLIENTS] Save publish-credential error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** DELETE /api/clients/:id/publish-credential — remove the client's publishing key. */
+router.delete('/:id/publish-credential', authorize('admin'), (req, res) => {
+  try {
+    const result = db.prepare('DELETE FROM client_publish_credentials WHERE client_id = ?').run(req.params.id);
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_publish_credential_remove',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff: { removed: result.changes === 1 },
+      ip: req.ip,
+    });
+    res.json({ success: true, publish_credential: { set: false } });
+  } catch (err) {
+    console.error('[CLIENTS] Remove publish-credential error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/publish-credential/test
+ * One authenticated read against the client's CMS. Reports the HTTP status,
+ * never the response.
+ */
+router.post('/:id/publish-credential/test', authorize('admin'), async (req, res) => {
+  try {
+    const result = await testCredential(req.params.id);
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'client_publish_credential_test',
+      entityType: 'client',
+      entityId: parseInt(req.params.id),
+      diff: result,
+      ip: req.ip,
+    });
+    res.json(result);
+  } catch (err) {
+    if (err instanceof KeyMissingError) {
+      return res.status(503).json({ error: 'CLIENT_CREDENTIALS_KEY is not set on the server.' });
+    }
+    console.error('[CLIENTS] Test publish-credential error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

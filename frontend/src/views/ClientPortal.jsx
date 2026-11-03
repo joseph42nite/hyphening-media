@@ -1256,6 +1256,10 @@ export default function ClientPortal({ showToast }) {
   const [onboardingMeta, setOnboardingMeta] = useState({ brand_onboarded_at: null });
   const [onboardingLoading, setOnboardingLoading] = useState(false);
   const [onboardingSaving, setOnboardingSaving] = useState(false);
+  // Blog requests (reviewer, topics to avoid, wishes). Requests only: what the
+  // blog pipeline includes is set by Hyphening in the admin dashboard.
+  const [blogPrefs, setBlogPrefs] = useState({ blog_pref_reviewer_name: '', blog_pref_topics_avoid: '', blog_pref_requests: '' });
+  const [blogPrefsSaving, setBlogPrefsSaving] = useState(false);
   const [syncingComments, setSyncingComments] = useState(false);
 
   // Leads & Alerts settings
@@ -1560,6 +1564,7 @@ export default function ClientPortal({ showToast }) {
         fetchIntegrations();
         fetchComments();
         fetchOnboarding();
+        fetchBlogPrefs();
       }
     } catch (err) {
       console.error('Error fetching portal sub-data:', err);
@@ -1998,6 +2003,41 @@ export default function ClientPortal({ showToast }) {
       console.error('Error fetching onboarding:', err);
     } finally {
       setOnboardingLoading(false);
+    }
+  };
+
+  const fetchBlogPrefs = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/portal/${token}/blog-preferences`, { credentials: 'include', cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok && data) {
+        setBlogPrefs({
+          blog_pref_reviewer_name: data.blog_pref_reviewer_name || '',
+          blog_pref_topics_avoid: data.blog_pref_topics_avoid || '',
+          blog_pref_requests: data.blog_pref_requests || '',
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching blog preferences:', err);
+    }
+  };
+
+  const saveBlogPrefs = async () => {
+    setBlogPrefsSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/portal/${token}/blog-preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(blogPrefs),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      showToast('Blog preferences sent to Hyphening', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setBlogPrefsSaving(false);
     }
   };
 
@@ -3493,6 +3533,42 @@ export default function ClientPortal({ showToast }) {
                 <div className="portal-form-group" style={{ margin: 0 }}>
                   <label className="portal-label">How Often Should We Post?</label>
                   <input type="text" className="portal-control" placeholder="e.g. 2x/week, 70% educational / 30% promo" value={onboardingForm.brand_publishing_cadence} onChange={e => setOnboardingForm({ ...onboardingForm, brand_publishing_cadence: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            {/* Blog Preferences (requests to Hyphening, not settings) */}
+            <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h3 style={{ fontSize: '0.95rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.06em', color: '#dfe7e0' }}>
+                    Blog Preferences
+                  </h3>
+                  <p style={{ color: '#8b9b90', fontSize: '0.8rem', margin: '4px 0 0' }}>
+                    Requests for your blog. Our team reviews them and confirms what's included in your plan.
+                  </p>
+                </div>
+                <button
+                  onClick={saveBlogPrefs}
+                  disabled={blogPrefsSaving}
+                  className="portal-btn portal-btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600 }}
+                >
+                  <CheckCircle size={14} /> {blogPrefsSaving ? 'Sending...' : 'Send Preferences'}
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Who should review posts before they go live?</label>
+                  <input type="text" className="portal-control" placeholder="e.g. Dr. A. Rao, Head of Dentistry" value={blogPrefs.blog_pref_reviewer_name} onChange={e => setBlogPrefs({ ...blogPrefs, blog_pref_reviewer_name: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Topics to avoid</label>
+                  <textarea className="portal-control" rows={2} style={{ width: '100%', resize: 'vertical' }} value={blogPrefs.blog_pref_topics_avoid} onChange={e => setBlogPrefs({ ...blogPrefs, blog_pref_topics_avoid: e.target.value })} />
+                </div>
+                <div className="portal-form-group" style={{ margin: 0 }}>
+                  <label className="portal-label">Anything else? <span style={{ textTransform: 'none', fontWeight: 400 }}>— e.g. audio versions, Hindi posts</span></label>
+                  <textarea className="portal-control" rows={2} style={{ width: '100%', resize: 'vertical' }} value={blogPrefs.blog_pref_requests} onChange={e => setBlogPrefs({ ...blogPrefs, blog_pref_requests: e.target.value })} />
                 </div>
               </div>
             </div>

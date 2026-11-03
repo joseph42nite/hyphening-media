@@ -13,6 +13,7 @@ import { getConnectUrl, getClientConnectedAccounts } from '../services/composioS
 import { fetchPostComments, replyToComment } from '../services/commentSync.js';
 import { countableLeadSql } from '../services/leadFilters.js';
 import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS, parseJsonArrayInput } from '../services/onboardingFields.js';
+import { PREFERENCE_FIELDS, validatePreferenceInput } from '../services/blogPipeline.js';
 
 const router = Router();
 
@@ -1264,6 +1265,43 @@ router.put('/:token/onboarding', portalAuth, (req, res) => {
     res.json({ success: true, ...updated });
   } catch (err) {
     console.error('[PORTAL] Save onboarding error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/portal/:token/blog-preferences
+ * The client's own blog requests (reviewer, topics to avoid, wishes like
+ * audio or another language). Requests only: what the pipeline actually
+ * includes is set by Hyphening in the admin Onboarding modal.
+ */
+router.get('/:token/blog-preferences', portalAuth, (req, res) => {
+  try {
+    const client = db.prepare(`SELECT ${PREFERENCE_FIELDS.join(', ')}, blog_prefs_updated_at FROM crm_clients WHERE id = ?`).get(req.portalClient.id);
+    res.json(client);
+  } catch (err) {
+    console.error('[PORTAL] Get blog preferences error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** PUT /api/portal/:token/blog-preferences — save the client's blog requests. */
+router.put('/:token/blog-preferences', portalAuth, (req, res) => {
+  try {
+    const { updates } = validatePreferenceInput(req.body);
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid blog preference fields to update' });
+    }
+
+    updates.blog_prefs_updated_at = new Date().toISOString();
+    updates.updated_at = new Date().toISOString();
+    const setClauses = Object.keys(updates).map((k) => `${k} = ?`).join(', ');
+    db.prepare(`UPDATE crm_clients SET ${setClauses} WHERE id = ?`).run(...Object.values(updates), req.portalClient.id);
+
+    const updated = db.prepare(`SELECT ${PREFERENCE_FIELDS.join(', ')}, blog_prefs_updated_at FROM crm_clients WHERE id = ?`).get(req.portalClient.id);
+    res.json({ success: true, ...updated });
+  } catch (err) {
+    console.error('[PORTAL] Save blog preferences error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

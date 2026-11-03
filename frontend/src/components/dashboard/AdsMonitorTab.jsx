@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import { MarkdownBlock, ReportValue, parseReportJson } from './SeoMonitorTab.jsx';
-import AdsModeToggle from './AdsModeToggle.jsx';
+import FleetModeToggle from './FleetModeToggle.jsx';
 
 const IN_FLIGHT = ['queued', 'running'];
 
@@ -437,7 +437,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
 
   return (
     <div>
-      <AdsModeToggle showToast={showToast} />
+      <FleetModeToggle scope="ads" showToast={showToast} confirmText="Turn the Ads fleet to AUTO? Scheduled ads runs will start queueing on their own and spend API tokens without you clicking anything." />
       {/* ---------------- All clients: the monitoring surface ---------------- */}
       {overview && (
         <div className="card glass-premium" style={{ ...panel, marginBottom: 20, padding: '18px 20px' }}>

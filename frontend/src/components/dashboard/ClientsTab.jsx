@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { API_BASE } from '../../api.js';
+import ClientBlogPipelineSection from './ClientBlogPipelineSection.jsx';
 
 const EMPTY_VENUE_FIELDS = {
   venue_name: '', venue_address: '', venue_city: '', venue_map_link: '',
@@ -940,16 +941,19 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
               </div>
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <button type="button" className="btn btn-primary" disabled={onboardingSaving} onClick={saveOnboarding}>
+                {onboardingSaving ? 'Saving...' : 'Save Brand & Voice'}
+              </button>
+            </div>
+
+            <ClientBlogPipelineSection client={onboardingClient} showToast={showToast} />
+
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
               <button type="button" className="btn btn-secondary" onClick={copyKickoffPrompt}>
                 Copy Kickoff Prompt
               </button>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowOnboardingModal(false)}>Close</button>
-                <button type="button" className="btn btn-primary" disabled={onboardingSaving} onClick={saveOnboarding}>
-                  {onboardingSaving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowOnboardingModal(false)}>Close</button>
             </div>
           </div>
         </div>

@@ -53,13 +53,13 @@ CLAUDE_BIN="$(command -v claude || true)"
 DOCKER_UP=0; docker info >/dev/null 2>&1 && DOCKER_UP=1
 
 python3 -I - "$OUT" "$BASE_URL" "${1:-}" "$FETCH_ERROR" "$VAULT_DIR" "$NOTES_DIR" \
-  "$CLIENTS_DIR" "$STATE_FILE" "$CONNECTOR_UP" "$CLAUDE_BIN" "$DOCKER_UP" <<'PY'
-import json, os, re, shutil, sys
+  "$CLIENTS_DIR" "$STATE_FILE" "$CONNECTOR_UP" "$CLAUDE_BIN" "$DOCKER_UP" "$JAR" <<'PY'
+import json, os, re, shutil, subprocess, sys
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 (out, base, mode, fetch_error, vault, notes_dir, clients_dir, state_file,
- connector_up, claude_bin, docker_up) = sys.argv[1:12]
+ connector_up, claude_bin, docker_up, jar) = sys.argv[1:13]
 write = mode == "--write"
 now = datetime.now(timezone.utc)
 now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -132,6 +132,16 @@ def manifest_check(repo):
         return WARN, "deploy manifest has an unknown deploy.type"
     return OK, f"deploy manifest OK ({m['deploy']['type']})"
 
+def blog_config(cid):
+    """GET /api/clients/:id/blog-config with the session from the login above.
+    None when the portal doesn't serve it (not deployed yet) or the call fails."""
+    try:
+        r = subprocess.run(["curl", "-sf", "--max-time", "20", "-b", jar, f"{base}/api/clients/{cid}/blog-config"],
+                           capture_output=True, text=True)
+        return json.loads(r.stdout) if r.returncode == 0 else None
+    except Exception:
+        return None
+
 # ---- clients and readiness --------------------------------------------------
 clients = {c["id"]: c for c in data["clients"]} if data else {}
 readiness = []  # (client, level, [details])
@@ -149,11 +159,26 @@ for cid, c in clients.items():
         add(WARN, "flags on but client is inactive: no work runs")
     if "seo" in flags or "ads" in flags:
         add(OK, f"GSC {c['gsc_property']}") if c["gsc_property"] else add(WARN, "no GSC property: SEO runs without Search Console data")
+    cfg = blog_config(cid)
+    if cfg is None:
+        add(OK, "blog-config not available from the portal yet")
+    else:
+        pipe = cfg["pipeline"]
+        if "blog" in flags:
+            add(OK, "brand form filled") if cfg["onboarding"]["filled"] else add(WARN, "brand & voice form not filled in")
+            add(OK, f"publishes via {pipe['blog_publish_target']}, bar {pipe['quality_bar']}")
+            if pipe["blog_posts_per_month"] == 0:
+                add(WARN, "posts per month is 0: the night schedule will skip it")
+            if pipe["blog_publish_target"] == "cms_api" and not cfg["publish_credential"]["set"]:
+                add(WARN, "publishes to its CMS but no publishing key is saved")
     info = notes.get(cid)
-    if not info:
+    if cfg and cfg["pipeline"].get("repo_path"):
+        info = {**(info or {"note": None}), "repo": cfg["pipeline"]["repo_path"]}
+    if not info or not info.get("note"):
         add(WARN, "no client note in Clients/: onboarding not done")
     else:
         add(OK, f"client note [[Companies/Hyphening/Clients/{info['note']}]]")
+    if info:
         repo = info["repo"]
         if not repo:
             add(OK, "no repo on this Mac (handoff / CMS only)")
