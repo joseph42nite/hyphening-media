@@ -165,7 +165,19 @@ export function finishRun(runId, status, { error = null, auditId = null, actualM
   const run = getRun(runId);
   clearPendingAudit(run.client_id, run.agent_type);
   broadcastRunStatus(run, { error });
+  wakeWaitingFixBatch(run.client_id);
   return run;
+}
+
+/**
+ * Night SEO: a client's fix batch waits until its skills are done
+ * (claimSeoFixBatches in seoNight.js). When the last one finishes, start the
+ * fix worker. Plain SQL here because seoNight.js imports this file.
+ */
+function wakeWaitingFixBatch(clientId) {
+  const inFlight = db.prepare("SELECT COUNT(*) AS n FROM seo_agent_runs WHERE client_id = ? AND status IN ('queued','running')").get(clientId).n;
+  if (inFlight > 0) return;
+  if (db.prepare("SELECT 1 FROM seo_fix_batches WHERE client_id = ? AND status = 'queued'").get(clientId)) pushRunSignal('seo_fix');
 }
 
 /** Same as finishRun but addressed the way OpenClaw's webhook identifies work. */

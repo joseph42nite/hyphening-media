@@ -106,6 +106,19 @@ export default function SeoNightDrawer({ client, position, total, busy, onClose,
             </div>
           )}
 
+          {client.already_done?.length > 0 && (
+            <div style={section}>
+              <div style={{ ...label, color: '#60a5fa' }}>Already done, marked completed ({client.already_done.length})</div>
+              <div style={{ ...muted, marginTop: '2px' }}>The code already does these, often from a fix pushed earlier. Closed with what the worker found.</div>
+              {client.already_done.map(f => (
+                <div key={f.id} style={item}>
+                  <div style={{ fontWeight: 700 }}>{f.metric} <span style={muted}>· {f.priority}</span></div>
+                  <div style={{ fontSize: '0.82rem', marginTop: '2px' }}>{f.fix_reason}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {client.failed.length > 0 && (
             <div style={section}>
               <div style={{ ...label, color: '#f87171' }}>Failed ({client.failed.length})</div>

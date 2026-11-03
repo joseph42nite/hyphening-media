@@ -162,7 +162,10 @@ function runClaude(promptFile, model) {
     const args = ['-p', '--output-format', 'text', '--permission-mode', 'bypassPermissions'];
     if (model) args.push('--model', model);
 
-    const proc = spawn(CLAUDE_BIN, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    // The run's own temp folder, not whatever folder the worker inherited:
+    // a run once failed with "current working directory was deleted" while
+    // another Claude worked on the same repo.
+    const proc = spawn(CLAUDE_BIN, args, { cwd: path.dirname(promptFile), stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '';
     let err = '';
     proc.stdout.on('data', d => { out += d; });

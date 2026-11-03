@@ -129,6 +129,20 @@ export function unavailableReason(agentType, clientId = null) {
   const stat = UNAVAILABLE_SKILLS.get(agentType);
   if (stat) return stat;
 
+  // Per-client facts that disable a card. Decided here, not only on the card,
+  // so the night queue (seoNight.js) skips exactly what the dashboard greys out.
+  if ((agentType === 'ecommerce' || agentType === 'local') && clientId) {
+    const client = db.prepare('SELECT client_type, contact_phone, is_ecommerce FROM crm_clients WHERE id = ?').get(clientId);
+    if (agentType === 'ecommerce' && client && !client.is_ecommerce) {
+      return "Not an e-commerce client. Set \"E-commerce business?\" to Yes in the client's settings to turn this on";
+    }
+    // 'local' audits NAP (name, address, phone) consistency; without a phone
+    // on file it would audit incomplete data.
+    if (agentType === 'local' && client?.client_type === 'marketing' && !client.contact_phone) {
+      return 'Add a contact phone number to unlock local SEO audits';
+    }
+  }
+
   // backlink_gap has two prerequisites, not one, and has to clear both. This
   // runs before the DataForSEO branch below and deliberately falls through
   // instead of returning null: a client with no approved competitor and a

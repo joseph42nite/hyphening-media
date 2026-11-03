@@ -3,6 +3,7 @@ import db from '../../database.js';
 import * as night from '../services/seoNight.js';
 import { setMode, getMode } from '../services/automationMode.js';
 import seoNightRouter from '../routes/seoNight.js';
+import { unavailableReason } from '../routes/seo.js';
 
 // Everything runs inside one transaction rolled back at the end, so the local
 // database the dashboard reads is left as it was. Real queued runs are parked
@@ -22,9 +23,10 @@ afterAll(() => {
 
 function makeClient(overrides = {}) {
   return db.prepare(`
-    INSERT INTO crm_clients (name, client_type, is_active, seo_enabled, website_url, repo_path)
-    VALUES (?, 'marketing', 1, 1, 'https://example.test/', ?)
-  `).run(`Night client ${Math.random()}`, overrides.repo === undefined ? '/tmp/example-repo' : overrides.repo).lastInsertRowid;
+    INSERT INTO crm_clients (name, client_type, is_active, seo_enabled, website_url, repo_path, contact_phone, is_ecommerce)
+    VALUES (?, 'marketing', 1, 1, 'https://example.test/', ?, ?, ?)
+  `).run(`Night client ${Math.random()}`, overrides.repo === undefined ? '/tmp/example-repo' : overrides.repo,
+    overrides.phone === undefined ? '+91 90000 00000' : overrides.phone, overrides.ecommerce ? 1 : 0).lastInsertRowid;
 }
 
 function audit(clientId, type, daysAgo, score = 60) {
@@ -73,6 +75,22 @@ describe('night audits', () => {
   });
 });
 
+describe('disabled cards are never run at night', () => {
+  it('e-commerce only for e-commerce clients; local only with a phone on file', () => {
+    setMode('seo', 'auto');
+    const shop = makeClient({ ecommerce: true });
+    const agency = makeClient({ phone: null });
+    expect(unavailableReason('ecommerce', agency)).toMatch(/Not an e-commerce client/);
+    expect(unavailableReason('ecommerce', shop)).toBeNull();
+    expect(unavailableReason('local', agency)).toMatch(/contact phone/);
+    expect(unavailableReason('local', shop)).toBeNull();
+    const agencyDue = night.dueSkills(agency).map(d => d.audit_type);
+    expect(agencyDue).not.toContain('ecommerce');
+    expect(agencyDue).not.toContain('local');
+    expect(night.dueSkills(shop).map(d => d.audit_type)).toContain('ecommerce');
+  });
+});
+
 describe('fix batches, from queue to deploy', () => {
   let clientId;
   let batchId;
@@ -88,7 +106,7 @@ describe('fix batches, from queue to deploy', () => {
 
   it('queues one batch, and the worker claims it with the candidates', () => {
     const a = audit(clientId, 'technical', 2);
-    recs = [rec(clientId, a, { metric: 'Meta description' }), rec(clientId, a, { metric: 'Rewrite hero copy' }), rec(clientId, a, { metric: 'GA4 filter' }), rec(clientId, a, { metric: 'Alt text' })];
+    recs = [rec(clientId, a, { metric: 'Meta description' }), rec(clientId, a, { metric: 'Rewrite hero copy' }), rec(clientId, a, { metric: 'GA4 filter' }), rec(clientId, a, { metric: 'Alt text' }), rec(clientId, a, { metric: 'Canonical tag' })];
     const q = night.queueSeoFixes({ clientId, by: 'Boothroyd' });
     expect(q.queued).toHaveLength(1);
     batchId = q.queued[0].batch_id;
@@ -106,11 +124,13 @@ describe('fix batches, from queue to deploy', () => {
       { id: recs[1], triage: 'needs_007', reason: 'copy change' },
       { id: recs[2], triage: 'not_code', reason: 'analytics setting' },
       { id: recs[3], triage: 'safe', reason: 'alt text' },
+      { id: recs[4], triage: 'already_done', reason: 'index.html already has a canonical link' },
     ] });
     expect(r.success).toBe(true);
     const st = (id) => db.prepare('SELECT status, fix_triage FROM seo_recommendations WHERE id = ?').get(id);
     expect(st(recs[1])).toEqual({ status: 'needs_007', fix_triage: 'needs_007' });
     expect(st(recs[2])).toEqual({ status: 'open', fix_triage: 'not_code' });
+    expect(st(recs[4])).toEqual({ status: 'completed', fix_triage: 'already_done' });
   });
 
   it('stores the fixes and shows them in the morning report', () => {
@@ -120,12 +140,14 @@ describe('fix batches, from queue to deploy', () => {
     ] });
     const batch = db.prepare('SELECT * FROM seo_fix_batches WHERE id = ?').get(batchId);
     expect(batch.status).toBe('ready');
-    expect(batch.summary).toMatch(/1 fix\(es\) ready · 1 failed · 1 need you/);
+    expect(batch.summary).toMatch(/1 fix\(es\) ready · 1 failed · 1 already done · 1 need you/);
 
     const row = night.nightReport().clients.find(c => c.client_id === clientId);
     expect(row.fixes.map(f => f.id)).toEqual([recs[0]]);
     expect(row.failed.map(f => f.id)).toEqual([recs[3]]);
     expect(row.needs_007.map(f => f.id)).toEqual([recs[1]]);
+    expect(row.already_done.map(f => f.id)).toEqual([recs[4]]);
+    expect(row.already_done[0].fix_reason).toMatch(/canonical/);
     // Tonight's queue skips a client whose fixes are waiting for Deploy.
     expect(night.queueSeoFixes({ clientId }).skipped[0].reason).toMatch(/waiting for Deploy or Discard/);
   });
@@ -170,6 +192,21 @@ describe('fix batches, from queue to deploy', () => {
     expect(r).toEqual({ status: 'open', fix_approved: 1, fix_triage: 'safe' });
     night.ignoreRecommendation(recs[1]);
     expect(db.prepare('SELECT status FROM seo_recommendations WHERE id = ?').get(recs[1]).status).toBe('ignored');
+  });
+});
+
+describe('fixes wait for the night audits', () => {
+  it('a batch is not claimed while the client has skills queued or running', () => {
+    setMode('seo', 'auto');
+    const id = makeClient();
+    const a = audit(id, 'technical', 1);
+    rec(id, a);
+    const run = night.queueNightAudits({ clientId: id }).queued[0];
+    const b = night.queueSeoFixes({ clientId: id }).queued[0].batch_id;
+    expect(night.claimSeoFixBatches('test').map(x => x.batch_id)).not.toContain(b);
+    db.prepare("UPDATE seo_agent_runs SET status = 'completed' WHERE client_id = ?").run(id);
+    expect(night.claimSeoFixBatches('test').map(x => x.batch_id)).toContain(b);
+    expect(run).toBeTruthy();
   });
 });
 

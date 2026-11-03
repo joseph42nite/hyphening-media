@@ -56,7 +56,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
   const [editingVenueId, setEditingVenueId] = useState(null);
   const [clientFormData, setClientFormData] = useState({
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
-    parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
+    parent_id: '', website_url: '', is_ecommerce: false, instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
     google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: '',
     ...EMPTY_VENUE_FIELDS
   });
@@ -105,6 +105,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
         contact_phone: client.contact_phone || '',
         parent_id: client.parent_id || '',
         website_url: client.website_url || '',
+        is_ecommerce: !!client.is_ecommerce,
         instagram_url: client.instagram_url || '',
         youtube_url: client.youtube_url || '',
         gsc_property: client.gsc_property || '',
@@ -127,7 +128,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
       setEditingVenueId(null);
       setClientFormData({
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
-        parent_id: '', website_url: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
+        parent_id: '', website_url: '', is_ecommerce: false, instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
         google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: '',
         ...EMPTY_VENUE_FIELDS
       });
@@ -693,6 +694,18 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
                   <label className="form-label">YouTube Channel URL</label>
                   <input type="url" className="form-control" placeholder="https://..." value={clientFormData.youtube_url} onChange={e => setClientFormData({...clientFormData, youtube_url: e.target.value})} />
                 </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">E-commerce business?</label>
+                <select className="form-control" style={{ maxWidth: '320px' }} value={clientFormData.is_ecommerce ? 'yes' : 'no'}
+                  onChange={e => setClientFormData({ ...clientFormData, is_ecommerce: e.target.value === 'yes' })}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes, sells products online</option>
+                </select>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Yes turns on the e-commerce SEO skill (product schema, Shopping, marketplaces) for this client.
+                </span>
               </div>
 
               <h4 style={{ margin: '16px 0 8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>SEO Data Sources</h4>

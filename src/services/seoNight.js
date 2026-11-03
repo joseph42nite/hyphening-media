@@ -4,8 +4,10 @@
  *
  *   01:15 IST  Tanner: queueNightAudits() — each SEO-on client's overdue skills, 3 at most
  *   03:30 IST  Boothroyd: queueSeoFixes() — one fix batch per client with a site repo
- *              → the Mac's seo_fix_worker sorts the open recommendations, fixes the safe
- *                ones on a branch, and reports back (claim / triage / submit below)
+ *              → the Mac's seo_fix_worker sorts the open recommendations, closes the ones
+ *                already done in the code, fixes the safe ones on a branch, and reports
+ *                back (claim / triage / submit below). A client's batch waits until that
+ *                client's night audits have finished, so it works on their findings.
  *   morning    007 reads nightReport() in the SEO Monitor and presses Deploy or Discard
  *              → the Mac's deploy_worker pushes and deploys per the repo's manifest
  *
@@ -142,7 +144,14 @@ export function queueSeoFixes({ by = 'agent', clientId = null } = {}) {
 /** The fix worker takes every queued batch, with what it needs to work on. */
 export function claimSeoFixBatches(worker = 'mac') {
   const claim = db.transaction(() => {
-    const batches = db.prepare("SELECT * FROM seo_fix_batches WHERE status = 'queued' ORDER BY id").all();
+    // A client whose skills are still queued or running waits: its fixes should
+    // be sorted against tonight's findings, and two Claude runs on the same
+    // repo at once is how 2026-11-03's local and cluster runs failed.
+    const batches = db.prepare(`
+      SELECT * FROM seo_fix_batches b WHERE b.status = 'queued'
+        AND NOT EXISTS (SELECT 1 FROM seo_agent_runs r WHERE r.client_id = b.client_id AND r.status IN ('queued', 'running'))
+      ORDER BY b.id
+    `).all();
     for (const b of batches) {
       db.prepare("UPDATE seo_fix_batches SET status = 'running', started_at = datetime('now'), updated_at = datetime('now'), log = ? WHERE id = ?")
         .run(`claimed by ${worker}`, b.id);
@@ -172,14 +181,20 @@ export function submitSeoTriage(payload) {
   let n = 0;
   const apply = db.transaction(() => {
     for (const r of payload.results) {
-      if (!['safe', 'needs_007', 'not_code'].includes(r?.triage)) continue;
+      if (!['safe', 'needs_007', 'not_code', 'already_done'].includes(r?.triage)) continue;
       const rec = db.prepare("SELECT id, fix_approved FROM seo_recommendations WHERE id = ? AND client_id = ? AND status = 'open'").get(r.id, batch.client_id);
       if (!rec) continue;
       // 007's "Fix tonight" outranks the sort.
-      const triage = rec.fix_approved ? 'safe' : r.triage;
+      const triage = rec.fix_approved && r.triage !== 'already_done' ? 'safe' : r.triage;
+      // already_done: the code already does it (often a fix pushed earlier that
+      // nobody marked). Closed here, with what the worker found as the note.
+      const status = triage === 'needs_007' ? 'needs_007' : triage === 'already_done' ? 'completed' : 'open';
       db.prepare(`
-        UPDATE seo_recommendations SET fix_triage = ?, fix_reason = ?, status = ?, fix_batch_id = ? WHERE id = ?
-      `).run(triage, String(r.reason || '').slice(0, 400), triage === 'needs_007' ? 'needs_007' : 'open', batch.id, rec.id);
+        UPDATE seo_recommendations SET fix_triage = ?, fix_reason = ?, status = ?, fix_batch_id = ?,
+          fix_approved = CASE WHEN ? = 'completed' THEN 0 ELSE fix_approved END,
+          fixed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE fixed_at END
+        WHERE id = ?
+      `).run(triage, String(r.reason || '').slice(0, 400), status, batch.id, status, status, rec.id);
       n++;
     }
   });
@@ -215,10 +230,11 @@ export function submitSeoFixBatch(payload) {
       }
     }
     const needs = db.prepare("SELECT COUNT(*) AS n FROM seo_recommendations WHERE client_id = ? AND status = 'needs_007'").get(batch.client_id).n;
+    const done = db.prepare("SELECT COUNT(*) AS n FROM seo_recommendations WHERE fix_batch_id = ? AND fix_triage = 'already_done'").get(batch.id).n;
     const failed = fixes.length - ok.length;
     const summary = status === 'failed'
       ? `Fixes did not run: ${String(payload.error || 'unknown error').slice(0, 200)}`
-      : `${ok.length} fix(es) ready${failed ? ` · ${failed} failed` : ''}${needs ? ` · ${needs} need you` : ''}`;
+      : `${ok.length} fix(es) ready${failed ? ` · ${failed} failed` : ''}${done ? ` · ${done} already done` : ''}${needs ? ` · ${needs} need you` : ''}`;
     db.prepare(`
       UPDATE seo_fix_batches SET status = ?, branch = ?, base_commit = ?, summary = ?, error = ?,
         finished_at = datetime('now'), updated_at = datetime('now') WHERE id = ?
@@ -348,10 +364,11 @@ export function nightReport({ hours = 30 } = {}) {
     });
 
     const batch = db.prepare('SELECT * FROM seo_fix_batches WHERE client_id = ? ORDER BY id DESC LIMIT 1').get(c.id) || null;
-    const ready = batch ? db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE fix_batch_id = ? AND status IN ('ready_to_deploy', 'completed') ORDER BY id`).all(batch.id) : [];
+    const ready = batch ? db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE fix_batch_id = ? AND status IN ('ready_to_deploy', 'completed') AND fix_commit IS NOT NULL ORDER BY id`).all(batch.id) : [];
     const failed = batch ? db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE fix_batch_id = ? AND status = 'fix_failed' ORDER BY id`).all(batch.id) : [];
     const needs = db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE client_id = ? AND status = 'needs_007' ORDER BY CASE priority WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 ELSE 3 END, id DESC`).all(c.id);
     const tonight = db.prepare("SELECT COUNT(*) AS n FROM seo_recommendations WHERE client_id = ? AND status = 'open' AND fix_approved = 1").get(c.id).n;
+    const alreadyDone = batch ? db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE fix_batch_id = ? AND fix_triage = 'already_done' ORDER BY id`).all(batch.id) : [];
 
     let setup = null;
     if (!c.repo_path) setup = 'Audits only: no site repo is set for this client';
@@ -359,7 +376,7 @@ export function nightReport({ hours = 30 } = {}) {
 
     return {
       client_id: c.id, client_name: c.name, setup, runs, batch,
-      fixes: ready, failed, needs_007: needs, approved_for_tonight: tonight,
+      fixes: ready, failed, needs_007: needs, already_done: alreadyDone, approved_for_tonight: tonight,
     };
   });
 
@@ -371,6 +388,7 @@ export function nightReport({ hours = 30 } = {}) {
       needs_007: rows.reduce((n, r) => n + r.needs_007.length, 0),
       failed: rows.reduce((n, r) => n + (r.batch && parseTime(r.batch.created_at) > new Date(Date.now() - hours * 3600000) ? r.failed.length : 0), 0),
       skills_run: rows.reduce((n, r) => n + r.runs.length, 0),
+      already_done: rows.reduce((n, r) => n + (r.batch && parseTime(r.batch.created_at) > new Date(Date.now() - hours * 3600000) ? r.already_done.length : 0), 0),
     },
     clients: rows,
   };

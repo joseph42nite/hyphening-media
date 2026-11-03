@@ -129,7 +129,7 @@ router.post('/', authorize('admin'), (req, res) => {
       name, client_type, contact_person, contact_email, contact_phone,
       parent_id, website_url, instagram_url, youtube_url,
       gsc_property, ga4_property_id,
-      google_ads_customer_id, google_ads_login_customer_id, meta_ads_account_id
+      google_ads_customer_id, google_ads_login_customer_id, meta_ads_account_id, is_ecommerce
     } = req.body;
 
     if (!name) {
@@ -141,8 +141,8 @@ router.post('/', authorize('admin'), (req, res) => {
         name, client_type, contact_person, contact_email, contact_phone,
         parent_id, website_url, instagram_url, youtube_url,
         gsc_property, ga4_property_id,
-        google_ads_customer_id, google_ads_login_customer_id, meta_ads_account_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        google_ads_customer_id, google_ads_login_customer_id, meta_ads_account_id, is_ecommerce
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       client_type || 'marketing',
@@ -157,7 +157,8 @@ router.post('/', authorize('admin'), (req, res) => {
       ga4_property_id || null,
       google_ads_customer_id || null,
       google_ads_login_customer_id || null,
-      meta_ads_account_id || null
+      meta_ads_account_id || null,
+      is_ecommerce ? 1 : 0
     );
 
     logAction({
@@ -202,7 +203,9 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       // would return one client's search data during another client's audit,
       // attributed to the wrong client with nothing in the report to show it.
       'gsc_property', 'ga4_property_id',
-      'google_ads_customer_id', 'google_ads_login_customer_id', 'meta_ads_account_id'
+      'google_ads_customer_id', 'google_ads_login_customer_id', 'meta_ads_account_id',
+      // Sells online: unlocks the SEO Monitor's e-commerce skill (seo.js unavailableReason).
+      'is_ecommerce'
       // Pipeline kill switches (blog_enabled/seo_enabled/ads_enabled) are
       // deliberately NOT in this generic allow-list — they go only through
       // PATCH /:id/flags below, so every toggle hits one audited code path.
@@ -217,6 +220,7 @@ router.patch('/:id', authorize('admin'), (req, res) => {
         if (field === 'parent_id') {
           val = val && !isNaN(parseInt(val)) ? parseInt(val) : null;
         }
+        if (field === 'is_ecommerce') val = val ? 1 : 0;
         updates[field] = val;
         diff[field] = { from: client[field], to: val };
       }

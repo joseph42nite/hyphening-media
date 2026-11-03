@@ -109,10 +109,11 @@ async function undo(wt, linked) {
 function triagePrompt(job, manifest) {
   return [
     `You are sorting SEO recommendations for ${job.client.name} (${job.client.website_url}). The site's code is in the current folder.`,
-    'Read the code as needed (you can only read), then sort EVERY recommendation below into one of:',
+    'Read the code as needed (you can only read), then sort EVERY recommendation below into one of these. Only use "already_done" when you have looked at the file and seen it:',
     `- "safe": a code change that is ONLY one of these, small, and inside the allowed files: ${SAFE_LIST.join('; ')}.`,
     '- "needs_007": a site change that is outside that list or risky: wording or copy changes, medical/health/price/legal claims, design or layout, new pages, deleting content, rendering or framework changes, anything large (roughly over 60 changed lines), or anything that needs files outside the allowed list.',
-    '- "not_code": not a change to this site\'s code at all: analytics or Search Console settings, Google Business Profile, backlinks, content strategy or new articles, monitoring, or something already true in the code.',
+    '- "already_done": the code already does what it asks (check the actual files; often a fix that was pushed earlier). The reason must say what you found and where, e.g. "index.html already has a 148-character meta description".',
+    '- "not_code": not a change to this site\'s code at all: analytics or Search Console settings, Google Business Profile, backlinks, content strategy or new articles, monitoring.',
     `Allowed files: ${manifest.seo_fixes.paths.join(', ')}. Never: ${(manifest.seo_fixes.never_touch || []).join(', ') || '(none listed)'}.`,
     job.client.blog_compliance_profile === 'healthcare' ? 'This is a healthcare client: anything touching health claims is "needs_007".' : '',
     'Give each a one-line reason a busy owner understands.',

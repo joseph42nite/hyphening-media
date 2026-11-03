@@ -97,7 +97,7 @@ export default function SeoNightPanel({ showToast }) {
         <div>
           <h2 style={{ fontSize: '1.1rem', textTransform: 'uppercase', fontWeight: 900, margin: 0 }}>SEO Monitor</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            Fixes ready {t.fixes_ready} · Needs you {t.needs_007} · Failed {t.failed} · Skills run last night {t.skills_run}
+            Fixes ready {t.fixes_ready} · Needs you {t.needs_007} · Failed {t.failed} · Marked done {t.already_done || 0} · Skills run last night {t.skills_run}
           </p>
         </div>
         <FleetModeToggle
@@ -150,6 +150,7 @@ export default function SeoNightPanel({ showToast }) {
                   <span style={{ color: '#4ade80' }}>{ready.length} fix{ready.length === 1 ? '' : 'es'} ready</span>
                   <span style={{ color: c.needs_007.length ? '#facc15' : 'var(--text-muted)' }}>· {c.needs_007.length} need you</span>
                   <span style={{ color: c.failed.length ? '#f87171' : 'var(--text-muted)' }}>· {c.failed.length} failed</span>
+                  {c.already_done?.length > 0 && <span style={{ color: '#60a5fa' }}>· {c.already_done.length} already done</span>}
                   {c.approved_for_tonight > 0 && <span style={muted}>· {c.approved_for_tonight} approved for tonight</span>}
                 </button>
                 {isOpen && (
@@ -158,6 +159,7 @@ export default function SeoNightPanel({ showToast }) {
                     {c.needs_007.slice(0, 8).map(f => <li key={f.id} style={{ color: '#facc15' }}>{f.metric}: <span style={{ color: 'var(--text-muted)' }}>{f.fix_reason}</span></li>)}
                     {c.needs_007.length > 8 && <li style={muted}>…and {c.needs_007.length - 8} more in Review</li>}
                     {c.failed.map(f => <li key={f.id} style={{ color: '#f87171' }}>{f.metric}: <span style={{ color: 'var(--text-muted)' }}>{f.fix_error}</span></li>)}
+                    {(c.already_done || []).map(f => <li key={f.id} style={{ color: '#60a5fa' }}>{f.metric}: <span style={{ color: 'var(--text-muted)' }}>{f.fix_reason}</span></li>)}
                   </ul>
                 )}
               </div>
