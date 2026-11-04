@@ -890,7 +890,7 @@ tr:hover td {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-main, #18181b);
+  color: var(--text-primary);
 }
 
 .content-modal-close-btn {
@@ -908,7 +908,7 @@ tr:hover td {
 
 .content-modal-close-btn:hover {
   background: rgba(0, 0, 0, 0.08);
-  color: var(--text-main, #18181b);
+  color: var(--text-primary);
 }
 
 .content-modal-actions {

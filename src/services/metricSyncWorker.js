@@ -21,7 +21,8 @@ async function getClientMediaList(clientId) {
   try {
     const userMedia = await executeClientAction(clientId, 'INSTAGRAM_GET_IG_USER_MEDIA', {
       ig_user_id: 'me',
-      fields: 'id,caption,media_type,permalink,shortcode,like_count,comments_count,timestamp'
+      fields: 'id,caption,media_type,permalink,shortcode,like_count,comments_count,timestamp',
+      limit: 100 // the API's default is 25, which drops a busy account's older posts
     });
     const list = Array.isArray(userMedia?.data?.data) ? userMedia.data.data : [];
     mediaListCache.set(clientId, list);
@@ -37,20 +38,23 @@ async function getClientMediaList(clientId) {
  * Match a content tracker row to an Instagram media item.
  * Strategy: 1) Match by shortcode/link  2) Match by date proximity (±2 days)
  */
-function findMatchingMedia(item, mediaList) {
-  const shortcode = extractInstagramShortcode(item.link);
+export function findMatchingMedia(item, mediaList) {
+  // The post can be in the main Link or in the IG field, which the form
+  // fills when a row has a link per platform.
+  const links = [item.link, item.instagram_link].filter(Boolean);
 
-  // 1. Match by shortcode
-  if (shortcode) {
-    const match = mediaList.find(m =>
-      m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode))
-    );
-    if (match) return match;
-  }
+  for (const link of links) {
+    // 1. Match by shortcode
+    const shortcode = extractInstagramShortcode(link);
+    if (shortcode) {
+      const match = mediaList.find(m =>
+        m.shortcode === shortcode || (m.permalink && m.permalink.includes(shortcode))
+      );
+      if (match) return match;
+    }
 
-  // 2. Match by link containing shortcode
-  if (item.link) {
-    const match = mediaList.find(m => m.shortcode && item.link.includes(m.shortcode));
+    // 2. Match by link containing shortcode
+    const match = mediaList.find(m => m.shortcode && link.includes(m.shortcode));
     if (match) return match;
   }
 
