@@ -22,7 +22,7 @@ router.get('/clients', authorize('admin', 'api_readonly'), (req, res) => {
   try {
     const rows = db.prepare(`
       SELECT id, name, client_type, is_active,
-             blog_enabled, seo_enabled, ads_enabled,
+             blog_enabled, blog_audio_enabled, seo_enabled, ads_enabled,
              gsc_property, ga4_property_id
       FROM crm_clients
       ORDER BY id
@@ -36,6 +36,7 @@ router.get('/clients', authorize('admin', 'api_readonly'), (req, res) => {
         client_type: r.client_type,
         is_active: !!r.is_active,
         blog_enabled: !!r.blog_enabled,
+        blog_audio_enabled: !!r.blog_audio_enabled,
         seo_enabled: !!r.seo_enabled,
         ads_enabled: !!r.ads_enabled,
         gsc_property: r.gsc_property || null,

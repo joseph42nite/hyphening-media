@@ -192,7 +192,8 @@ for cid, c in clients.items():
     readiness.append((c, level, lines, flags))
 
 # ---- changes since last run -------------------------------------------------
-FIELDS = ("name", "is_active", "blog_enabled", "seo_enabled", "ads_enabled", "gsc_property", "ga4_property_id")
+FIELDS = ("name", "is_active", "blog_enabled", "blog_audio_enabled", "seo_enabled", "ads_enabled", "gsc_property", "ga4_property_id")
+FLAG_LABEL = {"blog_audio_enabled": "blog audio"}
 prev, first_run = {}, False
 try:
     prev = {int(k): v for k, v in json.load(open(state_file))["clients"].items()}
@@ -209,11 +210,13 @@ if data and not first_run:
     for cid in sorted(set(clients) & set(prev)):
         a, b = prev[cid], clients[cid]
         for f in FIELDS:
+            if f not in a:  # a field newer than the saved state: nothing to compare yet
+                continue
             if a.get(f) != b.get(f):
                 if f == "is_active":
                     changes.append(f"client {cid} {b['name']}: {'reactivated' if b[f] else 'DEACTIVATED: archive its room'}")
                 elif f.endswith("_enabled"):
-                    changes.append(f"client {cid} {b['name']}: {f.split('_')[0]} switched {'ON' if b[f] else 'off'}")
+                    changes.append(f"client {cid} {b['name']}: {FLAG_LABEL.get(f, f.split('_')[0])} switched {'ON' if b[f] else 'off'}")
                 else:
                     changes.append(f"client {cid} {b['name']}: {f} {a.get(f) or 'unknown'} -> {b.get(f) or 'unknown'}")
 
@@ -317,7 +320,7 @@ Full client list: [[Companies/Hyphening/Docs/Hyphening - Client Status]] · hist
 # change before the notes have reported it.
 if data and write:
     os.makedirs(os.path.dirname(state_file), exist_ok=True)
-    json.dump({"saved_at": now_iso, "clients": {str(k): {f: v.get(f) for f in FIELDS} for k, v in clients.items()}},
+    json.dump({"saved_at": now_iso, "clients": {str(k): {f: v[f] for f in FIELDS if f in v} for k, v in clients.items()}},
               open(state_file, "w"), indent=1)
 
 sys.exit(2 if overall == BLOCKED else 0)
