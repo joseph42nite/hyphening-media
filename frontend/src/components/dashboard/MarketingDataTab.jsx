@@ -293,6 +293,14 @@ export default function MarketingDataTab({
     setShowContentModal(true);
   };
 
+  // A click anywhere on a tracker row edits it, except on the row's own
+  // controls (status dropdown, post links, Edit/Delete) or when selecting text.
+  const openContentFromRow = (e, item) => {
+    if (e.target.closest('a, button, select, input, textarea')) return;
+    if (window.getSelection()?.toString()) return;
+    openContentModal(item);
+  };
+
   const handleContentSubmit = async (e) => {
     e.preventDefault();
     if (!selectedClientForReports) return;
@@ -588,7 +596,12 @@ export default function MarketingDataTab({
                   </tr>
                 ) : (
                   visibleContent.map(item => (
-                    <tr key={item.id}>
+                    <tr
+                      key={item.id}
+                      onClick={canEdit ? (e) => openContentFromRow(e, item) : undefined}
+                      style={canEdit ? { cursor: 'pointer' } : undefined}
+                      title={canEdit ? 'Click to edit' : undefined}
+                    >
                       <td>{item.date ? formatDateStr(item.date) : '-'}</td>
                       <td><span className="badge badge-info">{item.post_type}</span></td>
                       <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.script_title || item.script}>
