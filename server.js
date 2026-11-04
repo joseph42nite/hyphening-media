@@ -525,8 +525,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
           </div>`
     ).join('\n          ');
 
-    return `<noscript>
-      <main>
+    return `<main>
         <h1>Hyphening Media: Creative Operations and Marketing Performance for D2C, B2B, F&amp;B and Healthcare Brands</h1>
         <p class="lead">Hyphening Media is a Bengaluru-based creative operations agency for ambitious D2C, B2B, F&B, and healthcare brands that want content to produce customers, not just views. We script, shoot, produce and measure the work ourselves, so a campaign and its numbers sit under one roof. For healthcare brands, every piece is built inside advertising rules, not around them.</p>
         <p>A follower count and a bank balance have one thing in common: neither tells you why it changed. We report CTR, conversions and organic reach, and we leave out the numbers that only look good.</p>
@@ -585,8 +584,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
           <a href="https://www.instagram.com/hypheningmedia/">Instagram</a> ·
           <a href="https://www.linkedin.com/company/are-you-hyphening/">LinkedIn</a>
         </address>
-      </main>
-    </noscript>`;
+      </main>`;
   }
 
   // SPA fallback — serve index.html for all non-API routes with dynamic canonical injection & 301 trailing slash normalization
@@ -633,7 +631,10 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
       const canonicalTag = onAdminHost ? '' : `<link rel="canonical" href="${canonicalUrl}" />`;
       let updatedHtml = html.replace('</head>', `  ${canonicalTag}\n</head>`);
       if (cleanPath === '/') {
-        updatedHtml = updatedHtml.replace('</body>', `  ${buildHomepageNoscript()}\n  </body>`);
+        // Inside #root (not <noscript>): the raw HTML carries the full copy and
+        // FAQ, and createRoot() replaces it once the app mounts.
+        const homepageHtml = buildHomepageNoscript();
+        updatedHtml = updatedHtml.replace(/<div id="root">[\s\S]*?<\/main>/, () => `<div id="root">\n      ${homepageHtml}`);
       } else if (!onAdminHost) {
         // Blog, case study and capability bodies for non-JS crawlers (rec 1968).
         updatedHtml = injectSocialMeta(updatedHtml, cleanPath, canonicalUrl);
