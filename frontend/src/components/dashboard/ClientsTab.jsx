@@ -20,6 +20,14 @@ const EMPTY_ONBOARDING_FIELDS = {
   brand_niche_keywords: '', brand_publishing_cadence: ''
 };
 
+// The venue name follows the client name while the two match (or the venue
+// name is empty), so a venue named after its client is typed once.
+const withClientName = (form, name) => ({
+  ...form,
+  name,
+  ...(!form.venue_name || form.venue_name === form.name ? { venue_name: name } : {})
+});
+
 // Line-delimited textarea <-> stored JSON-array-as-string convention shared
 // with the backend. Nothing here is rendered to a file — a blog skill run
 // pulls these same columns live via GET /api/clients/:id/onboarding.
@@ -573,7 +581,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
               <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Client Name</label>
-                  <input type="text" className="form-control" value={clientFormData.name} onChange={e => setClientFormData({...clientFormData, name: e.target.value})} required />
+                  <input type="text" className="form-control" value={clientFormData.name} onChange={e => setClientFormData(withClientName(clientFormData, e.target.value))} required />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Client Type</label>
@@ -623,10 +631,11 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
                       <input
                         type="text"
                         className="form-control"
-                        placeholder={clientFormData.name || 'Same as client name'}
+                        placeholder="Same as client name"
                         value={clientFormData.venue_name}
                         onChange={e => setClientFormData({...clientFormData, venue_name: e.target.value})}
                       />
+                      <small style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Same as client name — change only if the venue is called something else.</small>
                     </div>
                     <div className="form-group">
                       <label className="form-label">City</label>
