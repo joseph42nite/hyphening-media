@@ -10,7 +10,7 @@ import { portalLimiter } from '../middleware/rateLimit.js';
 import { logAction } from '../services/auditLogger.js';
 import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { getConnectUrl, getClientConnectedAccounts } from '../services/composioService.js';
-import { fetchPostComments, replyToComment } from '../services/commentSync.js';
+import { syncPostComments, replyToComment } from '../services/commentSync.js';
 import { countableLeadSql } from '../services/leadFilters.js';
 import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS, parseJsonArrayInput } from '../services/onboardingFields.js';
 import { PREFERENCE_FIELDS, validatePreferenceInput } from '../services/blogPipeline.js';
@@ -1354,33 +1354,18 @@ router.post('/:token/comments/sync', portalAuth, async (req, res) => {
         AND (t.link IS NOT NULL OR t.platform_post_id IS NOT NULL OR t.instagram_media_id IS NOT NULL OR t.youtube_video_id IS NOT NULL)
     `).all(req.portalClient.id);
 
-    const insertComment = db.prepare(`
-      INSERT OR IGNORE INTO social_comments (
-        content_id, client_id, platform, comment_id, commenter_name, comment_text, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    let synced = 0;
+    let synced = 0, removed = 0;
     for (const post of recentPosts) {
       try {
-        for (const comment of await fetchPostComments(req.portalClient.id, post)) {
-          insertComment.run(
-            post.id,
-            req.portalClient.id,
-            comment.platform,
-            comment.id,
-            comment.author,
-            comment.text,
-            comment.publishedAt || new Date().toISOString()
-          );
-          synced++;
-        }
+        const r = await syncPostComments(req.portalClient.id, post);
+        synced += r.added;
+        removed += r.removed;
       } catch (err) {
         console.error(`[PORTAL-COMMENTS] Sync failed for post #${post.id}:`, err.message);
       }
     }
 
-    res.json({ success: true, synced, postsChecked: recentPosts.length });
+    res.json({ success: true, synced, removed, postsChecked: recentPosts.length });
   } catch (err) {
     console.error('[PORTAL-COMMENTS] Manual sync error:', err.message);
     res.status(500).json({ error: 'Failed to sync comments' });
@@ -1393,12 +1378,15 @@ router.post('/:token/comments/sync', portalAuth, async (req, res) => {
  */
 router.get('/:token/comments', portalAuth, (req, res) => {
   try {
+    // Answered comments leave the inbox; ?replied=1 lists them instead.
+    const replied = req.query.replied === '1';
     const comments = db.prepare(`
-      SELECT sc.*, ct.title AS post_title
+      SELECT sc.*, ct.title AS post_title,
+             ct.link AS post_link, ct.instagram_link AS post_instagram_link, ct.youtube_link AS post_youtube_link
       FROM social_comments sc
       LEFT JOIN marketing_content_tracker ct ON sc.content_id = ct.id
-      WHERE sc.client_id = ?
-      ORDER BY sc.created_at DESC
+      WHERE sc.client_id = ? AND sc.replied_at IS ${replied ? 'NOT NULL' : 'NULL'}
+      ORDER BY ${replied ? 'sc.replied_at' : 'sc.created_at'} DESC
       LIMIT 50
     `).all(req.portalClient.id);
 
@@ -1427,6 +1415,9 @@ router.post('/:token/comments/reply', portalAuth, async (req, res) => {
       console.log(`[PORTAL-COMMENTS] [MOCK] Dry-run reply to comment ${commentId}: "${replyText}"`);
       result = { success: true, mock: true };
     }
+
+    db.prepare(`UPDATE social_comments SET replied_at = CURRENT_TIMESTAMP, reply_text = ?
+                WHERE comment_id = ? AND client_id = ?`).run(replyText, String(commentId), req.portalClient.id);
 
     res.json({ success: true, result });
   } catch (err) {

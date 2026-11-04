@@ -1249,6 +1249,9 @@ export default function ClientPortal({ showToast }) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [replyTextMap, setReplyTextMap] = useState({});
   const [replyingId, setReplyingId] = useState(null);
+  const [showReplied, setShowReplied] = useState(false);
+  const [emojiOpenId, setEmojiOpenId] = useState(null);
+  const replyInputRefs = useRef({});
   const [connectingApp, setConnectingApp] = useState(null);
 
   // Brand & Voice onboarding state (client self-service; admin's Onboarding
@@ -1956,10 +1959,10 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
-  const fetchComments = async () => {
+  const fetchComments = async (replied = showReplied) => {
     try {
       setCommentsLoading(true);
-      const res = await fetch(`${API_BASE}/api/portal/${token}/comments`, { credentials: 'include', cache: 'no-store' });
+      const res = await fetch(`${API_BASE}/api/portal/${token}/comments${replied ? '?replied=1' : ''}`, { credentials: 'include', cache: 'no-store' });
       const data = await res.json();
       if (res.ok && data.comments) {
         setComments(data.comments);
@@ -2103,7 +2106,7 @@ export default function ClientPortal({ showToast }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to sync comments');
-      showToast(`Synced ${data.synced} comments from ${data.postsChecked} posts`, 'success');
+      showToast(`Synced ${data.synced} new comments from ${data.postsChecked} posts${data.removed ? `, removed ${data.removed} deleted on the platform` : ''}`, 'success');
       fetchComments();
     } catch (err) {
       showToast(err.message, 'error');
@@ -2130,7 +2133,7 @@ export default function ClientPortal({ showToast }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send reply');
 
-      showToast('✓ Reply posted live to social platform!', 'success');
+      showToast('✓ Reply posted live — moved to Replied', 'success');
       setReplyTextMap(prev => ({ ...prev, [commentId]: '' }));
       fetchComments();
     } catch (err) {
@@ -2140,6 +2143,26 @@ export default function ClientPortal({ showToast }) {
     }
   };
 
+  // Puts the emoji where the cursor is in that comment's reply box.
+  const insertEmoji = (commentId, emoji) => {
+    const input = replyInputRefs.current[commentId];
+    const text = replyTextMap[commentId] || '';
+    const start = input?.selectionStart ?? text.length;
+    const end = input?.selectionEnd ?? text.length;
+    setReplyTextMap(prev => ({ ...prev, [commentId]: text.slice(0, start) + emoji + text.slice(end) }));
+    requestAnimationFrame(() => {
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  const commentPostUrl = (comm) => {
+    const isYouTube = comm.platform === 'youtube';
+    const own = isYouTube ? comm.post_youtube_link : comm.post_instagram_link;
+    const main = comm.post_link && comm.post_link.includes(isYouTube ? 'youtu' : 'instagram.com') ? comm.post_link : null;
+    return own || main || null;
+  };
 
   const handleApprove = async (id, contentId = null) => {
     if (!window.confirm('Are you sure you want to approve this?')) return;
@@ -3267,6 +3290,13 @@ export default function ClientPortal({ showToast }) {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => { const next = !showReplied; setShowReplied(next); fetchComments(next); }}
+                    className="portal-btn"
+                    style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                  >
+                    {showReplied ? '← Back to inbox' : '✓ Show replied'}
+                  </button>
                   <button 
                     onClick={handleSyncComments}
                     className="portal-btn portal-btn-primary"
@@ -3276,7 +3306,7 @@ export default function ClientPortal({ showToast }) {
                     {syncingComments ? '⏳ Syncing...' : '🔄 Sync Comments'}
                   </button>
                   <button 
-                    onClick={fetchComments}
+                    onClick={() => fetchComments()}
                     className="portal-btn"
                     style={{ fontSize: '0.8rem', padding: '6px 14px' }}
                   >
@@ -3292,9 +3322,11 @@ export default function ClientPortal({ showToast }) {
               ) : comments.length === 0 ? (
                 <div style={{ padding: '36px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px dashed rgba(223, 231, 224, 0.16)', color: '#8b9b90' }}>
                   <MessageSquare size={32} style={{ opacity: 0.4, marginBottom: '8px' }} />
-                  <div style={{ fontWeight: 600, color: '#dfe7e0', fontSize: '0.95rem' }}>No Ingested Comments Yet</div>
+                  <div style={{ fontWeight: 600, color: '#dfe7e0', fontSize: '0.95rem' }}>{showReplied ? 'No replied comments yet' : 'All caught up'}</div>
                   <div style={{ fontSize: '0.8rem', marginTop: '4px', fontWeight: 400 }}>
-                    Comments are automatically synced every night at 2:00 AM UTC once social accounts are connected.
+                    {showReplied
+                      ? 'Comments you reply to here move to this list.'
+                      : 'New comments are synced every night at 2:00 AM UTC once social accounts are connected.'}
                   </div>
                 </div>
               ) : (
@@ -3323,8 +3355,15 @@ export default function ClientPortal({ showToast }) {
                               : `${comm.platform === 'youtube' ? 'YouTube User' : 'Instagram User'}`}
                           </strong>
                         </div>
-                        <span style={{ fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500 }}>
+                        <span style={{ fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '10px' }}>
                           {comm.post_title ? `Post: ${comm.post_title}` : `Post ID: #${comm.content_id}`}
+                          {commentPostUrl(comm) && (
+                            <a href={commentPostUrl(comm)} target="_blank" rel="noopener noreferrer"
+                              title={`Open on ${comm.platform === 'youtube' ? 'YouTube' : 'Instagram'} to like the comment`}
+                              style={{ color: '#dfe7e0', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}>
+                              Open post <ExternalLink size={12} />
+                            </a>
+                          )}
                         </span>
                       </div>
 
@@ -3332,8 +3371,35 @@ export default function ClientPortal({ showToast }) {
                         "{comm.comment_text}"
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      {showReplied ? (
+                        <div style={{ fontSize: '0.82rem', color: '#8b9b90', paddingLeft: '12px' }}>
+                          ↳ You replied{comm.replied_at ? ` on ${new Date(comm.replied_at.replace(' ', 'T') + 'Z').toLocaleDateString()}` : ''}:{' '}
+                          <span style={{ color: '#dfe7e0' }}>"{comm.reply_text}"</span>
+                        </div>
+                      ) : (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px', position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={() => setEmojiOpenId(emojiOpenId === comm.comment_id ? null : comm.comment_id)}
+                          className="portal-btn"
+                          title="Add an emoji"
+                          aria-label="Add an emoji"
+                          style={{ fontSize: '1rem', padding: '6px 10px' }}
+                        >
+                          😊
+                        </button>
+                        {emojiOpenId === comm.comment_id && (
+                          <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 5, display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2px', padding: '8px', background: '#0b0e12', border: '1px solid rgba(223, 231, 224, 0.16)', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                            {['🙌', '❤️', '😊', '🙏', '👏', '🔥', '😍', '👍', '✨', '💯', '😂', '🤩', '🥰', '😁', '👌', '💪', '🦷', '💙', '🎉', '😇', '🤝', '👀', '😄', '🌟'].map(e => (
+                              <button key={e} type="button" onClick={() => insertEmoji(comm.comment_id, e)}
+                                style={{ background: 'transparent', border: 0, fontSize: '1.15rem', padding: '4px', cursor: 'pointer', borderRadius: '6px' }}>
+                                {e}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         <input
+                          ref={el => { replyInputRefs.current[comm.comment_id] = el; }}
                           type="text"
                           placeholder="Type live reply to post on social platform..."
                           value={replyTextMap[comm.comment_id] || ''}
@@ -3357,6 +3423,7 @@ export default function ClientPortal({ showToast }) {
                           <Send size={14} /> {replyingId === comm.comment_id ? 'Posting...' : 'Reply'}
                         </button>
                       </div>
+                      )}
                     </div>
                   ))}
                 </div>

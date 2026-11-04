@@ -1,5 +1,5 @@
 import db from '../../database.js';
-import { fetchPostComments } from './commentSync.js';
+import { syncPostComments } from './commentSync.js';
 
 /**
  * Daily Comment Ingestion Cron Worker (Runs once at 2:00 AM UTC)
@@ -22,27 +22,9 @@ export async function runDailyCommentSync() {
 
     if (!process.env.COMPOSIO_API_KEY) return;
 
-    const insert = db.prepare(`
-      INSERT OR IGNORE INTO social_comments (
-        content_id, client_id, platform, comment_id, commenter_name, comment_text, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
     for (const post of recentPosts) {
       try {
-        for (const comment of await fetchPostComments(post.client_id, post)) {
-          // Tagged with the platform the comment came from, not the row's
-          // primary platform — a cross-posted row collects both.
-          insert.run(
-            post.id,
-            post.client_id,
-            comment.platform,
-            comment.id,
-            comment.author,
-            comment.text,
-            comment.publishedAt || new Date().toISOString()
-          );
-        }
+        await syncPostComments(post.client_id, post);
       } catch (err) {
         console.error(`[COMMENT-SYNC] Failed to fetch comments for post #${post.id}:`, err.message);
       }
