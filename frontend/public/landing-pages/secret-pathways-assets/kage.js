@@ -3421,12 +3421,23 @@ function wirePartnerForm() {
   });
 }
 
-window.navigateToSection = function(targetId) {
-  if (!targetId || targetId === 'top' || targetId === 'hero') {
-    window.scrollTo({ top: 0, behavior: REDUCE ? 'auto' : 'smooth' });
-    return;
+/* Menu links can arrive before the loader is done: from another page the
+   site opens /#contact and asks within a second, while the scene takes
+   several. Until the page is unlocked, remember the last request (or the
+   parent page's #section) and go there once it is. */
+let sectionsAreReady = false, pendingSection = null;
+function sectionsReady() {
+  sectionsAreReady = true;
+  let target = pendingSection;
+  if (!target) {
+    try { target = (window.parent.location.hash || location.hash).slice(1); } catch (e) { target = location.hash.slice(1); }
+    if (!SECTION_IDS[target]) target = null;
   }
-  const idMap = {
+  pendingSection = null;
+  if (target) window.navigateToSection(target);
+}
+
+const SECTION_IDS = {
     'our-story': 'gate',
     'story': 'gate',
     'gate': 'gate',
@@ -3439,8 +3450,15 @@ window.navigateToSection = function(targetId) {
     'contact': 'eternity',
     'partners': 'eternity',
     'eternity': 'eternity'
-  };
-  const actualId = idMap[targetId] || targetId;
+};
+
+window.navigateToSection = function(targetId) {
+  if (!sectionsAreReady) { pendingSection = targetId; return; }
+  if (!targetId || targetId === 'top' || targetId === 'hero') {
+    window.scrollTo({ top: 0, behavior: REDUCE ? 'auto' : 'smooth' });
+    return;
+  }
+  const actualId = SECTION_IDS[targetId] || targetId;
   const t = document.getElementById(actualId) || document.querySelector('#' + actualId);
   if (t) {
     const topPos = actualId === 'top' ? 0 : Math.max(0, t.offsetTop - 50);
@@ -3871,6 +3889,7 @@ function fallback(err) {
   preEl.classList.add('done');
   $$('[data-rv], .mask-line').forEach(e => e.classList.add('rv-in'));
   window.__kage = window.__secret = { fallback: true, error: String(err && err.message || err) };
+  sectionsReady();
 }
 
 let started = false;
@@ -3894,12 +3913,14 @@ function start() {
     $$('[data-rv], .mask-line').forEach(e => e.classList.add('rv-in'));
     document.body.classList.remove('is-locked');
     preEl.classList.add('done');
+    sectionsReady();
   } else {
     preEl.classList.add('done');
     setTimeout(() => {
       document.body.classList.remove('is-locked');
       $('#hero').querySelectorAll('[data-rv], .mask-line').forEach((e, i) =>
         setTimeout(() => e.classList.add('rv-in'), REDUCE ? 0 : 120 + i * 95));
+      sectionsReady();
     }, REDUCE ? 0 : 340);
   }
   running = true; tPrev = performance.now();
