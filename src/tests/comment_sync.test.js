@@ -37,3 +37,19 @@ describe('syncPostComments', () => {
     expect(stored()).toEqual(['t1', 'y1']);
   });
 });
+
+describe('comments already answered', () => {
+  it('leave the inbox with the reply kept, and replies are never inbox items', async () => {
+    const fetchFn = async () => ({
+      comments: [c('a1'), c('a2')],
+      complete: new Set(),
+      answered: new Map([['a1', { text: 'Thanks! :D', at: '2026-11-04T07:25:29+0000' }]]),
+    });
+    await syncPostComments(post.client_id, post, { fetchFn });
+    const rows = db.prepare("SELECT comment_id, replied_at, reply_text FROM social_comments WHERE comment_id IN ('a1', 'a2') ORDER BY comment_id").all();
+    expect(rows).toEqual([
+      { comment_id: 'a1', replied_at: '2026-11-04 07:25:29', reply_text: 'Thanks! :D' },
+      { comment_id: 'a2', replied_at: null, reply_text: null },
+    ]);
+  });
+});

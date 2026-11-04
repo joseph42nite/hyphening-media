@@ -26,8 +26,20 @@ function normalizeYouTubeThread(thread) {
     author: snippet.authorDisplayName || 'YouTube User',
     // textDisplay carries YouTube's HTML entities (&#39;); textOriginal is raw.
     text: snippet.textOriginal || snippet.textDisplay || '',
-    publishedAt: snippet.publishedAt || null
+    publishedAt: snippet.publishedAt || null,
+    ownReply: ownYouTubeReply(thread)
   };
+}
+
+/** The channel's own latest reply in a thread, if it answered: { text, at }. */
+function ownYouTubeReply(thread) {
+  const channelId = thread?.snippet?.channelId;
+  if (!channelId) return null;
+  const own = (thread?.replies?.comments || [])
+    .map(r => r?.snippet || {})
+    .filter(r => r.authorChannelId?.value === channelId)
+    .sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)))[0];
+  return own ? { text: own.textOriginal || own.textDisplay || '', at: own.publishedAt || null } : null;
 }
 
 function normalizeInstagramComment(comment) {
@@ -39,7 +51,11 @@ function normalizeInstagramComment(comment) {
       || comment?.owner?.username
       || 'Instagram User',
     text: comment?.text || '',
-    publishedAt: comment?.timestamp || null
+    publishedAt: comment?.timestamp || null,
+    // Instagram lists replies alongside comments: a reply names its comment
+    // in parent_id, and the account's own carry self_ig_scoped_id.
+    parentId: comment?.parent_id || null,
+    fromSelf: !!comment?.from?.self_ig_scoped_id
   };
 }
 
@@ -76,12 +92,14 @@ export async function fetchPostComments(clientId, post) {
 
 /**
  * fetchPostComments plus, per platform, whether the platform returned the
- * post's whole comment list (no further page). Only a whole list can say a
- * comment is gone; a first page of a busy post can't.
+ * post's whole comment list (no further page) — only a whole list can say a
+ * comment is gone; a first page of a busy post can't — and which comments the
+ * account has already answered, wherever the reply was sent from.
  */
 export async function fetchPostCommentsWithStatus(clientId, post) {
   const collected = [];
   const complete = new Set();
+  const answered = new Map(); // comment id -> the account's own reply { text, at }
 
   const videoId = resolveYouTubeVideoId(post);
   if (videoId) {
@@ -91,8 +109,10 @@ export async function fetchPostCommentsWithStatus(clientId, post) {
       maxResults: 100
     });
     for (const thread of (res?.data?.items || [])) {
-      const c = normalizeYouTubeThread(thread);
-      if (c.id) collected.push({ ...c, platform: 'youtube' });
+      const { ownReply, ...c } = normalizeYouTubeThread(thread);
+      if (!c.id) continue;
+      collected.push({ ...c, platform: 'youtube' });
+      if (ownReply) answered.set(String(c.id), ownReply);
     }
     if (Array.isArray(res?.data?.items) && !res.data.nextPageToken) complete.add('youtube');
   }
@@ -104,13 +124,28 @@ export async function fetchPostCommentsWithStatus(clientId, post) {
     });
     const raw = res?.data?.data || res?.data || [];
     for (const comment of (Array.isArray(raw) ? raw : [])) {
-      const c = normalizeInstagramComment(comment);
-      if (c.id) collected.push({ ...c, platform: 'instagram' });
+      const { parentId, fromSelf, ...c } = normalizeInstagramComment(comment);
+      if (!c.id) continue;
+      if (parentId) {
+        // A reply isn't an inbox item; the account's own marks its comment answered.
+        const prev = answered.get(String(parentId));
+        if (fromSelf && (!prev || String(c.publishedAt) > String(prev.at))) {
+          answered.set(String(parentId), { text: c.text, at: c.publishedAt });
+        }
+        continue;
+      }
+      collected.push({ ...c, platform: 'instagram' });
     }
     if (Array.isArray(raw) && !res?.data?.paging?.next) complete.add('instagram');
   }
 
-  return { comments: collected, complete };
+  return { comments: collected, complete, answered };
+}
+
+// Instagram's "+0000" offsets aren't something SQLite's datetime() reads.
+function sqliteTime(at) {
+  const d = at ? new Date(at) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toISOString().replace('T', ' ').slice(0, 19) : null;
 }
 
 /**
@@ -121,11 +156,16 @@ export async function fetchPostCommentsWithStatus(clientId, post) {
  * @returns {{ added: number, removed: number }}
  */
 export async function syncPostComments(clientId, post, { fetchFn = fetchPostCommentsWithStatus } = {}) {
-  const { comments, complete } = await fetchFn(clientId, post);
+  const { comments, complete, answered = new Map() } = await fetchFn(clientId, post);
   const insert = db.prepare(`
     INSERT OR IGNORE INTO social_comments (
       content_id, client_id, platform, comment_id, commenter_name, comment_text, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const markAnswered = db.prepare(`
+    UPDATE social_comments
+    SET replied_at = COALESCE(replied_at, ?, CURRENT_TIMESTAMP), reply_text = COALESCE(reply_text, ?)
+    WHERE comment_id = ? AND client_id = ?
   `);
   let added = 0, removed = 0;
   db.transaction(() => {
@@ -134,6 +174,10 @@ export async function syncPostComments(clientId, post, { fetchFn = fetchPostComm
       // platform — a cross-posted row collects both.
       added += insert.run(post.id, clientId, c.platform, c.id, c.author, c.text,
         c.publishedAt || new Date().toISOString()).changes;
+    }
+    // Answered in the app or before the inbox recorded replies: out of the inbox.
+    for (const [commentId, reply] of answered) {
+      markAnswered.run(sqliteTime(reply.at), reply.text, commentId, clientId);
     }
     for (const platform of complete) {
       const seen = comments.filter(c => c.platform === platform).map(c => String(c.id));
