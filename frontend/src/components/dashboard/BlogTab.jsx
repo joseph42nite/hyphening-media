@@ -49,7 +49,7 @@ export default function BlogTab({ showToast }) {
     let internalLinksStr = '';
     try {
       const parsed = JSON.parse(post.internal_links || '[]');
-      internalLinksStr = Array.isArray(parsed) ? parsed.join(', ') : '';
+      internalLinksStr = Array.isArray(parsed) ? parsed.map(l => (typeof l === 'string' ? l : l?.url || '')).filter(Boolean).join(', ') : '';
     } catch (e) { internalLinksStr = ''; }
 
     setFormData({

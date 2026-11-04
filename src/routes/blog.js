@@ -182,6 +182,25 @@ router.get('/admin/all', requireAdmin, (req, res) => {
 });
 
 /**
+ * Slugs of the blog posts a post links to. Posts written in the admin editor
+ * store plain slugs; the night pipeline stores {url, anchor} objects, where
+ * only /blog/<slug> URLs are other posts.
+ */
+export function linkedSlugs(internalLinks) {
+  if (!Array.isArray(internalLinks)) return [];
+  const slugs = internalLinks.map(link => {
+    if (typeof link === 'string') return link.includes('/') ? fromBlogUrl(link) : link.trim();
+    return fromBlogUrl(String(link?.url || ''));
+  });
+  return [...new Set(slugs.filter(Boolean))];
+}
+
+function fromBlogUrl(url) {
+  const m = url.match(/\/blog\/([^/?#]+)/);
+  return m ? m[1] : '';
+}
+
+/**
  * GET /api/blog/:slug
  * Public. Returns a single published post by slug + related posts.
  */
@@ -210,12 +229,13 @@ router.get('/:slug', (req, res) => {
     }
 
     // Fetch linked posts
+    const slugs = linkedSlugs(internalLinks);
     let linkedPosts = [];
-    if (internalLinks.length > 0) {
-      const placeholders = internalLinks.map(() => '?').join(',');
+    if (slugs.length > 0) {
+      const placeholders = slugs.map(() => '?').join(',');
       linkedPosts = db.prepare(
         `SELECT id, title, slug, excerpt, cover_image_url, category FROM blog_posts WHERE slug IN (${placeholders}) AND status = 'published'`
-      ).all(...internalLinks);
+      ).all(...slugs);
     }
 
     res.json({ post, related, linked_posts: linkedPosts });
