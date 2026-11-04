@@ -89,6 +89,19 @@ describe('queueing', () => {
     runs.addBlogTopics(capped, [{ topic: 'x' }]);
     expect(runs.queueBlogRuns({ clientId: capped, force: true })).toEqual([]);
   });
+
+  it('counts "today" as the IST day, so last evening\'s draft doesn\'t block the 01:00 run', () => {
+    const id = makeClient();
+    runs.addBlogTopics(id, [{ topic: 'Tonight' }]);
+    const at = (shift) => db.prepare(`SELECT datetime('now', '+330 minutes', 'start of day', '-330 minutes', '${shift}') AS t`).get().t;
+    const add = (shift) => db.prepare("INSERT INTO blog_agent_runs (client_id, status, requested_by, created_at) VALUES (?, 'published', 'test', ?)").run(id, at(shift));
+    add('-1 minute'); // 23:59 IST yesterday
+    expect(runs.queueBlogRuns({ clientId: id })).toHaveLength(1);
+    db.prepare("UPDATE blog_agent_runs SET status = 'failed' WHERE client_id = ? AND status = 'queued'").run(id);
+    db.prepare("UPDATE blog_topics SET status = 'planned' WHERE client_id = ?").run(id);
+    add('+1 minute'); // 00:01 IST today
+    expect(runs.queueBlogRuns({ clientId: id })).toEqual([]);
+  });
 });
 
 describe('a run from claim to published', () => {

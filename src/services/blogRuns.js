@@ -24,6 +24,11 @@ const SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://hypheningmedia.com').r
 // Statuses that count against a client's posts-per-month and block a second
 // run the same night. Failed and rejected runs don't count.
 const LIVE_STATUSES = ['queued', 'running', 'client_review', 'ready', 'approved', 'published'];
+// "Today" and "this month" are IST days: at the 01:00 IST run it is still
+// yesterday in UTC, so a UTC day would count yesterday evening's draft.
+const IST = "'+330 minutes'";
+const CREATED_TODAY_IST = `datetime(created_at, ${IST}) >= date('now', ${IST})`;
+const CREATED_THIS_MONTH_IST = `datetime(created_at, ${IST}) >= date('now', ${IST}, 'start of month')`;
 const JSON_FIELDS = ['tags', 'internal_links', 'blockers', 'evidence'];
 
 const now = () => new Date().toISOString();
@@ -64,12 +69,12 @@ export function blogOutlook() {
   return clients.map((c) => {
     const used = db.prepare(`
       SELECT COUNT(*) AS n FROM blog_agent_runs
-      WHERE client_id = ? AND status IN (${placeholders}) AND created_at >= date('now', 'start of month')
+      WHERE client_id = ? AND status IN (${placeholders}) AND ${CREATED_THIS_MONTH_IST}
     `).get(c.id, ...LIVE_STATUSES).n;
     const inFlight = db.prepare(`
       SELECT COUNT(*) AS n FROM blog_agent_runs
       WHERE (client_id = ? AND status IN ('queued', 'running'))
-         OR (client_id = ? AND status IN (${placeholders}) AND created_at >= date('now'))
+         OR (client_id = ? AND status IN (${placeholders}) AND ${CREATED_TODAY_IST})
     `).get(c.id, c.id, ...LIVE_STATUSES).n;
     const planned = db.prepare(`
       SELECT id, topic, target_keyword, planned_for FROM blog_topics WHERE client_id = ? AND status = 'planned'
@@ -109,14 +114,14 @@ export function queueBlogRuns({ clientId = null, requestedBy = 'schedule', force
     const placeholders = LIVE_STATUSES.map(() => '?').join(',');
     const thisMonth = db.prepare(`
       SELECT COUNT(*) AS n FROM blog_agent_runs
-      WHERE client_id = ? AND status IN (${placeholders}) AND created_at >= date('now', 'start of month')
+      WHERE client_id = ? AND status IN (${placeholders}) AND ${CREATED_THIS_MONTH_IST}
     `).get(client.id, ...LIVE_STATUSES).n;
     if (thisMonth >= client.blog_posts_per_month) return null;
 
     const today = db.prepare(`
       SELECT COUNT(*) AS n FROM blog_agent_runs
       WHERE (client_id = ? AND status IN ('queued', 'running'))
-         OR (client_id = ? AND status IN (${placeholders}) AND created_at >= date('now'))
+         OR (client_id = ? AND status IN (${placeholders}) AND ${CREATED_TODAY_IST})
     `).get(client.id, client.id, ...LIVE_STATUSES).n;
     if (today > 0) return null;
 
