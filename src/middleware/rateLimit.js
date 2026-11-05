@@ -7,15 +7,53 @@ import rateLimit from 'express-rate-limit';
 
 /**
  * Global rate limiter: 2000 requests per 15 minutes per IP
+ *
+ * Login, refresh, logout and health skip it: auth has its own limiter, and a
+ * runaway dashboard tab on the same network must not lock anyone out of login.
+ * The first time an IP is blocked in a window, its busiest paths are logged so
+ * the flood can be traced (there is no request log in production).
  */
-export const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 2000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => req.method === 'OPTIONS',
-  message: { error: 'Too many requests, please try again later.' },
-});
+const GLOBAL_EXEMPT = /^\/(auth\/|health$)/;
+
+// Hide ids and portal tokens so the log groups by route and leaks nothing.
+const routeOf = (req) => (req.baseUrl + req.path)
+  .split('/')
+  .map(seg => (/^\d+$/.test(seg) || seg.length >= 20 ? ':id' : seg))
+  .join('/');
+
+export function createGlobalLimiter({ windowMs = 15 * 60 * 1000, max = 2000, log = console.warn } = {}) {
+  const tallies = new Map(); // ip -> { paths: Map<route, count>, logged }
+  setInterval(() => tallies.clear(), windowMs).unref();
+
+  const limiter = rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res, next, options) => {
+      const tally = tallies.get(req.ip);
+      if (tally && !tally.logged) {
+        tally.logged = true;
+        const top = [...tally.paths].sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([route, n]) => `${route} x${n}`).join(', ');
+        log(`[RATE-LIMIT] ${req.ip} blocked after ${max} requests. Busiest: ${top}`);
+      }
+      res.status(options.statusCode).json(options.message);
+    },
+    message: { error: 'Too many requests, please try again later.' },
+  });
+
+  return (req, res, next) => {
+    if (req.method === 'OPTIONS' || GLOBAL_EXEMPT.test(req.path)) return next();
+    let tally = tallies.get(req.ip);
+    if (!tally) tallies.set(req.ip, tally = { paths: new Map(), logged: false });
+    const route = `${req.method} ${routeOf(req)}`;
+    tally.paths.set(route, (tally.paths.get(route) || 0) + 1);
+    return limiter(req, res, next);
+  };
+}
+
+export const globalLimiter = createGlobalLimiter();
 
 /**
  * Auth rate limiter: 300 requests per 15 minutes per IP
