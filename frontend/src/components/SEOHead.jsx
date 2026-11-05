@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const SITE_URL = 'https://hypheningmedia.com';
-const DEFAULT_OG_IMAGE = `${SITE_URL}/og-card.png`;
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-card.jpg`;
 
 /**
  * Dynamic SEO Head Component
