@@ -797,6 +797,20 @@ export function checkRequirements(agentConfig, available) {
   return { ok: missing.length === 0, missing };
 }
 
+/**
+ * Sections a card reads when the client has them, without being blocked when
+ * it does not. `requires` decides whether a card may run at all; this decides
+ * what else it is shown once it does.
+ *
+ * The monitor needs this split. It can run on spend alone, so `requires` is
+ * just spend, but it is asked about conversion quality, tracking and pacing.
+ * Trimmed to `requires`, it was handed spend only and reported leads and
+ * pacing as missing for a client that had both (DentAlchemy, 2026-11-07).
+ */
+const OPTIONAL_SECTIONS = {
+  monitor: ['leads', 'pacing', 'landing'],
+};
+
 /** The fact pack trimmed to what one agent needs, for the claim response.
  *  Sending the whole pack to every agent would put a creative section in a
  *  pacing prompt — tokens spent on context that cannot change the answer. */
@@ -815,6 +829,9 @@ export function packForAgent(pack, agentConfig) {
         ...(pack.sections.cost_per_outcome ? ['cost_per_outcome'] : []),
         ...(required.includes('spend_current_month') && pack.sections.pacing ? ['pacing'] : []),
         ...(required.includes('prices') && pack.sections.revenue ? ['revenue'] : []),
+        // Absent sections are dropped by the loop below, so an optional one
+        // the client lacks is simply not sent.
+        ...(OPTIONAL_SECTIONS[agentConfig.agent_type] || []),
       ])];
 
   const sections = {};

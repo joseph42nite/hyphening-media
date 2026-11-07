@@ -133,6 +133,28 @@ describe('per-agent pack trimming', () => {
     expect(Object.keys(trimmed.sections).length).toBeLessThanOrEqual(Object.keys(pack.sections).length);
   });
 
+  // Built by hand rather than from the database: these pin down the trimming
+  // rule itself, whatever data the test database happens to hold.
+  const monitor = { agent_type: 'monitor', requires: '["spend"]' };
+
+  it('shows the monitor leads, pacing and landing when the client has them', () => {
+    const pack = {
+      focus_month: '2026-11',
+      sections: { spend: {}, leads: {}, pacing: {}, landing: {}, content: {}, prices: {}, cost_per_outcome: {} },
+    };
+    const trimmed = packForAgent(pack, monitor);
+    expect(trimmed.sections_included.sort())
+      .toEqual(['cost_per_outcome', 'landing', 'leads', 'pacing', 'spend']);
+  });
+
+  it('still packs the monitor on spend alone, without inventing the optional sections', () => {
+    const pack = { focus_month: '2026-11', sections: { spend: {} } };
+    const trimmed = packForAgent(pack, monitor);
+    expect(trimmed.sections_included).toEqual(['spend']);
+    expect(trimmed.sections.leads).toBeUndefined();
+    expect(trimmed.sections.pacing).toBeUndefined();
+  });
+
   it('gives the full audit everything', () => {
     const { withSpend } = pickClients();
     if (!withSpend) return;
