@@ -149,6 +149,7 @@ const ADS_SCORE_FIELDS = [
 
 const ADS_PRIORITIES = new Set(['Critical', 'High', 'Medium', 'Low']);
 const ADS_PLATFORMS = new Set(['Google', 'Meta', 'YouTube']);
+export const ADS_KINDS = new Set(['site_code', 'ad_account', 'business']);
 
 /**
  * Stores a finished ads analysis.
@@ -228,8 +229,8 @@ export function handleCreateAdsAudit(payload) {
       const insert = db.prepare(`
         INSERT INTO ads_recommendations (
           audit_id, client_id, priority, platform, campaign_name, metric,
-          issue, action_required, observation, failure_check, expected_impact
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          issue, action_required, observation, failure_check, expected_impact, kind, page_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const rec of payload.recommendations) {
         // The three fields a recommendation is useless without. A row with a
@@ -248,6 +249,10 @@ export function handleCreateAdsAudit(payload) {
           rec.observation || null,
           rec.failure_check || null,
           rec.expected_impact || null,
+          // Where it is acted on. Unknown values are stored as NULL: the night
+          // worker sorts those itself, so a typo never routes code work away.
+          ADS_KINDS.has(rec.kind) ? rec.kind : null,
+          typeof rec.page_url === 'string' && /^https?:\/\//.test(rec.page_url) ? rec.page_url.slice(0, 1000) : null,
         );
         stored++;
       }

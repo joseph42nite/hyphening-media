@@ -40,17 +40,17 @@ router.post('/batches/:id/discard', authorize('admin'), (req, res) => {
   res.json({ success: true });
 });
 
-/** POST /api/seo-night/recommendations/:id/fix-tonight */
+/** POST /api/seo-night/recommendations/:id/fix-tonight — :id is an SEO id, or 'ads-<id>' for an ads finding. */
 router.post('/recommendations/:id/fix-tonight', authorize('admin'), (req, res) => {
-  const r = approveFixTonight(parseInt(req.params.id, 10), req.user);
+  const r = approveFixTonight(req.params.id, req.user);
   if (r.status !== 200) return res.status(r.status).json({ error: r.error });
-  logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'seo_fix_approved', entityType: 'seo_recommendation', entityId: parseInt(req.params.id, 10) });
+  logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'seo_fix_approved', entityType: String(req.params.id).startsWith('ads-') ? 'ads_recommendation' : 'seo_recommendation', entityId: parseInt(String(req.params.id).replace(/^ads-/, ''), 10) });
   res.json({ success: true });
 });
 
 /** POST /api/seo-night/recommendations/:id/ignore */
 router.post('/recommendations/:id/ignore', authorize('admin'), (req, res) => {
-  const r = ignoreRecommendation(parseInt(req.params.id, 10));
+  const r = ignoreRecommendation(req.params.id);
   if (r.status !== 200) return res.status(r.status).json({ error: r.error });
   res.json({ success: true });
 });

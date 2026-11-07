@@ -1103,7 +1103,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
       </div>
         )}
       />
-      <OutreachPanel showToast={showToast} clientId={selectedClientId} />
+      <OutreachPanel showToast={showToast} clientId={selectedClientId} seoOn={!!selectedClient?.seo_enabled} />
 
       {!selectedClientId ? (
         <div style={{ textAlign: 'center', padding: '48px 24px', background: 'rgba(12, 16, 24, 0.6)', borderRadius: '12px', border: '1px dashed rgba(223, 231, 224, 0.15)' }}>

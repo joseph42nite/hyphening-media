@@ -20,7 +20,7 @@ const tabStyle = (active) => ({
   borderBottom: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
 });
 
-export default function OutreachPanel({ showToast, clientId }) {
+export default function OutreachPanel({ showToast, clientId, seoOn = true }) {
   const [data, setData] = useState(null);
   const [view, setView] = useState('approve');
   const [openId, setOpenId] = useState(null);
@@ -84,7 +84,8 @@ export default function OutreachPanel({ showToast, clientId }) {
     act(`o${p.id}`, () => api(`/api/outreach/${p.id}/outcome`, { method: 'POST', body: JSON.stringify(body) }), STATUS_LABEL[kind]);
   };
 
-  if (!data || !clientId) return null;
+  // Outreach runs only for clients with SEO on; for the rest it could only fail.
+  if (!data || !clientId || !seoOn) return null;
   const dfs = data.dataforseo;
   const failedRuns = data.runs.filter(r => mine(r) && r.status === 'failed');
 

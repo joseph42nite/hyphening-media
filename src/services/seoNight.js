@@ -32,6 +32,35 @@ const TRIAGE_LIMIT = 40;
 const NIGHT_SKIP = new Set(['full', 'flow', 'backlinks', 'backlink_gap', 'dataforseo', 'maps']);
 const OPEN_BATCH = ['queued', 'running', 'ready', 'deploy_queued', 'deploying'];
 
+// Findings from both fleets share one fix batch per client: they land in the
+// same repo and go live with the same Deploy. An SEO finding keeps its numeric
+// id; an ads finding travels as 'ads-<id>' (to the worker, in the report, in
+// the routes), so the two tables' ids never collide.
+const REC_TABLES = { seo: 'seo_recommendations', ads: 'ads_recommendations' };
+export const recKey = (fleet, id) => (fleet === 'ads' ? `ads-${id}` : id);
+export function parseRecKey(key) {
+  const m = /^ads-(\d+)$/.exec(String(key));
+  if (m) return { fleet: 'ads', table: REC_TABLES.ads, id: Number(m[1]) };
+  const n = Number(String(key).replace(/^seo-/, ''));
+  return Number.isInteger(n) && n > 0 ? { fleet: 'seo', table: REC_TABLES.seo, id: n } : null;
+}
+const TABLES = Object.values(REC_TABLES);
+/** Runs a statement on both tables and adds up the changes or counts. */
+const sumBoth = (sql, ...params) => TABLES.reduce((n, t) => n + (db.prepare(sql.replaceAll('{recs}', t)).get(...params)?.n || 0), 0);
+const runBoth = (sql, ...params) => TABLES.forEach((t) => db.prepare(sql.replaceAll('{recs}', t)).run(...params));
+// An ads finding goes to the worker when it is website code, or not sorted yet
+// (from before cards set `kind`); the worker calls the others not_code.
+const ADS_CANDIDATE = "(r.kind = 'site_code' OR r.kind IS NULL)";
+const PRIORITY_RANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+
+/** Which fleets' findings the night worker takes for a client: enabled for the client and on Auto. */
+function fixFleets(client) {
+  const f = [];
+  if (client.seo_enabled && getMode('seo') === 'auto') f.push('seo');
+  if (client.ads_enabled && getMode('ads') === 'auto') f.push('ads');
+  return f;
+}
+
 /** The IST date a night belongs to (01:15 on the 4th → '2026-11-04'). */
 export function istDate(d = new Date()) {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -105,12 +134,16 @@ export function queueNightAudits({ by = 'agent', clientId = null } = {}) {
   return { queued, skipped };
 }
 
-/** Boothroyd, 03:30 IST: one fix batch per SEO-on client that has a site repo on the Mac. */
+/**
+ * Boothroyd, 03:30 IST: one fix batch per client that has a site repo on the
+ * Mac, taking its SEO findings, its ads website-code findings, or both —
+ * whichever fleets are on for the client and on Auto.
+ */
 export function queueSeoFixes({ by = 'agent', clientId = null } = {}) {
-  if (getMode('seo') !== 'auto') return { queued: [], skipped: [{ reason: 'SEO fleet is on Manual' }] };
+  if (getMode('seo') !== 'auto' && getMode('ads') !== 'auto') return { queued: [], skipped: [{ reason: 'SEO and Ads fleets are on Manual' }] };
   const clients = db.prepare(`
-    SELECT id, name, repo_path FROM crm_clients
-    WHERE is_active = 1 AND seo_enabled = 1 ${clientId ? 'AND id = ?' : ''} ORDER BY id
+    SELECT id, name, repo_path, seo_enabled, ads_enabled FROM crm_clients
+    WHERE is_active = 1 AND (seo_enabled = 1 OR ads_enabled = 1) ${clientId ? 'AND id = ?' : ''} ORDER BY id
   `).all(...(clientId ? [clientId] : []));
 
   const queued = [];
@@ -118,21 +151,24 @@ export function queueSeoFixes({ by = 'agent', clientId = null } = {}) {
   const night = istDate();
   for (const client of clients) {
     if (!client.repo_path) { skipped.push({ client_name: client.name, reason: 'no site repo set (audits only)' }); continue; }
+    const fleets = fixFleets(client);
+    if (!fleets.length) { skipped.push({ client_name: client.name, reason: 'its fleets are on Manual' }); continue; }
     // Open, or a failed deploy whose fixes are still waiting for Retry deploy.
     const open = db.prepare(`
       SELECT b.id, b.status FROM seo_fix_batches b WHERE b.client_id = ? AND (
         b.status IN (${OPEN_BATCH.map(() => '?').join(',')})
-        OR (b.status = 'deploy_failed' AND EXISTS (SELECT 1 FROM seo_recommendations r WHERE r.fix_batch_id = b.id AND r.status = 'ready_to_deploy'))
+        OR (b.status = 'deploy_failed' AND (
+          EXISTS (SELECT 1 FROM seo_recommendations r WHERE r.fix_batch_id = b.id AND r.status = 'ready_to_deploy')
+          OR EXISTS (SELECT 1 FROM ads_recommendations r WHERE r.fix_batch_id = b.id AND r.status = 'ready_to_deploy')))
       ) ORDER BY b.id DESC LIMIT 1
     `).get(client.id, ...OPEN_BATCH);
     if (open) {
       skipped.push({ client_name: client.name, reason: ['ready', 'deploy_failed'].includes(open.status) ? 'last night\'s fixes are waiting for Deploy or Discard' : `a batch is already ${open.status}` });
       continue;
     }
-    const candidates = db.prepare(`
-      SELECT COUNT(*) AS n FROM seo_recommendations
-      WHERE client_id = ? AND status = 'open' AND (fix_triage IS NULL OR fix_approved = 1)
-    `).get(client.id).n;
+    const isCandidate = 'r.client_id = ? AND r.status = \'open\' AND (r.fix_triage IS NULL OR r.fix_approved = 1)';
+    const candidates = (fleets.includes('seo') ? db.prepare(`SELECT COUNT(*) AS n FROM seo_recommendations r WHERE ${isCandidate}`).get(client.id).n : 0)
+      + (fleets.includes('ads') ? db.prepare(`SELECT COUNT(*) AS n FROM ads_recommendations r WHERE ${isCandidate} AND ${ADS_CANDIDATE}`).get(client.id).n : 0);
     if (candidates === 0) { skipped.push({ client_name: client.name, reason: 'no new recommendations to look at' }); continue; }
     const res = db.prepare(`
       INSERT INTO seo_fix_batches (client_id, night, status, requested_by) VALUES (?, ?, 'queued', ?)
@@ -153,6 +189,7 @@ export function claimSeoFixBatches(worker = 'mac') {
     const batches = db.prepare(`
       SELECT * FROM seo_fix_batches b WHERE b.status = 'queued'
         AND NOT EXISTS (SELECT 1 FROM seo_agent_runs r WHERE r.client_id = b.client_id AND r.status IN ('queued', 'running'))
+        AND NOT EXISTS (SELECT 1 FROM ads_agent_runs r WHERE r.client_id = b.client_id AND r.status IN ('queued', 'running'))
       ORDER BY b.id
     `).all();
     for (const b of batches) {
@@ -162,16 +199,25 @@ export function claimSeoFixBatches(worker = 'mac') {
     return batches;
   });
   return claim().map((b) => {
-    const client = db.prepare('SELECT id, name, website_url, repo_path, blog_compliance_profile FROM crm_clients WHERE id = ?').get(b.client_id);
-    const candidates = db.prepare(`
+    const { seo_enabled: seoOn, ads_enabled: adsOn, ...client } = db.prepare(
+      'SELECT id, name, website_url, repo_path, blog_compliance_profile, seo_enabled, ads_enabled FROM crm_clients WHERE id = ?',
+    ).get(b.client_id);
+    const open = 'r.client_id = ? AND r.status = \'open\' AND (r.fix_triage IS NULL OR r.fix_approved = 1)';
+    const seo = seoOn ? db.prepare(`
       SELECT r.id, r.priority, r.metric, r.issue, r.action_required, r.observation, r.page_url, r.fix_approved, r.fix_triage,
              a.audit_type
-      FROM seo_recommendations r JOIN seo_audits a ON a.id = r.audit_id
-      WHERE r.client_id = ? AND r.status = 'open' AND (r.fix_triage IS NULL OR r.fix_approved = 1)
-      ORDER BY r.fix_approved DESC,
-               CASE r.priority WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 ELSE 3 END, r.id DESC
-      LIMIT ?
-    `).all(b.client_id, TRIAGE_LIMIT);
+      FROM seo_recommendations r JOIN seo_audits a ON a.id = r.audit_id WHERE ${open} ORDER BY r.id DESC
+    `).all(b.client_id).map((r) => ({ ...r, fleet: 'seo' })) : [];
+    // Ads findings say "ads <card>" as their audit, and carry the campaign they
+    // are about; the worker sorts the unsorted ones like any other.
+    const ads = adsOn ? db.prepare(`
+      SELECT r.id, r.priority, r.metric, r.issue, r.action_required, r.observation, r.page_url, r.fix_approved, r.fix_triage,
+             'ads ' || a.agent_type AS audit_type, r.campaign_name, r.kind
+      FROM ads_recommendations r JOIN ads_audits a ON a.id = r.audit_id WHERE ${open} AND ${ADS_CANDIDATE} ORDER BY r.id DESC
+    `).all(b.client_id).map((r) => ({ ...r, id: recKey('ads', r.id), fleet: 'ads' })) : [];
+    const candidates = [...seo, ...ads]
+      .sort((x, y) => (y.fix_approved - x.fix_approved) || (PRIORITY_RANK[x.priority] - PRIORITY_RANK[y.priority]))
+      .slice(0, TRIAGE_LIMIT);
     return { batch_id: b.id, night: b.night, client, candidates, max_fixes: NIGHT_FIXES_PER_CLIENT };
   });
 }
@@ -185,7 +231,9 @@ export function submitSeoTriage(payload) {
   const apply = db.transaction(() => {
     for (const r of payload.results) {
       if (!['safe', 'needs_007', 'not_code', 'already_done'].includes(r?.triage)) continue;
-      const rec = db.prepare("SELECT id, fix_approved FROM seo_recommendations WHERE id = ? AND client_id = ? AND status = 'open'").get(r.id, batch.client_id);
+      const k = parseRecKey(r.id);
+      if (!k) continue;
+      const rec = db.prepare(`SELECT id, fix_approved FROM ${k.table} WHERE id = ? AND client_id = ? AND status = 'open'`).get(k.id, batch.client_id);
       if (!rec) continue;
       // 007's "Fix tonight" outranks the sort.
       const triage = rec.fix_approved && r.triage !== 'already_done' ? 'safe' : r.triage;
@@ -193,7 +241,7 @@ export function submitSeoTriage(payload) {
       // nobody marked). Closed here, with what the worker found as the note.
       const status = triage === 'needs_007' ? 'needs_007' : triage === 'already_done' ? 'completed' : 'open';
       db.prepare(`
-        UPDATE seo_recommendations SET fix_triage = ?, fix_reason = ?, status = ?, fix_batch_id = ?,
+        UPDATE ${k.table} SET fix_triage = ?, fix_reason = ?, status = ?, fix_batch_id = ?,
           fix_approved = CASE WHEN ? = 'completed' THEN 0 ELSE fix_approved END,
           fixed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE fixed_at END
         WHERE id = ?
@@ -219,21 +267,22 @@ export function submitSeoFixBatch(payload) {
 
   const apply = db.transaction(() => {
     for (const f of fixes) {
-      const rec = db.prepare('SELECT id FROM seo_recommendations WHERE id = ? AND client_id = ?').get(f.rec_id, batch.client_id);
+      const k = parseRecKey(f.rec_id);
+      const rec = k && db.prepare(`SELECT id FROM ${k.table} WHERE id = ? AND client_id = ?`).get(k.id, batch.client_id);
       if (!rec) continue;
       if (f.ok && f.commit && status === 'ready') {
         db.prepare(`
-          UPDATE seo_recommendations SET status = 'ready_to_deploy', fix_commit = ?, fix_summary = ?, fix_diff = ?,
+          UPDATE ${k.table} SET status = 'ready_to_deploy', fix_commit = ?, fix_summary = ?, fix_diff = ?,
             fix_error = NULL, fix_batch_id = ?, fix_approved = 0, fixed_at = datetime('now') WHERE id = ?
         `).run(String(f.commit).slice(0, 64), String(f.summary || '').slice(0, 2000), String(f.diff || '').slice(0, 20000), batch.id, rec.id);
       } else {
         db.prepare(`
-          UPDATE seo_recommendations SET status = 'fix_failed', fix_error = ?, fix_summary = ?, fix_batch_id = ?, fix_approved = 0 WHERE id = ?
+          UPDATE ${k.table} SET status = 'fix_failed', fix_error = ?, fix_summary = ?, fix_batch_id = ?, fix_approved = 0 WHERE id = ?
         `).run(String(f.error || 'the fix did not pass the checks').slice(0, 1000), String(f.summary || '').slice(0, 2000), batch.id, rec.id);
       }
     }
-    const needs = db.prepare("SELECT COUNT(*) AS n FROM seo_recommendations WHERE client_id = ? AND status = 'needs_007'").get(batch.client_id).n;
-    const done = db.prepare("SELECT COUNT(*) AS n FROM seo_recommendations WHERE fix_batch_id = ? AND fix_triage = 'already_done'").get(batch.id).n;
+    const needs = sumBoth("SELECT COUNT(*) AS n FROM {recs} WHERE client_id = ? AND status = 'needs_007'", batch.client_id);
+    const done = sumBoth("SELECT COUNT(*) AS n FROM {recs} WHERE fix_batch_id = ? AND fix_triage = 'already_done'", batch.id);
     const failed = fixes.length - ok.length;
     const summary = status === 'failed'
       ? `Fixes did not run: ${String(payload.error || 'unknown error').slice(0, 200)}`
@@ -249,7 +298,7 @@ export function submitSeoFixBatch(payload) {
 
 // ------------------------------------------------------- deploy and discard
 
-const recCount = (batchId, status) => db.prepare('SELECT COUNT(*) AS n FROM seo_recommendations WHERE fix_batch_id = ? AND status = ?').get(batchId, status).n;
+const recCount = (batchId, status) => sumBoth('SELECT COUNT(*) AS n FROM {recs} WHERE fix_batch_id = ? AND status = ?', batchId, status);
 
 /** 007 pressed Deploy. */
 export function requestDeploy(batchId, user) {
@@ -271,11 +320,11 @@ export function discardBatch(batchId, user) {
   if (!batch) return { status: 404, error: 'Fix batch not found' };
   if (!['ready', 'empty', 'failed', 'deploy_failed'].includes(batch.status)) return { status: 409, error: `This batch is ${batch.status} and can't be discarded` };
   const apply = db.transaction(() => {
-    db.prepare(`
-      UPDATE seo_recommendations SET status = 'needs_007',
+    runBoth(`
+      UPDATE {recs} SET status = 'needs_007',
         fix_reason = ?, fix_commit = NULL, fix_diff = NULL
       WHERE fix_batch_id = ? AND status IN ('ready_to_deploy', 'fix_failed')
-    `).run(`Discarded by ${user?.email || 'admin'} on ${istDate()}. Press "Fix tonight" to try again.`, batch.id);
+    `, `Discarded by ${user?.email || 'admin'} on ${istDate()}. Press "Fix tonight" to try again.`, batch.id);
     db.prepare("UPDATE seo_fix_batches SET status = 'discarded', updated_at = datetime('now') WHERE id = ?").run(batch.id);
   });
   apply();
@@ -295,7 +344,11 @@ export function claimSeoDeploys(worker = 'mac') {
   return claim().map((b) => ({
     batch_id: b.id, branch: b.branch, base_commit: b.base_commit,
     client: db.prepare('SELECT id, name, website_url, repo_path FROM crm_clients WHERE id = ?').get(b.client_id),
-    commits: db.prepare("SELECT id AS rec_id, fix_commit AS commit_sha, metric FROM seo_recommendations WHERE fix_batch_id = ? AND status = 'ready_to_deploy' ORDER BY fixed_at, id").all(b.id),
+    commits: Object.entries(REC_TABLES)
+      .flatMap(([fleet, table]) => db.prepare(`SELECT id, fix_commit AS commit_sha, metric, fixed_at FROM ${table} WHERE fix_batch_id = ? AND status = 'ready_to_deploy'`).all(b.id)
+        .map(({ id, fixed_at: at, ...c }) => ({ rec_id: recKey(fleet, id), ...c, at })))
+      .sort((x, y) => String(x.at).localeCompare(String(y.at)))
+      .map(({ at, ...c }) => c),
   }));
 }
 
@@ -308,14 +361,14 @@ export function finishSeoDeploy(payload) {
   const error = payload.error ? String(payload.error).slice(0, 1000) : null;
   const apply = db.transaction(() => {
     if (status === 'live') {
-      db.prepare("UPDATE seo_recommendations SET status = 'completed' WHERE fix_batch_id = ? AND status = 'ready_to_deploy'").run(batch.id);
+      runBoth("UPDATE {recs} SET status = 'completed' WHERE fix_batch_id = ? AND status = 'ready_to_deploy'", batch.id);
     } else if (!(status === 'deploy_failed' && payload.pushed === false)) {
       // Rolled back, or failed after the push: those fixes are done for.
       // Failed before the push: nothing changed anywhere, so they stay ready
       // and the batch can be retried.
-      db.prepare(`
-        UPDATE seo_recommendations SET status = 'fix_failed', fix_error = ? WHERE fix_batch_id = ? AND status = 'ready_to_deploy'
-      `).run(`${status === 'rolled_back' ? 'Deploy rolled back' : 'Deploy failed'}: ${error || 'see the deploy log'}`, batch.id);
+      runBoth(`
+        UPDATE {recs} SET status = 'fix_failed', fix_error = ? WHERE fix_batch_id = ? AND status = 'ready_to_deploy'
+      `, `${status === 'rolled_back' ? 'Deploy rolled back' : 'Deploy failed'}: ${error || 'see the deploy log'}`, batch.id);
     }
     db.prepare(`
       UPDATE seo_fix_batches SET status = ?, live_commit = ?, log = ?, error = ?, deploy_finished_at = datetime('now'), updated_at = datetime('now') WHERE id = ?
@@ -329,18 +382,20 @@ export function finishSeoDeploy(payload) {
 
 /** "Fix tonight": 007 lets the night worker make a change outside the safe list (or retry a failed one). */
 export function approveFixTonight(recId, user) {
-  const rec = db.prepare('SELECT * FROM seo_recommendations WHERE id = ?').get(recId);
+  const k = parseRecKey(recId);
+  const rec = k && db.prepare(`SELECT * FROM ${k.table} WHERE id = ?`).get(k.id);
   if (!rec) return { status: 404, error: 'Recommendation not found' };
   if (!['needs_007', 'fix_failed', 'open'].includes(rec.status)) return { status: 409, error: `This recommendation is ${rec.status}` };
   db.prepare(`
-    UPDATE seo_recommendations SET status = 'open', fix_approved = 1, fix_triage = 'safe', fix_error = NULL,
+    UPDATE ${k.table} SET status = 'open', fix_approved = 1, fix_triage = 'safe', fix_error = NULL,
       fix_reason = ? WHERE id = ?
   `).run(`Approved for tonight by ${user?.email || 'admin'}`, rec.id);
   return { status: 200 };
 }
 
 export function ignoreRecommendation(recId) {
-  const res = db.prepare("UPDATE seo_recommendations SET status = 'ignored', fix_approved = 0 WHERE id = ? AND status <> 'completed'").run(recId);
+  const k = parseRecKey(recId);
+  const res = k ? db.prepare(`UPDATE ${k.table} SET status = 'ignored', fix_approved = 0 WHERE id = ? AND status <> 'completed'`).run(k.id) : { changes: 0 };
   return res.changes ? { status: 200 } : { status: 404, error: 'Recommendation not found or already completed' };
 }
 
@@ -349,15 +404,22 @@ export function ignoreRecommendation(recId) {
 const parseTime = (t) => (t ? new Date(`${t.replace(' ', 'T')}${t.endsWith('Z') ? '' : 'Z'}`) : null);
 
 /**
- * The SEO Monitor's "Last night": per SEO-on client, the skills that ran at
- * night with their score against the previous run, and the latest fix batch
- * with its fixes, what needs 007 and what failed.
+ * The Site changes report, shown in the SEO and Ads Monitors: per client with
+ * SEO or ads on, the SEO skills that ran at night with their score against the
+ * previous run, and the latest fix batch with its fixes, what needs 007 and
+ * what failed — SEO and ads findings together, each tagged with its `fleet`.
  */
 export function nightReport({ hours = 30 } = {}) {
   const clients = db.prepare(`
-    SELECT id, name, repo_path FROM crm_clients WHERE is_active = 1 AND seo_enabled = 1 ORDER BY name
+    SELECT id, name, repo_path, seo_enabled, ads_enabled FROM crm_clients
+    WHERE is_active = 1 AND (seo_enabled = 1 OR ads_enabled = 1) ORDER BY name
   `).all();
   const recFields = 'id, priority, metric, issue, action_required, page_url, status, fix_triage, fix_reason, fix_summary, fix_diff, fix_commit, fix_error, fix_batch_id, fix_approved';
+  // One query on both tables; ads ids become 'ads-<id>'.
+  const recs = (where, ...params) => Object.entries(REC_TABLES)
+    .flatMap(([fleet, table]) => db.prepare(`SELECT ${recFields} FROM ${table} WHERE ${where}`).all(...params)
+      .map((r) => ({ ...r, id: recKey(fleet, r.id), fleet })));
+  const byPriority = (list) => list.sort((x, y) => (PRIORITY_RANK[x.priority] - PRIORITY_RANK[y.priority]));
 
   const rows = clients.map((c) => {
     const runs = db.prepare(`
@@ -372,19 +434,19 @@ export function nightReport({ hours = 30 } = {}) {
     });
 
     const batch = db.prepare('SELECT * FROM seo_fix_batches WHERE client_id = ? ORDER BY id DESC LIMIT 1').get(c.id) || null;
-    const ready = batch ? db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE fix_batch_id = ? AND status IN ('ready_to_deploy', 'completed') AND fix_commit IS NOT NULL ORDER BY id`).all(batch.id) : [];
-    const failed = batch ? db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE fix_batch_id = ? AND status = 'fix_failed' ORDER BY id`).all(batch.id) : [];
-    const needs = db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE client_id = ? AND status = 'needs_007' ORDER BY CASE priority WHEN 'Critical' THEN 0 WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 ELSE 3 END, id DESC`).all(c.id);
-    const tonight = db.prepare("SELECT COUNT(*) AS n FROM seo_recommendations WHERE client_id = ? AND status = 'open' AND fix_approved = 1").get(c.id).n;
-    const alreadyDone = batch ? db.prepare(`SELECT ${recFields} FROM seo_recommendations WHERE fix_batch_id = ? AND fix_triage = 'already_done' ORDER BY id`).all(batch.id) : [];
+    const ready = batch ? recs("fix_batch_id = ? AND status IN ('ready_to_deploy', 'completed') AND fix_commit IS NOT NULL", batch.id) : [];
+    const failed = batch ? recs("fix_batch_id = ? AND status = 'fix_failed'", batch.id) : [];
+    const needs = byPriority(recs("client_id = ? AND status = 'needs_007'", c.id));
+    const tonight = sumBoth("SELECT COUNT(*) AS n FROM {recs} WHERE client_id = ? AND status = 'open' AND fix_approved = 1", c.id);
+    const alreadyDone = batch ? recs("fix_batch_id = ? AND fix_triage = 'already_done'", batch.id) : [];
 
     let setup = null;
-    if (!c.repo_path) setup = 'Audits only: no site repo is set for this client';
+    if (!c.repo_path) setup = 'Audits only: no site repo is set for this client, so website fixes can\'t be made';
     else if (batch?.status === 'failed' && /manifest/i.test(batch.error || '')) setup = `Audits only: ${batch.error}`;
 
     const retryable = batch?.status === 'deploy_failed' && ready.some((f) => f.status === 'ready_to_deploy');
     return {
-      client_id: c.id, client_name: c.name, setup, runs, batch, retryable,
+      client_id: c.id, client_name: c.name, seo_enabled: !!c.seo_enabled, ads_enabled: !!c.ads_enabled, setup, runs, batch, retryable,
       fixes: ready, failed, needs_007: needs, already_done: alreadyDone, approved_for_tonight: tonight,
     };
   });

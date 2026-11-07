@@ -116,9 +116,27 @@ believed.
   "action_required": "What to change. Specific enough to do without asking.",
   "observation":     "The numbers this was read off, quoted from the pack.",
   "expected_impact": "₹ or % at current rates, or omit.",
-  "failure_check":   "The condition that would make this advice wrong."
+  "failure_check":   "The condition that would make this advice wrong.",
+  "kind":            "site_code | ad_account | business",
+  "page_url":        "https://… the page to change, for site_code only"
 }
 ```
+
+`kind` says where the action is done, and routes it:
+
+- `site_code`: a change to the client's website code: the landing page's
+  forms (passing the page URL and click IDs with a submission), tracking tags,
+  page speed, layout, copy and claims on the page. These go to the night fix
+  worker, which makes the small safe ones on a branch for the operator to
+  Deploy, and leaves copy, claims and design for the operator. Give `page_url`.
+- `ad_account`: done inside the ad platform: keywords, negatives, match types,
+  bids, budgets, conversion actions, assets, audiences.
+- `business`: done by the client or the team: lead follow-up and
+  qualification, walk-in logging, the budget and targets in the dashboard,
+  onboarding, competitors.
+
+One recommendation, one kind. If an action needs both a site change and an
+account change, return two recommendations.
 
 `metric`, `issue` and `action_required` are required — a row missing any of them
 is dropped on receipt, because an action nobody can act on sits in the open

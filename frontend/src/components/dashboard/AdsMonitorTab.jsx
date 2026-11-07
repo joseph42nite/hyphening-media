@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import { MarkdownBlock, ReportValue, parseReportJson } from './SeoMonitorTab.jsx';
+import SiteChangesPanel from './SiteChangesPanel.jsx';
 import FleetModeToggle from './FleetModeToggle.jsx';
 
 const IN_FLIGHT = ['queued', 'running'];
@@ -115,6 +116,14 @@ const heading = {
 };
 
 // ---------------------------------------------------------------------------
+
+/** Where an ads finding is acted on, in the order the open actions list shows them. */
+const KIND_GROUPS = [
+  { kind: 'ad_account', label: 'In the ad account', note: 'Done by hand in Google Ads (or Meta). Mark Done once changed.' },
+  { kind: 'site_code', label: 'Website code', note: 'The night worker prepares the safe ones for Deploy under Site changes; copy, claims and design wait for you there.' },
+  { kind: 'business', label: 'Clinic and team', note: 'Lead follow-up, walk-ins, plan settings and onboarding.' },
+  { kind: null, label: 'Not sorted yet', note: 'From runs before cards said where the work is done. Re-running the card sorts them; website ones are also picked up at night.' },
+];
 
 export default function AdsMonitorTab({ auth, clients, showToast }) {
   const marketingClients = clients.filter(c => c.client_type === 'marketing');
@@ -583,6 +592,16 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
         </div>
       ) : (
         <>
+          {/* Website fixes from this monitor and the SEO Monitor, one queue
+              and one Deploy per client. Admins only; hidden for others. */}
+          {isAdmin && (
+            <SiteChangesPanel
+              showToast={showToast}
+              clientId={selectedClientId}
+              clientName={marketingClients.find(c => String(c.id) === String(selectedClientId))?.name}
+            />
+          )}
+
           {/* ---------------- Snapshot ---------------- */}
           {snapshot && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
@@ -737,8 +756,21 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
               Nothing open. Run an agent above, or wait for the scheduled anomaly watch.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-              {recommendations.map(rec => {
+            <div style={{ marginBottom: 28 }}>
+              {/* Grouped by where the work is done (the card's `kind`). Website
+                  items also go to the night worker, which prepares the safe
+                  ones for Deploy in Site changes above. */}
+              {KIND_GROUPS.map(g => {
+                const items = recommendations.filter(r => (r.kind || null) === g.kind);
+                if (!items.length) return null;
+                return (
+                  <div key={g.label} style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-primary)', marginBottom: 2 }}>
+                      {g.label} ({items.length})
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'rgba(223, 231, 224, 0.5)', marginBottom: 8 }}>{g.note}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {items.map(rec => {
                 const tone = PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.Low;
                 return (
                   <div key={rec.id} style={{ ...panel, padding: '14px 16px', borderLeft: `4px solid ${tone.bd}` }}>
@@ -782,6 +814,10 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                       <MiniButton onClick={() => setRecStatus(rec, 'completed')}>Done</MiniButton>
                       <MiniButton onClick={() => setRecStatus(rec, 'ignored')} muted>Ignore</MiniButton>
+                    </div>
+                  </div>
+                );
+              })}
                     </div>
                   </div>
                 );

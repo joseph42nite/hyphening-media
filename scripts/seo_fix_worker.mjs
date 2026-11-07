@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * Night SEO fix worker (master plan Phase 6). Runs on the Mac, started by the
- * connector after Boothroyd's 03:30 IST routine queues fix batches.
+ * Night site fix worker (master plan Phase 6). Runs on the Mac, started by the
+ * connector after Boothroyd's 03:30 IST routine queues fix batches. A batch
+ * holds the client's SEO findings and its ads website-code findings (ids
+ * 'ads-<n>'): one branch and one Deploy per client, since both change the same
+ * site. The manifest's `seo_fixes` section governs both.
  *
  * For each client batch:
  *   1. Read the repo's deploy manifest. No valid manifest, or night fixes off → audits only.
@@ -52,6 +55,9 @@ export const SAFE_LIST = [
   'broken links (fix or remove the link)',
   'image dimensions, lazy loading and other image attributes',
   'Open Graph and Twitter card tags',
+  // From the Ads Monitor: what lets a lead be tied to the ad that brought it.
+  'sending the page URL and the ad click IDs already in it (gclid, gbraid, wbraid, gad_campaignid, utm_*) with a form submission, as hidden fields or in the existing submit code',
+  'adding an analytics or conversion tag whose ID the recommendation gives (e.g. a GA4 / Google tag snippet), once, in the shared page head',
 ];
 
 
@@ -80,18 +86,19 @@ async function undo(wt, linked) {
 
 function triagePrompt(job, manifest) {
   return [
-    `You are sorting SEO recommendations for ${job.client.name} (${job.client.website_url}). The site's code is in the current folder.`,
+    `You are sorting SEO and paid-ads recommendations for ${job.client.name} (${job.client.website_url}). The site's code is in the current folder.`,
+    'Ads recommendations have ids like "ads-12" and an audit starting "ads"; answer with their ids exactly as given.',
     'Read the code as needed (you can only read), then sort EVERY recommendation below into one of these. Only use "already_done" when you have looked at the file and seen it:',
     `- "safe": a code change that is ONLY one of these, small, and inside the allowed files: ${SAFE_LIST.join('; ')}.`,
     '- "needs_007": a site change that is outside that list or risky: wording or copy changes, medical/health/price/legal claims, design or layout, new pages, deleting content, rendering or framework changes, anything large (roughly over 60 changed lines), or anything that needs files outside the allowed list.',
     '- "already_done": the code already does what it asks (check the actual files; often a fix that was pushed earlier). The reason must say what you found and where, e.g. "index.html already has a 148-character meta description".',
-    '- "not_code": not a change to this site\'s code at all: analytics or Search Console settings, Google Business Profile, backlinks, content strategy or new articles, monitoring.',
+    '- "not_code": not a change to this site\'s code at all: analytics or Search Console settings, Google Business Profile, backlinks, content strategy or new articles, monitoring; and for ads: anything done in the ad account (keywords, negatives, bids, budgets, conversion actions, assets) or by the business (lead follow-up, walk-in logging, dashboard settings).',
     `Allowed files: ${manifest.seo_fixes.paths.join(', ')}. Never: ${(manifest.seo_fixes.never_touch || []).join(', ') || '(none listed)'}.`,
     job.client.blog_compliance_profile === 'healthcare' ? 'This is a healthcare client: anything touching health claims is "needs_007".' : '',
     'Give each a one-line reason a busy owner understands.',
     '',
     'Recommendations (JSON):',
-    JSON.stringify(job.candidates.map((c) => ({ id: c.id, priority: c.priority, audit: c.audit_type, metric: c.metric, issue: c.issue, action: c.action_required, page: c.page_url }))),
+    JSON.stringify(job.candidates.map((c) => ({ id: c.id, priority: c.priority, audit: c.audit_type, metric: c.metric, issue: c.issue, action: c.action_required, page: c.page_url, campaign: c.campaign_name || undefined }))),
     '',
     'Answer with the list only, between <json> and </json>:',
     '<json>[{"id": 123, "triage": "safe", "reason": "..."}]</json>',
@@ -100,7 +107,7 @@ function triagePrompt(job, manifest) {
 
 function fixPrompt(job, manifest, rec) {
   return [
-    `Make one SEO fix in this website's code (${job.client.name}, ${job.client.website_url}). The code is in the current folder.`,
+    `Make one ${rec.fleet === 'ads' ? 'paid-ads' : 'SEO'} fix in this website's code (${job.client.name}, ${job.client.website_url}). The code is in the current folder.`,
     '',
     `Recommendation #${rec.id} (${rec.priority}, from the ${rec.audit_type} audit):`,
     `- Metric: ${rec.metric}`,
@@ -197,7 +204,8 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
         continue;
       }
       await git(wt, ['add', '--', ...files]);
-      await git(wt, ['commit', '--quiet', '-m', `SEO: ${rec.metric} (#${rec.id})`, '-m', `${answer.summary || ''}\n\nNight SEO fix for recommendation #${rec.id}. Goes live only when 007 presses Deploy.`]);
+      const label = rec.fleet === 'ads' ? 'Ads' : 'SEO';
+      await git(wt, ['commit', '--quiet', '-m', `${label}: ${rec.metric} (#${rec.id})`, '-m', `${answer.summary || ''}\n\nNight ${label} fix for recommendation #${rec.id}. Goes live only when 007 presses Deploy.`]);
       const commit = await git(wt, ['rev-parse', 'HEAD']);
       const diff = await git(wt, ['show', '--stat', '--patch', '--format=', 'HEAD']);
       fixes.push({ rec_id: rec.id, ok: true, commit, summary: answer.summary || rec.metric, diff: diff.slice(0, 20000) });
@@ -215,7 +223,7 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
   await hookFn('submit_seo_fix_batch', {
     batch_id: job.batch_id, status: ok.length ? 'ready' : 'empty', branch: ok.length ? branch : null, base_commit: base, fixes,
   });
-  await appendNightReport(`SEO FIXES · ${name} · ${ok.length} ready to deploy${fixes.length - ok.length ? ` · ${fixes.length - ok.length} failed` : ''} (SEO Monitor → Last night)`);
+  await appendNightReport(`SEO FIXES · ${name} · ${ok.length} ready to deploy${fixes.length - ok.length ? ` · ${fixes.length - ok.length} failed` : ''} (Site changes, in the SEO and Ads Monitors)`);
   return { status: ok.length ? 'ready' : 'empty', branch, fixes };
 }
 

@@ -246,3 +246,59 @@ describe('summary for the bots', () => {
     expect(night.nightSummaryText()).toMatch(/^SEO fleet: (auto|manual)\. Fixes ready/);
   });
 });
+
+describe('ads website-code findings share the client\'s fix batch', () => {
+  it('queues, sorts, fixes, deploys and reports ads findings next to SEO ones', () => {
+    const savedAds = getMode('ads');
+    setMode('seo', 'manual');
+    setMode('ads', 'auto');
+    try {
+      const id = makeClient();
+      db.prepare('UPDATE crm_clients SET seo_enabled = 0, ads_enabled = 1 WHERE id = ?').run(id);
+      const adsAudit = db.prepare("INSERT INTO ads_audits (client_id, agent_type, period_month) VALUES (?, 'landing', '2026-11')").run(id).lastInsertRowid;
+      const adsRec = (kind, metric) => db.prepare(`
+        INSERT INTO ads_recommendations (audit_id, client_id, priority, metric, issue, action_required, kind)
+        VALUES (?, ?, 'High', ?, 'issue', 'do it', ?)`).run(adsAudit, id, metric, kind).lastInsertRowid;
+      const site = adsRec('site_code', 'Form attribution');
+      const unsorted = adsRec(null, 'Landing speed');
+      adsRec('ad_account', 'Broad match waste');
+
+      // SEO is on Manual and off for the client; the ads fleet alone queues it.
+      const q = night.queueSeoFixes({ clientId: id });
+      expect(q.queued[0].candidates).toBe(2);
+      const job = night.claimSeoFixBatches('test').find(x => x.batch_id === q.queued[0].batch_id);
+      expect(job.candidates.map(c => c.id).sort()).toEqual([`ads-${site}`, `ads-${unsorted}`].sort());
+      expect(job.candidates.every(c => c.fleet === 'ads' && c.audit_type === 'ads landing')).toBe(true);
+      expect(job.client).not.toHaveProperty('ads_enabled');
+
+      night.submitSeoTriage({ batch_id: job.batch_id, results: [
+        { id: `ads-${site}`, triage: 'safe', reason: 'hidden page_url field' },
+        { id: `ads-${unsorted}`, triage: 'not_code', reason: 'hosting' },
+      ] });
+      expect(db.prepare('SELECT status, fix_triage FROM ads_recommendations WHERE id = ?').get(unsorted)).toEqual({ status: 'open', fix_triage: 'not_code' });
+
+      night.submitSeoFixBatch({ batch_id: job.batch_id, status: 'ready', branch: 'seo/a', base_commit: 'a', fixes: [{ rec_id: `ads-${site}`, ok: true, commit: 'c0de', summary: 'adds page_url' }] });
+      const row = night.nightReport().clients.find(c => c.client_id === id);
+      expect(row.ads_enabled).toBe(true);
+      expect(row.fixes).toEqual([expect.objectContaining({ id: `ads-${site}`, fleet: 'ads', status: 'ready_to_deploy' })]);
+
+      night.requestDeploy(job.batch_id, {});
+      const d = night.claimSeoDeploys('test').find(x => x.batch_id === job.batch_id);
+      expect(d.commits).toEqual([{ rec_id: `ads-${site}`, commit_sha: 'c0de', metric: 'Form attribution' }]);
+      night.finishSeoDeploy({ batch_id: job.batch_id, status: 'live', live_commit: 'l' });
+      expect(db.prepare('SELECT status FROM ads_recommendations WHERE id = ?').get(site).status).toBe('completed');
+
+      expect(night.ignoreRecommendation(`ads-${unsorted}`).status).toBe(200);
+      expect(db.prepare('SELECT status FROM ads_recommendations WHERE id = ?').get(unsorted).status).toBe('ignored');
+    } finally {
+      setMode('ads', savedAds);
+    }
+  });
+
+  it('keeps ads and SEO ids apart', () => {
+    expect(night.parseRecKey('ads-7')).toMatchObject({ fleet: 'ads', id: 7 });
+    expect(night.parseRecKey(7)).toMatchObject({ fleet: 'seo', id: 7 });
+    expect(night.parseRecKey('7')).toMatchObject({ fleet: 'seo', id: 7 });
+    expect(night.parseRecKey('ads-x')).toBeNull();
+  });
+});
