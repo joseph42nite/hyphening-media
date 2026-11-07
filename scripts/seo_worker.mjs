@@ -26,10 +26,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { mkdtemp, rm, readFile, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
-import { spawn } from 'child_process';
 import dotenv from 'dotenv';
 import { hook, API } from './lib/hook.mjs';
-import { firstJsonObject } from './lib/proc.mjs';
+import { firstJsonObject, runClaude } from './lib/proc.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Explicit path, not dotenv's cwd-relative default: cron's working directory
@@ -140,25 +139,16 @@ function buildPrompt(job) {
  * sub-agents with their own tool sets), so a fixed allowlist would keep
  * breaking as audit types change.
  */
-function runClaude(promptFile, model) {
-  return new Promise((resolve, reject) => {
-    const args = ['-p', '--output-format', 'text', '--permission-mode', 'bypassPermissions'];
-    if (model) args.push('--model', model);
-
+async function runClaudeFor(promptFile) {
+  return runClaude({
+    bin: CLAUDE_BIN,
+    prompt: await readFile(promptFile, 'utf8'),
+    model: MODEL,
     // The run's own temp folder, not whatever folder the worker inherited:
     // a run once failed with "current working directory was deleted" while
     // another Claude worked on the same repo.
-    const proc = spawn(CLAUDE_BIN, args, { cwd: path.dirname(promptFile), stdio: ['pipe', 'pipe', 'pipe'] });
-    let out = '';
-    let err = '';
-    proc.stdout.on('data', d => { out += d; });
-    proc.stderr.on('data', d => { err += d; });
-    proc.on('error', reject);
-    proc.on('close', code => {
-      if (code !== 0) return reject(new Error(`claude exited ${code}: ${(err || out).trim().slice(0, 500)}`));
-      resolve(out);
-    });
-    readFile(promptFile, 'utf8').then(text => { proc.stdin.write(text); proc.stdin.end(); }).catch(reject);
+    cwd: path.dirname(promptFile),
+    permissionMode: 'bypassPermissions',
   });
 }
 
@@ -172,7 +162,7 @@ async function runJob(job) {
 
   try {
     await writeFile(promptFile, buildPrompt(job), 'utf8');
-    const raw = await runClaude(promptFile, MODEL);
+    const raw = await runClaudeFor(promptFile);
     const parsed = firstJsonObject(raw);
 
     if (!parsed) {

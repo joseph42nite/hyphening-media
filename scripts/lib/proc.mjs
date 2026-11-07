@@ -34,6 +34,25 @@ export function sh(command, cwd, timeoutMs = 10 * 60 * 1000) {
 
 export const tail = (s, n = 600) => String(s || '').trim().slice(-n);
 
+/**
+ * One headless Claude run (`claude -p`), prompt on stdin; resolves stdout.
+ *
+ * Shared by the SEO and ads workers, which each had their own copy. `-p` has no
+ * TTY to answer a permission prompt, so a tool that is not pre-approved is
+ * denied rather than waited on: pass `allowedTools` (preferred: a fixed list)
+ * or a `permissionMode`. With neither, the run cannot read a file or fetch a
+ * page — which is how the ads fleet's brand and landing cards came back empty.
+ */
+export async function runClaude({ prompt, model, cwd, allowedTools, permissionMode, timeoutMs, bin = 'claude' }) {
+  const args = ['-p', '--output-format', 'text'];
+  if (permissionMode) args.push('--permission-mode', permissionMode);
+  if (allowedTools) args.push('--allowedTools', allowedTools);
+  if (model) args.push('--model', model);
+  const res = await run(bin, args, { input: prompt, cwd, timeoutMs });
+  if (res.code !== 0) throw new Error(`claude exited ${res.code}: ${String(res.err || res.out).trim().slice(0, 500)}`);
+  return res.out;
+}
+
 /** Every URL answers 200 (redirects followed), retried while a restart settles. */
 export async function healthCheck(urls, { tries = 12, waitMs = 10000 } = {}) {
   let last = '';
