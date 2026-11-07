@@ -97,13 +97,17 @@ if os.path.isdir(vault):
     lvl = BLOCKED if free_gb < 2 else WARN if free_gb < 10 else OK
     system.append((lvl, "Disk (Mac Valhalla)", f"{free_gb:.0f} GB free"))
 
-# Deploys, night fixes and blog drafts all run through the connector, at any
-# hour, so it being down is always worth a WARN (2026-11-07: it had stopped,
-# and a Deploy sat queued unseen).
+# Q's routines run the connector 00:55-05:30 and 11:00-18:00 IST. Down inside
+# either window means night fixes, blog drafts and deploys aren't running; the
+# 01:00 check falls in the night window, so it now catches that.
+minutes = ist.hour * 60 + ist.minute
+in_window = 55 <= minutes < 330 or 660 <= minutes < 1080
 if connector_up == "1":
     system.append((OK, "Mac connector", "running"))
+elif in_window:
+    system.append((WARN, "Mac connector", "not running inside its window (00:55-05:30, 11:00-18:00 IST): night fixes, blog drafts and deploys wait"))
 else:
-    system.append((WARN, "Mac connector", "not running: deploys, night fixes and blog drafts wait until it is"))
+    system.append((OK, "Mac connector", "off between its windows (Q starts it at 00:55 and 11:00 IST)"))
 system.append((OK, "Docker", "running" if docker_up == "1" else "not running (Kokoro starts it when audio renders)"))
 
 # ---- client notes: client_id -> {repo, note} --------------------------------

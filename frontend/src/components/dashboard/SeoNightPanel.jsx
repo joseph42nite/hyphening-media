@@ -108,12 +108,20 @@ export default function SeoNightPanel({ showToast }) {
         />
       </div>
 
-      {report.connector && !report.connector.online && (
-        <div style={{ ...card, borderColor: '#ef4444', color: '#fca5a5', fontSize: '0.85rem', marginBottom: '10px' }}>
-          <strong>Mac connector offline</strong> since {new Date(report.connector.since).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
-          {' '}Deploys, night fixes and blog drafts wait until it reconnects. Check the Mac is on and the connector is running.
-        </div>
-      )}
+      {report.connector && !report.connector.online && (() => {
+        // Q runs the connector 00:55-05:30 and 11:00-18:00 IST; off between those is normal.
+        const ist = new Date(Date.now() + 330 * 60000);
+        const m = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+        const inWindow = (m >= 55 && m < 330) || (m >= 660 && m < 1080);
+        return (
+          <div style={{ ...card, borderColor: inWindow ? '#ef4444' : '#facc15', color: inWindow ? '#fca5a5' : '#fde68a', fontSize: '0.85rem', marginBottom: '10px' }}>
+            <strong>Mac connector offline</strong> since {new Date(report.connector.since).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
+            {' '}{inWindow
+              ? 'It should be running now: deploys, night fixes and blog drafts are waiting. Check the Mac is on and awake.'
+              : 'That is normal outside 00:55–05:30 and 11:00–18:00 IST. A Deploy pressed now starts when it next connects (Q starts it at 00:55 and 11:00).'}
+          </div>
+        );
+      })()}
 
       {(report.clients.length > 1) && (
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
