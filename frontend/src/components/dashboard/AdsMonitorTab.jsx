@@ -307,7 +307,9 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
   /** Queues every agent that can actually run, skipping the blocked ones so the
    *  server is not asked for something it is about to refuse. */
   const runAll = async () => {
-    const runnable = agents.filter(a => !a.blockedReason && a.agentType !== 'audit' && !activeRuns[a.agentType]);
+    // Platform Research is left out: it researches a named topic, and a fleet
+    // run gives it none, so it spends a run and reports that it did nothing.
+    const runnable = agents.filter(a => !a.blockedReason && a.agentType !== 'audit' && a.agentType !== 'research' && !activeRuns[a.agentType]);
     if (!runnable.length) {
       showToast?.('Nothing to run — every agent is either blocked or already in flight.', 'info');
       return;

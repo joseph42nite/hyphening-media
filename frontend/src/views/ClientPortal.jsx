@@ -4190,8 +4190,12 @@ export default function ClientPortal({ showToast }) {
                                     {(lead.qualification_status === 'Disqualified' || lead.appointment_status === 'Not Booked') ? (
                                       (() => {
                                         const isPreset = PRESET_REASON_OPTIONS.includes(lead.rejection_reason);
-                                        const selectVal = isPreset ? (lead.rejection_reason || 'Out of Budget') : 'Other';
-                                        const showTextInput = !isPreset || lead.rejection_reason === 'Other';
+                                        // No reason saved yet: say so, rather than showing "Other" as if
+                                        // one had been picked. Without a reason the ads reports cannot tell
+                                        // poor targeting from poor follow-up.
+                                        const missing = !lead.rejection_reason || !String(lead.rejection_reason).trim();
+                                        const selectVal = missing ? '' : (isPreset ? lead.rejection_reason : 'Other');
+                                        const showTextInput = !missing && (!isPreset || lead.rejection_reason === 'Other');
                                         return (
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '140px' }}>
                                             <select 
@@ -4203,12 +4207,14 @@ export default function ClientPortal({ showToast }) {
                                                 fontSize: '0.76rem',
                                                 fontWeight: 600,
                                                 borderRadius: '9999px',
-                                                border: '1px solid rgba(224, 35, 28, 0.35)',
+                                                border: missing ? '2px solid #ef4444' : '1px solid rgba(224, 35, 28, 0.35)',
                                                 backgroundColor: 'rgba(224, 35, 28, 0.15)',
                                                 color: '#ff8580',
                                                 width: '100%'
                                               }}
+                                              title={missing ? 'Pick a reason so the reports can tell targeting problems from follow-up problems' : undefined}
                                             >
+                                              {missing && <option value="" disabled>⚠️ Reason needed</option>}
                                               <option value="Out of Budget">💰 Out of Budget</option>
                                               <option value="Not Interested">🙅 Not Interested</option>
                                               <option value="Wrong Number / Spam">🚫 Spam / Wrong No.</option>
