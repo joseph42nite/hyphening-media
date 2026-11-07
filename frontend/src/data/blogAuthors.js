@@ -75,7 +75,7 @@ export function articleSchema(post) {
       '@id': ORG_ID,
       name: 'Hyphening Media',
       url: SITE,
-      logo: { '@type': 'ImageObject', url: `${SITE}/favicon.png` },
+      logo: { '@type': 'ImageObject', url: `${SITE}/assets/logo.png`, width: 500, height: 500 },
     },
     ...(published && { datePublished: published }),
     ...(modified && { dateModified: modified }),
