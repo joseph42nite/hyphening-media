@@ -187,7 +187,8 @@ function totalise(rows) {
  * attributable leads: no campaign may claim a lead that named none.
  */
 function withOrphans(totals, orphanLeads, walkInLeads = 0) {
-  const leads = totals.leads + orphanLeads + walkInLeads;
+  const ads = adLeads(totals, orphanLeads);
+  const leads = ads + walkInLeads;
   return {
     ...totals,
     leads,
@@ -196,9 +197,23 @@ function withOrphans(totals, orphanLeads, walkInLeads = 0) {
     walk_in_leads: walkInLeads,
     // Ad-driven only, for an agent that wants to separate the two. The headline
     // `cpl_inr` above deliberately does not use it.
-    cpl_excluding_walk_ins_inr: ratio(totals.spend_inr, totals.leads + orphanLeads),
+    cpl_excluding_walk_ins_inr: ratio(totals.spend_inr, ads),
     cpl_inr: ratio(totals.spend_inr, leads),
   };
+}
+
+/**
+ * Ad-driven lead volume: the larger of what the platform reported and what
+ * reached the CRM, never their sum.
+ *
+ * Unattributed CRM leads are ad leads whose campaign is unknown, so they are
+ * the same people as the platform's reported count, not extra ones. Adding the
+ * two counted DentAlchemy's September twice once Google's own count was read
+ * (26 reported + 18 unattributed). `totals.leads` is already the per-campaign
+ * larger figure; the unattributed ones join the captured side here.
+ */
+function adLeads(totals, orphanLeads) {
+  return Math.max(totals.leads, totals.leads_captured + orphanLeads);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,12 +405,12 @@ function spendSection(clientId, month) {
         // month where attribution improved does not read as a collapse in
         // volume, and a quiet month for walk-ins does not read as ad failure.
         leads_pct: delta(
-          focusTotals.leads + unattributedFor(focus) + walkInFor(focus),
-          priorTotals.leads + unattributedFor(prior) + walkInFor(prior),
+          adLeads(focusTotals, unattributedFor(focus)) + walkInFor(focus),
+          adLeads(priorTotals, unattributedFor(prior)) + walkInFor(prior),
         ),
         cpl_pct: delta(
-          ratio(focusTotals.spend_inr, focusTotals.leads + unattributedFor(focus) + walkInFor(focus)),
-          ratio(priorTotals.spend_inr, priorTotals.leads + unattributedFor(prior) + walkInFor(prior)),
+          ratio(focusTotals.spend_inr, adLeads(focusTotals, unattributedFor(focus)) + walkInFor(focus)),
+          ratio(priorTotals.spend_inr, adLeads(priorTotals, unattributedFor(prior)) + walkInFor(prior)),
         ),
         ctr_pct: delta(focusTotals.ctr_pct, priorTotals.ctr_pct),
         cpc_pct: delta(focusTotals.cpc_inr, priorTotals.cpc_inr),

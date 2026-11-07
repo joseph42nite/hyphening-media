@@ -29,6 +29,19 @@ describe('Google evidence in the fact pack', () => {
     expect(c.bidding_strategy).toBe('MAXIMIZE_CONVERSIONS');
   });
 
+  it('never adds unattributed CRM leads on top of the platform count', () => {
+    if (!client) return;
+    addCampaign({ plc: 26 });
+    const lead = db.prepare(`INSERT INTO campaign_leads (client_id, name, phone, platform, source, campaign_name, created_at, is_test)
+      VALUES (?, 'T', '1', 'Google', 'form', 'Some Landing Page', ?, 0)`);
+    for (let i = 0; i < 18; i++) lead.run(client.id, `${month}-02 10:00:00`);
+    const account = buildFactPack(client.id, { month }).pack.sections.spend.account;
+    expect(account.leads_unattributed).toBe(18);
+    // Larger of 26 reported and 18 captured, not 44.
+    expect(account.leads).toBe(26 + account.walk_in_leads);
+    expect(account.cpl_excluding_walk_ins_inr).toBe(Math.round((9000 / 26) * 100) / 100);
+  });
+
   it('builds google_evidence from the synced tables', () => {
     if (!client) return;
     addCampaign();
