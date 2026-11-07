@@ -100,10 +100,14 @@ export function findServiceAccountKey() {
 
 // Tokens last an hour. Cached because a sync of several clients would otherwise
 // mint one per client, and the exchange is the slowest part of a short run.
-let tokenCache = { token: null, expiresAt: 0 };
+// One cache entry per scope: the same service account also reads GA4
+// (src/services/ga4Client.js), and a token minted for one scope is refused by
+// the other API.
+const tokenCache = new Map();
 
-export async function getAccessToken() {
-  if (tokenCache.token && Date.now() < tokenCache.expiresAt) return tokenCache.token;
+export async function getAccessToken(scope = SCOPE) {
+  const cached = tokenCache.get(scope);
+  if (cached && Date.now() < cached.expiresAt) return cached.token;
 
   const found = findServiceAccountKey();
   if (!found || found.missing) {
@@ -120,7 +124,7 @@ export async function getAccessToken() {
   const { key } = found;
   const now = Math.floor(Date.now() / 1000);
   const assertion = jwt.sign(
-    { iss: key.client_email, scope: SCOPE, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 },
+    { iss: key.client_email, scope, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 },
     key.private_key,
     { algorithm: 'RS256' },
   );
@@ -135,8 +139,8 @@ export async function getAccessToken() {
   if (!res.ok) throw new Error(`Google token exchange failed (${res.status}): ${JSON.stringify(body).slice(0, 300)}`);
 
   // Refreshed a minute early so a long sync cannot expire mid-run.
-  tokenCache = { token: body.access_token, expiresAt: Date.now() + ((body.expires_in || 3600) - 60) * 1000 };
-  return tokenCache.token;
+  tokenCache.set(scope, { token: body.access_token, expiresAt: Date.now() + ((body.expires_in || 3600) - 60) * 1000 });
+  return body.access_token;
 }
 
 const digits = (v) => (v == null ? null : String(v).replace(/\D/g, ''));
@@ -298,4 +302,148 @@ export async function getAdGroupMonths(customerId, { since, until, ...opts } = {
     clicks: Number(r.metrics?.clicks || 0),
     conversions: Number(r.metrics?.conversions || 0),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Account evidence beyond campaign totals: what claude-ads' Google audit checks
+// (conversion setup, search terms, keywords, negatives, impression share).
+// Every query was run against DentAlchemy's live account on 2026-11-07.
+// ---------------------------------------------------------------------------
+
+const micros = (v) => Number(v || 0) / 1e6;
+const share = (v) => (v == null ? null : Math.round(Number(v) * 1000) / 10); // 0.318 -> 31.8 (%)
+
+/**
+ * Categories that mean a person asked to be contacted. Directions, page views
+ * and "other engagements" are excluded: Google counts them as conversions when
+ * they are primary goals, but none of them is a lead.
+ */
+export const LEAD_CATEGORIES = new Set([
+  'SUBMIT_LEAD_FORM', 'PHONE_CALL_LEAD', 'CONTACT', 'IMPORTED_LEAD',
+  'QUALIFIED_LEAD', 'CONVERTED_LEAD', 'REQUEST_QUOTE', 'BOOK_APPOINTMENT', 'SIGNUP',
+]);
+
+/** The account's conversion actions and how each is counted. */
+export async function getConversionActions(customerId, opts = {}) {
+  const rows = await query(customerId, `
+    SELECT conversion_action.id, conversion_action.name, conversion_action.status,
+           conversion_action.type, conversion_action.category,
+           conversion_action.primary_for_goal, conversion_action.counting_type,
+           conversion_action.include_in_conversions_metric
+    FROM conversion_action
+  `, opts);
+  return rows.map(({ conversionAction: a }) => ({
+    actionId: String(a.id),
+    name: a.name,
+    status: a.status,
+    type: a.type,
+    category: a.category,
+    primaryForGoal: !!a.primaryForGoal,
+    countingType: a.countingType || null,
+    // What actually decides whether it lands in metrics.conversions.
+    inConversions: !!a.includeInConversionsMetric,
+  }));
+}
+
+/** Conversions per campaign, month and conversion action. `conversions` is
+ *  what the account counts (bids on); `allConversions` includes the rest. */
+export async function getConversionMonths(customerId, { since, until, ...opts } = {}) {
+  const rows = await query(customerId, `
+    SELECT campaign.id, segments.month, segments.conversion_action_name,
+           segments.conversion_action_category, metrics.conversions, metrics.all_conversions
+    FROM campaign
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+  `, opts);
+  return rows.map(r => ({
+    campaignId: String(r.campaign.id),
+    month: String(r.segments.month).slice(0, 7),
+    actionName: r.segments.conversionActionName,
+    category: r.segments.conversionActionCategory,
+    conversions: Number(r.metrics?.conversions || 0),
+    allConversions: Number(r.metrics?.allConversions || 0),
+  }));
+}
+
+/** Search impression share, bidding and budget per Search campaign-month. */
+export async function getSearchShareMonths(customerId, { since, until, ...opts } = {}) {
+  const rows = await query(customerId, `
+    SELECT campaign.id, campaign.bidding_strategy_type, campaign_budget.amount_micros,
+           segments.month, metrics.search_impression_share,
+           metrics.search_budget_lost_impression_share, metrics.search_rank_lost_impression_share
+    FROM campaign
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+      AND campaign.advertising_channel_type = 'SEARCH'
+  `, opts);
+  return rows.map(r => ({
+    campaignId: String(r.campaign.id),
+    month: String(r.segments.month).slice(0, 7),
+    biddingStrategy: r.campaign.biddingStrategyType || null,
+    dailyBudget: r.campaignBudget?.amountMicros != null ? micros(r.campaignBudget.amountMicros) : null,
+    impressionSharePct: share(r.metrics?.searchImpressionShare),
+    lostToBudgetPct: share(r.metrics?.searchBudgetLostImpressionShare),
+    lostToRankPct: share(r.metrics?.searchRankLostImpressionShare),
+  }));
+}
+
+/** The search terms report by month. */
+export async function getSearchTermMonths(customerId, { since, until, ...opts } = {}) {
+  const rows = await query(customerId, `
+    SELECT campaign.id, search_term_view.search_term, search_term_view.status, segments.month,
+           metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+    FROM search_term_view
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+  `, opts);
+  return rows.map(r => ({
+    campaignId: String(r.campaign.id),
+    term: r.searchTermView.searchTerm,
+    status: r.searchTermView.status,
+    month: String(r.segments.month).slice(0, 7),
+    impressions: Number(r.metrics?.impressions || 0),
+    clicks: Number(r.metrics?.clicks || 0),
+    spend: micros(r.metrics?.costMicros),
+    conversions: Number(r.metrics?.conversions || 0),
+  }));
+}
+
+/** Positive keywords with quality score, by month. */
+export async function getKeywordMonths(customerId, { since, until, ...opts } = {}) {
+  const rows = await query(customerId, `
+    SELECT campaign.id, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type,
+           ad_group_criterion.status, ad_group_criterion.quality_info.quality_score, segments.month,
+           metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+    FROM keyword_view
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+  `, opts);
+  return rows.map(r => ({
+    campaignId: String(r.campaign.id),
+    text: r.adGroupCriterion.keyword?.text,
+    matchType: r.adGroupCriterion.keyword?.matchType,
+    status: r.adGroupCriterion.status,
+    qualityScore: r.adGroupCriterion.qualityInfo?.qualityScore ?? null,
+    month: String(r.segments.month).slice(0, 7),
+    impressions: Number(r.metrics?.impressions || 0),
+    clicks: Number(r.metrics?.clicks || 0),
+    spend: micros(r.metrics?.costMicros),
+    conversions: Number(r.metrics?.conversions || 0),
+  }));
+}
+
+/** Negative keywords at ad group and campaign level. No metrics exist for them. */
+export async function getNegativeKeywords(customerId, opts = {}) {
+  const [adGroup, campaign] = await Promise.all([
+    query(customerId, `
+      SELECT campaign.id, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type
+      FROM ad_group_criterion
+      WHERE ad_group_criterion.negative = TRUE AND ad_group_criterion.type = 'KEYWORD'
+    `, opts),
+    query(customerId, `
+      SELECT campaign.id, campaign_criterion.keyword.text, campaign_criterion.keyword.match_type
+      FROM campaign_criterion
+      WHERE campaign_criterion.negative = TRUE AND campaign_criterion.type = 'KEYWORD'
+    `, opts),
+  ]);
+  return [
+    ...adGroup.map(r => ({ level: 'ad_group', campaignId: String(r.campaign.id), text: r.adGroupCriterion.keyword?.text, matchType: r.adGroupCriterion.keyword?.matchType })),
+    ...campaign.map(r => ({ level: 'campaign', campaignId: String(r.campaign.id), text: r.campaignCriterion.keyword?.text, matchType: r.campaignCriterion.keyword?.matchType })),
+  ];
 }

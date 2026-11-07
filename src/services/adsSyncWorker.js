@@ -14,7 +14,12 @@
  */
 
 import db from '../../database.js';
-import { getAccountInfo, getCampaignMonths, getAdGroupMonths } from './googleAdsClient.js';
+import {
+  getAccountInfo, getCampaignMonths, getAdGroupMonths,
+  getConversionActions, getConversionMonths, getSearchShareMonths,
+  getSearchTermMonths, getKeywordMonths, getNegativeKeywords, LEAD_CATEGORIES,
+} from './googleAdsClient.js';
+import { getSessionMonths } from './ga4Client.js';
 import { computeAdMetrics } from './metrics.js';
 
 /** Months, newest first, as 'YYYY-MM'. */
@@ -43,7 +48,7 @@ function rangeFor(months) {
  */
 export async function syncClient(clientId, { dryRun = false, monthsBack = 3, triggerSource = 'manual' } = {}) {
   const client = db.prepare(`
-    SELECT id, name, google_ads_customer_id, google_ads_login_customer_id, ads_enabled
+    SELECT id, name, google_ads_customer_id, google_ads_login_customer_id, ads_enabled, ga4_property_id
     FROM crm_clients WHERE id = ?
   `).get(clientId);
 
@@ -254,7 +259,11 @@ export async function syncClient(clientId, { dryRun = false, monthsBack = 3, tri
 
     write();
 
-    console.log(`[ADS SYNC] ${client.name}: ${plan.insert.length} inserted, ${plan.update.length} updated, ${plan.skippedManual.length} skipped (manual), ${groupsInScope.length} ad groups.`);
+    // After the spend rows exist, so the per-campaign columns have rows to land
+    // on. Supplementary: a failure here is recorded, never fails the spend sync.
+    summary.evidence = await syncEvidence(client, { customerId, opts, months, since, until });
+
+    console.log(`[ADS SYNC] ${client.name}: ${plan.insert.length} inserted, ${plan.update.length} updated, ${plan.skippedManual.length} skipped (manual), ${groupsInScope.length} ad groups.${summary.evidence.errors.length ? ' Evidence errors: ' + summary.evidence.errors.join(' | ') : ''}`);
 
     import('../../server.js')
       .then(({ broadcastEvent }) => broadcastEvent('ads_sync_completed', { clientId, ...summary }))
@@ -264,6 +273,153 @@ export async function syncClient(clientId, { dryRun = false, monthsBack = 3, tri
   } catch (err) {
     return fail(err.message);
   }
+}
+
+/** Sums rows sharing a key; the API returns one row per ad group or segment. */
+function sumBy(rows, keyOf, fields) {
+  const out = new Map();
+  for (const r of rows) {
+    const k = keyOf(r);
+    const acc = out.get(k);
+    if (!acc) { out.set(k, { ...r }); continue; }
+    for (const f of fields) acc[f] = (acc[f] || 0) + (r[f] || 0);
+    // Keep the last non-null descriptive value (status, quality score).
+    for (const [f, v] of Object.entries(r)) if (!fields.includes(f) && v != null) acc[f] = v;
+  }
+  return [...out.values()];
+}
+
+/**
+ * The account evidence claude-ads' Google audit reads: conversion setup and
+ * counts, impression share, search terms, keywords, negatives — plus GA4
+ * sessions when the client has a property. Replaced for the synced months.
+ *
+ * Returns row counts and any errors; never throws.
+ */
+async function syncEvidence(client, { customerId, opts, months, since, until }) {
+  const clientId = client.id;
+  const errors = [];
+  const counts = {};
+  const monthsJson = JSON.stringify(months);
+  const inScope = (r) => months.includes(r.month);
+
+  try {
+    const [actions, conv, share, terms, keywords, negatives] = await Promise.all([
+      getConversionActions(customerId, opts),
+      getConversionMonths(customerId, { since, until, ...opts }),
+      getSearchShareMonths(customerId, { since, until, ...opts }),
+      getSearchTermMonths(customerId, { since, until, ...opts }),
+      getKeywordMonths(customerId, { since, until, ...opts }),
+      getNegativeKeywords(customerId, opts),
+    ]);
+
+    const convRows = sumBy(conv.filter(inScope), r => `${r.campaignId}|${r.month}|${r.actionName}`, ['conversions', 'allConversions']);
+    const termRows = sumBy(terms.filter(inScope), r => `${r.campaignId}|${r.month}|${r.term}`, ['impressions', 'clicks', 'spend', 'conversions']);
+    const keywordRows = sumBy(keywords.filter(inScope), r => `${r.campaignId}|${r.month}|${r.text}|${r.matchType}`, ['impressions', 'clicks', 'spend', 'conversions']);
+
+    // Google's lead count per campaign-month: counted conversions in a lead
+    // category. Directions and page views are conversions to Google, not leads.
+    const leadConv = new Map();
+    for (const r of convRows) {
+      if (!LEAD_CATEGORIES.has(r.category)) continue;
+      const k = `${r.campaignId}|${r.month}`;
+      leadConv.set(k, (leadConv.get(k) || 0) + r.conversions);
+    }
+
+    db.transaction(() => {
+      db.prepare(`DELETE FROM ads_conversion_actions WHERE client_id = ? AND platform = 'Google'`).run(clientId);
+      const insAction = db.prepare(`
+        INSERT INTO ads_conversion_actions
+          (client_id, platform, action_id, name, status, type, category, primary_for_goal, counting_type, in_conversions)
+        VALUES (?, 'Google', ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const a of actions) insAction.run(clientId, a.actionId, a.name, a.status, a.type, a.category, a.primaryForGoal ? 1 : 0, a.countingType, a.inConversions ? 1 : 0);
+
+      db.prepare(`DELETE FROM ads_conversion_months WHERE client_id = ? AND month IN (SELECT value FROM json_each(?))`).run(clientId, monthsJson);
+      const insConv = db.prepare(`
+        INSERT INTO ads_conversion_months (client_id, external_campaign_id, month, action_name, category, conversions, all_conversions)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const r of convRows) insConv.run(clientId, r.campaignId, r.month, r.actionName, r.category, r.conversions, r.allConversions);
+
+      // Synced rows only; a hand-entered campaign keeps whatever it has.
+      db.prepare(`
+        UPDATE marketing_ad_campaigns SET platform_lead_conversions = 0
+        WHERE client_id = ? AND source = 'google_ads' AND month IN (SELECT value FROM json_each(?))
+      `).run(clientId, monthsJson);
+      const setLeadConv = db.prepare(`
+        UPDATE marketing_ad_campaigns SET platform_lead_conversions = ?
+        WHERE client_id = ? AND source = 'google_ads' AND external_campaign_id = ? AND month = ?
+      `);
+      for (const [k, v] of leadConv) {
+        const [cid, month] = k.split('|');
+        setLeadConv.run(Math.round(v * 100) / 100, clientId, cid, month);
+      }
+
+      const setShare = db.prepare(`
+        UPDATE marketing_ad_campaigns
+        SET search_impression_share_pct = ?, search_lost_to_budget_pct = ?, search_lost_to_rank_pct = ?,
+            bidding_strategy = ?, daily_budget = ?
+        WHERE client_id = ? AND source = 'google_ads' AND external_campaign_id = ? AND month = ?
+      `);
+      for (const r of share.filter(inScope)) {
+        setShare.run(r.impressionSharePct, r.lostToBudgetPct, r.lostToRankPct, r.biddingStrategy, r.dailyBudget, clientId, r.campaignId, r.month);
+      }
+
+      db.prepare(`DELETE FROM ads_search_terms WHERE client_id = ? AND month IN (SELECT value FROM json_each(?))`).run(clientId, monthsJson);
+      const insTerm = db.prepare(`
+        INSERT INTO ads_search_terms (client_id, external_campaign_id, month, term, status, impressions, clicks, spend, conversions)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const r of termRows) insTerm.run(clientId, r.campaignId, r.month, r.term, r.status, r.impressions, r.clicks, r.spend, r.conversions);
+
+      db.prepare(`DELETE FROM ads_keywords WHERE client_id = ? AND month IN (SELECT value FROM json_each(?))`).run(clientId, monthsJson);
+      const insKw = db.prepare(`
+        INSERT INTO ads_keywords (client_id, external_campaign_id, month, text, match_type, status, quality_score, impressions, clicks, spend, conversions)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const r of keywordRows) {
+        if (!r.text || !r.matchType) continue;
+        insKw.run(clientId, r.campaignId, r.month, r.text, r.matchType, r.status, r.qualityScore, r.impressions, r.clicks, r.spend, r.conversions);
+      }
+
+      db.prepare(`DELETE FROM ads_negative_keywords WHERE client_id = ?`).run(clientId);
+      const insNeg = db.prepare(`
+        INSERT OR IGNORE INTO ads_negative_keywords (client_id, level, external_campaign_id, text, match_type)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      for (const n of negatives) if (n.text && n.matchType) insNeg.run(clientId, n.level, n.campaignId, n.text, n.matchType);
+    })();
+
+    Object.assign(counts, {
+      conversionActions: actions.length, conversionRows: convRows.length,
+      searchTerms: termRows.length, keywords: keywordRows.length, negatives: negatives.length,
+    });
+  } catch (err) {
+    errors.push(`Google Ads evidence: ${err.message}`);
+  }
+
+  if (client.ga4_property_id) {
+    try {
+      const rows = sumBy((await getSessionMonths(client.ga4_property_id, { since, until })).filter(inScope),
+        r => `${r.month}|${r.host}|${r.channel}`, ['sessions', 'engagedSessions', 'keyEvents']);
+      db.transaction(() => {
+        db.prepare(`DELETE FROM ga4_session_months WHERE client_id = ? AND month IN (SELECT value FROM json_each(?))`).run(clientId, monthsJson);
+        const ins = db.prepare(`
+          INSERT INTO ga4_session_months (client_id, month, host, channel, sessions, engaged_sessions, key_events)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const r of rows) ins.run(clientId, r.month, r.host, r.channel, r.sessions, r.engagedSessions, r.keyEvents);
+      })();
+      counts.ga4Rows = rows.length;
+    } catch (err) {
+      errors.push(`GA4: ${err.message}`);
+    }
+  }
+
+  db.prepare('UPDATE crm_clients SET ads_last_evidence_error = ? WHERE id = ?')
+    .run(errors.length ? errors.join(' | ').slice(0, 1000) : null, clientId);
+  return { counts, errors };
 }
 
 /** Every client with a customer ID. Used by the scheduled run. */
