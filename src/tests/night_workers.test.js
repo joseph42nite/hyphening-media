@@ -68,7 +68,12 @@ async function fakeClaude(prompt, cwd, tools) {
 
 let ready;
 
-describe('seo_fix_worker', () => {
+// These run real git (init, worktrees, commits, a push to a bare remote), which
+// takes over the 5 s default on a slow or external drive. The first test then
+// times out and the deploy tests, which use its batch, fail after it.
+const GIT_TIMEOUT = { timeout: 30000 };
+
+describe('seo_fix_worker', GIT_TIMEOUT, () => {
   it('commits the good fix on a night branch, throws away the bad ones, and leaves the repo folder alone', async () => {
     const calls = [];
     const job = { batch_id: 7, night: '2026-11-04', client: client(), max_fixes: 8,
@@ -106,7 +111,7 @@ describe('seo_fix_worker', () => {
   });
 });
 
-describe('deploy_worker', () => {
+describe('deploy_worker', GIT_TIMEOUT, () => {
   const deployJob = (batch) => ({
     batch_id: 7, branch: batch.branch, base_commit: batch.base_commit, client: client(),
     commits: batch.fixes.filter(f => f.ok).map(f => ({ rec_id: f.rec_id, commit_sha: f.commit, metric: 'Title tag' })),
