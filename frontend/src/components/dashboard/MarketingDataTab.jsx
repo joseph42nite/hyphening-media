@@ -218,6 +218,8 @@ export default function MarketingDataTab({
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [priceRows, setPriceRows] = useState([]);
   const [defaultBookingValue, setDefaultBookingValue] = useState('');
+  // The plan the ads account is paced and judged against. Optional.
+  const [adPlan, setAdPlan] = useState({ monthly_ad_budget_inr: '', target_cost_per_qualified_lead_inr: '', target_cost_per_booking_inr: '' });
   const [priceMeta, setPriceMeta] = useState({ observed: [], untyped: 0 });
 
   const openPriceModal = async () => {
@@ -248,6 +250,7 @@ export default function MarketingDataTab({
 
       setPriceRows(rows);
       setDefaultBookingValue(data.default_booking_value_inr != null ? String(data.default_booking_value_inr) : '');
+      setAdPlan(Object.fromEntries(Object.keys(adPlan).map(k => [k, data[k] != null ? String(data[k]) : ''])));
       setPriceMeta({ observed: data.observed_treatments || [], untyped: data.untyped_bookings || 0 });
       setShowPriceModal(true);
     } catch (err) {
@@ -267,7 +270,8 @@ export default function MarketingDataTab({
           prices: priceRows
             .filter(r => r.price_inr !== '' && Number(r.price_inr) >= 0)
             .map(r => ({ treatment_type: r.treatment_type, price_inr: Number(r.price_inr) })),
-          default_booking_value_inr: defaultBookingValue === '' ? null : Number(defaultBookingValue)
+          default_booking_value_inr: defaultBookingValue === '' ? null : Number(defaultBookingValue),
+          ...Object.fromEntries(Object.entries(adPlan).map(([k, v]) => [k, v === '' ? null : Number(v)])),
         })
       });
       const data = await res.json();
@@ -1251,6 +1255,26 @@ export default function MarketingDataTab({
                     {priceMeta.untyped} booking{priceMeta.untyped === 1 ? '' : 's'} on this client have no procedure recorded — without a fallback they count as ₹0.
                   </small>
                 )}
+              </div>
+
+              <div className="form-group" style={{ borderTop: '2px solid var(--border-color)', paddingTop: '12px' }}>
+                <label>Ads plan (optional)</label>
+                <small style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: '8px' }}>
+                  What the Ads Monitor paces spend against and judges cost per lead by. Leave blank if not agreed with the client.
+                </small>
+                {[
+                  ['monthly_ad_budget_inr', 'Monthly ad budget (₹)'],
+                  ['target_cost_per_qualified_lead_inr', 'Target cost per qualified lead (₹)'],
+                  ['target_cost_per_booking_inr', 'Target cost per booking (₹)'],
+                ].map(([key, label]) => (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ flex: 1, fontSize: '0.8rem' }}>{label}</span>
+                    <input className="form-control" type="number" min="0" step="0.01" placeholder="₹"
+                      style={{ width: '140px', flex: '0 0 140px' }}
+                      value={adPlan[key]}
+                      onChange={e => setAdPlan({ ...adPlan, [key]: e.target.value })} />
+                  </div>
+                ))}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>

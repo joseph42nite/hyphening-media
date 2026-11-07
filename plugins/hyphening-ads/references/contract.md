@@ -24,9 +24,12 @@ say not to invent account context; this makes the same point concrete:
   client does not have. Say what is missing and what it would take to have it.
 - **Do not quote an industry benchmark.** The pack contains none. Compare
   against the account's own `monthly_series`, and say that is what you did.
-- **Do not pace against a budget.** No monthly budget is stored anywhere in this
-  system. The pacing section compares against the account's own prior-month
-  average and says so.
+- **Pace against a budget only when `pacing.budget_inr` is present.** It is the
+  client's agreed monthly budget. Without it, pacing compares against the
+  account's own prior-month average and says so; never assume a budget.
+- **Judge cost per outcome against a target only when one is set**
+  (`cost_per_outcome.account.target_*`). Otherwise compare with the account's
+  own history.
 - **Revenue is the first booked treatment only.** No repeat visit is recorded
   anywhere, so it is never lifetime value. `coverage_pct` is how much of the
   booked volume could be priced — below 100 the figure is a floor.

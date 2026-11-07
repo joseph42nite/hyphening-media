@@ -788,6 +788,18 @@ const getAdWithLeads = (adId) => {
 };
 
 /**
+ * The client's ad economics, edited beside the price list: what a booking is
+ * worth when its procedure is unpriced, and the plan the account is paced and
+ * judged against (migration 107). Read by the ads fact pack.
+ */
+const ECONOMICS_FIELDS = [
+  'default_booking_value_inr',
+  'monthly_ad_budget_inr',
+  'target_cost_per_qualified_lead_inr',
+  'target_cost_per_booking_inr',
+];
+
+/**
  * GET /api/clients/:id/treatment-prices
  * The client's price list, plus every treatment_type their leads actually
  * mention. treatment_type is free text from the CRM, so offering the values
@@ -797,7 +809,7 @@ router.get('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
   try {
     const clientId = req.params.id;
 
-    const client = db.prepare('SELECT id, default_booking_value_inr FROM crm_clients WHERE id = ?').get(clientId);
+    const client = db.prepare(`SELECT id, ${ECONOMICS_FIELDS.join(', ')} FROM crm_clients WHERE id = ?`).get(clientId);
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
     const prices = db.prepare(`
@@ -837,7 +849,7 @@ router.get('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
       prices,
       observed_treatments: observed,
       untyped_bookings: untypedBookings,
-      default_booking_value_inr: client.default_booking_value_inr
+      ...Object.fromEntries(ECONOMICS_FIELDS.map(f => [f, client[f]])),
     });
   } catch (err) {
     console.error('[MARKETING] Treatment prices fetch error:', err);
@@ -855,7 +867,7 @@ router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
     const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(clientId);
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
-    const { prices, default_booking_value_inr } = req.body || {};
+    const { prices } = req.body || {};
     if (prices !== undefined && !Array.isArray(prices)) {
       return res.status(400).json({ error: 'prices must be an array' });
     }
@@ -870,11 +882,17 @@ router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
       }
     }
 
-    const defaultValue = default_booking_value_inr === '' || default_booking_value_inr === null || default_booking_value_inr === undefined
-      ? null
-      : Number(default_booking_value_inr);
-    if (defaultValue !== null && (!Number.isFinite(defaultValue) || defaultValue < 0)) {
-      return res.status(400).json({ error: 'default_booking_value_inr must be a non-negative number' });
+    // Each economics field: absent = leave as is, '' or null = clear, else a
+    // non-negative number.
+    const economics = {};
+    for (const f of ECONOMICS_FIELDS) {
+      const raw = req.body?.[f];
+      if (raw === undefined) continue;
+      const v = raw === '' || raw === null ? null : Number(raw);
+      if (v !== null && (!Number.isFinite(v) || v < 0)) {
+        return res.status(400).json({ error: `${f} must be a non-negative number` });
+      }
+      economics[f] = v;
     }
 
     const upsert = db.prepare(`
@@ -893,8 +911,9 @@ router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
           upsert.run(clientId, String(p.treatment_type).trim(), Number(p.price_inr));
         }
       }
-      if (default_booking_value_inr !== undefined) {
-        db.prepare('UPDATE crm_clients SET default_booking_value_inr = ? WHERE id = ?').run(defaultValue, clientId);
+      for (const [f, v] of Object.entries(economics)) {
+        // f is from ECONOMICS_FIELDS, never from the request body.
+        db.prepare(`UPDATE crm_clients SET ${f} = ? WHERE id = ?`).run(v, clientId);
       }
     })();
 
@@ -904,7 +923,7 @@ router.put('/:id/treatment-prices', authorize('admin', 'ops_social_media_manager
       action: 'update',
       entityType: 'client_treatment_prices',
       entityId: parseInt(clientId, 10),
-      diff: { count: (prices || []).length, default_booking_value_inr: defaultValue },
+      diff: { count: (prices || []).length, ...economics },
       ip: req.ip,
     });
 

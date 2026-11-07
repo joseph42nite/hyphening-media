@@ -4,6 +4,7 @@
  * Dispatched from src/routes/webhooks.js after the signature check.
  */
 
+import { supersedeOpenRecommendations } from '../services/recommendations.js';
 import db from '../../database.js';
 // The ads fleet has its own runs table and lifecycle module, imported under
 // aliases: every name is the same word as its SEO counterpart, and an
@@ -251,10 +252,16 @@ export function handleCreateAdsAudit(payload) {
         stored++;
       }
     }
-    return { auditId, stored, skipped };
+    // Only a run that produced findings replaces the last one: a failed or
+    // empty run must not clear a card's open items.
+    const superseded = stored
+      ? supersedeOpenRecommendations('ads', { clientId, newAuditId: auditId, params: [agentType] })
+      : 0;
+    return { auditId, stored, skipped, superseded };
   });
 
-  const { auditId, stored, skipped } = store();
+  const { auditId, stored, skipped, superseded } = store();
+  if (superseded) console.log(`[ADS] Audit #${auditId} (${agentType}) replaced ${superseded} open recommendation(s) from earlier runs.`);
   if (skipped) {
     console.warn(`[ADS] Audit #${auditId}: skipped ${skipped} recommendation(s) missing metric, issue or action_required.`);
   }

@@ -97,8 +97,9 @@ Statically blocked cards are skipped by the sweep: waiting cannot unblock them.
   output is a recommendation a person actions.
 - **Quote an industry benchmark.** Nothing in the pack contains one. Cards
   compare against the account's own history and say so.
-- **Pace against a budget.** No monthly budget is stored anywhere in this
-  system. Pacing compares to the account's own prior-month average.
+- **Invent a budget or a target.** Pacing and cost per outcome are judged
+  against the client's agreed budget and targets when set (Marketing Data →
+  procedure prices), and against the account's own history when not.
 - **Report lifetime value.** Revenue is the first booked treatment, priced off
   the client's own list, and every report says so.
 - **Report a landing page conversion rate.** There is no sessions figure in this

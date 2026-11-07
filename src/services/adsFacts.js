@@ -124,6 +124,15 @@ function deriveCampaign(row) {
     // against the fraction that did arrive.
     lead_capture_pct: row.lead_capture_pct,
     ...derived,
+    // Google Search only, from the sync. Absent for other rows rather than null,
+    // so a model does not reason about a share that was never measured.
+    ...(row.search_impression_share_pct != null || row.search_lost_to_budget_pct != null ? {
+      search_impression_share_pct: row.search_impression_share_pct,
+      search_lost_to_budget_pct: row.search_lost_to_budget_pct,
+      search_lost_to_rank_pct: row.search_lost_to_rank_pct,
+    } : {}),
+    ...(row.bidding_strategy ? { bidding_strategy: row.bidding_strategy } : {}),
+    ...(row.daily_budget != null ? { daily_budget_inr: round(row.daily_budget) } : {}),
     // Present only when the stored and recomputed values genuinely disagree,
     // so its absence is not something the model has to reason about.
     ...(drift.length ? { stored_value_drift: drift } : {}),
@@ -212,6 +221,9 @@ function spendSection(clientId, month) {
     SELECT a.id, a.platform, a.ad_campaign_name, a.leads, a.total_ad_spend_inr,
            a.impressions, a.clicks, a.ctr_pct, a.cpc_inr, a.cpl_inr,
            a.revenue_generated, a.roas, ${CAMPAIGN_MONTH.replace(/\b(month|created_at)\b/g, 'a.$1')} AS month,
+           a.source, a.platform_conversions, a.platform_lead_conversions,
+           a.search_impression_share_pct, a.search_lost_to_budget_pct, a.search_lost_to_rank_pct,
+           a.bidding_strategy, a.daily_budget,
            (
              SELECT COUNT(l.id) FROM campaign_leads l
              WHERE l.client_id = a.client_id
@@ -295,7 +307,12 @@ function spendSection(clientId, month) {
   const walkInFor = countOf('walk_in');
 
   for (const row of rows) {
-    const reported = row.leads || 0;
+    // What the platform reported. For a synced Google row that is Google's own
+    // count of lead conversions (src/services/adsSyncWorker.js); `leads` stays
+    // 0 on those rows by design, and reading it said "Google reports 0 leads"
+    // for an account Google credited with 21 lead-form conversions in October.
+    // A hand-entered row has its reported leads typed into `leads`.
+    const reported = row.platform_lead_conversions != null ? Math.round(row.platform_lead_conversions) : (row.leads || 0);
     const captured = row.actual_leads || 0;
     row.leads_reported = reported;
     row.leads_captured = captured;
@@ -581,6 +598,18 @@ function landingSection(clientId, client) {
   const landingUrl = client.website_url || null;
   if (!landingUrl && !landing.length && !fromLeads.length && !seo.length) return null;
 
+  // GA4 sessions on the landing host, by channel and month — the denominator
+  // contact clicks never had. A property often holds several sites, so the
+  // hosts it does track are listed when the landing host is not among them.
+  let landingHost = null;
+  try { landingHost = landingUrl ? new URL(landingUrl).hostname.replace(/^www\./, '') : null; } catch { /* leave null */ }
+  const ga4Hosts = db.prepare('SELECT DISTINCT host FROM ga4_session_months WHERE client_id = ?').all(clientId).map(r => r.host);
+  const ga4 = landingHost ? db.prepare(`
+    SELECT month, channel, SUM(sessions) AS sessions, SUM(engaged_sessions) AS engaged_sessions, ROUND(SUM(key_events), 2) AS key_events
+    FROM ga4_session_months WHERE client_id = ? AND REPLACE(host, 'www.', '') = ?
+    GROUP BY month, channel ORDER BY month DESC, sessions DESC
+  `).all(clientId, landingHost) : [];
+
   return {
     // The ads and the site share one URL. Named `landing_url` rather than
     // `website_url` so a skill reading this section does not have to know that,
@@ -588,6 +617,10 @@ function landingSection(clientId, client) {
     landing_url: landingUrl,
     landing_contact_clicks: landing,
     lead_contact_clicks: fromLeads,
+    ...(ga4.length ? { ga4_sessions: ga4 } : {}),
+    ...(!ga4.length && ga4Hosts.length ? {
+      ga4_note: `The client's GA4 property tracks ${ga4Hosts.join(', ')}, not ${landingHost}. The landing page is not tagged, so there is no sessions figure for it.`,
+    } : {}),
     // Borrowed from the SEO fleet rather than re-audited. A landing page's
     // technical health is the same fact whichever monitor asks, and running a
     // second crawl to learn it would be the expensive way to be consistent.
@@ -597,6 +630,87 @@ function landingSection(clientId, client) {
       summary: (a.summary || '').slice(0, 400),
       at: a.created_at,
     })),
+  };
+}
+
+/**
+ * Google Ads account evidence for one month, from the sync's evidence tables:
+ * how conversions are set up and counted, the search terms report, keywords
+ * and negatives. What claude-ads' Google audit checks, summarised so the pack
+ * stays small: totals, and the rows that carry the spend.
+ */
+function googleEvidenceSection(clientId, month) {
+  if (!month) return null;
+  const actions = db.prepare(`
+    SELECT name, status, category, type, primary_for_goal, in_conversions
+    FROM ads_conversion_actions WHERE client_id = ? AND platform = 'Google'
+    ORDER BY in_conversions DESC, name
+  `).all(clientId);
+  const termCount = db.prepare('SELECT COUNT(*) AS n FROM ads_search_terms WHERE client_id = ? AND month = ?').get(clientId, month).n;
+  if (!actions.length && !termCount) return null;
+
+  const campaignName = new Map(db.prepare(`
+    SELECT external_campaign_id AS id, ad_campaign_name AS name FROM marketing_ad_campaigns
+    WHERE client_id = ? AND external_campaign_id IS NOT NULL ORDER BY id
+  `).all(clientId).map(r => [r.id, r.name]));
+  const named = (r) => ({ ...r, campaign: campaignName.get(r.campaign) || r.campaign });
+
+  const byAction = db.prepare(`
+    SELECT action_name, category, ROUND(SUM(conversions), 2) AS counted, ROUND(SUM(all_conversions), 2) AS recorded
+    FROM ads_conversion_months WHERE client_id = ? AND month = ?
+    GROUP BY action_name, category ORDER BY recorded DESC
+  `).all(clientId, month);
+
+  const termTotals = db.prepare(`
+    SELECT ROUND(SUM(spend), 2) AS spend_inr, SUM(clicks) AS clicks, ROUND(SUM(conversions), 2) AS conversions,
+           ROUND(SUM(CASE WHEN conversions = 0 THEN spend ELSE 0 END), 2) AS spend_on_zero_conversion_terms_inr
+    FROM ads_search_terms WHERE client_id = ? AND month = ?
+  `).get(clientId, month);
+  const topTerms = db.prepare(`
+    SELECT term, external_campaign_id AS campaign, status, clicks, ROUND(spend, 2) AS spend_inr, ROUND(conversions, 2) AS conversions
+    FROM ads_search_terms WHERE client_id = ? AND month = ?
+    ORDER BY spend DESC LIMIT 25
+  `).all(clientId, month).map(named);
+  const zeroConvTerms = db.prepare(`
+    SELECT term, external_campaign_id AS campaign, clicks, ROUND(spend, 2) AS spend_inr
+    FROM ads_search_terms WHERE client_id = ? AND month = ? AND conversions = 0 AND spend > 0
+    ORDER BY spend DESC LIMIT 20
+  `).all(clientId, month).map(named);
+
+  const keywordsByMatch = db.prepare(`
+    SELECT match_type, COUNT(*) AS keywords, ROUND(SUM(spend), 2) AS spend_inr, ROUND(SUM(conversions), 2) AS conversions
+    FROM ads_keywords WHERE client_id = ? AND month = ? GROUP BY match_type ORDER BY spend_inr DESC
+  `).all(clientId, month);
+  const lowQuality = db.prepare(`
+    SELECT text, match_type, external_campaign_id AS campaign, quality_score, clicks, ROUND(spend, 2) AS spend_inr
+    FROM ads_keywords WHERE client_id = ? AND month = ? AND quality_score IS NOT NULL AND quality_score <= 4 AND spend > 0
+    ORDER BY spend DESC LIMIT 15
+  `).all(clientId, month).map(named);
+  const negatives = db.prepare(`
+    SELECT level, external_campaign_id AS campaign, COUNT(*) AS negatives
+    FROM ads_negative_keywords WHERE client_id = ? GROUP BY level, external_campaign_id
+  `).all(clientId).map(named);
+
+  return {
+    month,
+    conversion_actions: actions.map(a => ({
+      name: a.name, status: a.status, category: a.category, type: a.type,
+      primary_for_goal: !!a.primary_for_goal,
+      // Whether it lands in "Conversions" — what bidding optimises toward and
+      // what leads_reported counts (lead categories only).
+      counted_in_conversions: !!a.in_conversions,
+    })),
+    conversions_by_action: byAction,
+    conversions_note: '`counted` is what Google includes in Conversions (and bids toward); `recorded` includes actions it tracks but does not count. leads_reported in the spend section is `counted` for lead categories only (lead form, call, contact).',
+    search_terms: {
+      terms: termCount,
+      ...termTotals,
+      top_by_spend: topTerms,
+      top_zero_conversion_by_spend: zeroConvTerms,
+    },
+    keywords_by_match_type: keywordsByMatch,
+    low_quality_score_keywords: lowQuality,
+    negative_keywords: negatives,
   };
 }
 
@@ -658,7 +772,8 @@ function competitorsSection(clientId) {
 export function buildFactPack(clientId, { month = null } = {}) {
   const client = db.prepare(`
     SELECT id, name, client_type, website_url, contact_phone,
-           google_ads_customer_id, meta_ads_account_id
+           google_ads_customer_id, meta_ads_account_id,
+           monthly_ad_budget_inr, target_cost_per_qualified_lead_inr, target_cost_per_booking_inr
     FROM crm_clients WHERE id = ?
   `).get(clientId);
   if (!client) return null;
@@ -681,6 +796,8 @@ export function buildFactPack(clientId, { month = null } = {}) {
     'No posted, tracked content with views recorded for this client.');
   add('landing', landingSection(clientId, client),
     'No website URL is set on the client record, and no contact clicks or SEO audits exist. Add the Website URL on the client to unblock this.');
+  add('google_evidence', googleEvidenceSection(clientId, sections.spend?.focus_month || month),
+    'No Google Ads account evidence synced yet (conversion actions, search terms, keywords). It arrives with the next Google Ads sync for a client with a customer ID.');
   add('brand', brandSection(clientId),
     'Brand onboarding has not been filled in for this client (audience, positioning, differentiation, voice). Fill it in on the client record or in the client portal.');
   add('competitors', competitorsSection(clientId),
@@ -711,6 +828,16 @@ export function buildFactPack(clientId, { month = null } = {}) {
       account: {
         cost_per_qualified_lead_inr: ratio(sections.spend.account.spend_inr, sections.leads.account.qualified),
         cost_per_booked_appointment_inr: ratio(sections.spend.account.spend_inr, sections.leads.account.booked),
+        // The client's agreed targets, where set, and how far off them the
+        // month is. Positive = over target (worse).
+        ...(client.target_cost_per_qualified_lead_inr != null ? {
+          target_cost_per_qualified_lead_inr: round(client.target_cost_per_qualified_lead_inr),
+          vs_target_qualified_pct: delta(ratio(sections.spend.account.spend_inr, sections.leads.account.qualified), client.target_cost_per_qualified_lead_inr),
+        } : {}),
+        ...(client.target_cost_per_booking_inr != null ? {
+          target_cost_per_booking_inr: round(client.target_cost_per_booking_inr),
+          vs_target_booking_pct: delta(ratio(sections.spend.account.spend_inr, sections.leads.account.booked), client.target_cost_per_booking_inr),
+        } : {}),
       },
       by_campaign: sections.leads.by_campaign.map(lc => {
         const sc = spendByCampaign.get(lc.campaign);
@@ -797,7 +924,14 @@ export function buildFactPack(clientId, { month = null } = {}) {
       projected_vs_prior_average_pct: typicalSpend
         ? delta(round((thisMonth.spend_inr / dayOfMonth) * daysInMonth), typicalSpend)
         : null,
-      note: 'No monthly budget is stored in this system. Pacing is measured against this account\'s own prior-month average spend, not against a plan.',
+      ...(client.monthly_ad_budget_inr != null ? {
+        budget_inr: round(client.monthly_ad_budget_inr),
+        spent_of_budget_pct: pct(thisMonth.spend_inr, client.monthly_ad_budget_inr),
+        projected_vs_budget_pct: delta(round((thisMonth.spend_inr / dayOfMonth) * daysInMonth), client.monthly_ad_budget_inr),
+        note: 'Pacing is against the client\'s agreed monthly budget (budget_inr), with the account\'s own prior-month average alongside.',
+      } : {
+        note: 'No monthly budget is set for this client. Pacing is measured against this account\'s own prior-month average spend, not against a plan. Set one beside the procedure prices in Marketing Data.',
+      }),
     };
     available.add('pacing');
   }
@@ -861,20 +995,20 @@ export function checkRequirements(agentConfig, available) {
  * (DentAlchemy, 2026-11-07). Each list is what that card's skill is asked to
  * judge, not everything that exists.
  */
-const PAID = ['spend', 'leads', 'pacing', 'revenue', 'landing'];
+const PAID = ['spend', 'leads', 'pacing', 'revenue', 'landing', 'google_evidence'];
 const OPTIONAL_SECTIONS = {
   monitor: PAID,
   google: PAID,
   meta: PAID,
   youtube: PAID,
   optimize: PAID,
-  budget: ['spend', 'leads', 'pacing', 'revenue'],
+  budget: ['spend', 'leads', 'pacing', 'revenue', 'google_evidence'],
   math: ['spend', 'leads', 'prices', 'revenue', 'pacing'],
   report: [...PAID, 'prices', 'content'],
   plan: [...PAID, 'prices', 'content', 'brand', 'competitors'],
-  test: ['spend', 'leads', 'landing', 'content'],
-  attribution: ['spend', 'leads', 'landing'],
-  server_side_tracking: ['spend', 'leads', 'landing'],
+  test: ['spend', 'leads', 'landing', 'content', 'google_evidence'],
+  attribution: ['spend', 'leads', 'landing', 'google_evidence'],
+  server_side_tracking: ['spend', 'leads', 'landing', 'google_evidence'],
   landing: ['spend', 'leads', 'brand'],
   creative: ['spend', 'leads', 'content', 'brand'],
   create: ['spend', 'leads', 'prices', 'content', 'brand', 'competitors'],

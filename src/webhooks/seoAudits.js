@@ -4,6 +4,7 @@
  * Dispatched from src/routes/webhooks.js after the signature check.
  */
 
+import { supersedeOpenRecommendations } from '../services/recommendations.js';
 import db from '../../database.js';
 import { logAction } from '../services/auditLogger.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
@@ -217,6 +218,16 @@ export function handleCreateSeoAudit(payload) {
           rec.leading_indicator || null,
           rec.page_url || result.page_url || payload.url
         );
+      }
+      // Only a run that produced findings replaces the last one. Same skill,
+      // same page, own site vs competitor kept apart (src/services/recommendations.js).
+      if (result.recommendations.length) {
+        const superseded = supersedeOpenRecommendations('seo', {
+          clientId: payload.client_id,
+          newAuditId: auditId,
+          params: [payload.audit_type, result.page_url || payload.url, isCompetitorAudit ? 1 : 0],
+        });
+        if (superseded) console.log(`[SEO] Audit #${auditId} (${payload.audit_type}) replaced ${superseded} open recommendation(s) from earlier runs.`);
       }
     }
 

@@ -137,8 +137,9 @@ repeat visits, so it is not lifetime value and must never be called that.
 
 ## `pacing`
 
-Month-to-date spend, projected to month end, against this account's own
-prior-month average. Read its `note`: there is no stored budget to pace against.
+Month-to-date spend, projected to month end, against the client's agreed
+`budget_inr` when one is set, and always against this account's own prior-month
+average. Read its `note`: it says which basis applies.
 
 **Trap:** a projection made on day 3 is nearly meaningless — one heavy day
 scales into a 10x month. Say what day of the month it is.
@@ -158,8 +159,12 @@ plus `landing_contact_clicks` by channel, campaign and month (with
 `with_ad_click_id`, how many carried a Google or Meta click ID),
 `lead_contact_clicks` by channel, and the most recent SEO audits for the site.
 
-**Trap:** contact clicks are not conversions. They are intent signals with no
-denominator here — there is no sessions figure in this system — so a click
+`ga4_sessions` (month × channel, with engaged sessions and key events) is
+present when the client's GA4 property tracks the landing host; otherwise
+`ga4_note` says which hosts it does track.
+
+**Trap:** contact clicks are not conversions. They are intent signals, and
+without `ga4_sessions` there is no denominator — so a click
 count cannot become a conversion rate no matter how it is phrased.
 
 ## `brand`
@@ -187,3 +192,27 @@ Each card gets the sections it requires plus the ones it reads when present.
 `sections_included` lists them. `sections_withheld` lists sections this client
 HAS that were left out of this card for focus — they are not missing data and
 must not be reported as gaps. Only `gaps` names data the client does not have.
+
+## `google_evidence`
+
+Google Ads account evidence for the focus month, from the sync:
+`conversion_actions` (each with `counted_in_conversions`),
+`conversions_by_action` (`counted` vs `recorded`), `search_terms` (totals,
+`top_by_spend`, `top_zero_conversion_by_spend`), `keywords_by_match_type`,
+`low_quality_score_keywords` (quality score 4 or less, with spend) and
+`negative_keywords` counts by level and campaign. Campaign lines in `spend`
+also carry search impression share, share lost to budget and to rank,
+bidding strategy and daily budget.
+
+`leads_reported` on synced Google rows is Google's own count of lead
+conversions (lead form, call and contact categories it counts), so
+`lead_capture_pct` compares Google's count with what reached the CRM.
+
+**Trap:** a conversion action that records but is not counted
+(`counted_in_conversions: false`) is invisible to bidding. Recorded call clicks
+that are not counted are a setup finding, not missing leads.
+
+**Trap:** search-term conversions are Google-counted conversions, so a term
+with zero conversions may still have produced a CRM lead. Do not propose
+negative keywords from this alone; check business relevance and the existing
+`negative_keywords` first.
