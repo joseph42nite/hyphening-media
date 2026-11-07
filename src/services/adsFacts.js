@@ -28,6 +28,7 @@
 import crypto from 'crypto';
 import db from '../../database.js';
 import { countableLeadSql } from './leadFilters.js';
+import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS } from './onboardingFields.js';
 
 /** Rounds to `dp` places, or null when the input is not a finite number. */
 function round(value, dp = 2) {
@@ -548,11 +549,15 @@ function contentSection(clientId) {
 
 /** What paid traffic does after the click, as far as this system can see it. */
 function landingSection(clientId, client) {
+  // Grouped by campaign, not by page URL: every ad click carries its own click
+  // ID in the URL, so grouping by URL made each click its own row. The campaign
+  // is resolved from the URL at capture (src/services/attribution.js).
   const landing = db.prepare(`
-    SELECT channel, campaign_name, page_url, COUNT(*) AS clicks,
+    SELECT channel, campaign_name, COUNT(*) AS clicks,
+           SUM(CASE WHEN click_id IS NOT NULL THEN 1 ELSE 0 END) AS with_ad_click_id,
            strftime('%Y-%m', created_at) AS month
     FROM landing_contact_clicks WHERE client_id = ?
-    GROUP BY channel, campaign_name, page_url, month
+    GROUP BY channel, campaign_name, month
     ORDER BY month DESC, clicks DESC
   `).all(clientId);
 
@@ -595,6 +600,49 @@ function landingSection(clientId, client) {
   };
 }
 
+/**
+ * The client's brand and voice, from the onboarding the blog skills already
+ * use (src/services/onboardingFields.js) — one profile, filled once, read by
+ * both fleets. Without it the brand and concept cards had nothing but a
+ * campaign name to build from.
+ */
+function brandSection(clientId) {
+  const row = db.prepare(`SELECT ${ONBOARDING_FIELDS.join(', ')}, brand_onboarded_at FROM crm_clients WHERE id = ?`).get(clientId);
+  if (!row) return null;
+  const profile = {};
+  for (const field of ONBOARDING_FIELDS) {
+    let v = row[field];
+    if (v == null || v === '') continue;
+    if (ONBOARDING_JSON_FIELDS.includes(field)) {
+      try { v = JSON.parse(v); } catch { /* keep the stored text */ }
+      if (Array.isArray(v) && !v.length) continue;
+    }
+    profile[field] = v;
+  }
+  if (!Object.keys(profile).length) return null;
+  return {
+    ...profile,
+    onboarded_at: row.brand_onboarded_at || null,
+    note: 'Filled by the agency or the client in brand onboarding. Treat as the client\'s stated position, not as verified fact.',
+  };
+}
+
+/**
+ * Competitors the SEO fleet discovered or the agency added
+ * (client_competitors). Shared with the SEO Monitor rather than kept twice.
+ * Rejected ones are left out; `status` says which are approved.
+ */
+function competitorsSection(clientId) {
+  const rows = db.prepare(`
+    SELECT domain, url, label, status, discovered_for_query, notes
+    FROM client_competitors
+    WHERE client_id = ? AND COALESCE(status, '') != 'rejected'
+    ORDER BY CASE status WHEN 'approved' THEN 0 ELSE 1 END, domain
+  `).all(clientId);
+  if (!rows.length) return null;
+  return { competitors: rows };
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -633,6 +681,10 @@ export function buildFactPack(clientId, { month = null } = {}) {
     'No posted, tracked content with views recorded for this client.');
   add('landing', landingSection(clientId, client),
     'No website URL is set on the client record, and no contact clicks or SEO audits exist. Add the Website URL on the client to unblock this.');
+  add('brand', brandSection(clientId),
+    'Brand onboarding has not been filled in for this client (audience, positioning, differentiation, voice). Fill it in on the client record or in the client portal.');
+  add('competitors', competitorsSection(clientId),
+    'No competitors recorded. Add them in the SEO Monitor\'s competitor list, or run its competitor discovery; both fleets read the same list.');
 
   const available = new Set(Object.keys(sections));
   const spend = sections.spend;
@@ -802,14 +854,39 @@ export function checkRequirements(agentConfig, available) {
  * it does not. `requires` decides whether a card may run at all; this decides
  * what else it is shown once it does.
  *
- * The monitor needs this split. It can run on spend alone, so `requires` is
- * just spend, but it is asked about conversion quality, tracking and pacing.
- * Trimmed to `requires`, it was handed spend only and reported leads and
- * pacing as missing for a client that had both (DentAlchemy, 2026-11-07).
+ * Trimmed to `requires` alone, the fleet ran blind: the monitor was handed
+ * spend only and reported leads and pacing missing for a client that had both,
+ * and seven cards that require nothing (tracking, setup, concepts, brand,
+ * competitor, research, validate) got cost per outcome and nothing else
+ * (DentAlchemy, 2026-11-07). Each list is what that card's skill is asked to
+ * judge, not everything that exists.
  */
+const PAID = ['spend', 'leads', 'pacing', 'revenue', 'landing'];
 const OPTIONAL_SECTIONS = {
-  monitor: ['leads', 'pacing', 'landing'],
+  monitor: PAID,
+  google: PAID,
+  meta: PAID,
+  youtube: PAID,
+  optimize: PAID,
+  budget: ['spend', 'leads', 'pacing', 'revenue'],
+  math: ['spend', 'leads', 'prices', 'revenue', 'pacing'],
+  report: [...PAID, 'prices', 'content'],
+  plan: [...PAID, 'prices', 'content', 'brand', 'competitors'],
+  test: ['spend', 'leads', 'landing', 'content'],
+  attribution: ['spend', 'leads', 'landing'],
+  server_side_tracking: ['spend', 'leads', 'landing'],
+  landing: ['spend', 'leads', 'brand'],
+  creative: ['spend', 'leads', 'content', 'brand'],
+  create: ['spend', 'leads', 'prices', 'content', 'brand', 'competitors'],
+  dna: ['landing', 'content', 'brand', 'competitors'],
+  competitor: ['spend', 'landing', 'brand', 'competitors'],
+  setup: ['spend', 'leads', 'prices', 'landing', 'brand', 'competitors'],
+  research: ['brand', 'competitors'],
 };
+
+/** Cards that read the whole pack by definition. 'full' is the name the audit
+ *  card had before migration 076; validate checks the pack itself. */
+const WHOLE_PACK = new Set(['audit', 'full', 'validate']);
 
 /** The fact pack trimmed to what one agent needs, for the claim response.
  *  Sending the whole pack to every agent would put a creative section in a
@@ -818,11 +895,9 @@ export function packForAgent(pack, agentConfig) {
   let required;
   try { required = JSON.parse(agentConfig.requires); } catch { required = []; }
 
-  // The full audit reads everything by definition; every other card gets its
-  // own sections plus the two joins that are meaningless to compute twice.
-  // 'full' is kept alongside 'audit' so a pack built before migration 076
-  // renamed the card still trims the same way.
-  const keys = (agentConfig.agent_type === 'audit' || agentConfig.agent_type === 'full')
+  // Whole-pack cards read everything; every other card gets its own sections
+  // plus the two joins that are meaningless to compute twice.
+  const keys = WHOLE_PACK.has(agentConfig.agent_type)
     ? Object.keys(pack.sections)
     : [...new Set([
         ...required.map(k => k.replace(/^spend_.*/, 'spend')),
@@ -837,5 +912,19 @@ export function packForAgent(pack, agentConfig) {
   const sections = {};
   for (const k of keys) if (pack.sections[k]) sections[k] = pack.sections[k];
 
-  return { ...pack, sections, sections_included: Object.keys(sections) };
+  // Sections this client HAS but this card was not sent. Listed so a card does
+  // not report them as missing data: `gaps` is what the client lacks, this is
+  // what was left out for focus. The validate card failed the pack for
+  // conflating the two.
+  const withheld = Object.keys(pack.sections).filter(k => !(k in sections));
+
+  return {
+    ...pack,
+    sections,
+    sections_included: Object.keys(sections),
+    sections_withheld: withheld,
+    ...(withheld.length ? {
+      sections_note: 'sections_withheld exist for this client but were not sent to this card. They are not missing data: do not list them as gaps or ask for them. Only `gaps` names data this client does not have.',
+    } : {}),
+  };
 }

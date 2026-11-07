@@ -12,6 +12,7 @@ import { syncContentToKanbanTask } from '../services/kanbanSync.js';
 import { getConnectUrl, getClientConnectedAccounts } from '../services/composioService.js';
 import { syncPostComments, replyToComment } from '../services/commentSync.js';
 import { countableLeadSql } from '../services/leadFilters.js';
+import { attributionFor } from '../services/attribution.js';
 import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS, parseJsonArrayInput } from '../services/onboardingFields.js';
 import { PREFERENCE_FIELDS, validatePreferenceInput } from '../services/blogPipeline.js';
 import { serializeRun, clientApproveBlogRun, rejectBlogRun } from '../services/blogRuns.js';
@@ -799,10 +800,12 @@ router.post('/:token/contact-click', (req, res) => {
       return res.status(404).json({ error: 'Client not found or portal disabled' });
     }
 
+    const attr = attributionFor(client.id, { pageUrl: page_url, sentCampaignName: campaign_name });
     db.prepare(`
-      INSERT INTO landing_contact_clicks (client_id, channel, campaign_name, page_url)
-      VALUES (?, ?, ?, ?)
-    `).run(client.id, channel, campaign_name || null, page_url || null);
+      INSERT INTO landing_contact_clicks
+        (client_id, channel, campaign_name, page_url, source_label, external_campaign_id, click_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(client.id, channel, attr.campaign_name, attr.page_url, attr.source_label, attr.external_campaign_id, attr.click_id);
 
     res.json({ success: true });
   } catch (err) {
@@ -818,7 +821,7 @@ router.post('/:token/contact-click', (req, res) => {
 router.post('/:token/leads/capture', async (req, res) => {
   try {
     const { token } = req.params;
-    const { name, email, phone, platform, source, campaign_name, treatment_type, service, treatment, call_duration_seconds, additional_data } = req.body;
+    const { name, email, phone, platform, source, campaign_name, treatment_type, service, treatment, call_duration_seconds, additional_data, page_url } = req.body;
 
     const client = db.prepare(
       'SELECT id, name, lead_alerts_enabled FROM crm_clients WHERE portal_token = ? AND portal_enabled = 1 AND is_active = 1'
@@ -832,15 +835,27 @@ router.post('/:token/leads/capture', async (req, res) => {
       return res.status(400).json({ error: 'Name and Phone are required fields' });
     }
 
-    const cleanPlatform = ['YouTube', 'Meta', 'Google', 'Other'].includes(platform) ? platform : 'Other';
     const cleanSource = ['form', 'call'].includes(source) ? source : 'form';
     const cleanTreatment = treatment_type || service || treatment || (additional_data?.treatment) || (additional_data?.service) || null;
     const additionalDataStr = additional_data ? JSON.stringify(additional_data) : null;
 
+    // The page URL may come top-level or inside additional_data; ad parameters
+    // the page read itself (utm_*, gclid) may come as fields of either.
+    const extra = additional_data && typeof additional_data === 'object' ? additional_data : {};
+    const attr = attributionFor(client.id, {
+      pageUrl: page_url || extra.page_url || extra.landing_url || null,
+      sentCampaignName: campaign_name,
+      fields: { ...extra, ...req.body },
+    });
+    // A resolved campaign knows its platform; otherwise trust what was sent.
+    const sentPlatform = ['YouTube', 'Meta', 'Google', 'Other'].includes(platform) ? platform : 'Other';
+    const cleanPlatform = attr.platform && sentPlatform === 'Other' ? attr.platform : sentPlatform;
+
     const result = db.prepare(`
       INSERT INTO campaign_leads (
-        client_id, name, email, phone, platform, source, campaign_name, treatment_type, call_duration_seconds, additional_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        client_id, name, email, phone, platform, source, campaign_name, treatment_type, call_duration_seconds, additional_data,
+        page_url, source_label, external_campaign_id, click_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       client.id,
       name,
@@ -848,10 +863,14 @@ router.post('/:token/leads/capture', async (req, res) => {
       phone,
       cleanPlatform,
       cleanSource,
-      campaign_name || null,
+      attr.campaign_name,
       cleanTreatment,
       call_duration_seconds || null,
-      additionalDataStr
+      additionalDataStr,
+      attr.page_url,
+      attr.source_label,
+      attr.external_campaign_id,
+      attr.click_id
     );
 
     // Telegram lead alerts retired 2026-10-11 (007's decision) — see the note on

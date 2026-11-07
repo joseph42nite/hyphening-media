@@ -129,7 +129,9 @@ describe('per-agent pack trimming', () => {
     const { pack } = buildFactPack(withSpend.id);
     const creative = db.prepare(`SELECT * FROM ads_agent_config WHERE agent_type = 'creative'`).get();
     const trimmed = packForAgent(pack, creative);
-    expect(trimmed.sections.spend).toBeUndefined();
+    // Creative reads spend, leads, content and brand; never pacing or prices.
+    expect(trimmed.sections.pacing).toBeUndefined();
+    expect(trimmed.sections.prices).toBeUndefined();
     expect(Object.keys(trimmed.sections).length).toBeLessThanOrEqual(Object.keys(pack.sections).length);
   });
 
@@ -153,6 +155,28 @@ describe('per-agent pack trimming', () => {
     expect(trimmed.sections_included).toEqual(['spend']);
     expect(trimmed.sections.leads).toBeUndefined();
     expect(trimmed.sections.pacing).toBeUndefined();
+  });
+
+  it('sends a card that requires nothing more than cost per outcome', () => {
+    // Server-side tracking requires nothing, and was sent cost_per_outcome alone.
+    const pack = { focus_month: '2026-11', sections: { spend: {}, leads: {}, landing: {}, content: {}, cost_per_outcome: {} } };
+    const trimmed = packForAgent(pack, { agent_type: 'server_side_tracking', requires: '[]' });
+    expect(trimmed.sections_included.sort()).toEqual(['cost_per_outcome', 'landing', 'leads', 'spend']);
+  });
+
+  it('lists sections left out for focus as withheld, not as gaps', () => {
+    const pack = { focus_month: '2026-11', gaps: [], sections: { spend: {}, content: {}, prices: {} } };
+    const trimmed = packForAgent(pack, monitor);
+    expect(trimmed.sections_withheld.sort()).toEqual(['content', 'prices']);
+    expect(trimmed.sections_note).toMatch(/not missing data/);
+    expect(trimmed.gaps).toEqual([]);
+  });
+
+  it('gives the validate card the whole pack', () => {
+    const pack = { focus_month: '2026-11', sections: { spend: {}, content: {}, prices: {}, brand: {} } };
+    const trimmed = packForAgent(pack, { agent_type: 'validate', requires: '[]' });
+    expect(trimmed.sections_withheld).toEqual([]);
+    expect(trimmed.sections_note).toBeUndefined();
   });
 
   it('gives the full audit everything', () => {

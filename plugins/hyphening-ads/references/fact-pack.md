@@ -59,6 +59,12 @@ A high share is a finding: it means the landing page is not passing the campaign
 through, so no campaign-level cost per lead can be trusted. Say so before
 quoting one.
 
+Since 2026-11-07 a lead or click whose page URL carries a Google campaign ID
+(`gad_campaignid`, `campaign_id`, `utm_id`) or a matching `utm_campaign` is
+attributed at capture: `campaign_name` holds the real campaign and the page's
+own label is kept as `source_label`. Leads from before that, and leads whose
+page sends no URL, stay unattributed.
+
 ### Walk-ins count, and are also listed separately
 
 `walk_in_leads` counts leads the client logged by hand in their portal —
@@ -148,9 +154,36 @@ well organically is a creative hypothesis worth testing, not a prediction.
 ## `landing`
 
 `landing_url` — the page the ads point at, which is the client's website —
-plus `landing_contact_clicks` and `lead_contact_clicks` by channel and the most
-recent SEO audits for the site.
+plus `landing_contact_clicks` by channel, campaign and month (with
+`with_ad_click_id`, how many carried a Google or Meta click ID),
+`lead_contact_clicks` by channel, and the most recent SEO audits for the site.
 
 **Trap:** contact clicks are not conversions. They are intent signals with no
 denominator here — there is no sessions figure in this system — so a click
 count cannot become a conversion rate no matter how it is phrased.
+
+## `brand`
+
+The client's brand onboarding — the same fields the blog skills read
+(`brand_audience_*`, `brand_positioning`, `brand_editorial_do`/`dont`,
+`brand_taboo_phrases`, `brand_competitor_differentiation`,
+`brand_niche_keywords`, `persona_*`). Only filled fields are present.
+
+**Trap:** this is what the client says about itself. Use it for voice and
+positioning; do not quote it as evidence of performance or of a claim's truth.
+
+## `competitors`
+
+`competitors[]` from the list the SEO Monitor keeps: `domain`, `url`, `label`,
+`status` (`approved` first; rejected ones are left out) and the search query it
+was discovered for.
+
+**Trap:** these are SEO competitors found by search ranking. Whether they also
+advertise on the same keywords is not known from this list.
+
+## What a card is sent
+
+Each card gets the sections it requires plus the ones it reads when present.
+`sections_included` lists them. `sections_withheld` lists sections this client
+HAS that were left out of this card for focus — they are not missing data and
+must not be reported as gaps. Only `gaps` names data the client does not have.
