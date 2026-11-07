@@ -214,6 +214,9 @@ describe('retry after a deploy that failed before pushing', () => {
     rec(id, a, { metric: 'Something new' });
     expect(night.queueSeoFixes({ clientId: id }).skipped[0].reason).toMatch(/waiting for Deploy or Discard/);
     expect(night.requestDeploy(b, {}).status).toBe(200);
+    // The retry clears the error but keeps why the last attempt failed.
+    expect(db.prepare('SELECT error, previous_error FROM seo_fix_batches WHERE id = ?').get(b))
+      .toEqual({ error: null, previous_error: 'check failed: vite: command not found' });
 
     // Failing after the push is different: those fixes are done for.
     night.claimSeoDeploys('test');

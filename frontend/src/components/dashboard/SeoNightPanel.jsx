@@ -108,6 +108,13 @@ export default function SeoNightPanel({ showToast }) {
         />
       </div>
 
+      {report.connector && !report.connector.online && (
+        <div style={{ ...card, borderColor: '#ef4444', color: '#fca5a5', fontSize: '0.85rem', marginBottom: '10px' }}>
+          <strong>Mac connector offline</strong> since {new Date(report.connector.since).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
+          {' '}Deploys, night fixes and blog drafts wait until it reconnects. Check the Mac is on and the connector is running.
+        </div>
+      )}
+
       {(report.clients.length > 1) && (
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
           <button type="button" style={chip(clientFilter == null)} onClick={() => setClientFilter(null)}>All</button>
@@ -144,6 +151,9 @@ export default function SeoNightPanel({ showToast }) {
                 </div>
                 {c.setup && <div style={{ fontSize: '0.78rem', color: '#facc15', marginTop: '4px' }}>{c.setup}</div>}
                 {(b?.error && !c.setup) && <div style={{ fontSize: '0.78rem', color: '#fca5a5', marginTop: '4px' }}>{b.error}</div>}
+                {(b?.previous_error && !b.error && b.status !== 'live') && (
+                  <div style={{ fontSize: '0.78rem', color: '#fca5a5', marginTop: '4px', opacity: 0.8 }}>Last attempt failed: {b.previous_error}</div>
+                )}
                 <button type="button" onClick={() => setOpen({ ...open, [c.client_id]: !isOpen })}
                   style={{ all: 'unset', cursor: 'pointer', fontSize: '0.8rem', marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}

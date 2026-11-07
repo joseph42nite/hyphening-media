@@ -259,7 +259,8 @@ export function requestDeploy(batchId, user) {
   if (!['ready', 'deploy_failed'].includes(batch.status)) return { status: 409, error: `This batch is ${batch.status}; only ready fixes can be deployed` };
   if (recCount(batch.id, 'ready_to_deploy') === 0) return { status: 409, error: 'No fixes in this batch are waiting to deploy' };
   db.prepare(`
-    UPDATE seo_fix_batches SET status = 'deploy_queued', deploy_requested_by = ?, error = NULL, log = NULL, updated_at = datetime('now') WHERE id = ?
+    UPDATE seo_fix_batches SET status = 'deploy_queued', deploy_requested_by = ?,
+      previous_error = COALESCE(error, previous_error), error = NULL, log = NULL, updated_at = datetime('now') WHERE id = ?
   `).run(user?.email || 'admin', batch.id);
   return { status: 200, batch: db.prepare('SELECT * FROM seo_fix_batches WHERE id = ?').get(batch.id) };
 }

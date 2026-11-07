@@ -17,6 +17,14 @@
 import { WebSocketServer } from 'ws';
 
 let macSocket = null;
+// When the connector last connected or dropped. Starts as the server's own
+// start: until a connector dials in, it has been offline at least that long.
+let changedAt = new Date();
+
+/** { online, since }: whether a connector is connected, and since when that's been so. */
+export function connectorStatus() {
+  return { online: !!macSocket && macSocket.readyState === macSocket.OPEN, since: changedAt.toISOString() };
+}
 
 export function attachMacConnector(httpServer) {
   const wss = new WebSocketServer({
@@ -36,10 +44,11 @@ export function attachMacConnector(httpServer) {
       macSocket.close();
     }
     macSocket = socket;
+    changedAt = new Date();
     console.log('[MAC CONNECTOR] Connected.');
 
     socket.on('close', () => {
-      if (macSocket === socket) macSocket = null;
+      if (macSocket === socket) { macSocket = null; changedAt = new Date(); }
       console.log('[MAC CONNECTOR] Disconnected.');
     });
     socket.on('error', (err) => console.error('[MAC CONNECTOR] Socket error:', err.message));
