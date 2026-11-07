@@ -55,6 +55,22 @@ async function deployStep(manifest, log) {
  * One Deploy. `job` is a claim_seo_deploys entry. Returns the result it
  * reported: { status: live|rolled_back|deploy_failed, live_commit?, error? }.
  */
+/**
+ * The fixes in the order they were made on the night branch. Each fix is made
+ * on top of the one before it, often in the same file, but the server lists
+ * them by recommendation id, which needn't match: on 2026-11-07 #1950 was
+ * replayed before the #1983 it was made on, and clashed. Commits git can't
+ * place keep their order, at the end.
+ */
+export async function inBranchOrder(repo, commits, baseCommit) {
+  const args = ['rev-list', '--topo-order', '--reverse', ...commits.map(c => c.commit_sha)];
+  if (baseCommit) args.push(`^${baseCommit}`);
+  const res = await git(repo, args, { allowFail: true });
+  const order = res.code === 0 ? res.out.trim().split('\n') : [];
+  const at = (c) => { const i = order.indexOf(c.commit_sha); return i === -1 ? Infinity : i; };
+  return commits.map((c, i) => ({ c, i })).sort((a, b) => (at(a.c) - at(b.c)) || (a.i - b.i)).map(x => x.c);
+}
+
 export async function deployBatch(job, { hookFn = hook, health = healthCheck } = {}) {
   const lines = [];
   // Whether anything reached the remote. A failure before the push leaves the
@@ -93,7 +109,7 @@ export async function deployBatch(job, { hookFn = hook, health = healthCheck } =
   try {
     // Without these the checks can't build (2026-11-03: "vite: command not found").
     await linkNodeModules(repo, wt);
-    for (const c of job.commits) {
+    for (const c of await inBranchOrder(repo, job.commits, job.base_commit)) {
       const pick = await git(wt, ['cherry-pick', c.commit_sha], { allowFail: true });
       if (pick.code !== 0) {
         await git(wt, ['cherry-pick', '--abort'], { allowFail: true });

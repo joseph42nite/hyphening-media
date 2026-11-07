@@ -169,4 +169,27 @@ describe('deploy_worker', () => {
     expect(calls[0][1].pushed).toBe(false);
     expect(sh(remote, 'rev-parse', 'main')).toBe(before);
   });
+
+  it('replays fixes in the order they were made, whatever order the server lists them in', async () => {
+    sh(repo, 'fetch', '--quiet', 'origin');
+    const base = sh(repo, 'rev-parse', 'origin/main');
+    const wt = path.join(tmp, 'wt4');
+    sh(repo, 'worktree', 'add', '--quiet', '-b', 'seo/night-4', wt, base);
+    // As on 2026-11-07: the later fix (#20) builds on the earlier one (#30) in the same file.
+    fs.writeFileSync(path.join(wt, 'index.html'), '<html><head><title>Step 1</title></head></html>\n');
+    sh(wt, 'commit', '--quiet', '-am', 'SEO: step 1 (#30)');
+    const first = sh(wt, 'rev-parse', 'HEAD');
+    fs.writeFileSync(path.join(wt, 'index.html'), '<html><head><title>Step 2</title></head></html>\n');
+    sh(wt, 'commit', '--quiet', '-am', 'SEO: step 2 (#20)');
+    const second = sh(wt, 'rev-parse', 'HEAD');
+    sh(repo, 'worktree', 'remove', '--force', wt);
+
+    const calls = [];
+    const r = await deployWorker.deployBatch({ batch_id: 11, branch: 'seo/night-4', base_commit: base, client: client(),
+      commits: [{ rec_id: 20, commit_sha: second, metric: 'step 2' }, { rec_id: 30, commit_sha: first, metric: 'step 1' }] },
+    { hookFn: fakeHook(calls), health: async () => ({ ok: true }) });
+    expect(r.status).toBe('live');
+    expect(sh(remote, 'show', 'main:index.html')).toMatch(/Step 2/);
+    expect(sh(remote, 'log', '-2', '--format=%s', 'main').split('\n')).toEqual(['SEO: step 2 (#20)', 'SEO: step 1 (#30)']);
+  });
 });
