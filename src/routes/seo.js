@@ -742,66 +742,6 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
 });
 
 /**
- * POST /api/clients/:id/seo/recommendations/:recId/convert-task
- * Converts an SEO audit recommendation into a Kanban Task card.
- */
-router.post('/:id/seo/recommendations/:recId/convert-task', (req, res) => {
-  try {
-    const { assigned_to, due_date, priority } = req.body;
-    const clientId = req.params.id;
-    const recId = req.params.recId;
-
-    const rec = db.prepare('SELECT * FROM seo_recommendations WHERE id = ? AND client_id = ?').get(recId, clientId);
-    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
-
-    // Insert task card
-    const title = `[SEO Recommendation] - Fix ${rec.metric}`;
-    const description = `### Issue:\n${rec.issue}\n\n### Action Required:\n${rec.action_required}\n\n### Observation:\n${rec.observation || 'N/A'}`;
-
-    const taskResult = db.prepare(`
-      INSERT INTO kanban_tasks (client_id, title, description, status, priority, task_type, assigned_to, due_date, created_by)
-      VALUES (?, ?, ?, 'todo', ?, 'other', ?, ?, ?)
-    `).run(
-      clientId,
-      title,
-      description,
-      priority || 'medium',
-      assigned_to || null,
-      due_date || null,
-      req.user.id
-    );
-
-    const taskId = taskResult.lastInsertRowid;
-
-    // Link task and update recommendation status to in_progress
-    db.prepare(`
-      UPDATE seo_recommendations
-      SET kanban_task_id = ?, status = 'in_progress'
-      WHERE id = ?
-    `).run(taskId, recId);
-
-    logAction({
-      actorId: req.user.id,
-      actorEmail: req.user.email,
-      action: 'convert_to_task',
-      entityType: 'seo_recommendation',
-      entityId: recId,
-      diff: { taskId, status: 'in_progress' }
-    });
-
-    res.json({
-      success: true,
-      message: 'Recommendation successfully converted and linked to Kanban task.',
-      taskId
-    });
-
-  } catch (err) {
-    console.error('[SEO ROUTE] Convert recommendation error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
  * PATCH /api/clients/:id/seo/recommendations/:recId
  * Update recommendation status directly
  */

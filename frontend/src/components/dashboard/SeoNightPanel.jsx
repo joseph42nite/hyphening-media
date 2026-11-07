@@ -6,11 +6,13 @@ import { api, card, muted, label } from './blogMonitorShared.js';
 import { BATCH_LABEL, BATCH_COLOR } from './seoNightShared.js';
 
 /**
- * "Last night" at the top of the SEO Monitor: for every SEO-on client, the
- * skills that ran overnight with their scores, the safe fixes waiting on a
- * branch, what needs 007 and what failed — and the Deploy button that is the
- * approval for them. Same shape as the Blog Monitor: counts, client chips,
- * one row per client, a drawer to review. Server side: src/routes/seoNight.js.
+ * The SEO Monitor's night section. Above the client dropdown: the fleet
+ * toggle, the totals, and a "waiting" line naming each client with fixes to
+ * deploy or items that need you (click one to select it). Below the dropdown
+ * (`selector`): "Last night" for the selected client only — the skills that
+ * ran overnight with their scores, the safe fixes waiting on a branch, what
+ * needs 007 and what failed, and the Deploy button that is the approval for
+ * them. Server side: src/routes/seoNight.js.
  */
 const BUSY = ['queued', 'running', 'deploy_queued', 'deploying'];
 
@@ -34,9 +36,8 @@ function ScoreChange({ run }) {
   );
 }
 
-export default function SeoNightPanel({ showToast }) {
+export default function SeoNightPanel({ showToast, clientId, clientName, onSelectClient, selector }) {
   const [report, setReport] = useState(null);
-  const [clientFilter, setClientFilter] = useState(null);
   const [busy, setBusy] = useState(null);
   const [open, setOpen] = useState({});
   const [drawerId, setDrawerId] = useState(null);
@@ -54,7 +55,13 @@ export default function SeoNightPanel({ showToast }) {
     return () => clearInterval(t);
   }, [anyBusy, load]);
 
-  const rows = useMemo(() => (report?.clients || []).filter(c => clientFilter == null || c.client_id === clientFilter), [report, clientFilter]);
+  const rows = useMemo(() => (report?.clients || []).filter(c => String(c.client_id) === String(clientId)), [report, clientId]);
+  // Every SEO-on client with something to act on, for the line above the dropdown.
+  const waiting = useMemo(() => (report?.clients || []).map(c => ({
+    id: c.client_id, name: c.client_name,
+    ready: (c.batch?.status === 'ready' || c.retryable) ? c.fixes.filter(f => f.status === 'ready_to_deploy').length : 0,
+    needs: c.needs_007.length,
+  })).filter(c => c.ready || c.needs), [report]);
 
   const act = async (key, fn, success) => {
     setBusy(key);
@@ -86,9 +93,8 @@ export default function SeoNightPanel({ showToast }) {
   const fixTonight = (rec) => act(`f${rec.id}`, () => api(`/api/seo-night/recommendations/${rec.id}/fix-tonight`, { method: 'POST' }), 'Will be fixed tonight');
   const ignore = (rec) => act(`i${rec.id}`, () => api(`/api/seo-night/recommendations/${rec.id}/ignore`, { method: 'POST' }), 'Ignored');
 
-  if (!report) return null;
+  if (!report) return selector;
   const t = report.totals;
-  const drawerIds = rows.map(r => r.client_id);
   const drawerClient = drawerId != null && rows.find(r => r.client_id === drawerId);
 
   return (
@@ -123,21 +129,33 @@ export default function SeoNightPanel({ showToast }) {
         );
       })()}
 
-      {(report.clients.length > 1) && (
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-          <button type="button" style={chip(clientFilter == null)} onClick={() => setClientFilter(null)}>All</button>
-          {report.clients.map(c => (
-            <button type="button" key={c.client_id} style={chip(clientFilter === c.client_id)} onClick={() => setClientFilter(c.client_id)}>{c.client_name}</button>
+      {waiting.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px', fontSize: '0.8rem' }}>
+          <span style={muted}>Waiting:</span>
+          {waiting.map(c => (
+            <button type="button" key={c.id} style={chip(String(c.id) === String(clientId))} onClick={() => onSelectClient?.(String(c.id))}
+              title={`Select ${c.name}`}>
+              {c.name}
+              {c.ready > 0 && <span style={{ color: '#4ade80' }}> · {c.ready} to deploy</span>}
+              {c.needs > 0 && <span style={{ color: '#facc15' }}> · {c.needs} need you</span>}
+            </button>
           ))}
         </div>
       )}
 
-      <div style={card}>
+      {selector}
+
+      {clientId && rows.length === 0 && (
+        <div style={{ ...card, ...muted, marginBottom: '20px' }}>
+          Night audits and fixes are off for {clientName || 'this client'}: SEO is not on for them. Turn it on in the client's settings to have skills run overnight and safe fixes waiting here to deploy.
+        </div>
+      )}
+
+      {rows.length > 0 && <div style={{ ...card, marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase' }}>Last night</h3>
+          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase' }}>Last night · deploy</h3>
           <button className="btn btn-secondary" onClick={load} title="Refresh"><RefreshCw size={14} /></button>
         </div>
-        {rows.length === 0 && <p style={{ ...muted, margin: 0 }}>No client has SEO on.</p>}
         {rows.map(c => {
           const b = c.batch;
           const ready = c.fixes.filter(f => f.status === 'ready_to_deploy');
@@ -193,19 +211,14 @@ export default function SeoNightPanel({ showToast }) {
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {drawerClient && (() => {
-        const i = drawerIds.indexOf(drawerClient.client_id);
         return (
           <SeoNightDrawer
             client={drawerClient}
-            position={i + 1}
-            total={drawerIds.length}
             busy={busy}
             onClose={() => setDrawerId(null)}
-            onPrev={i > 0 ? () => setDrawerId(drawerIds[i - 1]) : null}
-            onNext={i < drawerIds.length - 1 ? () => setDrawerId(drawerIds[i + 1]) : null}
             onDeploy={deploy}
             onDiscard={discard}
             onFixTonight={fixTonight}

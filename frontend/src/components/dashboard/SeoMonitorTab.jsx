@@ -449,6 +449,19 @@ export default function SeoMonitorTab({ clients, showToast }) {
   const [reportViewTab, setReportViewTab] = useState('report');
 
   const selectedClient = clients.find(c => String(c.id) === String(selectedClientId));
+
+  // From the dropdown, or a client chip in the night panel's "waiting" line.
+  const selectClient = (newId) => {
+    setSelectedClientId(newId);
+    localStorage.setItem('seo_monitor_selected_client_id', newId);
+    setActiveConsoleAgent(null);
+    setConsoleLogs([]);
+    setFocusedAgentType(null);
+    setShowReportModal(false);
+    setTerminalTab('all');
+    setActiveRuns({});
+    setPendingApprovals({});
+  };
   const currentAudit = audits.find(a => String(a.id) === String(selectedAuditId));
   const dropdownAudits = focusedAgentType ? audits.filter(a => a.audit_type === focusedAgentType) : audits;
 
@@ -1030,10 +1043,15 @@ export default function SeoMonitorTab({ clients, showToast }) {
 
   return (
     <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
-      <SeoNightPanel showToast={showToast} />
-      <OutreachPanel showToast={showToast} />
-
-      {/* Dropdown selector panel */}
+      {/* The night panel's fleet line and "waiting" chips sit above the client
+          dropdown; its deploy section, and Outreach, sit below it and show the
+          selected client only. */}
+      <SeoNightPanel
+        showToast={showToast}
+        clientId={selectedClientId}
+        clientName={selectedClient?.name}
+        onSelectClient={selectClient}
+        selector={(
       <div className="card glass-premium" style={{ marginBottom: '20px', padding: '18px 20px', border: '1px solid rgba(223, 231, 224, 0.12)', background: 'rgba(12, 16, 24, 0.85)', backdropFilter: 'blur(20px)', borderRadius: '12px' }}>
         <div className="seo-command-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <div>
@@ -1047,18 +1065,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
                 className="form-control"
                 style={{ minWidth: '220px', fontWeight: 600, border: '1px solid rgba(223, 231, 224, 0.2)', background: 'rgba(5, 7, 10, 0.8)', color: 'var(--text-primary)', borderRadius: '6px', flexGrow: 1 }}
                 value={selectedClientId}
-                onChange={e => {
-                  const newId = e.target.value;
-                  setSelectedClientId(newId);
-                  localStorage.setItem('seo_monitor_selected_client_id', newId);
-                  setActiveConsoleAgent(null);
-                  setConsoleLogs([]);
-                  setFocusedAgentType(null);
-                  setShowReportModal(false);
-                  setTerminalTab('all');
-                  setActiveRuns({});
-                  setPendingApprovals({});
-                }}
+                onChange={e => selectClient(e.target.value)}
               >
                 {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
                   <option key={c.id} value={c.id}>{c.name} ({c.client_type})</option>
@@ -1094,6 +1101,9 @@ export default function SeoMonitorTab({ clients, showToast }) {
           </div>
         </div>
       </div>
+        )}
+      />
+      <OutreachPanel showToast={showToast} clientId={selectedClientId} />
 
       {!selectedClientId ? (
         <div style={{ textAlign: 'center', padding: '48px 24px', background: 'rgba(12, 16, 24, 0.6)', borderRadius: '12px', border: '1px dashed rgba(223, 231, 224, 0.15)' }}>

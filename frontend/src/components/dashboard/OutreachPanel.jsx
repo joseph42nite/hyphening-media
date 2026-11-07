@@ -9,7 +9,8 @@ import { KIND_LABEL, STATUS_LABEL, VIEWS } from './outreachShared.js';
  * prospects weekly (DataForSEO + Claude), 007 approves and assigns them, and
  * the assigned staff member sends from their own Gmail. Whether DataForSEO
  * worked on the last run is shown first, so a missing login or an empty
- * balance is never silent. Server side: src/routes/outreach.js.
+ * balance is never silent. Shows the client picked in the SEO Monitor's
+ * dropdown only. Server side: src/routes/outreach.js.
  */
 const DFS_COLOR = { ok: '#4ade80', never: 'var(--text-muted)', missing: '#f87171', auth: '#f87171', funds: '#f87171', failed: '#f87171' };
 
@@ -19,10 +20,9 @@ const tabStyle = (active) => ({
   borderBottom: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
 });
 
-export default function OutreachPanel({ showToast }) {
+export default function OutreachPanel({ showToast, clientId }) {
   const [data, setData] = useState(null);
   const [view, setView] = useState('approve');
-  const [client, setClient] = useState('');
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState(null);
   const [ccDraft, setCcDraft] = useState(null);
@@ -32,18 +32,19 @@ export default function OutreachPanel({ showToast }) {
   }, [showToast]);
   useEffect(() => { load(); }, [load]);
 
-  const running = data?.runs.some(r => ['queued', 'running'].includes(r.status));
+  const mine = (r) => String(r.client_id) === String(clientId);
+  const running = data?.runs.some(r => mine(r) && ['queued', 'running'].includes(r.status));
   useEffect(() => {
     if (!running) return undefined;
     const t = setInterval(load, 20000);
     return () => clearInterval(t);
   }, [running, load]);
 
-  const clients = useMemo(() => [...new Set((data?.prospects || []).map(p => p.client_name))].sort(), [data]);
-  const inView = (v) => (data?.prospects || []).filter(p => v.statuses.includes(p.status) && (!client || p.client_name === client));
+  const prospects = useMemo(() => (data?.prospects || []).filter(mine), [data, clientId]);
+  const inView = (v) => prospects.filter(p => v.statuses.includes(p.status));
   const current = VIEWS.find(v => v.id === view);
   const rows = data ? inView(current) : [];
-  const open = data?.prospects.find(p => p.id === openId);
+  const open = prospects.find(p => p.id === openId);
 
   const act = async (key, fn, success) => {
     setBusy(key);
@@ -61,7 +62,7 @@ export default function OutreachPanel({ showToast }) {
   };
 
   const findNow = () => act('find', async () => {
-    const d = await api('/api/outreach/run', { method: 'POST', body: JSON.stringify({}) });
+    const d = await api('/api/outreach/run', { method: 'POST', body: JSON.stringify({ client_id: Number(clientId) }) });
     return { note: d.connector_online ? `Finding prospects for ${d.queued.map(q => q.client_name).join(', ')}` : 'Queued; the Mac connector is offline, it starts when it next connects' };
   });
   const saveCc = () => act('cc', async () => { await api('/api/outreach/cc', { method: 'PUT', body: JSON.stringify({ emails: ccDraft }) }); setCcDraft(null); }, 'CC list saved');
@@ -83,12 +84,12 @@ export default function OutreachPanel({ showToast }) {
     act(`o${p.id}`, () => api(`/api/outreach/${p.id}/outcome`, { method: 'POST', body: JSON.stringify(body) }), STATUS_LABEL[kind]);
   };
 
-  if (!data) return null;
+  if (!data || !clientId) return null;
   const dfs = data.dataforseo;
-  const failedRuns = data.runs.filter(r => r.status === 'failed');
+  const failedRuns = data.runs.filter(r => mine(r) && r.status === 'failed');
 
   return (
-    <div style={card}>
+    <div style={{ ...card, marginBottom: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase' }}>Outreach</h3>
@@ -134,12 +135,6 @@ export default function OutreachPanel({ showToast }) {
             </button>
           ))}
         </div>
-        {clients.length > 1 && (
-          <select className="form-control" style={{ maxWidth: '220px' }} value={client} onChange={e => setClient(e.target.value)}>
-            <option value="">All clients</option>
-            {clients.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        )}
       </div>
 
       {rows.length === 0 ? <p style={{ ...muted, margin: '10px 0 0' }}>Nothing here.</p> : rows.map(p => (
@@ -148,7 +143,7 @@ export default function OutreachPanel({ showToast }) {
           <span style={{ minWidth: 0, flex: '1 1 380px' }}>
             <span style={{ ...label, color: '#a5b4fc', marginRight: '8px' }}>{KIND_LABEL[p.kind]}</span>
             <strong>{p.site_domain}</strong>
-            <span style={muted}> · {p.client_name}{p.domain_rank != null ? ` · rank ${p.domain_rank}` : ''}</span>
+            {p.domain_rank != null && <span style={muted}> · rank {p.domain_rank}</span>}
             <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.reason || p.page_title || p.page_url}</span>
           </span>
           <span style={{ ...muted, alignSelf: 'center' }}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Rocket, Trash2, X, ChevronLeft, ChevronRight, Moon, EyeOff } from 'lucide-react';
+import { Rocket, Trash2, X, Moon, EyeOff } from 'lucide-react';
 import { muted, label } from './blogMonitorShared.js';
 import { BATCH_LABEL, BATCH_COLOR } from './seoNightShared.js';
 
@@ -27,19 +27,17 @@ function Diff({ text }) {
 /**
  * One client's night in full: every fix with its before/after and code
  * change, what needs 007 (Fix tonight / Ignore), what failed, the deploy log,
- * and Deploy / Discard. ‹ › (or the arrow keys) move between clients.
+ * and Deploy / Discard.
  */
-export default function SeoNightDrawer({ client, position, total, busy, onClose, onPrev, onNext, onDeploy, onDiscard, onFixTonight, onIgnore }) {
+export default function SeoNightDrawer({ client, busy, onClose, onDeploy, onDiscard, onFixTonight, onIgnore }) {
   useEffect(() => {
     const onKey = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') onNext?.();
-      if (e.key === 'ArrowLeft') onPrev?.();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, onNext, onPrev]);
+  }, [onClose]);
 
   const b = client.batch;
   const ready = client.fixes.filter(f => f.status === 'ready_to_deploy');
@@ -49,12 +47,7 @@ export default function SeoNightDrawer({ client, position, total, busy, onClose,
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
       <aside onClick={e => e.stopPropagation()} style={{ width: 'min(860px, 100vw)', height: '100%', background: 'var(--bg-primary)', borderLeft: '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
         <header style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <button className="btn btn-secondary" disabled={!onPrev} onClick={onPrev} title="Previous client (←)"><ChevronLeft size={14} /></button>
-              <span style={muted}>{position} of {total}</span>
-              <button className="btn btn-secondary" disabled={!onNext} onClick={onNext} title="Next client (→)"><ChevronRight size={14} /></button>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <button className="btn btn-secondary" onClick={onClose} title="Close (Esc)"><X size={14} /></button>
           </div>
           <div>

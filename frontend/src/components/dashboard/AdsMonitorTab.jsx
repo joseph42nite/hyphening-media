@@ -340,24 +340,6 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
     }
   };
 
-  const toTask = async (rec) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/ads/recommendations/${rec.id}/convert-task`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priority: rec.priority === 'Critical' ? 'high' : 'medium' }),
-      });
-      if (res.ok) {
-        showToast?.('Added to the Kanban board.', 'success');
-        setRecommendations(prev => prev.filter(r => r.id !== rec.id));
-        fetchOverview();
-      }
-    } catch (err) {
-      showToast?.(`Could not convert: ${err.message}`, 'error');
-    }
-  };
-
   /**
    * Pulls campaigns from Google Ads.
    *
@@ -798,7 +780,6 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
                     )}
 
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                      <MiniButton onClick={() => toTask(rec)}>Add to board</MiniButton>
                       <MiniButton onClick={() => setRecStatus(rec, 'completed')}>Done</MiniButton>
                       <MiniButton onClick={() => setRecStatus(rec, 'ignored')} muted>Ignore</MiniButton>
                     </div>

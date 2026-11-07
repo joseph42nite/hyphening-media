@@ -92,9 +92,9 @@ describe('Google evidence in the fact pack', () => {
 
 describe('superseding recommendations', () => {
   const audit = (agentType) => db.prepare(`INSERT INTO ads_audits (client_id, agent_type, period_month) VALUES (?, ?, ?)`).run(client.id, agentType, month).lastInsertRowid;
-  const rec = (auditId, status = 'open', kanban = null) => db.prepare(`
-    INSERT INTO ads_recommendations (audit_id, client_id, priority, metric, issue, action_required, status, kanban_task_id)
-    VALUES (?, ?, 'High', 'CPL', 'issue', 'action', ?, ?)`).run(auditId, client.id, status, kanban).lastInsertRowid;
+  const rec = (auditId, status = 'open') => db.prepare(`
+    INSERT INTO ads_recommendations (audit_id, client_id, priority, metric, issue, action_required, status)
+    VALUES (?, ?, 'High', 'CPL', 'issue', 'action', ?)`).run(auditId, client.id, status).lastInsertRowid;
   const statusOf = (id) => db.prepare('SELECT status, superseded_by_audit_id AS by FROM ads_recommendations WHERE id = ?').get(id);
 
   it("retires the same card's earlier open items and nothing else", () => {
@@ -102,7 +102,6 @@ describe('superseding recommendations', () => {
     const old = audit('monitor');
     const openOld = rec(old);
     const inProgress = rec(old, 'in_progress');
-    const asTask = rec(old, 'open', 42);
     const otherCard = rec(audit('google'));
     const fresh = audit('monitor');
     const openNew = rec(fresh);
@@ -111,7 +110,6 @@ describe('superseding recommendations', () => {
     expect(n).toBe(1);
     expect(statusOf(openOld)).toEqual({ status: 'ignored', by: fresh });
     expect(statusOf(inProgress).status).toBe('in_progress');
-    expect(statusOf(asTask).status).toBe('open');
     expect(statusOf(otherCard).status).toBe('open');
     expect(statusOf(openNew).status).toBe('open');
   });

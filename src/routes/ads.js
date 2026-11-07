@@ -453,49 +453,6 @@ router.patch('/:id/ads/recommendations/:recId', (req, res) => {
   }
 });
 
-/** POST /api/clients/:id/ads/recommendations/:recId/convert-task
- *  Pushes an action onto the Kanban board, where the team already looks. */
-router.post('/:id/ads/recommendations/:recId/convert-task', (req, res) => {
-  try {
-    const { assigned_to, due_date, priority } = req.body;
-    const rec = db.prepare('SELECT * FROM ads_recommendations WHERE id = ? AND client_id = ?')
-      .get(req.params.recId, req.params.id);
-    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
-
-    const scope = [rec.platform, rec.campaign_name].filter(Boolean).join(' · ');
-    const title = `[Ads] ${rec.metric}${scope ? ` — ${scope}` : ''}`;
-    const description = [
-      `### Issue\n${rec.issue}`,
-      `### Action\n${rec.action_required}`,
-      rec.observation ? `### Read off\n${rec.observation}` : null,
-      rec.expected_impact ? `### Expected impact\n${rec.expected_impact}` : null,
-      // Carried onto the card deliberately. The reason to do this can stop
-      // being true between the audit and the task being picked up, and the
-      // card is where someone finds out.
-      rec.failure_check ? `### This is wrong if\n${rec.failure_check}` : null,
-    ].filter(Boolean).join('\n\n');
-
-    const task = db.prepare(`
-      INSERT INTO kanban_tasks (client_id, title, description, status, priority, task_type, assigned_to, due_date, created_by)
-      VALUES (?, ?, ?, 'todo', ?, 'other', ?, ?, ?)
-    `).run(req.params.id, title, description, priority || 'medium', assigned_to || null, due_date || null, req.user.id);
-
-    db.prepare('UPDATE ads_recommendations SET kanban_task_id = ?, status = \'in_progress\' WHERE id = ?')
-      .run(task.lastInsertRowid, rec.id);
-
-    logAction({
-      actorId: req.user.id, actorEmail: req.user.email,
-      action: 'convert_to_task', entityType: 'ads_recommendation',
-      entityId: rec.id, diff: { taskId: task.lastInsertRowid },
-    });
-
-    res.json({ success: true, taskId: task.lastInsertRowid });
-  } catch (err) {
-    console.error('[ADS ROUTE] Convert task error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 /**
  * POST /api/clients/:id/ads/sync
  *

@@ -8,7 +8,7 @@
  * runs again its earlier OPEN items are retired.
  *
  * Only items still untouched are retired: anything a person moved on (in
- * progress, completed, turned into a task) or the SEO night pipeline picked up
+ * progress, completed) or the SEO night pipeline picked up
  * (ready to deploy, needs 007, fix failed) is left exactly as it is. Retired
  * items become 'ignored' with superseded_by_audit_id naming the run that
  * replaced them, so the trail survives and nothing reads as dismissed by hand.
@@ -47,7 +47,7 @@ export function supersedeOpenRecommendations(fleet, { clientId, newAuditId, para
   return db.prepare(`
     UPDATE ${cfg.recs}
     SET status = 'ignored', superseded_by_audit_id = ?
-    WHERE client_id = ? AND status = 'open' AND kanban_task_id IS NULL ${cfg.extra}
+    WHERE client_id = ? AND status = 'open' ${cfg.extra}
       AND audit_id != ?
       AND audit_id IN (
         SELECT a.id FROM ${cfg.audits} a
