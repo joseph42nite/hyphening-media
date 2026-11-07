@@ -40,9 +40,9 @@ const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SE
 const WORKER = process.env.SEO_WORKER_ID || os.hostname();
 const POLL_MS = (Number(process.env.SEO_POLL_SECONDS) || 30) * 1000;
 const CLAUDE_BIN = process.env.SEO_CLAUDE_BIN || 'claude';
-// A run's own routed model (kimi / deepseek-v4-flash, per claude_seo_SKILL.md's
-// "Model Selection Routing") is an OpenRouter id the local claude CLI cannot
-// run — same reasoning as the ads worker. Pinned here instead.
+// Every skill runs on the Claude subscription through the local claude CLI,
+// pinned here (agent_run_config.default_model says the same since migration
+// 104; it used to hold OpenRouter ids this CLI can't run).
 const MODEL = process.env.SEO_MODEL || 'claude-sonnet-5-5';
 const ONCE = process.argv.includes('--once');
 
