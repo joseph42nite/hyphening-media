@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Rocket, Trash2, X, Moon, EyeOff } from 'lucide-react';
 import { muted, label } from './blogMonitorShared.js';
-import { BATCH_LABEL, BATCH_COLOR } from './seoNightShared.js';
+import { BATCH_LABEL, BATCH_COLOR, ddmmyyyy } from './seoNightShared.js';
 
 const section = { marginBottom: '18px' };
 const item = { borderTop: '1px solid var(--border-color)', padding: '10px 0' };
@@ -52,7 +52,7 @@ export default function SeoNightDrawer({ client, busy, onClose, onDeploy, onDisc
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{client.client_name}</div>
-            {b && <div style={{ ...label, color: BATCH_COLOR[b.status], marginTop: '2px' }}>{BATCH_LABEL[b.status]} · night of {b.night}{b.summary ? ` · ${b.summary}` : ''}</div>}
+            {b && <div style={{ ...label, color: BATCH_COLOR[b.status], marginTop: '2px' }}>{BATCH_LABEL[b.status]} · night of {ddmmyyyy(b.night)}{b.summary ? ` · ${b.summary}` : ''}</div>}
             {client.setup && <div style={{ fontSize: '0.8rem', color: '#facc15', marginTop: '4px' }}>{client.setup}</div>}
           </div>
           {(b?.status === 'ready' || client.retryable) && (

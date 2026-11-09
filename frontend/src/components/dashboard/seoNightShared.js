@@ -1,3 +1,9 @@
+/** "2026-11-08" (a night) → "08/11/2026". Anything else passes through unchanged. */
+export const ddmmyyyy = (ymd) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ymd;
+};
+
 /** Labels for a night fix batch, shared by the SEO Monitor's Last night panel and its drawer. */
 export const BATCH_LABEL = {
   queued: 'Fixes queued', running: 'Fixing…', ready: 'Ready to deploy', empty: 'No fixes', failed: 'Fixes failed',

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Rocket, Trash2, Eye, RefreshCw, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
 import SeoNightDrawer from './SeoNightDrawer.jsx';
 import { api, card, muted, label } from './blogMonitorShared.js';
-import { BATCH_LABEL, BATCH_COLOR } from './seoNightShared.js';
+import { BATCH_LABEL, BATCH_COLOR, ddmmyyyy } from './seoNightShared.js';
 
 /**
  * Site changes for one client, shown under the client dropdown in both the
@@ -119,7 +119,7 @@ export default function SiteChangesPanel({ showToast, clientId, clientName, repo
                   {b && (
                     <span style={{ ...label, color: BATCH_COLOR[b.status] }}>
                       {BUSY.includes(b.status) && <Loader2 size={11} className="spin" style={{ verticalAlign: '-1px', marginRight: 4 }} />}
-                      {BATCH_LABEL[b.status]}{b.night ? ` · ${b.night}` : ''}
+                      {BATCH_LABEL[b.status]}{b.night ? ` · ${ddmmyyyy(b.night)}` : ''}
                     </span>
                   )}
                 </div>
@@ -165,19 +165,6 @@ export default function SiteChangesPanel({ showToast, clientId, clientName, repo
         })}
       </div>}
 
-      {drawerClient && (() => {
-        return (
-          <SeoNightDrawer
-            client={drawerClient}
-            busy={busy}
-            onClose={() => setDrawerId(null)}
-            onDeploy={deploy}
-            onDiscard={discard}
-            onFixTonight={fixTonight}
-            onIgnore={ignore}
-          />
-        );
-      })()}
       {drawerClient && (
         <SeoNightDrawer
           client={drawerClient}

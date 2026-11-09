@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { isNative, API_BASE } from './api.js';
 import Login from './views/Login.jsx';
@@ -20,9 +20,13 @@ function App() {
   const [auth, setAuth] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const showToast = (message, type = 'success') => {
+  // Stable on purpose: panels load inside useCallback([showToast]). A new
+  // function per render made every toast refetch them, and a failed fetch's
+  // error toast refetched again, forever (09/11/2026: 2000+ requests per 15
+  // min from one tab, which rate-limited the Mac connector's workers too).
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
-  };
+  }, []);
 
   // Verify auth session against backend
   const verifySession = async () => {
