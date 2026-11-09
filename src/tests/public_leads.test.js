@@ -1,13 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import db from '../../database.js';
-import publicLeadsRouter from '../routes/publicLeads.js';
+import publicLeadsRouter, { flagNewDomain } from '../routes/publicLeads.js';
 import {
   issueFormToken,
   checkFormToken,
   validateLeadInput,
   detectSpamContent,
+  checkDomainAge,
 } from '../services/leadSpam.js';
+import {
+  emailDomain,
+  lookupDomainCreated,
+  parseRdapCreated,
+  parseWhoisCreated,
+  parseWhoisReferral,
+} from '../services/domainAge.js';
 
 describe('Lead bot checks', () => {
   it('accepts a token older than 3s and rejects fast, forged or missing ones', () => {
@@ -33,6 +41,43 @@ describe('Lead bot checks', () => {
     expect(detectSpamContent({ ...ok, message: 'http://a.com http://b.com http://c.com' })).toMatch(/links/);
     expect(detectSpamContent({ ...ok, message: 'Cheap [url=http://x]backlinks[/url]' })).toBeTruthy();
     expect(detectSpamContent({ ...ok, name: 'xKq8ZpLm2vRt9WqA' })).toBe('random-string name');
+  });
+});
+
+describe('Email domain age', () => {
+  const now = Date.parse('2026-11-08T08:14:31Z');
+
+  it('warns on domains under 90 days old and passes older ones', () => {
+    expect(checkDomainAge(new Date('2026-11-07T05:20:36Z'), now)).toBe('email domain registered 1 day ago (2026-11-07)');
+    expect(checkDomainAge(new Date('2026-11-08T01:00:00Z'), now)).toMatch(/registered today/);
+    expect(checkDomainAge(new Date('2026-09-01T00:00:00Z'), now)).toMatch(/68 days ago/);
+    expect(checkDomainAge(new Date('2026-08-01T00:00:00Z'), now)).toBeNull();
+    expect(checkDomainAge(null, now)).toBeNull();
+  });
+
+  it('parses RDAP and WHOIS registration dates', () => {
+    expect(parseRdapCreated({ events: [{ eventAction: 'last changed', eventDate: '2026-11-07T05:20:37Z' }, { eventAction: 'registration', eventDate: '2026-11-07T05:20:36Z' }] }).toISOString())
+      .toBe('2026-11-07T05:20:36.000Z');
+    expect(parseRdapCreated({ errorCode: 404 })).toBeNull();
+    expect(parseWhoisCreated('Domain Name: cocopat.us\nUpdated Date: 2026-11-07T05:20:37Z\nCreation Date: 2026-11-07T05:20:36Z\n').toISOString())
+      .toBe('2026-11-07T05:20:36.000Z');
+    expect(parseWhoisCreated('No match for domain')).toBeNull();
+    expect(parseWhoisReferral('domain: US\nwhois:        whois.nic.us\n')).toBe('whois.nic.us');
+  });
+
+  it('skips free mail and reserved domains without a lookup', async () => {
+    expect(emailDomain('Ana@Brand.co.in')).toBe('brand.co.in');
+    expect(await lookupDomainCreated('someone@gmail.com')).toBeNull();
+    expect(await lookupDomainCreated('someone@example.com')).toBeNull();
+  });
+
+  it('marks a saved lead with the warning but keeps it New', async () => {
+    const email = `lead-test-newdomain-${Date.now()}@example.com`;
+    const { lastInsertRowid: id } = db.prepare(`INSERT INTO leads (client_name, email, status, source, created_at, updated_at) VALUES ('Scam Co', ?, 'New', 'website:kage', datetime('now'), datetime('now'))`).run(email);
+    const fresh = async () => new Date(Date.now() - 86_400_000);
+    expect(await flagNewDomain(id, email, fresh)).toMatch(/1 day ago/);
+    expect(db.prepare('SELECT status, spam_reason FROM leads WHERE id = ?').get(id)).toMatchObject({ status: 'New', spam_reason: expect.stringMatching(/email domain registered/) });
+    expect(await flagNewDomain(id, email, async () => { throw new Error('whois down'); })).toBeNull();
   });
 });
 

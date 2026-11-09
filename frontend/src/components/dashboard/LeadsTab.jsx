@@ -890,11 +890,17 @@ export default function LeadsTab({
                           >
                             <Globe size={11} /> Website form
                           </span>
-                          {lead.spam_reason && (
+                          {lead.spam_reason && (lead.status === 'Spam' ? (
                             <span title={lead.spam_reason} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>
                               Spam: {lead.spam_reason}
                             </span>
-                          )}
+                          ) : (
+                            // Not spam, but a scam signal (e.g. brand-new email domain):
+                            // verify through the brand's real site before replying.
+                            <span title={`${lead.spam_reason}. Verify via the brand's real website before sending anything or opening files.`} style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
+                              ⚠ Check: {lead.spam_reason}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </td>

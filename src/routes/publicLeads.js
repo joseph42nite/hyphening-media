@@ -19,7 +19,9 @@ import {
   checkFormToken,
   validateLeadInput,
   detectSpamContent,
+  checkDomainAge,
 } from '../services/leadSpam.js';
+import { lookupDomainCreated } from '../services/domainAge.js';
 
 const router = Router();
 const SOURCES = new Set(['footer', 'kage']);
@@ -79,10 +81,29 @@ router.post('/', async (req, res) => {
     }
 
     res.json({ ok: true });
+
+    // 5. Email domain age, after replying so the visitor never waits on WHOIS.
+    // A brand-new domain is the tell of brand-impersonation scams; the lead
+    // stays New with the warning shown in the Leads tab.
+    await flagNewDomain(lead.id, data.email);
   } catch (err) {
     console.error('[PUBLIC LEADS] Save error:', err);
     res.status(500).json({ error: 'Something went wrong. Please email deepanjan@hypheningmedia.com directly.' });
   }
 });
+
+export async function flagNewDomain(leadId, email, lookup = lookupDomainCreated) {
+  try {
+    const warning = checkDomainAge(await lookup(email));
+    if (!warning) return null;
+    db.prepare(`UPDATE leads SET spam_reason = ?, updated_at = datetime('now') WHERE id = ? AND spam_reason IS NULL`)
+      .run(warning, leadId);
+    console.warn(`[PUBLIC LEADS] Lead #${leadId} needs a check: ${warning}`);
+    return warning;
+  } catch (err) {
+    console.error(`[PUBLIC LEADS] Domain age check failed for lead #${leadId}:`, err.message);
+    return null;
+  }
+}
 
 export default router;

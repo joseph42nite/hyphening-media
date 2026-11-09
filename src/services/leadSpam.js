@@ -83,3 +83,18 @@ export function detectSpamContent({ name, company, message }) {
   if (/^[a-z0-9]{15,}$/i.test(name) && !/\s/.test(name)) return 'random-string name';
   return null;
 }
+
+const NEW_DOMAIN_DAYS = 90;
+
+/**
+ * Warning for a lead whose email domain is younger than 90 days, else null.
+ * Not spam on its own (a real startup can have a new domain), so the lead
+ * stays New with this shown as a "Check" badge.
+ */
+export function checkDomainAge(created, now = Date.now()) {
+  if (!(created instanceof Date) || Number.isNaN(created.getTime())) return null;
+  const days = Math.floor((now - created.getTime()) / 86_400_000);
+  if (days >= NEW_DOMAIN_DAYS) return null;
+  const when = days <= 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`;
+  return `email domain registered ${when} (${created.toISOString().slice(0, 10)})`;
+}
