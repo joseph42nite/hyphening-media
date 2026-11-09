@@ -5,7 +5,7 @@ import Login from './views/Login.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import CinematographerScripts from './views/CinematographerScripts.jsx';
 import ClientPortal from './views/ClientPortal.jsx';
-import Toast from './components/Toast.jsx';
+import ToastStack from './components/Toast.jsx';
 
 // Lazy-load Landing page — never fetched on mobile (saves ~60KB + game canvas)
 const Landing = React.lazy(() => import('./views/Landing.jsx'));
@@ -18,14 +18,19 @@ const Router = isNative ? HashRouter : BrowserRouter;
 
 function App() {
   const [auth, setAuth] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [toasts, setToasts] = useState([]);
 
   // Stable on purpose: panels load inside useCallback([showToast]). A new
   // function per render made every toast refetch them, and a failed fetch's
   // error toast refetched again, forever (09/11/2026: 2000+ requests per 15
   // min from one tab, which rate-limited the Mac connector's workers too).
+  // Up to 3 at once, top right; the oldest goes when a fourth arrives.
   const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts(list => [...list, { id, message: String(message ?? ''), type }].slice(-3));
+  }, []);
+  const dismissToast = useCallback((id) => {
+    setToasts(list => list.filter(t => t.id !== id));
   }, []);
 
   // Verify auth session against backend
@@ -164,14 +169,8 @@ function App() {
           />
         </Routes>
 
-        {/* Global Toast Notification */}
-        {toast && (
-          <Toast 
-            message={toast.message} 
-            type={toast.type} 
-            onClose={() => setToast(null)} 
-          />
-        )}
+        {/* Global toasts, top right */}
+        <ToastStack toasts={toasts} onDismiss={dismissToast} />
       </div>
     </Router>
   );
