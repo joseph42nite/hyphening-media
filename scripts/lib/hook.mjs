@@ -11,7 +11,8 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.env') });
 
-export const API = (process.env.HYPHENING_API_URL || 'https://hypheningmedia.com').replace(/\/$/, '');
+// No default: a worker run without it must not post signed events to the live site.
+export const API = (process.env.HYPHENING_API_URL || '').replace(/\/$/, '');
 const SECRET = process.env.HYPHENING_HMAC_SECRET || process.env.OPENCLAW_HMAC_SECRET;
 
 // A 429 is refused before the server does anything, so it's safe to retry.
@@ -20,6 +21,7 @@ const RETRY_WAIT_MS = 60_000;
 const RETRIES = 2;
 
 export async function hook(event_type, payload, attempt = 0) {
+  if (!API) throw new Error('HYPHENING_API_URL is not set in the repo .env');
   if (!SECRET) throw new Error('HYPHENING_HMAC_SECRET is not set in the repo .env');
   const body = JSON.stringify({ event_type, payload });
   const res = await fetch(`${API}/api/openclaw/webhook`, {

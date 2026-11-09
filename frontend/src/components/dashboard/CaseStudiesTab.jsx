@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink, X, Upload } from 'lucide-react';
+import { formatDate } from '../../formatDate.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 // Public posts live on the main site, not the ops subdomain this dashboard runs on
@@ -147,10 +148,6 @@ export default function CaseStudiesTab({ showToast }) {
     }
   };
 
-  const formatDate = (d) => {
-    if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
 
   return (
     <div>
@@ -196,7 +193,7 @@ export default function CaseStudiesTab({ showToast }) {
                         {post.status === 'published' ? <><Eye size={10} /> Published</> : <><EyeOff size={10} /> Draft</>}
                       </span>
                     </td>
-                    <td style={{ fontSize: '0.8rem' }}>{formatDate(post.published_at)}</td>
+                    <td style={{ fontSize: '0.8rem' }}>{formatDate(post.published_at, '-')}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {post.status === 'published' && (
@@ -235,7 +232,7 @@ export default function CaseStudiesTab({ showToast }) {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', gap: '8px', flexWrap: 'wrap' }}>
                   <span>{post.client_name || '—'}</span>
-                  <span>{formatDate(post.published_at)}</span>
+                  <span>{formatDate(post.published_at, '-')}</span>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>

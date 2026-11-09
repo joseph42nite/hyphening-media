@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import logoImg from '../assets/logo.png';
 import { articleSchema, authorByline, wasUpdated } from '../data/blogAuthors';
+import { formatDate } from '../formatDate.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -72,13 +73,6 @@ function renderMarkdown(md) {
 function qualitySignals(post) {
   if (!post) return [];
   return post.audio_url ? [{ key: 'audio', label: 'Narrated', icon: Volume2 }] : [];
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
 // ============================================================

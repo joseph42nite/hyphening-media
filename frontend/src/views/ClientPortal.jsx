@@ -1230,6 +1230,8 @@ export default function ClientPortal({ showToast }) {
   const [overview, setOverview] = useState(null);
   const [contentList, setContentList] = useState([]);
   const [leads, setLeads] = useState([]);
+  const leadsRef = useRef(leads);
+  leadsRef.current = leads;
   // Which capture month the leads tab is showing; 'all' for every month.
   const [leadsMonth, setLeadsMonth] = useState('all');
   // Landing-page Call/WhatsApp taps, one bucket per month.
@@ -1390,14 +1392,14 @@ export default function ClientPortal({ showToast }) {
         if (res.ok && data.leads) {
           setLandingClicks(data.landing_clicks || []);
           setLandingClicksLog(data.landing_clicks_log || []);
-          // Compare lists to identify new leads
-          const existingIds = new Set(leads.map(l => l.id));
+          // Compare with the leads already shown (a ref, so the interval
+          // isn't torn down and restarted every time a lead arrives).
+          const existingIds = new Set(leadsRef.current.map(l => l.id));
           const newLeads = data.leads.filter(l => !existingIds.has(l.id));
-          
+
           if (newLeads.length > 0) {
-            // New leads detected!
             setLeads(data.leads);
-            
+
             // Play notification chime and browser alert if notifications are enabled
             if (leadAlertsEnabled) {
               playNotificationSound();
@@ -1416,7 +1418,7 @@ export default function ClientPortal({ showToast }) {
     }, 30000); // 30 seconds
 
     return () => clearInterval(intervalId);
-  }, [isVerified, leads, leadAlertsEnabled, token, clientType]);
+  }, [isVerified, leadAlertsEnabled, token, clientType]);
 
   // Real-time SSE Connection Hook for Client Portal
   useEffect(() => {

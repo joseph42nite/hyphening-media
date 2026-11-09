@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import logoImg from '../assets/logo.png';
+import { formatDate } from '../formatDate.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -51,13 +52,6 @@ function renderMarkdown(md) {
   html = html.replace(/<p class="blog-p">(<hr \/>|<div class="blog-img-frame"|<div class="cs-video-embed")/g, '$1').replace(/(<\/div>)<\/p>/g, '$1');
 
   return html;
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
 /**
