@@ -374,7 +374,7 @@ router.get('/:id/seo/agents/status', (req, res) => {
       const lastAudit = db.prepare(`
         SELECT id, created_at, audit_type, health_score, technical_score, content_score,
                on_page_score, schema_score, performance_score, geo_score,
-               backlinks_score, local_score, sxo_score, audit_score
+               backlinks_score, local_score, sxo_score, audit_score, report_json
         FROM seo_audits
         WHERE client_id = ? AND audit_type = ? AND is_competitor = 0
         ORDER BY created_at DESC LIMIT 1

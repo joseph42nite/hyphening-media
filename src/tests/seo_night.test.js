@@ -57,21 +57,30 @@ describe('night audits', () => {
     expect(r.skipped[0].reason).toMatch(/Manual/);
   });
 
-  it('queues at most 3 overdue skills per client, never the skipped ones, most overdue first', () => {
+  it('queues every skill past its cadence, most overdue first; on-demand and fresh ones wait', () => {
     setMode('seo', 'auto');
     const id = makeClient();
-    // Fresh technical audit: not due. Everything else has never run.
+    // Fresh technical audit: not due. A 40-day-old full (30-day cadence): due.
     audit(id, 'technical', 1);
-    const due = night.dueSkills(id).map(d => d.audit_type);
-    expect(due).not.toContain('technical');
-    for (const skip of ['full', 'flow', 'backlinks', 'backlink_gap', 'dataforseo', 'maps']) expect(due).not.toContain(skip);
+    audit(id, 'full', 40);
+    const due = night.dueSkills(id);
+    const types = due.map(d => d.audit_type);
+    expect(types).not.toContain('technical');
+    expect(types).toContain('full');
+    // Cards on cadence that used to be skipped at night now run when due.
+    for (const t of ['flow', 'backlinks']) expect(types).toContain(t);
+    // 9999 = on demand: never queued.
+    const onDemand = db.prepare('SELECT audit_type FROM agent_run_config WHERE stale_after_days >= 9999').all().map(r => r.audit_type);
+    for (const t of onDemand) expect(types).not.toContain(t);
+    // Blocked cards (no data source) stay out, the same as their Run button.
+    for (const t of types) expect(unavailableReason(t, id)).toBeNull();
 
     const r = night.queueNightAudits({ by: 'Tanner', clientId: id });
-    expect(r.queued).toHaveLength(night.NIGHT_SKILLS_PER_CLIENT);
+    expect(r.queued.map(q => q.agent_type).sort()).toEqual([...types].sort());
     const runs = db.prepare("SELECT requested_by FROM seo_agent_runs WHERE client_id = ? AND status = 'queued'").all(id);
     expect(runs.every(x => x.requested_by === 'night:Tanner')).toBe(true);
     // Already in flight: not queued twice.
-    expect(night.dueSkills(id).map(d => d.audit_type)).not.toContain(r.queued[0].agent_type);
+    expect(night.dueSkills(id)).toEqual([]);
   });
 });
 

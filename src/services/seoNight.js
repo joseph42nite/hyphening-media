@@ -2,7 +2,8 @@
  * Night SEO (master plan Phase 6). The bots start each step; this file is the
  * server's half of it.
  *
- *   01:15 IST  Tanner: queueNightAudits() — each SEO-on client's overdue skills, 3 at most
+ *   01:15 IST  Tanner: queueNightAudits() — every SEO-on client's skills that are past
+ *              their card's cadence (the SEO Monitor's "Cadence"), all of them
  *   03:30 IST  Boothroyd: queueSeoFixes() — one fix batch per client with a site repo
  *              → the Mac's seo_fix_worker sorts the open recommendations, closes the ones
  *                already done in the code, fixes the safe ones on a branch, and reports
@@ -22,14 +23,16 @@ import { startAgentRun } from './agentRunner.js';
 import { getActiveRunsForClient } from './agentRuns.js';
 import { unavailableReason, skillStateFor, resolveAuditScore } from '../routes/seo.js';
 
-export const NIGHT_SKILLS_PER_CLIENT = 3;
 export const NIGHT_FIXES_PER_CLIENT = 8;
 const TRIAGE_LIMIT = 40;
 
-// Never queued at night. 'full' repeats the single skills; 'flow' is a 90-day
-// planning pass; the backlink and DataForSEO skills have no data source yet
-// (no Moz, Bing or DataForSEO key), so they would only report the outage.
-const NIGHT_SKIP = new Set(['full', 'flow', 'backlinks', 'backlink_gap', 'dataforseo', 'maps']);
+// The card's cadence decides what runs: every skill past its stale_after_days
+// is queued (9999 = on demand, never queued). The only things that hold a due
+// card back are the ones that hold back its Run button — no data source
+// (unavailableReason, e.g. DataForSEO skills until the login is in .env), an
+// unhealthy skill, a run already in flight — plus the client's budget cap.
+// There used to be a fixed skip list here (full, flow, backlinks, ...) and a
+// 3-per-night cap; both left cards reading STALE with nothing ever running them.
 const OPEN_BATCH = ['queued', 'running', 'ready', 'deploy_queued', 'deploying'];
 
 // Findings from both fleets share one fix batch per client: they land in the
@@ -95,7 +98,7 @@ export function dueSkills(clientId) {
   `).all(clientId);
   const now = Date.now();
   return rows
-    .filter((r) => !NIGHT_SKIP.has(r.audit_type) && !active.has(r.audit_type))
+    .filter((r) => !active.has(r.audit_type))
     .map((r) => {
       const ageDays = r.last_run ? (now - new Date(`${r.last_run.replace(' ', 'T')}Z`).getTime()) / 86400000 : Infinity;
       return { ...r, overdue_days: ageDays - r.stale_after_days };
@@ -106,7 +109,7 @@ export function dueSkills(clientId) {
     .sort((a, b) => b.overdue_days - a.overdue_days);
 }
 
-/** Tanner, 01:15 IST: queue each SEO-on client's overdue skills. */
+/** Tanner, 01:15 IST: queue every SEO-on client's skills that are past their cadence. */
 export function queueNightAudits({ by = 'agent', clientId = null } = {}) {
   if (getMode('seo') !== 'auto') return { queued: [], skipped: [{ reason: 'SEO fleet is on Manual' }] };
   const clients = db.prepare(`
@@ -119,7 +122,7 @@ export function queueNightAudits({ by = 'agent', clientId = null } = {}) {
   for (const client of clients) {
     if (!client.website_url) { skipped.push({ client_name: client.name, reason: 'no website URL' }); continue; }
     if (overBudget(client.id)) { skipped.push({ client_name: client.name, reason: 'monthly budget cap reached' }); continue; }
-    const due = dueSkills(client.id).slice(0, NIGHT_SKILLS_PER_CLIENT);
+    const due = dueSkills(client.id);
     if (due.length === 0) { skipped.push({ client_name: client.name, reason: 'nothing overdue' }); continue; }
     for (const skill of due) {
       const conf = db.prepare('SELECT * FROM agent_run_config WHERE audit_type = ?').get(skill.audit_type);
