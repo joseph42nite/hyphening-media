@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ContentModal from './ContentModal.jsx';
-import AllClientsMarketingDashboard from './AllClientsMarketingDashboard.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState, formatWatchSeconds } from './contentFormHelper.js';
 
 // Columns the monthly report modal edits; the rest of the row is filled by the
@@ -51,10 +50,6 @@ function PositionChange({ now, prev }) {
 export default function MarketingDataTab({
   auth,
   clients,
-  allClientsOverview = [],
-  overviewMonths = [],
-  overviewMonth = '',
-  onOverviewMonthChange,
   marketingContent,
   adCampaigns = [],
   availableAdMonths = [],
@@ -83,11 +78,7 @@ export default function MarketingDataTab({
 
   useEffect(() => {
     setContentMonthFilter('all');
-    if (selectedClientForReports?.id === 'all' || !selectedClientForReports) {
-      fetchMarketingData('all');
-    } else if (selectedClientForReports?.id) {
-      fetchMarketingData(selectedClientForReports.id);
-    }
+    if (selectedClientForReports?.id) fetchMarketingData(selectedClientForReports.id);
   }, [selectedClientForReports?.id]);
 
   // Modal local states (Content Row)
@@ -501,21 +492,14 @@ export default function MarketingDataTab({
           <label className="form-label" style={{ margin: 0 }}>Select Client:</label>
           <select
             className="form-control"
-            value={selectedClientForReports?.id || 'all'}
+            value={selectedClientForReports?.id || ''}
             onChange={(e) => {
-              const val = e.target.value;
-              if (val === 'all') {
-                setSelectedClientForReports({ id: 'all', name: 'All Clients' });
-                fetchMarketingData('all');
-              } else {
-                const client = clients.find(c => c.id === parseInt(val));
-                setSelectedClientForReports(client);
-                if (client) fetchMarketingData(client.id);
-              }
+              const client = clients.find(c => c.id === parseInt(e.target.value, 10));
+              if (client) setSelectedClientForReports(client);
             }}
             style={{ maxWidth: '280px', fontWeight: 'bold' }}
           >
-            <option value="all">🌐 All Clients (Dashboard)</option>
+            {!selectedClientForReports && <option value="">Select a client</option>}
             {clients.filter(c => c.client_type !== 'artist_curation').map(c => (
               <option key={c.id} value={c.id}>
                 {c.parent_name ? `${c.parent_name} - ${c.name}` : c.name}
@@ -525,17 +509,8 @@ export default function MarketingDataTab({
         </div>
       </div>
 
-      {(!selectedClientForReports || selectedClientForReports.id === 'all') ? (
-        <AllClientsMarketingDashboard
-          overviewData={allClientsOverview}
-          availableMonths={overviewMonths}
-          selectedMonth={overviewMonth}
-          onMonthChange={onOverviewMonthChange}
-          onSelectClient={(client) => {
-            setSelectedClientForReports(client);
-            fetchMarketingData(client.id);
-          }}
-        />
+      {!selectedClientForReports ? (
+        <p style={{ color: 'var(--text-muted)', padding: '24px 0' }}>No marketing clients yet.</p>
       ) : (
         <div>
           <div className="marketing-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>

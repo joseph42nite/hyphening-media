@@ -107,10 +107,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
   const [gigs, setGigs] = useState([]);
 
   // Selected client for marketing reports
-  const [selectedClientForReports, setSelectedClientForReports] = useState({ id: 'all', name: 'All Clients' });
-  const [allClientsOverview, setAllClientsOverview] = useState([]);
-  const [overviewMonths, setOverviewMonths] = useState([]);
-  const [overviewMonth, setOverviewMonth] = useState('');
+  const [selectedClientForReports, setSelectedClientForReports] = useState(null);
   const [marketingContent, setMarketingContent] = useState([]);
   const [adCampaigns, setAdCampaigns] = useState([]);
   const [availableAdMonths, setAvailableAdMonths] = useState([]);
@@ -541,19 +538,16 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         if (allClients.length > 0) {
           const marketingClients = allClients.filter(c => c.client_type !== 'artist_curation');
           if (marketingClients.length > 0) {
-            if (!selectedClientForReports || (selectedClientForReports.id !== 'all' && !marketingClients.some(c => c.id === selectedClientForReports.id))) {
-              const allClientsOption = { id: 'all', name: 'All Clients' };
-              setSelectedClientForReports(allClientsOption);
-              fetchMarketingData('all');
-            } else if (selectedClientForReports.id === 'all') {
-              fetchMarketingData('all');
+            // Reports open on the first marketing client; the tab fetches on selection.
+            if (!selectedClientForReports || !marketingClients.some(c => c.id === selectedClientForReports.id)) {
+              setSelectedClientForReports(marketingClients[0]);
             }
             // Scripts stay closed to video editors, so there is no client to preselect.
             if (!isVideoEditor && (!selectedScriptClient || !marketingClients.some(c => c.id === selectedScriptClient.id))) {
               setSelectedScriptClient(marketingClients[0]);
             }
           } else {
-            setSelectedClientForReports({ id: 'all', name: 'All Clients' });
+            setSelectedClientForReports(null);
             setSelectedScriptClient(null);
           }
           if (!selectedChatClient || !allClients.some(c => c.id === selectedChatClient.id)) {
@@ -561,7 +555,7 @@ export default function Dashboard({ auth, setAuth, showToast }) {
             fetchChats(allClients[0].id);
           }
         } else {
-          setSelectedClientForReports({ id: 'all', name: 'All Clients' });
+          setSelectedClientForReports(null);
           setSelectedScriptClient(null);
           setSelectedChatClient(null);
         }
@@ -640,25 +634,9 @@ export default function Dashboard({ auth, setAuth, showToast }) {
     }
   };
 
-  // The leaderboard's period is its own: it spans every client, so it has no
-  // reason to move when the single-client ad month does.
-  const fetchAllClientsOverview = async (month = overviewMonth) => {
-    const oRes = await authFetch(`/api/clients/marketing/all-overview${month ? `?month=${month}` : ''}`);
-    if (!oRes.ok) return;
-    const oData = await oRes.json();
-    setAllClientsOverview(oData.overview || []);
-    if (oData.available_months?.length > 0) setOverviewMonths(oData.available_months);
-    // Mirror the month the server applied, so the label can never claim a
-    // period the numbers below it don't belong to.
-    setOverviewMonth(oData.selected_month ?? '');
-  };
-
   const fetchMarketingData = async (clientId, monthFilter = selectedAdMonth) => {
     try {
-      if (clientId === 'all') {
-        await fetchAllClientsOverview();
-        return;
-      }
+      if (!clientId) return;
       const cRes = await authFetch(`/api/clients/${clientId}/marketing/content`);
       if (cRes.ok) {
         const cData = await cRes.json();
@@ -1203,10 +1181,6 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           <MarketingDataTab
             auth={auth}
             clients={clients}
-            allClientsOverview={allClientsOverview}
-            overviewMonths={overviewMonths}
-            overviewMonth={overviewMonth}
-            onOverviewMonthChange={fetchAllClientsOverview}
             marketingContent={marketingContent}
             adCampaigns={adCampaigns}
             availableAdMonths={availableAdMonths}
