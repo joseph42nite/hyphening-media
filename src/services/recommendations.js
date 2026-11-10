@@ -31,7 +31,9 @@ const SAME_CHECK = {
     audits: 'seo_audits',
     // Same skill on the same page of the same site, and own-site vs competitor
     // kept apart: a competitor audit must never retire the client's own items.
-    match: 'a.audit_type = ? AND COALESCE(a.page_url, a.url) = ? AND COALESCE(a.is_competitor, 0) = ?',
+    // A backlink gap is per competitor, so a report against one never retires
+    // another's (competitor_domain is null, so '', for every other skill).
+    match: "a.audit_type = ? AND COALESCE(a.page_url, a.url) = ? AND COALESCE(a.is_competitor, 0) = ? AND COALESCE(a.competitor_domain, '') = ?",
     // An item already in a night fix batch belongs to that batch.
     extra: 'AND fix_batch_id IS NULL',
   },

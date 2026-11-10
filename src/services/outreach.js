@@ -15,6 +15,7 @@
 
 import db from '../../database.js';
 import { addBlogTopics } from './blogRuns.js';
+import { outreachGapCandidates } from './backlinkGap.js';
 
 export const PROSPECTS_PER_RUN = 15;
 export const FOLLOW_UP_AFTER_DAYS = 5;
@@ -76,12 +77,16 @@ export function claimOutreachRuns(worker = 'mac') {
   });
   return claim().map((r) => {
     const client = db.prepare('SELECT id, name, website_url, blog_compliance_profile FROM crm_clients WHERE id = ?').get(r.client_id);
+    // Already known pages are skipped, so a weekly run only brings new ones.
+    const knownPages = db.prepare('SELECT page_url FROM outreach_prospects WHERE client_id = ?').all(r.client_id).map((p) => p.page_url);
     return {
       run_id: r.id,
       client,
       competitors: db.prepare("SELECT domain, label FROM client_competitors WHERE client_id = ? AND status = 'approved' ORDER BY domain").all(r.client_id),
-      // Already known pages are skipped, so a weekly run only brings new ones.
-      known_pages: db.prepare('SELECT page_url FROM outreach_prospects WHERE client_id = ?').all(r.client_id).map((p) => p.page_url),
+      known_pages: knownPages,
+      // Blog, resource and community domains from the latest backlink gap
+      // report against each approved competitor (src/services/backlinkGap.js).
+      gap_candidates: outreachGapCandidates(r.client_id, knownPages),
       planned_topics: db.prepare("SELECT id, topic FROM blog_topics WHERE client_id = ? AND status IN ('planned', 'queued')").all(r.client_id),
       follow_ups: db.prepare(`
         SELECT id, page_url, site_domain, contact_name, email_subject, email_body FROM outreach_prospects

@@ -5,6 +5,7 @@
  */
 
 import { supersedeOpenRecommendations } from '../services/recommendations.js';
+import { gapTasks } from '../services/backlinkGap.js';
 import db from '../../database.js';
 import { logAction } from '../services/auditLogger.js';
 // Timeout timers are cleared by finishRun as part of closing a run, so the
@@ -212,16 +213,38 @@ export function handleCreateSeoAudit(payload) {
           rec.page_url || result.page_url || payload.url
         );
       }
-      // Only a run that produced findings replaces the last one. Same skill,
-      // same page, own site vs competitor kept apart (src/services/recommendations.js).
-      if (result.recommendations.length) {
-        const superseded = supersedeOpenRecommendations('seo', {
-          clientId: payload.client_id,
-          newAuditId: auditId,
-          params: [payload.audit_type, result.page_url || payload.url, isCompetitorAudit ? 1 : 0],
-        });
-        if (superseded) console.log(`[SEO] Audit #${auditId} (${payload.audit_type}) replaced ${superseded} open recommendation(s) from earlier runs.`);
+    }
+
+    // A gap report's directory and news/PR domains become Manual tasks, one
+    // per domain, already sorted so the night worker leaves them alone
+    // (src/services/backlinkGap.js). Blog, resource and community domains are
+    // read by outreach instead.
+    let gapTaskCount = 0;
+    if (payload.audit_type === 'backlink_gap' && !isCompetitorAudit && auditCompetitorDomain) {
+      const clientName = db.prepare('SELECT name FROM crm_clients WHERE id = ?').get(payload.client_id)?.name || 'the client';
+      const insertTask = db.prepare(`
+        INSERT INTO seo_recommendations (
+          audit_id, client_id, priority, metric, issue, action_required, page_url, status,
+          fix_triage, fix_reason, manual_area, manual_group
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)
+      `);
+      for (const t of gapTasks({ clientName, competitor: auditCompetitorDomain, report: result.report_json })) {
+        insertTask.run(auditId, payload.client_id, t.priority, t.metric, t.issue, t.action_required, t.page_url,
+          t.fix_triage, t.fix_reason, t.manual_area, t.manual_group);
+        gapTaskCount++;
       }
+    }
+
+    // Only a run that produced findings replaces the last one. Same skill,
+    // same page, same competitor, own site vs competitor kept apart
+    // (src/services/recommendations.js).
+    if ((Array.isArray(result.recommendations) && result.recommendations.length) || gapTaskCount) {
+      const superseded = supersedeOpenRecommendations('seo', {
+        clientId: payload.client_id,
+        newAuditId: auditId,
+        params: [payload.audit_type, result.page_url || payload.url, isCompetitorAudit ? 1 : 0, auditCompetitorDomain || ''],
+      });
+      if (superseded) console.log(`[SEO] Audit #${auditId} (${payload.audit_type}) replaced ${superseded} open recommendation(s) from earlier runs.`);
     }
 
 

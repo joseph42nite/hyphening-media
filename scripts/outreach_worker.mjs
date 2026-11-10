@@ -11,7 +11,9 @@
  *      redirect fixes for the night SEO queue (never outreach, never shown to the client).
  *   3. Candidates, each double-checked here before Claude sees it:
  *        broken_link     a page linking to an approved competitor's dead page
- *        competitor_gap  a site linking to 2+ approved competitors but not to the client
+ *        competitor_gap  a blog, resource or community site from a backlink gap report
+ *                        (job.gap_candidates), or one linking to 2+ approved
+ *                        competitors but not to the client
  *        mention         a page naming the client without linking to it
  *   4. Claude (WebFetch only) reads each page, finds a published contact, says
  *      whether it's worth asking, picks the client page to offer (or proposes a
@@ -76,7 +78,7 @@ function vetPrompt(job, cand, pages) {
   const c = job.client;
   const what = {
     broken_link: () => `This page links to ${cand.dead_url}, a page on ${cand.competitor_domain} (a competitor) that no longer loads. We offer one of ${c.name}'s pages as a working replacement.`,
-    competitor_gap: () => `This site links to competitors (${cand.competitor_domains.join(', ')}) but not to ${c.name}. Find the most relevant page on the site to suggest ${c.name} for (a resource list, a tools or partners page, an article on the topic).`,
+    competitor_gap: () => `This site links to competitors (${cand.competitor_domains.join(', ')}) but not to ${c.name}.${cand.site_type ? ` Our backlink gap check took it for a ${cand.site_type} site${cand.why ? ` (${cand.why})` : ''}.` : ''} Find the most relevant page on the site to suggest ${c.name} for (a resource list, a tools or partners page, an article on the topic).`,
     mention: () => `This page mentions ${c.name} but doesn't link to ${c.website_url}. We ask them to add the link.`,
   }[cand.kind]();
   return [
@@ -121,12 +123,19 @@ async function claude(prompt, tools) {
   }
 }
 
+/** Where a candidate sits in the queue: lower is checked first. */
+export function candidateOrder(c) {
+  if (c.kind === 'broken_link') return 0;
+  if (c.kind === 'mention') return 1;
+  return c.source === 'gap_report' ? 2 : 3;
+}
+
 /** One client's run. Returns what was submitted. */
 export async function runOutreach(job, { dfsFn = dfs, claudeFn = claude, hookFn = hook, fetchFn = fetch } = {}) {
   const site = job.client.website_url;
   const domain = host(site);
   const known = new Set(job.known_pages);
-  const stats = { competitors_suggested: 0, own_broken: 0, candidates: 0, checked: 0, not_worth_it: 0 };
+  const stats = { competitors_suggested: 0, own_broken: 0, candidates: 0, gap_report_candidates: 0, checked: 0, not_worth_it: 0 };
   let cost = 0;
   const call = async (p, task) => { const r = await dfsFn(p, task); cost += r.cost; return r.items; };
 
@@ -165,6 +174,15 @@ export async function runOutreach(job, { dfsFn = dfs, claudeFn = claude, hookFn 
       candidates.push({ kind: 'broken_link', page_url: b.url_from, dead_url: b.url_to, competitor_domain: comp.domain, site_domain: host(b.url_from), domain_rank: b.domain_from_rank ?? b.rank ?? null, page_title: b.page_from_title || null });
     }
   }
+  // Gap report domains: already compared and typed by the backlink gap card,
+  // so they come before the 2+-competitor search below.
+  const fromGapReport = new Set();
+  for (const g of job.gap_candidates || []) {
+    if (!g?.page_url || known.has(g.page_url) || g.site_domain === domain || NOT_A_SITE.test(g.site_domain || '')) continue;
+    fromGapReport.add(g.site_domain);
+    candidates.push({ kind: 'competitor_gap', source: 'gap_report', page_url: g.page_url, site_domain: g.site_domain, domain_rank: g.domain_rank, competitor_domains: g.competitor_domains, site_type: g.type, why: g.why });
+  }
+  stats.gap_report_candidates = fromGapReport.size;
   if (competitors.length >= 2) {
     const sets = [];
     for (const comp of competitors) sets.push(new Map((await call('backlinks/referring_domains/live', { target: comp.domain, order_by: ['rank,desc'], limit: 300 })).map((r) => [r.domain, r.rank])));
@@ -173,7 +191,7 @@ export async function runOutreach(job, { dfsFn = dfs, claudeFn = claude, hookFn 
     sets.forEach((set, i) => { for (const [d, rank] of set) { const t = tally.get(d) || { comps: [], rank: 0 }; t.comps.push(competitors[i].domain); t.rank = Math.max(t.rank, rank || 0); tally.set(d, t); } });
     for (const [d, t] of tally) {
       const page = `https://${d}/`;
-      if (t.comps.length < 2 || ours.has(d) || d === domain || NOT_A_SITE.test(d) || known.has(page)) continue;
+      if (t.comps.length < 2 || ours.has(d) || d === domain || NOT_A_SITE.test(d) || known.has(page) || fromGapReport.has(d)) continue;
       candidates.push({ kind: 'competitor_gap', page_url: page, site_domain: d, domain_rank: t.rank, competitor_domains: t.comps });
     }
   }
@@ -185,9 +203,9 @@ export async function runOutreach(job, { dfsFn = dfs, claudeFn = claude, hookFn 
   }
   stats.candidates = candidates.length;
 
-  // Broken links first (the strongest ask), then by the linking site's rank.
-  const order = { broken_link: 0, mention: 1, competitor_gap: 2 };
-  candidates.sort((a, b) => order[a.kind] - order[b.kind] || (b.domain_rank || 0) - (a.domain_rank || 0));
+  // Broken links first (the strongest ask), then mentions, then gap report
+  // domains, then the 2+-competitor search; within each, by the site's rank.
+  candidates.sort((a, b) => candidateOrder(a) - candidateOrder(b) || (b.domain_rank || 0) - (a.domain_rank || 0));
 
   // 4. Check and draft, until enough prospects.
   const pages = await ourPages(site, fetchFn);

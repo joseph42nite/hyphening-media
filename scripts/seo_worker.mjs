@@ -111,10 +111,11 @@ function gapInstructions(job) {
     `Use DataForSEO: fetch \`backlinks_referring_domains\` for both ${ours} and ${job.competitor_domain} (or \`backlinks_domain_intersection\`), then compare the two sets.`,
     'In report_json return:',
     `- \`competitor\`: "${job.competitor_domain}", with both domains' referring-domain counts`,
-    `- \`gap_domains\`: domains linking to ${job.competitor_domain} but NOT to ${ours}, best first (domain, rank/authority, why it is relevant) — up to 50`,
+    `- \`gap_domains\`: domains linking to ${job.competitor_domain} but NOT to ${ours}, best first — up to 50. Each item: {"domain", "rank", "backlinks", "spam_score", "type", "why"}.`,
+    '  `type` is exactly one of: "directory" (business listing, directory, review or company profile site: a profile is submitted), "news_pr" (news or press-release site: placement is usually paid), "blog", "resource" (resource, tools or partners page), "community" (forum or Q&A), "irrelevant" (no plausible fit for the client\'s field). Judge from the domain and, when unsure, a quick look at the site.',
     `- \`shared_domains\`: domains linking to both`,
     `- \`only_ours\`: domains linking only to ${ours}`,
-    'Recommendations should name specific gap domains to approach. If DataForSEO fails for either domain, say so in data_availability and do not invent a list.',
+    'Each gap domain becomes its own task or outreach candidate in the Ops Center, so recommendations should cover the profile as a whole (link quality, spam, disavow, scale, content to earn links) and must not list gap domains to contact or submit to. If DataForSEO fails for either domain, say so in data_availability and do not invent a list.',
   ].join('\n');
 }
 
