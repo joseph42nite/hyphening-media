@@ -537,7 +537,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
 
         <h2>Our Capabilities</h2>
         <p>Hyphening Media offers nine capabilities, each with its own page covering what we do and how we work. Explore them below, from content strategy and video production to analytics, campaigns, brand development and news media PR, or see our <a href="/case-studies">case studies</a> and <a href="/blog">blog</a> for examples of the work.</p>
-        <p>Based in Bengaluru (Bangalore)? See our <a href="/landing-pages/digital-marketing-agency-bengaluru.html">digital marketing and social media agency in Bengaluru</a> page.</p>
+        <p>Based in Bengaluru (Bangalore)? See our <a href="/landing-pages/digital-marketing-agency-bengaluru.html">digital marketing and social media agency in Bengaluru</a> page, or our <a href="/landing-pages/d2c-marketing-agency-bengaluru.html">D2C marketing agency in Bengaluru</a> page.</p>
         <ul>
           <li><a href="/capabilities/content-strategy">Content Strategy</a></li>
           <li><a href="/capabilities/video-production">Video Production</a></li>
