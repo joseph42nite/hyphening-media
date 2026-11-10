@@ -38,6 +38,10 @@ vi.mock('../services/composioService.js', () => ({
         contentDetails: { duration: 'PT1M51S' }, statistics: { viewCount: '15', likeCount: '2', commentCount: '1' } })) } };
     }
     if (action === 'YOUTUBE_QUERY_ANALYTICS') {
+      // As YouTube does: one invalid ID in the filter fails the whole query.
+      if (/mock_post_/.test(params.filters)) {
+        return { successful: false, error: 'Invalid value (mock_post_1) given in field parameters.filters.', data: {} };
+      }
       return { successful: true, data: {
         columnHeaders: ['video', 'creatorContentType', 'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage', 'shares', 'subscribersGained'].map(name => ({ name })),
         rows: [['R0LNz1tNCwE', 'shorts', 15, 8, 64, 57.85, 1, 0], ['LongVideo01', 'videoOnDemand', 40, 30, 200, 40, 0, 1]],
@@ -175,6 +179,18 @@ describe('YouTube Short / Long label', () => {
       youtube_link: 'https://youtube.com/shorts/yVIOYucUNSU?si=x', youtube_format: 'Long' });
     await syncSingleContentMetrics(id);
     expect(read(id).youtube_format).toBe('Short');
+  });
+
+  it('a test row with a fake video ID does not break the batch for real videos', async () => {
+    const { runMetricSyncWorker } = await import('../services/metricSyncWorker.js');
+    const clientId = db.prepare("INSERT INTO crm_clients (name) VALUES ('Batch test')").run().lastInsertRowid;
+    const base = { client_id: clientId, platform: 'youtube', post_type: 'Youtube', status: 'Posted', date: new Date().toISOString().slice(0, 10) };
+    const ins = row => db.prepare(`INSERT INTO marketing_content_tracker (${Object.keys(row).join(', ')}) VALUES (${Object.keys(row).map(() => '?').join(', ')})`).run(...Object.values(row)).lastInsertRowid;
+    ins({ ...base, youtube_video_id: 'mock_post_1783231620498' });
+    const real = ins({ ...base, youtube_video_id: 'R0LNz1tNCwE' });
+    await runMetricSyncWorker({ clientId });
+    expect(read(real).youtube_format).toBe('Short');
+    expect(read(real).youtube_analytics_synced_at).not.toBeNull();
   });
 
   it('leaves it blank when neither YouTube nor the link says', async () => {

@@ -269,6 +269,10 @@ async function resolveYouTubeVideoId(item) {
  * two calls per run instead of one call per post.
  */
 const YT_BATCH_SIZE = 50;
+// A real YouTube video ID is 11 URL-safe characters. Anything else (old test
+// rows hold IDs like "mock_post_…") is never sent: YouTube Analytics rejects
+// a whole batch over one invalid ID.
+const YT_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const ytStatsCache = new Map();
 const ytStatsErrors = new Map();
 async function primeYouTubeStats(clientId, videoIds) {
@@ -278,7 +282,9 @@ async function primeYouTubeStats(clientId, videoIds) {
     ytStatsCache.set(clientId, cache);
   }
 
-  const missing = [...new Set(videoIds)].filter(id => id && !cache.has(id));
+  const wanted = [...new Set(videoIds)].filter(id => id && !cache.has(id));
+  for (const id of wanted.filter(id => !YT_VIDEO_ID.test(id))) cache.set(id, null);
+  const missing = wanted.filter(id => YT_VIDEO_ID.test(id));
   for (let i = 0; i < missing.length; i += YT_BATCH_SIZE) {
     const chunk = missing.slice(i, i + YT_BATCH_SIZE);
     try {
@@ -327,7 +333,9 @@ async function primeYouTubeAnalytics(clientId, videoIds) {
     ytAnalyticsCache.set(clientId, cache);
   }
 
-  const missing = [...new Set(videoIds)].filter(id => id && !cache.has(id));
+  const wanted = [...new Set(videoIds)].filter(id => id && !cache.has(id));
+  for (const id of wanted.filter(id => !YT_VIDEO_ID.test(id))) cache.set(id, null);
+  const missing = wanted.filter(id => YT_VIDEO_ID.test(id));
   const endDate = new Date().toISOString().slice(0, 10);
   for (let i = 0; i < missing.length; i += YT_ANALYTICS_BATCH) {
     const chunk = missing.slice(i, i + YT_ANALYTICS_BATCH);
