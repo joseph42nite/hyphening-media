@@ -20,6 +20,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import db from '../../database.js';
+import { manualSummaryLines } from '../services/manualTasks.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
@@ -346,7 +347,12 @@ export function executeEvent(eventType, payload) {
       case 'retry_blog_run': return handleRetryBlogRun(payload);
       case 'queue_seo_night': return handleQueueSeoNight(payload);
       case 'queue_seo_fixes': return handleQueueSeoFixes(payload);
-      case 'seo_night_summary': return { success: true, summary: nightSummaryText(), data: { text: nightSummaryText() } };
+      case 'seo_night_summary': {
+        // Manual tasks ride along so the morning brief shows the hand work waiting too.
+        const manual = manualSummaryLines();
+        const text = [nightSummaryText(), ...(manual.length ? ['Manual tasks (SEO and ads, Manual tasks tab):', ...manual] : [])].join('\n');
+        return { success: true, summary: text, data: { text } };
+      }
       case 'claim_seo_fix_batches': { const batches = claimSeoFixBatches(payload?.worker); return { success: true, summary: `Claimed ${batches.length} fix batch(es)`, data: { batches } }; }
       case 'submit_seo_triage': return submitSeoTriage(payload);
       case 'submit_seo_fix_batch': return submitSeoFixBatch(payload);

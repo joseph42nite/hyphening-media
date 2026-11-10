@@ -25,6 +25,7 @@
  */
 
 import db from '../../database.js';
+import { countManualTasks } from './manualTasks.js';
 
 /** Silent above this, to keep the badge readable. */
 const MAX_DISPLAY = 99;
@@ -214,8 +215,13 @@ function countOpenAdsActions(since) {
  * A failing count returns 0 rather than throwing: a badge is an affordance, and
  * losing the whole dashboard because one query broke would be a poor trade.
  */
+// Manual tasks are a to-do list, not news: the badge is how many are open,
+// whether or not the tab has been seen.
+const countOpenManualTasks = () => countManualTasks().total;
+
 const COUNTERS = {
   seo: countDueAudits,
+  manual: countOpenManualTasks,
   ads: countOpenAdsActions,
   scripts: countScriptResponses,
   tasks: countOverdueTasks,

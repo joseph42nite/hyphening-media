@@ -96,12 +96,13 @@ function triagePrompt(job, manifest) {
     `Allowed files: ${manifest.seo_fixes.paths.join(', ')}. Never: ${(manifest.seo_fixes.never_touch || []).join(', ') || '(none listed)'}.`,
     job.client.blog_compliance_profile === 'healthcare' ? 'This is a healthcare client: anything touching health claims is "needs_007".' : '',
     'Give each a one-line reason a busy owner understands.',
+    'For every "not_code" one, also give "area", where the work happens: "offsite" (backlinks, directories, listings, PR), "gbp" (Google Business Profile, reviews), "google" (Search Console, GA4, tag or analytics settings), "content" (new articles or pages to write, content plans), "ad_account" (done in an ad platform), "business" (done by the client\'s team), or "other".',
     '',
     'Recommendations (JSON):',
     JSON.stringify(job.candidates.map((c) => ({ id: c.id, priority: c.priority, audit: c.audit_type, metric: c.metric, issue: c.issue, action: c.action_required, page: c.page_url, campaign: c.campaign_name || undefined }))),
     '',
     'Answer with the list only, between <json> and </json>:',
-    '<json>[{"id": 123, "triage": "safe", "reason": "..."}]</json>',
+    '<json>[{"id": 123, "triage": "safe", "reason": "..."}, {"id": 124, "triage": "not_code", "area": "offsite", "reason": "..."}]</json>',
   ].filter((s) => s !== '').join('\n');
 }
 

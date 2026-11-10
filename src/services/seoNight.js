@@ -19,6 +19,9 @@
 
 import db from '../../database.js';
 import { getMode } from './automationMode.js';
+
+/** Where a not_code finding's work happens; kept in step with manualTasks.js WORKER_AREAS. */
+const WORKER_AREAS = ['offsite', 'gbp', 'google', 'content', 'ad_account', 'business', 'other'];
 import { startAgentRun } from './agentRunner.js';
 import { getActiveRunsForClient } from './agentRuns.js';
 import { unavailableReason, skillStateFor, resolveAuditScore } from '../routes/seo.js';
@@ -243,12 +246,15 @@ export function submitSeoTriage(payload) {
       // already_done: the code already does it (often a fix pushed earlier that
       // nobody marked). Closed here, with what the worker found as the note.
       const status = triage === 'needs_007' ? 'needs_007' : triage === 'already_done' ? 'completed' : 'open';
+      // Where a not_code finding's work happens, for the Manual tasks tab.
+      const area = triage === 'not_code' && WORKER_AREAS.includes(r.area) ? r.area : null;
       db.prepare(`
         UPDATE ${k.table} SET fix_triage = ?, fix_reason = ?, status = ?, fix_batch_id = ?,
           fix_approved = CASE WHEN ? = 'completed' THEN 0 ELSE fix_approved END,
-          fixed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE fixed_at END
+          fixed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE fixed_at END,
+          manual_area = COALESCE(?, manual_area)
         WHERE id = ?
-      `).run(triage, String(r.reason || '').slice(0, 400), status, batch.id, status, status, rec.id);
+      `).run(triage, String(r.reason || '').slice(0, 400), status, batch.id, status, status, area, rec.id);
       n++;
     }
   });

@@ -60,13 +60,15 @@ describe('night audits', () => {
   it('queues every skill past its cadence, most overdue first; on-demand and fresh ones wait', () => {
     setMode('seo', 'auto');
     const id = makeClient();
-    // Fresh technical audit: not due. A 40-day-old full (30-day cadence): due.
+    // Fresh technical audit: not due. A 40-day-old content audit (30-day cadence): due.
     audit(id, 'technical', 1);
-    audit(id, 'full', 40);
+    audit(id, 'content', 40);
     const due = night.dueSkills(id);
     const types = due.map(d => d.audit_type);
     expect(types).not.toContain('technical');
-    expect(types).toContain('full');
+    expect(types).toContain('content');
+    // The Full card was removed (migration 113).
+    expect(types).not.toContain('full');
     // Cards on cadence that used to be skipped at night now run when due.
     for (const t of ['flow', 'backlinks']) expect(types).toContain(t);
     // 9999 = on demand: never queued.
