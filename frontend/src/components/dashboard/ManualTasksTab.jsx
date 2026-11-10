@@ -13,6 +13,11 @@ import { gapSummary } from './outreachShared.js';
  */
 const CLIENT_KEY = 'seo_monitor_selected_client_id';
 const PRIORITY_COLOR = { Critical: '#f87171', High: '#fb923c', Medium: '#facc15', Low: 'var(--text-muted)' };
+// Same as the Outreach section's title, so every section reads at one size.
+const areaTitle = { margin: '0 0 8px', fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase' };
+// Done green, Not doing red: the same greens and reds as the SEO Monitor's approve and reject buttons.
+const doneStyle = { border: '1px solid rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', fontWeight: 700 };
+const notDoingStyle = { border: '1px solid rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.18)', color: '#f87171', fontWeight: 700 };
 const shortName = (email) => (email ? email.split('@')[0] : 'Unassigned');
 const selectStyle = { padding: '4px 8px', border: '1px solid rgba(223, 231, 224, 0.18)', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(5, 7, 10, 0.85)', color: 'var(--text-primary)' };
 
@@ -76,9 +81,9 @@ function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onF
               </button>
             )}
             {task.area !== 'site' && (
-              <button className="btn btn-secondary" disabled={disabled} onClick={() => onDone(task)}><Check size={13} /> Done</button>
+              <button className="btn" style={doneStyle} disabled={disabled} onClick={() => onDone(task)}><Check size={13} /> Done</button>
             )}
-            <button className="btn btn-secondary" disabled={disabled} onClick={() => setSkipping(true)}><X size={13} /> Not doing</button>
+            <button className="btn" style={notDoingStyle} disabled={disabled} onClick={() => setSkipping(true)}><X size={13} /> Not doing</button>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: '6px' }}>
@@ -182,13 +187,13 @@ export default function ManualTasksTab({ clients, showToast, isAdmin }) {
       {/* No off-site tasks to show: the gap line still gets its own card. */}
       {data?.backlink_gap?.length > 0 && !areas.some(a => a.key === 'offsite') && (
         <div style={card}>
-          <div style={{ ...label, marginBottom: '4px' }}>Backlinks & off-site (0)</div>
+          <h3 style={areaTitle}>Backlinks & off-site (0)</h3>
           <GapLine competitors={data.backlink_gap} />
         </div>
       )}
       {areas.map(area => (
         <div key={area.key} style={card}>
-          <div style={{ ...label, marginBottom: '4px' }}>{area.label} ({area.tasks.length})</div>
+          <h3 style={areaTitle}>{area.label} ({area.tasks.length})</h3>
           {area.key === 'offsite' && <GapLine competitors={data.backlink_gap} />}
           {area.tasks.map(t => (
             <TaskRow key={t.key} task={t} isAdmin={isAdmin} assignees={data.assignees} busy={busy} {...handlers} />
