@@ -12,7 +12,7 @@ vi.mock('../../server.js', () => ({ broadcastEvent: () => {} }));
 
 import db from '../../database.js';
 import { handleCreateSeoAudit } from '../webhooks/seoAudits.js';
-import { gapTasks, outreachGapCandidates } from '../services/backlinkGap.js';
+import { gapTasks, outreachGapCandidates, gapStatusByCompetitor } from '../services/backlinkGap.js';
 import { claimOutreachRuns } from '../services/outreach.js';
 import { listManualTasks } from '../services/manualTasks.js';
 import { candidateOrder } from '../../scripts/outreach_worker.mjs';
@@ -115,6 +115,13 @@ describe('storing a gap report', () => {
     const cands = outreachGapCandidates(clientId, ['https://forum.example/']);
     expect(cands.map(c => c.site_domain)).toEqual(['sukiweb.net']);
     expect(cands[0]).toMatchObject({ page_url: 'https://sukiweb.net/', type: 'blog', competitor_domains: ['socialee.in'] });
+  });
+
+  it('summarises each competitor\'s latest gap report for the screens', () => {
+    const status = gapStatusByCompetitor(clientId);
+    expect(Object.keys(status).sort()).toEqual(['nicodigital.com', 'socialee.in']);
+    expect(status['socialee.in']).toMatchObject({ directories: 1, news_pr: 0, outreach: 2, irrelevant: 0, untyped: 0 });
+    expect(status['nicodigital.com']).toMatchObject({ directories: 1, outreach: 0 });
   });
 
   it('hands them to the worker with the run', () => {

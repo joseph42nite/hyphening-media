@@ -5,12 +5,12 @@ import { api, card, muted, label } from './blogMonitorShared.js';
 import { KIND_LABEL, STATUS_LABEL, VIEWS } from './outreachShared.js';
 
 /**
- * Backlink outreach in the SEO Monitor, under "Last night". The Mac finds
+ * Backlink outreach, the last section of the Manual tasks tab. The Mac finds
  * prospects weekly (DataForSEO + Claude), 007 approves and assigns them, and
  * the assigned staff member sends from their own Gmail. Whether DataForSEO
  * worked on the last run is shown first, so a missing login or an empty
- * balance is never silent. Shows the client picked in the SEO Monitor's
- * dropdown only. Server side: src/routes/outreach.js.
+ * balance is never silent. Shows the client picked in the tab's dropdown
+ * only. Server side: src/routes/outreach.js.
  */
 const DFS_COLOR = { ok: '#4ade80', never: 'var(--text-muted)', missing: '#f87171', auth: '#f87171', funds: '#f87171', failed: '#f87171' };
 

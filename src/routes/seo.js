@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { cancelRun, getActiveRunsForClient, listQueue } from '../services/agentRuns.js';
 import { startAgentRun } from '../services/agentRunner.js';
+import { gapStatusByCompetitor } from '../services/backlinkGap.js';
 
 // Skills that cannot produce a real result, and why. Authoritative — the
 // trigger route rejects these, and /seo/agents/status reports the reason so the
@@ -763,10 +764,13 @@ router.get('/:id/seo/competitors', (req, res) => {
       };
     }
 
+    const gap = gapStatusByCompetitor(clientId);
     res.json({
       competitors: competitors.map(c => ({
         ...c,
         scores: byDomain[c.domain.replace(/^www\./, '')] || {},
+        // Latest backlink gap report against this competitor, or null.
+        gap: gap[c.domain] || null,
       })),
       own,
     });

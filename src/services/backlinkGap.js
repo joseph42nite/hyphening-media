@@ -110,3 +110,35 @@ export function outreachGapCandidates(clientId, knownPages = []) {
   }
   return [...byDomain.values()].sort((x, y) => (y.domain_rank || 0) - (x.domain_rank || 0));
 }
+
+/**
+ * The latest gap report against each competitor of a client, summarised:
+ * { [domain]: { auditId, checkedAt, directories, news_pr, outreach, irrelevant, untyped } }.
+ * What the Competitors panel, the gap card's picker and Manual tasks show.
+ */
+export function gapStatusByCompetitor(clientId) {
+  const rows = db.prepare(`
+    SELECT a.id, a.competitor_domain, a.created_at, a.report_json FROM seo_audits a
+    WHERE a.client_id = ? AND a.audit_type = 'backlink_gap' AND COALESCE(a.is_competitor, 0) = 0
+      AND a.competitor_domain IS NOT NULL
+      AND a.id = (SELECT MAX(b.id) FROM seo_audits b WHERE b.client_id = a.client_id AND b.audit_type = 'backlink_gap'
+                  AND b.competitor_domain = a.competitor_domain AND COALESCE(b.is_competitor, 0) = 0)
+  `).all(clientId);
+  const out = {};
+  for (const r of rows) {
+    let report = null;
+    try { report = JSON.parse(r.report_json || 'null'); } catch { /* counts stay 0 */ }
+    const gaps = gapDomains(report);
+    const n = (types) => gaps.filter((g) => types.includes(g.type)).length;
+    out[r.competitor_domain] = {
+      auditId: r.id,
+      checkedAt: r.created_at,
+      directories: n(['directory']),
+      news_pr: n(['news_pr']),
+      outreach: n(OUTREACH_TYPES),
+      irrelevant: n(['irrelevant']),
+      untyped: gaps.filter((g) => !g.type).length,
+    };
+  }
+  return out;
+}

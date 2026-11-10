@@ -1,16 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Check, X, ExternalLink, Moon } from 'lucide-react';
 import { api, card, muted, label } from './blogMonitorShared.js';
+import OutreachPanel from './OutreachPanel.jsx';
+import { gapSummary } from './outreachShared.js';
 
 /**
  * Manual tasks: every open SEO and ads finding a person has to do by hand, one
- * client at a time, grouped by where the work happens. Shares the SEO Monitor's
- * client choice. Server side: src/routes/manualTasks.js, src/services/manualTasks.js.
+ * client at a time, grouped by where the work happens, then Outreach (emails to
+ * send, OutreachPanel). Backlinks & off-site opens with which approved
+ * competitors have had a backlink gap check. Shares the SEO Monitor's client
+ * choice. Server side: src/routes/manualTasks.js, src/services/manualTasks.js.
  */
 const CLIENT_KEY = 'seo_monitor_selected_client_id';
 const PRIORITY_COLOR = { Critical: '#f87171', High: '#fb923c', Medium: '#facc15', Low: 'var(--text-muted)' };
 const shortName = (email) => (email ? email.split('@')[0] : 'Unassigned');
 const selectStyle = { padding: '4px 8px', border: '1px solid rgba(223, 231, 224, 0.18)', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(5, 7, 10, 0.85)', color: 'var(--text-primary)' };
+
+/** Which approved competitors have a backlink gap report, and what it found. */
+function GapLine({ competitors }) {
+  if (!competitors?.length) return null;
+  return (
+    <div style={{ fontSize: '0.8rem', margin: '2px 0 10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <span style={{ ...muted, fontWeight: 700 }}>Backlink gap (SEO Monitor → Backlink gap card)</span>
+      {competitors.map(c => (
+        <span key={c.domain} style={{ color: c.gap ? '#4ade80' : 'var(--text-muted)' }}>
+          {c.label || c.domain}: {gapSummary(c.gap) || 'not checked yet'}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onFixTonight }) {
   const [skipping, setSkipping] = useState(false);
@@ -153,14 +172,28 @@ export default function ManualTasksTab({ clients, showToast, isAdmin }) {
       {data && areas.length === 0 && (
         <div style={card}><p style={{ ...muted, margin: 0 }}>Nothing to do by hand here{who !== 'all' ? ' for this person' : ''}. New findings are sorted at night, after the audits.</p></div>
       )}
+      {/* No off-site tasks to show: the gap line still gets its own card. */}
+      {data?.backlink_gap?.length > 0 && !areas.some(a => a.key === 'offsite') && (
+        <div style={card}>
+          <div style={{ ...label, marginBottom: '4px' }}>Backlinks & off-site (0)</div>
+          <GapLine competitors={data.backlink_gap} />
+        </div>
+      )}
       {areas.map(area => (
         <div key={area.key} style={card}>
           <div style={{ ...label, marginBottom: '4px' }}>{area.label} ({area.tasks.length})</div>
+          {area.key === 'offsite' && <GapLine competitors={data.backlink_gap} />}
           {area.tasks.map(t => (
             <TaskRow key={t.key} task={t} isAdmin={isAdmin} assignees={data.assignees} busy={busy} {...handlers} />
           ))}
         </div>
       ))}
+
+      <OutreachPanel
+        showToast={showToast}
+        clientId={clientId}
+        seoOn={!!activeClients.find(c => String(c.id) === String(clientId))?.seo_enabled}
+      />
     </div>
   );
 }

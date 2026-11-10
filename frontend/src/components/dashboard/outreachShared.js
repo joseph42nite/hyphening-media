@@ -1,4 +1,4 @@
-/** Labels and the Gmail compose link for the SEO Monitor's Outreach section. */
+/** Labels, the Gmail compose link and backlink gap lines for the Outreach section (Manual tasks tab) and the SEO Monitor. */
 
 export const KIND_LABEL = { broken_link: 'Broken link', competitor_gap: 'Competitor gap', mention: 'Mention' };
 
@@ -24,4 +24,19 @@ export function gmailComposeUrl(p) {
   const q = new URLSearchParams({ view: 'cm', fs: '1', to: p.contact_email || '', su: p.email_subject || '', body: p.email_body || '' });
   if (p.email_cc) q.set('cc', p.email_cc);
   return `https://mail.google.com/mail/?${q.toString()}`;
+}
+
+/** "10 Nov" from a server timestamp (UTC, "YYYY-MM-DD HH:MM:SS"). */
+export function gapDay(ts) {
+  const d = new Date(`${String(ts).replace(' ', 'T')}Z`);
+  return Number.isNaN(d.getTime()) ? String(ts).slice(0, 10) : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+/** One line for a competitor's latest backlink gap report, or null when none has run. */
+export function gapSummary(gap) {
+  if (!gap) return null;
+  const parts = [`Gap checked ${gapDay(gap.checkedAt)}`];
+  if (gap.untyped) parts.push(`${gap.untyped} domains not sorted (re-run to sort)`);
+  else parts.push(`${gap.directories} directories`, `${gap.news_pr} PR`, `${gap.outreach} for outreach`);
+  return parts.join(' · ');
 }

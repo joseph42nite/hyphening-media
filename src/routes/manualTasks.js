@@ -2,7 +2,8 @@
  * Manual tasks tab (src/services/manualTasks.js). A task's :key is an SEO
  * finding id, or 'ads-<id>' for an ads finding, as in the Site changes routes.
  *
- *   GET  /api/manual-tasks?client_id=10   tasks grouped by area
+ *   GET  /api/manual-tasks?client_id=10   tasks grouped by area, plus the
+ *        backlink gap status of each approved competitor
  *   POST /api/manual-tasks/:key/assign    { assigned_to: email | null }
  *   POST /api/manual-tasks/:key/done      { note? }
  *   POST /api/manual-tasks/:key/skip      { reason }
@@ -15,6 +16,8 @@ import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { listManualTasks, assignManualTask, closeManualTask } from '../services/manualTasks.js';
+import { gapStatusByCompetitor } from '../services/backlinkGap.js';
+import db from '../../database.js';
 
 const router = Router();
 router.use(authenticate);
@@ -25,7 +28,10 @@ router.get('/', authorize(...STAFF, 'api_readonly'), (req, res) => {
   const clientId = Number(req.query.client_id);
   if (!Number.isInteger(clientId) || clientId <= 0) return res.status(400).json({ error: 'client_id is required' });
   try {
-    res.json(listManualTasks(clientId));
+    const gap = gapStatusByCompetitor(clientId);
+    const backlinkGap = db.prepare("SELECT domain, label FROM client_competitors WHERE client_id = ? AND status = 'approved' ORDER BY domain")
+      .all(clientId).map((c) => ({ ...c, gap: gap[c.domain] || null }));
+    res.json({ ...listManualTasks(clientId), backlink_gap: backlinkGap });
   } catch (err) {
     console.error('[MANUAL TASKS] list failed:', err.message);
     res.status(500).json({ error: 'Could not load manual tasks' });

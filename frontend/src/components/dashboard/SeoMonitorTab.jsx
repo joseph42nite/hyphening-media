@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Terminal, AlertTriangle, Loader2, ChevronUp, ChevronDown, XCircle, Users, Check, X } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import SeoNightPanel from './SeoNightPanel.jsx';
-import OutreachPanel from './OutreachPanel.jsx';
+import { gapDay, gapSummary } from './outreachShared.js';
 
 const IN_FLIGHT_STATUSES = ['queued', 'running'];
 
@@ -743,6 +743,8 @@ export default function SeoMonitorTab({ clients, showToast }) {
       if (String(data.clientId) === String(selectedClientId)) {
         showToast('New SEO audit received, refreshing list...', 'info');
         fetchClientData(selectedClientId);
+        // A gap report changes the competitors' "gap checked" line.
+        fetchCompetitors(selectedClientId);
       }
     });
 
@@ -1012,8 +1014,8 @@ export default function SeoMonitorTab({ clients, showToast }) {
   return (
     <div style={{ textAlign: 'left', paddingBottom: calculatedPadding, transition: 'padding 0.3s ease' }} className="seo-monitor-container">
       {/* The night panel's fleet line and "waiting" chips sit above the client
-          dropdown; its deploy section, and Outreach, sit below it and show the
-          selected client only. */}
+          dropdown; its deploy section sits below it and shows the selected
+          client only. Outreach is in the Manual tasks tab. */}
       <SeoNightPanel
         showToast={showToast}
         clientId={selectedClientId}
@@ -1050,13 +1052,6 @@ export default function SeoMonitorTab({ clients, showToast }) {
                   🚀 Run Full Audit (Master)
                 </button>
                 <button
-                  onClick={() => setIsTerminalOpen(prev => !prev)}
-                  className={`btn ${isTerminalOpen ? 'btn-primary' : 'btn-secondary'} seo-cmd-btn`}
-                  style={{ border: '1px solid rgba(223, 231, 224, 0.15)', padding: '9px 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, background: isTerminalOpen ? 'rgba(224, 35, 28, 0.18)' : 'rgba(255, 255, 255, 0.05)', color: isTerminalOpen ? '#fca5a5' : 'var(--text-primary)', borderRadius: '8px', flex: '1 1 180px', minWidth: '0' }}
-                >
-                  <Terminal size={16} /> {isTerminalOpen ? 'Hide Console' : 'Live Console'} ({consoleLogs.length})
-                </button>
-                <button
                   onClick={() => setShowCompetitorModal(true)}
                   className="btn btn-secondary seo-cmd-btn"
                   style={{ border: '1px solid rgba(223, 231, 224, 0.15)', padding: '9px 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', borderRadius: '8px', flex: '1 1 180px', minWidth: '0' }}
@@ -1071,7 +1066,6 @@ export default function SeoMonitorTab({ clients, showToast }) {
       </div>
         )}
       />
-      <OutreachPanel showToast={showToast} clientId={selectedClientId} seoOn={!!selectedClient?.seo_enabled} />
 
       {!selectedClientId ? (
         <div style={{ textAlign: 'center', padding: '48px 24px', background: 'rgba(12, 16, 24, 0.6)', borderRadius: '12px', border: '1px dashed rgba(223, 231, 224, 0.15)' }}>
@@ -1210,7 +1204,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
                             >
                               <option value="">compare vs…</option>
                               {competitors.filter(c => c.status === 'approved').map(c => (
-                                <option key={c.id} value={c.domain}>{c.label || c.domain}</option>
+                                <option key={c.id} value={c.domain}>{c.label || c.domain} · {c.gap ? `checked ${gapDay(c.gap.checkedAt)}` : 'not checked'}</option>
                               ))}
                             </select>
                           </div>
@@ -1912,6 +1906,12 @@ export default function SeoMonitorTab({ clients, showToast }) {
                               <> · found at #{comp.discovered_position ?? '?'} for “{comp.discovered_for_query}”</>
                             )}
                           </div>
+                          {isApproved && (
+                            <div style={{ fontSize: '0.75rem', marginTop: '4px', fontWeight: 600, color: comp.gap ? '#4ade80' : 'rgba(223, 231, 224, 0.5)' }}
+                              title="Latest backlink gap report against this competitor">
+                              {gapSummary(comp.gap) || 'No backlink gap check yet'}
+                            </div>
+                          )}
                         </div>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <span className="badge" style={{
