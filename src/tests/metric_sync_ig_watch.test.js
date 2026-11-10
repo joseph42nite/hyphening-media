@@ -39,8 +39,8 @@ vi.mock('../services/composioService.js', () => ({
     }
     if (action === 'YOUTUBE_QUERY_ANALYTICS') {
       return { successful: true, data: {
-        columnHeaders: ['video', 'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage', 'shares', 'subscribersGained'].map(name => ({ name })),
-        rows: [['R0LNz1tNCwE', 15, 8, 64, 57.85, 1, 0]],
+        columnHeaders: ['video', 'creatorContentType', 'views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage', 'shares', 'subscribersGained'].map(name => ({ name })),
+        rows: [['R0LNz1tNCwE', 'shorts', 15, 8, 64, 57.85, 1, 0], ['LongVideo01', 'videoOnDemand', 40, 30, 200, 40, 0, 1]],
       } };
     }
     throw new Error(`unexpected ${action}`);
@@ -152,5 +152,35 @@ describe('YouTube', () => {
     expect(r.youtube_avg_view_duration).toBeNull();
     expect(r.youtube_analytics_synced_at).toBeNull();
     expect(r.youtube_views).toBe(15);
+  });
+});
+
+describe('YouTube Short / Long label', () => {
+  it("uses YouTube's own content type, so a 1:51 Short is a Short", async () => {
+    // The mocked video is 1:51 long; a 60-second cut-off called it Long.
+    const id = addPost({ platform: 'youtube', post_type: 'Youtube', instagram_media_id: null, youtube_video_id: 'R0LNz1tNCwE', youtube_format: 'Long' });
+    await syncSingleContentMetrics(id);
+    expect(read(id).youtube_duration_seconds).toBe(111);
+    expect(read(id).youtube_format).toBe('Short');
+  });
+
+  it('labels a regular upload Long', async () => {
+    const id = addPost({ platform: 'youtube', post_type: 'Youtube', instagram_media_id: null, youtube_video_id: 'LongVideo01' });
+    await syncSingleContentMetrics(id);
+    expect(read(id).youtube_format).toBe('Long');
+  });
+
+  it('falls back to a /shorts/ link while Analytics has no data', async () => {
+    const id = addPost({ platform: 'youtube', post_type: 'Youtube', instagram_media_id: null, youtube_video_id: 'yVIOYucUNSU',
+      youtube_link: 'https://youtube.com/shorts/yVIOYucUNSU?si=x', youtube_format: 'Long' });
+    await syncSingleContentMetrics(id);
+    expect(read(id).youtube_format).toBe('Short');
+  });
+
+  it('leaves it blank when neither YouTube nor the link says', async () => {
+    const id = addPost({ platform: 'youtube', post_type: 'Youtube', instagram_media_id: null, youtube_video_id: 'yVIOYucUNSU',
+      youtube_link: 'https://www.youtube.com/watch?v=yVIOYucUNSU', youtube_format: 'Long' });
+    await syncSingleContentMetrics(id);
+    expect(read(id).youtube_format).toBeNull();
   });
 });

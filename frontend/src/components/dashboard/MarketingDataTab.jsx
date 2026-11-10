@@ -619,7 +619,7 @@ export default function MarketingDataTab({
                   <th>Score</th>
                   <th>Views</th>
                   <th title="Views per day since publish — comparable across video ages">Views/Day</th>
-                  <th title="Short (≤60s) or long-form">Format</th>
+                  <th title="Short, Long or Live, as YouTube classes the video">Format</th>
                   <th>Length</th>
                   <th>YT Likes</th>
                   <th>YT Comments</th>

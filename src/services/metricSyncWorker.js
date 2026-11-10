@@ -127,11 +127,19 @@ function parseIsoDuration(iso) {
 }
 
 /**
- * YouTube treats a video as a Short when it is 60s or under (3 minutes for
- * uploads after Oct 2024, but the 60s line matches how this channel posts and
- * keeps the label stable for older videos).
+ * Short / Long / Live as YouTube itself classes the video (Analytics
+ * creatorContentType), not guessed from length: Shorts run up to 3 minutes
+ * since Oct 2024, so a length cut-off mislabels them. Until Analytics has the
+ * video (2-3 days), a /shorts/ link is YouTube's own URL for a Short; anything
+ * else stays blank until YouTube reports.
  */
-const SHORTS_MAX_SECONDS = 60;
+const YT_CONTENT_TYPE_LABEL = { shorts: 'Short', videoOnDemand: 'Long', liveStream: 'Live' };
+function youtubeFormatFor(analytics, item) {
+  const fromYouTube = YT_CONTENT_TYPE_LABEL[analytics?.creatorContentType];
+  if (fromYouTube) return fromYouTube;
+  const link = `${item.youtube_link || ''} ${item.link || ''}`;
+  return /youtube\.com\/shorts\//i.test(link) ? 'Short' : null;
+}
 
 /**
  * Views per day since publication. Raw view count mostly measures how long a
@@ -329,7 +337,7 @@ async function primeYouTubeAnalytics(clientId, videoIds) {
         startDate: '2005-01-01',
         endDate,
         metrics: YT_ANALYTICS_METRICS.join(','),
-        dimensions: 'video',
+        dimensions: 'video,creatorContentType',
         filters: `video==${chunk.join(',')}`,
         sort: '-views',
         maxResults: YT_ANALYTICS_BATCH
@@ -340,7 +348,8 @@ async function primeYouTubeAnalytics(clientId, videoIds) {
       const headers = (data.columnHeaders || []).map(h => h.name);
       for (const row of (data.rows || [])) {
         const rec = Object.fromEntries(headers.map((h, idx) => [h, row[idx]]));
-        if (rec.video) cache.set(rec.video, rec);
+        // Sorted by views, so a video split across types keeps its main one.
+        if (rec.video && !cache.get(rec.video)) cache.set(rec.video, rec);
       }
     } catch (e) {
       console.warn(`[METRIC-SYNC] YouTube Analytics failed for client #${clientId}:`, e.message);
@@ -403,14 +412,12 @@ async function syncYouTubeMetrics(item, metrics) {
 
   updateFields.youtube_published_at = publishedAt;
   updateFields.youtube_duration_seconds = durationSeconds;
-  updateFields.youtube_format = durationSeconds === null
-    ? null
-    : (durationSeconds <= SHORTS_MAX_SECONDS ? 'Short' : 'Long');
   updateFields.youtube_views_per_day = viewsPerDay(metrics.youtube_views, publishedAt);
   updateFields.youtube_like_rate_pct = ratePct(metrics.youtube_likes, metrics.youtube_views);
   updateFields.youtube_comment_rate_pct = ratePct(metrics.youtube_comments, metrics.youtube_views);
 
   const analytics = (await primeYouTubeAnalytics(item.client_id, [videoId])).get(videoId);
+  updateFields.youtube_format = youtubeFormatFor(analytics, item);
   if (analytics) {
     if (Number.isFinite(analytics.estimatedMinutesWatched)) {
       updateFields.youtube_watch_time = Math.round((analytics.estimatedMinutesWatched / 60) * 100) / 100;
