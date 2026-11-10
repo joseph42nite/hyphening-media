@@ -63,6 +63,10 @@ if (!SECRET) {
  */
 function commandFor(job) {
   if (job.audit_type === 'full') return 'audit';
+  // A gap run is the backlinks skill's own gap command, against the competitor
+  // the run names. There is no `backlink-gap` command: sent that, the skill ran a
+  // plain profile review and went looking for competitors itself (run #125).
+  if (job.audit_type === 'backlink_gap') return `backlinks gap ${job.url} https://${job.competitor_domain}`;
   // seo-drift has three sub-commands; the card's job is comparing against the
   // baseline the worker captures (lib/drift.mjs).
   if (job.audit_type === 'drift') return 'drift compare';
@@ -95,10 +99,30 @@ async function log(runId, line) {
  *    curl it is unreliable in a way that asking it to emit one JSON object is
  *    not, and the ads side already proves the worker-signs pattern works.
  */
+/**
+ * What a gap run has to compare and return. The competitor is chosen and
+ * approved in the SEO Monitor, so the skill must not substitute its own; and
+ * the three lists are the point of the run, so they are asked for by name.
+ */
+function gapInstructions(job) {
+  const ours = new URL(job.url).hostname.replace(/^www\./, '');
+  return [
+    `Competitor: **${job.competitor_domain}** (approved in the Ops Center). Compare ${ours} against this domain only — do not look for or substitute other competitors.`,
+    `Use DataForSEO: fetch \`backlinks_referring_domains\` for both ${ours} and ${job.competitor_domain} (or \`backlinks_domain_intersection\`), then compare the two sets.`,
+    'In report_json return:',
+    `- \`competitor\`: "${job.competitor_domain}", with both domains' referring-domain counts`,
+    `- \`gap_domains\`: domains linking to ${job.competitor_domain} but NOT to ${ours}, best first (domain, rank/authority, why it is relevant) — up to 50`,
+    `- \`shared_domains\`: domains linking to both`,
+    `- \`only_ours\`: domains linking only to ${ours}`,
+    'Recommendations should name specific gap domains to approach. If DataForSEO fails for either domain, say so in data_availability and do not invent a list.',
+  ].join('\n');
+}
+
 function buildPrompt(job) {
   return [
     `Use the \`/seo ${commandFor(job)}\` command for **${job.client_name}** (client_id ${job.client_id}).`,
     `Target URL: ${job.url}`,
+    job.audit_type === 'backlink_gap' ? gapInstructions(job) : '',
     job.is_competitor ? 'This is a COMPETITOR research run, not an audit of our own client — do not use any of our own Search Console/GA4 property data for it.' : '',
     !job.is_competitor && job.gsc_property ? `Search Console property: ${job.gsc_property}` : '',
     !job.is_competitor && job.gsc_property ? `Before writing the brief, run \`python3 -W ignore ~/.claude/plugins/cache/agricidaniel-claude-seo/claude-seo/*/scripts/gsc_query.py --property ${job.gsc_property} --days 90 --limit 50 --json\` and use its rows as real Search Console data. If the command errors or returns no rows, say so explicitly in data_availability — do not silently skip it.` : '',
