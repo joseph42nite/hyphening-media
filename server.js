@@ -62,6 +62,7 @@ import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 // Import services
 import { initScheduler } from './src/services/scheduler.js';
 import { attachMacConnector } from './src/services/macConnector.js';
+import { PILLARS_BY_SLUG } from './frontend/src/data/pillarsData.js';
 import { prerenderPath, isKnownPath, NOT_FOUND_HTML, blogPostJsonLd, injectSocialMeta } from './src/services/prerender.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -589,6 +590,38 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
       </main>`;
   }
 
+  // Service + BreadcrumbList JSON-LD for each /capabilities/:slug page (rec 2013).
+  const capabilityJsonLd = (cleanPath, canonicalUrl) => {
+    const m = cleanPath.match(/^\/capabilities\/([^/]+)$/);
+    const p = m && Object.prototype.hasOwnProperty.call(PILLARS_BY_SLUG, m[1]) ? PILLARS_BY_SLUG[m[1]] : null;
+    if (!p) return '';
+    const site = 'https://hypheningmedia.com';
+    const graph = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Service',
+          '@id': `${canonicalUrl}#service`,
+          name: p.title,
+          url: canonicalUrl,
+          description: p.summary,
+          serviceType: p.title,
+          provider: { '@id': `${site}/#organization` },
+          areaServed: { '@type': 'City', name: 'Bengaluru' },
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: `${site}/` },
+            { '@type': 'ListItem', position: 2, name: 'Capabilities', item: `${site}/capabilities` },
+            { '@type': 'ListItem', position: 3, name: p.title, item: canonicalUrl },
+          ],
+        },
+      ],
+    };
+    return `<script type="application/ld+json" id="capability-jsonld">${JSON.stringify(graph).replace(/</g, '\\u003c')}</script>`;
+  };
+
   // SPA fallback — serve index.html for all non-API routes with dynamic canonical injection & 301 trailing slash normalization
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
@@ -642,6 +675,8 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         updatedHtml = injectSocialMeta(updatedHtml, cleanPath, canonicalUrl);
         const crawlerHtml = prerenderPath(cleanPath);
         if (crawlerHtml) updatedHtml = updatedHtml.replace('</body>', `  ${crawlerHtml}\n  </body>`);
+        const capabilityLd = capabilityJsonLd(cleanPath, canonicalUrl);
+        if (capabilityLd) updatedHtml = updatedHtml.replace('</head>', `  ${capabilityLd}\n</head>`);
         // Article/Person JSON-LD for blog posts (recs 1970, 1971).
         const articleJsonLd = blogPostJsonLd(cleanPath);
         if (articleJsonLd) updatedHtml = updatedHtml.replace('</head>', `  ${articleJsonLd}\n</head>`);
