@@ -1,18 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../database.js';
 import {
-  fillMonthlyReport, previousMonth, lastFinishedMonth, monthRange, setReportStatus, MIN_IMPRESSIONS,
+  fillMonthlyReport, previousMonth, nextMonth, lastFinishedMonth, monthRange, setReportStatus, MIN_IMPRESSIONS,
+  refreshMomGrowth, reportHost,
 } from '../services/seoMonthly.js';
 
 // One transaction rolled back at the end, so the local database is untouched.
 beforeAll(() => db.exec('BEGIN'));
 afterAll(() => db.exec('ROLLBACK'));
 
-function makeClient({ gsc = 'sc-domain:example.test', ga4 = 'properties/123' } = {}) {
+function makeClient({ gsc = 'sc-domain:example.test', ga4 = 'properties/123', site = 'https://www.example.test/' } = {}) {
   return db.prepare(`
     INSERT INTO crm_clients (name, client_type, is_active, website_url, gsc_property, ga4_property_id)
-    VALUES (?, 'marketing', 1, 'https://www.example.test/', ?, ?)
-  `).run(`Monthly client ${Math.random()}`, gsc, ga4).lastInsertRowid;
+    VALUES (?, 'marketing', 1, ?, ?, ?)
+  `).run(`Monthly client ${Math.random()}`, site, gsc, ga4).lastInsertRowid;
 }
 
 const row = (clientId, month) =>
@@ -50,6 +51,7 @@ function fakeSources({ failGsc = false } = {}) {
 describe('month helpers', () => {
   it('handles year boundaries and month lengths', () => {
     expect(previousMonth('2026-01')).toBe('2025-12');
+    expect(nextMonth('2026-12')).toBe('2027-01');
     expect(lastFinishedMonth(new Date('2026-12-03T00:30:00Z'))).toBe('2026-11');
     expect(monthRange('2028-02')).toEqual({ since: '2028-02-01', until: '2028-02-29' });
   });
@@ -141,5 +143,77 @@ describe('publishing', () => {
     expect(setReportStatus(id, '2026-10', 'published')).toBe(1);
     expect(visible().sort()).toEqual(['2026-08', '2026-10']);
     expect(() => setReportStatus(id, '2026-10', 'live')).toThrow();
+  });
+});
+
+describe('which site GA4 traffic counts', () => {
+  it('uses the Search Console site, not an ads landing page in website_url', () => {
+    expect(reportHost({ gsc_property: 'https://dentalchemy.in/', website_url: 'https://ads.dentalchemy.in' })).toBe('dentalchemy.in');
+    expect(reportHost({ gsc_property: 'sc-domain:www.Example.test', website_url: null })).toBe('example.test');
+    expect(reportHost({ gsc_property: null, website_url: 'https://www.shop.test/x' })).toBe('shop.test');
+  });
+
+  it('counts only that site, leaving out other sites sharing the tag and localhost', async () => {
+    const id = makeClient({ gsc: 'https://main.test/', site: 'https://ads.main.test' });
+    const sources = {
+      ...fakeSources(),
+      getSessionMonths: async () => [
+        { month: '2026-10', host: 'main.test', channel: 'Organic Search', sessions: 170 },
+        { month: '2026-10', host: 'www.main.test', channel: 'Direct', sessions: 30 },
+        { month: '2026-10', host: 'ads.main.test', channel: 'Paid Search', sessions: 900 },
+        { month: '2026-10', host: 'other-agency.biz', channel: 'Direct', sessions: 10 },
+        { month: '2026-10', host: 'localhost', channel: 'Direct', sessions: 1 },
+      ],
+    };
+    await fillMonthlyReport(id, '2026-10', { sources });
+    expect(row(id, '2026-10').website_traffic).toBe(200);
+  });
+
+  it('leaves traffic empty with a note when GA4 has nothing for the site', async () => {
+    const id = makeClient({ gsc: 'https://main.test/' });
+    const sources = {
+      ...fakeSources(),
+      getSessionMonths: async () => [{ month: '2026-10', host: 'other-agency.biz', channel: 'Direct', sessions: 10 }],
+    };
+    const result = await fillMonthlyReport(id, '2026-10', { sources });
+    expect(row(id, '2026-10').website_traffic).toBeNull();
+    expect(result.notes.join(' ')).toMatch(/GA4 has no sessions for main\.test/);
+  });
+});
+
+describe('month-on-month growth', () => {
+  it('is filled in whatever order the months are filled', async () => {
+    const id = makeClient();
+    // The later month first: no earlier month yet, so no growth.
+    await fillMonthlyReport(id, '2026-10', { sources: fakeSources() });
+    expect(row(id, '2026-10').mom_growth_sessions).toBeNull();
+
+    // Filling September afterwards works out October's growth too.
+    const sept = { ...fakeSources(), getSessionMonths: async () => [{ month: '2026-09', host: 'example.test', channel: 'Direct', sessions: 800 }] };
+    await fillMonthlyReport(id, '2026-09', { sources: sept });
+    expect(row(id, '2026-10').mom_growth_sessions).toBe(0.25);
+  });
+
+  it('covers map views and follows edits to the month before', () => {
+    const id = makeClient({ gsc: null, ga4: null });
+    const ins = db.prepare('INSERT INTO marketing_monthly_report (client_id, month, website_traffic, map_views) VALUES (?, ?, ?, ?)');
+    ins.run(id, '2026-06', 100, 400);
+    ins.run(id, '2026-07', 150, 300);
+    refreshMomGrowth(id, '2026-07');
+    expect(row(id, '2026-07')).toMatchObject({ mom_growth_sessions: 0.5, mom_growth_gmb_views: -0.25 });
+
+    db.prepare("UPDATE marketing_monthly_report SET website_traffic = 50 WHERE client_id = ? AND month = '2026-06'").run(id);
+    refreshMomGrowth(id, '2026-06');
+    expect(row(id, '2026-07').mom_growth_sessions).toBe(2);
+  });
+});
+
+describe('fill record', () => {
+  it('keeps what earlier runs filled when a rerun finds nothing empty', async () => {
+    const id = makeClient();
+    await fillMonthlyReport(id, '2026-10', { sources: fakeSources() });
+    const second = await fillMonthlyReport(id, '2026-10', { sources: fakeSources() });
+    expect(second.filled).toEqual([]);
+    expect(JSON.parse(row(id, '2026-10').auto_sources).filled).toContain('search_clicks');
   });
 });

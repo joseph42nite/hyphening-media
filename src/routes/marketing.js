@@ -13,7 +13,7 @@ import { extractAllPlatformIds } from '../services/linkExtractor.js';
 import { syncSingleContentMetrics } from '../services/metricSyncWorker.js';
 import { estimateBookingRevenue, withEfficiency } from '../services/bookingValue.js';
 import { countableLeadSql } from '../services/leadFilters.js';
-import { fillMonthlyReport, setReportStatus } from '../services/seoMonthly.js';
+import { fillMonthlyReport, setReportStatus, refreshMomGrowth } from '../services/seoMonthly.js';
 
 const router = Router();
 
@@ -1280,37 +1280,16 @@ router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manag
       f, numOrNull(req.body[f], f === 'avg_position' || f === 'avg_rating'),
     ]));
 
-    // Get previous month data for MoM computation
-    const [year, mon] = month.split('-').map(Number);
-    const prevDate = new Date(year, mon - 2, 1);
-    const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-
-    const prevReport = db.prepare(
-      'SELECT website_traffic, map_views FROM marketing_monthly_report WHERE client_id = ? AND month = ?'
-    ).get(req.params.id, prevMonth);
-
-    let mom_growth_sessions = null;
-    let mom_growth_gmb_views = null;
-
-    if (prevReport) {
-      if (prevReport.website_traffic && prevReport.website_traffic > 0 && values.website_traffic) {
-        mom_growth_sessions = ((values.website_traffic - prevReport.website_traffic) / prevReport.website_traffic);
-        mom_growth_sessions = Math.round(mom_growth_sessions * 10000) / 10000;
-      }
-      if (prevReport.map_views && prevReport.map_views > 0 && values.map_views) {
-        mom_growth_gmb_views = ((values.map_views - prevReport.map_views) / prevReport.map_views);
-        mom_growth_gmb_views = Math.round(mom_growth_gmb_views * 10000) / 10000;
-      }
-    }
-
-    const cols = [...MONTHLY_MANUAL_FIELDS, 'mom_growth_sessions', 'mom_growth_gmb_views'];
+    const cols = MONTHLY_MANUAL_FIELDS;
     db.prepare(`
       INSERT INTO marketing_monthly_report (client_id, month, ${cols.join(', ')})
       VALUES (@client_id, @month, ${cols.map(c => '@' + c).join(', ')})
       ON CONFLICT(client_id, month) DO UPDATE SET
         ${cols.map(c => `${c} = excluded.${c}`).join(',\n        ')},
         updated_at = datetime('now')
-    `).run({ client_id: req.params.id, month, ...values, mom_growth_sessions, mom_growth_gmb_views });
+    `).run({ client_id: req.params.id, month, ...values });
+    // Growth for this month and the next, from what is now stored.
+    refreshMomGrowth(Number(req.params.id), month);
 
     const report = db.prepare('SELECT * FROM marketing_monthly_report WHERE client_id = ? AND month = ?')
       .get(req.params.id, month);

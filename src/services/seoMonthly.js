@@ -26,11 +26,13 @@ const TOP_QUERIES = 10;
 
 const defaultSources = { gsc, getSessionMonths };
 
-export function previousMonth(month) {
+function shiftMonth(month, by) {
   const [y, m] = month.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 2, 1));
-  return d.toISOString().slice(0, 7);
+  return new Date(Date.UTC(y, m - 1 + by, 1)).toISOString().slice(0, 7);
 }
+
+export const previousMonth = (month) => shiftMonth(month, -1);
+export const nextMonth = (month) => shiftMonth(month, 1);
 
 /** The month before today's, e.g. on 2026-12-03 → '2026-11'. */
 export function lastFinishedMonth(now = new Date()) {
@@ -47,6 +49,35 @@ const round = (n, places) => (n == null ? null : Math.round(n * 10 ** places) / 
 
 function hostOf(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return null; }
+}
+
+/**
+ * The site the report is about: the one in Search Console. website_url can be
+ * an ads landing page while the main site is elsewhere (DentAlchemy runs
+ * ads.dentalchemy.in until its new site is built), so it is only the fallback.
+ */
+export function reportHost(client) {
+  const p = client.gsc_property || '';
+  if (p.startsWith('sc-domain:')) return p.slice('sc-domain:'.length).toLowerCase().replace(/^www\./, '');
+  return hostOf(p) || hostOf(client.website_url);
+}
+
+const growth = (now, prev) => (now != null && prev > 0 ? round((now - prev) / prev, 4) : null);
+
+/**
+ * Month-on-month growth is worked out from the stored numbers, never typed in,
+ * so it is recalculated for this month and the next whenever a month changes.
+ * That way the order months are filled or edited in does not matter.
+ */
+export function refreshMomGrowth(clientId, month) {
+  const get = db.prepare('SELECT id, website_traffic, map_views FROM marketing_monthly_report WHERE client_id = ? AND month = ?');
+  const set = db.prepare('UPDATE marketing_monthly_report SET mom_growth_sessions = ?, mom_growth_gmb_views = ? WHERE id = ?');
+  for (const m of [month, nextMonth(month)]) {
+    const row = get.get(clientId, m);
+    if (!row) continue;
+    const prev = get.get(clientId, previousMonth(m));
+    set.run(growth(row.website_traffic, prev?.website_traffic), growth(row.map_views, prev?.map_views), row.id);
+  }
 }
 
 /** Search Console numbers for one month, or throws. */
@@ -79,15 +110,17 @@ async function searchConsoleFigures(property, month, sources) {
   };
 }
 
-/** GA4 sessions for the client's own site in that month, or throws. */
-async function ga4Sessions(propertyId, websiteUrl, month, sources) {
+/**
+ * GA4 sessions for the report's site in that month, or throws. One property
+ * can carry other sites too (a landing page, another site sharing the tag,
+ * localhost), so only that host is counted. Nothing for it → null, not a
+ * total of whatever else is in the property.
+ */
+async function ga4Sessions(propertyId, host, month, sources) {
   const rows = (await sources.getSessionMonths(propertyId, monthRange(month))).filter(r => r.month === month);
-  // One property can hold several sites (ads.example.com); count the client's
-  // main host when it appears, everything otherwise.
-  const host = hostOf(websiteUrl);
-  const own = host ? rows.filter(r => r.host.replace(/^www\./, '') === host) : [];
-  const use = own.length ? own : rows;
-  return use.reduce((sum, r) => sum + r.sessions, 0);
+  const own = rows.filter(r => (r.host || '').toLowerCase().replace(/^www\./, '') === host);
+  if (!own.length) return null;
+  return own.reduce((sum, r) => sum + r.sessions, 0);
 }
 
 function countFixesLive(clientId, month) {
@@ -132,7 +165,10 @@ export async function fillMonthlyReport(clientId, month, { sources = defaultSour
     notes.push('GA4 not connected (no property ID saved for this client).');
   } else {
     try {
-      found.website_traffic = await ga4Sessions(client.ga4_property_id, client.website_url, month, sources);
+      const host = reportHost(client);
+      const sessions = host ? await ga4Sessions(client.ga4_property_id, host, month, sources) : null;
+      if (sessions == null) notes.push(`GA4 has no sessions for ${host || 'the client site'} in ${month}.`);
+      else found.website_traffic = sessions;
     } catch (err) {
       notes.push(`GA4 failed: ${err.message}`);
     }
@@ -150,15 +186,11 @@ export async function fillMonthlyReport(clientId, month, { sources = defaultSour
     const filled = Object.keys(found).filter(col => row[col] == null && found[col] != null);
     const updates = Object.fromEntries(filled.map(col => [col, found[col]]));
 
-    const traffic = row.website_traffic ?? updates.website_traffic;
-    if (row.mom_growth_sessions == null && traffic != null) {
-      const prev = db.prepare('SELECT website_traffic FROM marketing_monthly_report WHERE client_id = ? AND month = ?')
-        .get(clientId, previousMonth(month));
-      if (prev?.website_traffic > 0) {
-        updates.mom_growth_sessions = round((traffic - prev.website_traffic) / prev.website_traffic, 4);
-        filled.push('mom_growth_sessions');
-      }
-    }
+    // Keep what earlier runs filled; a rerun that finds nothing empty must not
+    // make the row look hand-typed.
+    let earlier = [];
+    try { earlier = JSON.parse(row.auto_sources || '{}').filled || []; } catch { /* old free text */ }
+    const allFilled = [...new Set([...earlier, ...filled])];
 
     const sets = Object.keys(updates).map(col => `${col} = @${col}`);
     db.prepare(`
@@ -169,8 +201,9 @@ export async function fillMonthlyReport(clientId, month, { sources = defaultSour
         auto_filled_at = datetime('now'),
         updated_at = datetime('now')
       WHERE id = @id
-    `).run({ ...updates, auto_sources: JSON.stringify({ filled, notes }), id: row.id });
+    `).run({ ...updates, auto_sources: JSON.stringify({ filled: allFilled, notes }), id: row.id });
 
+    refreshMomGrowth(clientId, month);
     return filled;
   });
 
