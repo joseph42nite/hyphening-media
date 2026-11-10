@@ -47,7 +47,7 @@ const WORKERS = {
   outreach: { cmd: 'node', args: ['scripts/outreach_worker.mjs', '--once'] },
 };
 
-function runWorker(kind) {
+function runWorker(kind, { sweep = false } = {}) {
   const spec = WORKERS[kind];
   if (!spec) {
     console.error(`[MAC CONNECTOR] Unknown run kind: ${kind}`);
@@ -58,23 +58,37 @@ function runWorker(kind) {
   // for Claude and the Kokoro lock.
   // The same goes for the fix and deploy workers: each drains its whole queue,
   // and two of them at once would fight over the same git worktrees.
-  if (SINGLE_RUN.has(kind) && running.has(kind)) {
-    console.log(`[MAC CONNECTOR] ${kind} worker already running; it will pick the new run up.`);
+  // A sweep never starts a second copy of anything, single-run or not.
+  if ((SINGLE_RUN.has(kind) || sweep) && running.get(kind)) {
+    if (!sweep) console.log(`[MAC CONNECTOR] ${kind} worker already running; it will pick the new run up.`);
     return;
   }
   console.log(`[MAC CONNECTOR] Running ${kind} worker...`);
   const child = spawn(spec.cmd, spec.args, { cwd: REPO_ROOT, stdio: 'inherit' });
-  if (SINGLE_RUN.has(kind)) running.add(kind);
+  running.set(kind, (running.get(kind) || 0) + 1);
   child.on('exit', (code) => {
-    running.delete(kind);
+    running.set(kind, running.get(kind) - 1);
     console.log(`[MAC CONNECTOR] ${kind} worker exited with code ${code}.`);
   });
 }
 
 const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy', 'outreach']);
-const running = new Set();
+const running = new Map(); // kind -> how many are running
 
 let stopping = false;
+
+// Every 10 minutes while connected, start each worker that isn't already
+// running. Workers give up after a few 429s, and the connector otherwise only
+// starts them on connect or on a portal signal: on 09/11/2026 every worker
+// died at 00:55 and nothing ran again until Q stopped the connector at 05:30.
+// Each worker only claims what's queued, so an idle sweep is one cheap call
+// per worker.
+const SWEEP_MS = 10 * 60 * 1000;
+let connected = false;
+setInterval(() => {
+  if (!connected) return;
+  for (const kind of Object.keys(WORKERS)) runWorker(kind, { sweep: true });
+}, SWEEP_MS);
 
 // Heartbeat: a socket killed while the laptop slept (or by a server restart)
 // never fires 'close' on this side, so ping regularly and terminate on a
@@ -106,6 +120,7 @@ function connect() {
 
   socket.on('open', () => {
     console.log('[MAC CONNECTOR] Connected to Ops Center.');
+    connected = true;
     // Catch up anything queued while we were offline.
     runWorker('seo');
     runWorker('ads');
@@ -125,6 +140,7 @@ function connect() {
   });
 
   socket.on('close', () => {
+    connected = false;
     clearInterval(heartbeat);
     if (stopping || retryScheduled) return;
     retryScheduled = true;
