@@ -6,8 +6,8 @@ import { gapSummary } from './outreachShared.js';
 
 /**
  * Manual tasks: every open SEO and ads finding a person has to do by hand, one
- * client at a time, grouped by where the work happens, then Outreach (emails to
- * send, OutreachPanel). Backlinks & off-site opens with which approved
+ * client at a time: Outreach first (emails to send, OutreachPanel), then the
+ * tasks grouped by where the work happens. Backlinks & off-site opens with which approved
  * competitors have had a backlink gap check. Shares the SEO Monitor's client
  * choice. Server side: src/routes/manualTasks.js, src/services/manualTasks.js.
  */
@@ -168,6 +168,13 @@ export default function ManualTasksTab({ clients, showToast, isAdmin }) {
         {data && <div style={{ ...muted, marginTop: '8px' }}>{data.total} open{who !== 'all' ? ` · showing ${areas.reduce((n, a) => n + a.tasks.length, 0)}` : ''}</div>}
       </div>
 
+      {/* Outreach first: its emails are the time-sensitive part (follow-ups after 5 days). */}
+      <OutreachPanel
+        showToast={showToast}
+        clientId={clientId}
+        seoOn={!!activeClients.find(c => String(c.id) === String(clientId))?.seo_enabled}
+      />
+
       {!data && <p style={muted}>Loading…</p>}
       {data && areas.length === 0 && (
         <div style={card}><p style={{ ...muted, margin: 0 }}>Nothing to do by hand here{who !== 'all' ? ' for this person' : ''}. New findings are sorted at night, after the audits.</p></div>
@@ -189,11 +196,6 @@ export default function ManualTasksTab({ clients, showToast, isAdmin }) {
         </div>
       ))}
 
-      <OutreachPanel
-        showToast={showToast}
-        clientId={clientId}
-        seoOn={!!activeClients.find(c => String(c.id) === String(clientId))?.seo_enabled}
-      />
     </div>
   );
 }
