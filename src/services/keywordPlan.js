@@ -124,7 +124,10 @@ export async function refreshKeywords(clientId, { sources = defaultSources, now 
       .map(k => k.keyword);
     // Approved keywords are re-checked too, so their numbers stay current.
     const approved = db.prepare("SELECT keyword FROM seo_keywords WHERE client_id = ? AND status = 'approved'").all(clientId).map(r => r.keyword);
-    const toCheck = [...new Set([...nearMisses, ...approved])].slice(0, 700);
+    // Keywords the night sort took from audit findings ("write about X") get
+    // their numbers here, then pass or leave by the same rules as any idea.
+    const fromAudits = db.prepare("SELECT keyword FROM seo_keywords WHERE client_id = ? AND status = 'candidate' AND source = 'audit'").all(clientId).map(r => r.keyword);
+    const toCheck = [...new Set([...nearMisses, ...approved, ...fromAudits])].slice(0, 700);
     try {
       if (toCheck.length) {
         const r = await sources.dfs('dataforseo_labs/google/keyword_overview/live', { ...INDIA, keywords: toCheck });

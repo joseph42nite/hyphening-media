@@ -26,7 +26,10 @@ function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onF
         </div>
         <div style={{ fontSize: '0.85rem', marginTop: '4px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{task.steps}</div>
         <div style={{ ...muted, marginTop: '4px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <span>From {task.card} · {new Date(task.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</span>
+          <span>
+            {task.keys.length > 1 ? `Raised by ${task.keys.length} audits: ${task.cards.join(', ')}` : `From ${task.card}`}
+            {' · '}{new Date(task.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}
+          </span>
           {task.page_url && (
             <a href={task.page_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
               {task.page_url.replace(/^https?:\/\//, '')} <ExternalLink size={11} />
@@ -129,7 +132,7 @@ export default function ManualTasksTab({ clients, showToast, isAdmin }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div style={{ minWidth: 0 }}>
             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, textTransform: 'uppercase' }}>Manual tasks</h3>
-            <span style={muted}>SEO and ads findings a person has to do: off-site work, Business Profile, Search Console, content, ad accounts, and site changes waiting for your OK. Sorted each night.</span>
+            <span style={muted}>Work a person has to do outside our code: Business Profile, directories and backlinks, GA4 and Search Console settings, ad accounts, the client's team. Plus site changes waiting for your OK. Code changes go to the night fixes, new articles to the Keywords panel, and re-checks run on their own.</span>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <select className="form-control" style={{ ...selectStyle, minWidth: '180px', fontSize: '0.85rem', fontWeight: 600 }} value={clientId} onChange={e => pickClient(e.target.value)}>

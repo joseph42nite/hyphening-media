@@ -224,8 +224,31 @@ export function claimSeoFixBatches(worker = 'mac') {
     const candidates = [...seo, ...ads]
       .sort((x, y) => (y.fix_approved - x.fix_approved) || (PRIORITY_RANK[x.priority] - PRIORITY_RANK[y.priority]))
       .slice(0, TRIAGE_LIMIT);
-    return { batch_id: b.id, night: b.night, client, candidates, max_fixes: NIGHT_FIXES_PER_CLIENT };
+    // Manual-task groups still open for this client, so a new finding asking for
+    // the same thing joins the existing task instead of starting another.
+    const groups = [...new Set(TABLES.flatMap((t) => db.prepare(
+      `SELECT manual_group FROM ${t} WHERE client_id = ? AND status = 'open' AND manual_group IS NOT NULL`,
+    ).all(client.id).map((r) => r.manual_group)))];
+    return { batch_id: b.id, night: b.night, client, candidates, groups, max_fixes: NIGHT_FIXES_PER_CLIENT };
   });
+}
+
+/** What the night worker may answer for each finding (see seo_fix_worker.mjs triagePrompt). */
+const TRIAGES = ['safe', 'needs_007', 'code', 'not_code', 'automatic', 'content', 'already_done'];
+const normKeyword = (k) => String(k || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 80);
+// The worker's name for "the same piece of work" across cards, e.g. 'ga4-internal-filter'.
+const groupSlug = (g) => (String(g || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || null);
+
+function setTriage(table, id, { triage, reason, status, batch, area = null, group = null, note = null, by = null }) {
+  db.prepare(`
+    UPDATE ${table} SET fix_triage = ?, fix_reason = ?, status = ?, fix_batch_id = ?,
+      fix_approved = CASE WHEN ? IN ('completed', 'ignored') THEN 0 ELSE fix_approved END,
+      fixed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE fixed_at END,
+      manual_area = COALESCE(?, manual_area), manual_group = COALESCE(?, manual_group),
+      manual_note = COALESCE(?, manual_note), manual_by = COALESCE(?, manual_by),
+      manual_at = CASE WHEN ? IS NOT NULL THEN datetime('now') ELSE manual_at END
+    WHERE id = ?
+  `).run(triage, reason, status, batch, status, status, area, group, note, by, by, id);
 }
 
 /** The worker's sort of each candidate: { batch_id, results: [{ id, triage, reason }] }. */
@@ -236,25 +259,55 @@ export function submitSeoTriage(payload) {
   let n = 0;
   const apply = db.transaction(() => {
     for (const r of payload.results) {
-      if (!['safe', 'needs_007', 'not_code', 'already_done'].includes(r?.triage)) continue;
+      if (!TRIAGES.includes(r?.triage)) continue;
       const k = parseRecKey(r.id);
       if (!k) continue;
-      const rec = db.prepare(`SELECT id, fix_approved FROM ${k.table} WHERE id = ? AND client_id = ? AND status = 'open'`).get(k.id, batch.client_id);
+      const rec = db.prepare(`SELECT id, client_id, fix_approved FROM ${k.table} WHERE id = ? AND client_id = ? AND status = 'open'`).get(k.id, batch.client_id);
       if (!rec) continue;
+      const reason = String(r.reason || '').slice(0, 400);
       // 007's "Fix tonight" outranks the sort.
-      const triage = rec.fix_approved && r.triage !== 'already_done' ? 'safe' : r.triage;
-      // already_done: the code already does it (often a fix pushed earlier that
-      // nobody marked). Closed here, with what the worker found as the note.
-      const status = triage === 'needs_007' ? 'needs_007' : triage === 'already_done' ? 'completed' : 'open';
-      // Where a not_code finding's work happens, for the Manual tasks tab.
-      const area = triage === 'not_code' && WORKER_AREAS.includes(r.area) ? r.area : null;
-      db.prepare(`
-        UPDATE ${k.table} SET fix_triage = ?, fix_reason = ?, status = ?, fix_batch_id = ?,
-          fix_approved = CASE WHEN ? = 'completed' THEN 0 ELSE fix_approved END,
-          fixed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE fixed_at END,
-          manual_area = COALESCE(?, manual_area)
-        WHERE id = ?
-      `).run(triage, String(r.reason || '').slice(0, 400), status, batch.id, status, status, area, rec.id);
+      if (rec.fix_approved && r.triage !== 'already_done') {
+        setTriage(k.table, rec.id, { triage: 'safe', reason, status: 'open', batch: batch.id });
+        n++;
+        continue;
+      }
+      switch (r.triage) {
+        // A site or app change outside the safe list: 007 decides (Fix tonight).
+        case 'code':
+        case 'needs_007':
+          setTriage(k.table, rec.id, { triage: 'needs_007', reason, status: 'needs_007', batch: batch.id });
+          break;
+        // already_done: the code already does it (often a fix pushed earlier that
+        // nobody marked). Closed here, with what the worker found as the note.
+        case 'already_done':
+          setTriage(k.table, rec.id, { triage: 'already_done', reason, status: 'completed', batch: batch.id });
+          break;
+        // A re-run, re-check or monitoring a card's cadence or an API already does.
+        case 'automatic':
+          setTriage(k.table, rec.id, { triage: 'not_code', reason, status: 'ignored', batch: batch.id, area: 'automatic', note: `Covered automatically: ${reason}`, by: 'night worker' });
+          break;
+        // New content to write: the keyword goes to the Keywords panel, where blog
+        // topics come from (007 approves there). Without a keyword it stays manual.
+        case 'content': {
+          const keyword = normKeyword(r.keyword);
+          if (keyword) {
+            db.prepare("INSERT OR IGNORE INTO seo_keywords (client_id, keyword, source) VALUES (?, ?, 'audit')").run(rec.client_id, keyword);
+            setTriage(k.table, rec.id, { triage: 'not_code', reason, status: 'completed', batch: batch.id, area: 'content', note: `Sent to the Keywords panel as "${keyword}"`, by: 'night worker' });
+          } else {
+            setTriage(k.table, rec.id, { triage: 'not_code', reason, status: 'open', batch: batch.id, area: 'content', group: groupSlug(r.group) });
+          }
+          break;
+        }
+        case 'safe':
+          setTriage(k.table, rec.id, { triage: 'safe', reason, status: 'open', batch: batch.id });
+          break;
+        // Work a person does in an outside account or off the site: Manual tasks.
+        default:
+          setTriage(k.table, rec.id, {
+            triage: 'not_code', reason, status: 'open', batch: batch.id,
+            area: WORKER_AREAS.includes(r.area) ? r.area : null, group: groupSlug(r.group),
+          });
+      }
       n++;
     }
   });

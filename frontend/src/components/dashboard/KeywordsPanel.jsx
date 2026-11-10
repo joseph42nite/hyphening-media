@@ -111,7 +111,7 @@ function KeywordTable({ rows, empty, actions }) {
         <tbody>
           {rows.map(k => (
             <tr key={k.id}>
-              <td style={{ ...cell, overflowWrap: 'anywhere' }}>{k.keyword}{k.source === 'search_console' && <span style={muted}> · near miss</span>}</td>
+              <td style={{ ...cell, overflowWrap: 'anywhere' }}>{k.keyword}{k.source === 'search_console' && <span style={muted}> · near miss</span>}{k.source === 'audit' && <span style={muted}> · from an SEO audit</span>}</td>
               <td style={cell}>{k.search_volume ?? '-'}</td>
               <td style={cell}>{k.difficulty ?? '-'}</td>
               <td style={cell}>{k.intent ?? '-'}</td>

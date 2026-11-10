@@ -102,6 +102,70 @@ describe('night worker sort', () => {
   });
 });
 
+describe('night sort outcomes', () => {
+  function sort(results, clientId) {
+    const batch = db.prepare("INSERT INTO seo_fix_batches (client_id, night, status) VALUES (?, '2026-11-10', 'running')").run(clientId).lastInsertRowid;
+    return submitSeoTriage({ batch_id: batch, results });
+  }
+  const row = (id) => db.prepare('SELECT status, fix_triage, manual_area, manual_group, manual_note FROM seo_recommendations WHERE id = ?').get(id);
+
+  it('code waits for your OK; automatic closes itself; neither is manual', () => {
+    const id = makeClient();
+    const a = seoAudit(id, 'technical');
+    const code = seoRec(id, a);
+    const auto = seoRec(id, a);
+    sort([
+      { id: code, triage: 'code', reason: 'image attributes are in app components' },
+      { id: auto, triage: 'automatic', reason: 'the Technical card re-runs PageSpeed monthly' },
+    ], id);
+    expect(row(code)).toMatchObject({ status: 'needs_007', fix_triage: 'needs_007' });
+    expect(row(auto)).toMatchObject({ status: 'ignored', manual_area: 'automatic' });
+    expect(row(auto).manual_note).toMatch(/Covered automatically/);
+    const list = manual.listManualTasks(id);
+    expect(keysIn(list)).toEqual([String(code)]);
+    expect(list.areas[0].key).toBe('site');
+  });
+
+  it('content with a keyword goes to the Keywords panel; without one it stays manual', () => {
+    const id = makeClient();
+    const a = seoAudit(id, 'local');
+    const withKw = seoRec(id, a);
+    const without = seoRec(id, a);
+    sort([
+      { id: withKw, triage: 'content', keyword: '  Dental Clinic Marketing  Bangalore ', reason: 'case study' },
+      { id: without, triage: 'content', reason: 'needs a plan' },
+    ], id);
+    expect(row(withKw)).toMatchObject({ status: 'completed', manual_area: 'content' });
+    const kw = db.prepare("SELECT source, status FROM seo_keywords WHERE client_id = ? AND keyword = 'dental clinic marketing bangalore'").get(id);
+    expect(kw).toEqual({ source: 'audit', status: 'candidate' });
+    expect(row(without)).toMatchObject({ status: 'open', manual_area: 'content' });
+  });
+
+  it('merges the same work raised by several cards into one task', () => {
+    const id = makeClient();
+    const r1 = seoRec(id, seoAudit(id, 'local'), { priority: 'Low' });
+    const r2 = seoRec(id, seoAudit(id, 'google'), { priority: 'Medium' });
+    const r3 = seoRec(id, seoAudit(id, 'schema'), { priority: 'Low' });
+    sort([r1, r2, r3].map(r => ({ id: r, triage: 'not_code', area: 'google', group: 'GA4 internal traffic filter', reason: 'GA4 setting' })), id);
+    expect(row(r1).manual_group).toBe('ga4-internal-traffic-filter');
+
+    const list = manual.listManualTasks(id);
+    expect(list.total).toBe(1);
+    expect(list.findings).toBe(3);
+    const task = list.areas[0].tasks[0];
+    expect(task.priority).toBe('Medium');
+    expect(task.cards.sort()).toEqual(['google', 'local', 'schema']);
+    expect(manual.countManualTasks(id)).toEqual({ total: 1, high: 0 });
+
+    // One click acts on the whole group.
+    const [first] = manual.assignees();
+    manual.assignManualTask(String(r3), first);
+    expect(db.prepare('SELECT COUNT(*) n FROM seo_recommendations WHERE id IN (?, ?, ?) AND assigned_to = ?').get(r1, r2, r3, first).n).toBe(3);
+    manual.closeManualTask(task.key, 'done', { user: { email: first } });
+    expect([r1, r2, r3].map(r => row(r).status)).toEqual(['completed', 'completed', 'completed']);
+  });
+});
+
 describe('actions', () => {
   it('assigns only to the listed staff', () => {
     const id = makeClient();
