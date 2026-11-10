@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ClientBlogPipelineSection from './ClientBlogPipelineSection.jsx';
+import GoogleAccessCard from '../GoogleAccessCard.jsx';
 
 const EMPTY_VENUE_FIELDS = {
   venue_name: '', venue_address: '', venue_city: '', venue_map_link: '',
@@ -962,6 +963,8 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
                 <input type="text" className="form-control" placeholder="e.g. 2x/week, 70% educational / 30% promo" value={onboardingForm.brand_publishing_cadence} onChange={e => setOnboardingForm({ ...onboardingForm, brand_publishing_cadence: e.target.value })} />
               </div>
             </div>
+
+            <GoogleAccessCard basePath={`/api/clients/${onboardingClient.id}/google-access`} variant="admin" showToast={showToast} />
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
               <button type="button" className="btn btn-primary" disabled={onboardingSaving} onClick={saveOnboarding}>

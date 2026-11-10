@@ -9,6 +9,7 @@ import { runDailyAdsWatch, runWeeklyAdsSweep } from './adsScheduler.js';
 import { syncAllClients } from './adsSyncWorker.js';
 import { getMode } from './automationMode.js';
 import { runMonthEnd } from './seoMonthly.js';
+import { runMonthlyKeywords } from './keywordPlan.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +79,15 @@ export function initScheduler() {
     if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') return;
     console.log('[SCHEDULER] Running month-end SEO report fill...');
     runMonthEnd().catch(err => console.error('[SCHEDULER] SEO monthly fill failed:', err.message));
+  }, { timezone: 'Asia/Kolkata' });
+
+  // Monthly keyword check — 07:00 IST on the 4th, the day after the report, so
+  // positions use the same finished month. Scores candidates for every
+  // marketing client; 007 approves them in the Blog Monitor.
+  cron.schedule('0 7 4 * *', () => {
+    if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') return;
+    console.log('[SCHEDULER] Running monthly keyword check...');
+    runMonthlyKeywords().catch(err => console.error('[SCHEDULER] Keyword check failed:', err.message));
   }, { timezone: 'Asia/Kolkata' });
 
   // Clean expired sessions — daily at 3 AM

@@ -8,7 +8,6 @@
 import db from '../../database.js';
 import {
   claimBlogRuns,
-  addBlogTopics,
   queueBlogRuns,
   listBlogRunsForAgents,
   getBlogRunForAgent,
@@ -31,11 +30,16 @@ export function handleClaimBlogRuns(payload) {
   return { success: true, summary: `Claimed ${runs.length} blog run(s)`, data: { runs } };
 }
 
-/** A bot loads a client's approved calendar: { client_id, topics: [{ topic, target_keyword?, planned_for?, notes? }] }. */
-export function handleAddBlogTopics(payload) {
-  const result = addBlogTopics(parseInt(payload?.client_id, 10), payload?.topics, payload?.created_by || 'agent');
-  if (result.error) return { success: false, summary: result.error };
-  return { success: true, summary: `Added ${result.ids.length} blog topic(s)`, data: { ids: result.ids } };
+/**
+ * Bots no longer add blog topics. Every topic now starts as a keyword checked
+ * against real search data (src/services/keywordPlan.js) and approved by 007 in
+ * the Blog Monitor, so all clients go through the same loop.
+ */
+export function handleAddBlogTopics() {
+  return {
+    success: false,
+    summary: 'Blog topics now come only from approved keywords: 007 approves them in the Blog Monitor\'s Keywords panel, which adds the topic. Suggest keywords to 007 instead.',
+  };
 }
 
 /**

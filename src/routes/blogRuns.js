@@ -15,6 +15,7 @@ import {
   getRunRow, serializeRun, queueBlogRuns, approveBlogRun, approveAllReady, retryPublish,
   rejectBlogRun, addBlogTopics, blogRunSummary, sendBlogRunToClient, blogOutlook,
 } from '../services/blogRuns.js';
+import { refreshKeywords, approveKeyword, rejectKeyword, nicheKeywords } from '../services/keywordPlan.js';
 
 const router = Router();
 router.use(authenticate);
@@ -136,6 +137,65 @@ router.delete('/topics/:id', authorize('admin'), (req, res) => {
   const result = db.prepare("DELETE FROM blog_topics WHERE id = ? AND status IN ('planned', 'skipped')").run(req.params.id);
   if (result.changes === 0) return res.status(409).json({ error: 'Only planned or skipped topics can be deleted' });
   res.json({ success: true });
+});
+
+// ---------------------------------------------------------------- keywords
+// Every blog topic starts here: src/services/keywordPlan.js.
+
+/**
+ * GET /api/blog-runs/keywords?client_id= — candidates and approved keywords,
+ * the onboarding niche keywords used as seeds, and the auto-approve setting.
+ */
+router.get('/keywords', authorize('admin'), (req, res) => {
+  const clientId = parseInt(req.query.client_id, 10);
+  if (!clientId) return res.status(400).json({ error: 'client_id is required' });
+  const keywords = db.prepare(`
+    SELECT * FROM seo_keywords WHERE client_id = ? AND status <> 'rejected'
+    ORDER BY status = 'candidate', score DESC
+  `).all(clientId);
+  const client = db.prepare('SELECT brand_niche_keywords, keywords_auto_approve FROM crm_clients WHERE id = ?').get(clientId);
+  res.json({ keywords, seeds: nicheKeywords(client?.brand_niche_keywords), auto_approve: client?.keywords_auto_approve || 0 });
+});
+
+/** PUT /api/blog-runs/keywords/settings — { client_id, auto_approve } keywords a month that become topics on their own. */
+router.put('/keywords/settings', authorize('admin'), (req, res) => {
+  const n = parseInt(req.body?.auto_approve, 10);
+  if (!(n >= 0 && n <= 10)) return res.status(400).json({ error: 'auto_approve must be 0-10' });
+  const changed = db.prepare('UPDATE crm_clients SET keywords_auto_approve = ? WHERE id = ?').run(n, parseInt(req.body?.client_id, 10)).changes;
+  if (!changed) return res.status(404).json({ error: 'Client not found' });
+  logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'update', entityType: 'keywords_auto_approve', entityId: req.body.client_id, diff: { auto_approve: n }, ip: req.ip });
+  res.json({ auto_approve: n });
+});
+
+/** POST /api/blog-runs/keywords/refresh — { client_id } runs the monthly check now. */
+router.post('/keywords/refresh', authorize('admin'), async (req, res) => {
+  try {
+    const result = await refreshKeywords(parseInt(req.body?.client_id, 10));
+    logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'refresh', entityType: 'seo_keywords', diff: result, ip: req.ip });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/** POST /api/blog-runs/keywords/:id/approve — makes it the client's next blog topic. */
+router.post('/keywords/:id/approve', authorize('admin'), (req, res) => {
+  try {
+    const topicId = approveKeyword(parseInt(req.params.id, 10), req.user.email);
+    logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'approve', entityType: 'seo_keyword', entityId: req.params.id, diff: { topic_id: topicId }, ip: req.ip });
+    res.json({ topic_id: topicId });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/keywords/:id/reject', authorize('admin'), (req, res) => {
+  try {
+    rejectKeyword(parseInt(req.params.id, 10), req.user.email);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // ---------------------------------------------------------------- one run

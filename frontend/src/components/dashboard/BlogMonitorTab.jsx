@@ -5,6 +5,7 @@ import BlogRunRow from './BlogRunRow.jsx';
 import BlogRunDrawer from './BlogRunDrawer.jsx';
 import BlogComingUp from './BlogComingUp.jsx';
 import BlogTopicsPanel from './BlogTopicsPanel.jsx';
+import KeywordsPanel from './KeywordsPanel.jsx';
 import { api, card, muted } from './blogMonitorShared.js';
 
 /**
@@ -20,7 +21,7 @@ import { api, card, muted } from './blogMonitorShared.js';
 const VIEWS = [
   { id: 'approve', label: 'To approve' },
   { id: 'coming', label: 'Coming up' },
-  { id: 'topics', label: 'Topics' },
+  { id: 'topics', label: 'Keywords & topics' },
   { id: 'history', label: 'History' },
 ];
 const RECENT_FAIL_HOURS = 72;
@@ -40,6 +41,7 @@ const tabStyle = (active) => ({
 export default function BlogMonitorTab({ showToast }) {
   const [view, setView] = useState('approve');
   const [clientFilter, setClientFilter] = useState(null);
+  const [topicsVersion, setTopicsVersion] = useState(0);
   const [runs, setRuns] = useState([]);
   const [history, setHistory] = useState([]);
   const [outlook, setOutlook] = useState([]);
@@ -207,7 +209,12 @@ export default function BlogMonitorTab({ showToast }) {
 
       {view === 'topics' && (clientFilter == null
         ? <div style={card}><p style={{ ...muted, margin: 0 }}>Pick a client above to see and edit its topics.</p></div>
-        : <BlogTopicsPanel key={clientFilter} clientId={clientFilter} clientName={clients.find(c => c.id === clientFilter)?.name} showToast={showToast} onChanged={loadOutlook} />)}
+        : (
+          <>
+            <KeywordsPanel key={`k${clientFilter}`} clientId={clientFilter} clientName={clients.find(c => c.id === clientFilter)?.name} showToast={showToast} onApproved={() => { setTopicsVersion(v => v + 1); loadOutlook(); }} />
+            <BlogTopicsPanel key={`${clientFilter}-${topicsVersion}`} clientId={clientFilter} clientName={clients.find(c => c.id === clientFilter)?.name} showToast={showToast} onChanged={loadOutlook} />
+          </>
+        ))}
 
       {view === 'history' && (
         <div style={card}>

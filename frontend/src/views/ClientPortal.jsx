@@ -10,6 +10,7 @@ import { API_BASE } from '../api.js';
 import logoImg from '../assets/logo.png';
 import SEOHead from '../components/SEOHead.jsx';
 import PortalBlogReviews from '../components/PortalBlogReviews.jsx';
+import GoogleAccessCard from '../components/GoogleAccessCard.jsx';
 
 const PRESET_REASON_OPTIONS = [
   'Out of Budget',
@@ -3490,6 +3491,8 @@ export default function ClientPortal({ showToast }) {
                 <CheckCircle size={14} /> {onboardingSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
+
+            <GoogleAccessCard basePath={`/api/portal/${token}/google-access`} variant="portal" showToast={showToast} />
 
             {/* Audience & Positioning */}
             <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>

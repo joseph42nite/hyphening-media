@@ -17,6 +17,7 @@ import { ONBOARDING_FIELDS, ONBOARDING_JSON_FIELDS, parseJsonArrayInput } from '
 import { PREFERENCE_FIELDS, validatePreferenceInput } from '../services/blogPipeline.js';
 import { serializeRun, clientApproveBlogRun, rejectBlogRun } from '../services/blogRuns.js';
 import { markdownToHtml } from '../services/markdown.js';
+import { getGoogleAccess, checkGoogleAccess, markGbpInviteSent } from '../services/googleAccess.js';
 
 const router = Router();
 
@@ -1282,6 +1283,39 @@ router.put('/:token/onboarding', portalAuth, (req, res) => {
     res.json({ success: true, ...updated });
   } catch (err) {
     console.error('[PORTAL] Save onboarding error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Google access step of onboarding (src/services/googleAccess.js): what to
+ * share with us, a check button, and the Business Profile invite.
+ */
+router.get('/:token/google-access', portalAuth, (req, res) => {
+  try {
+    res.json(getGoogleAccess(req.portalClient.id));
+  } catch (err) {
+    console.error('[PORTAL] Google access error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:token/google-access/check', portalAuth, async (req, res) => {
+  try {
+    const result = await checkGoogleAccess(req.portalClient.id, { ga4_property_id: req.body?.ga4_property_id });
+    logAction({ action: 'check', entityType: 'google_access', entityId: req.portalClient.id, diff: { search_console: result.search_console.ok, ga4: result.ga4.ok, by: 'client portal' }, ip: req.ip });
+    res.json(result);
+  } catch (err) {
+    console.error('[PORTAL] Google access check error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:token/google-access/gbp-invite', portalAuth, (req, res) => {
+  try {
+    res.json(markGbpInviteSent(req.portalClient.id));
+  } catch (err) {
+    console.error('[PORTAL] GBP invite error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

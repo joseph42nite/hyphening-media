@@ -14,6 +14,7 @@ import {
   PIPELINE_FIELDS, PREFERENCE_FIELDS, validatePipelineInput, validateCredentialInput,
   saveCredential, getCredentialStatus, testCredential, buildBlogConfig, KeyMissingError,
 } from '../services/blogPipeline.js';
+import { getGoogleAccess, checkGoogleAccess, markGbpInviteSent } from '../services/googleAccess.js';
 
 const router = Router();
 
@@ -510,6 +511,36 @@ router.put('/:id/onboarding', authorize('admin'), (req, res) => {
   } catch (err) {
     console.error('[CLIENTS] Save onboarding error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Google access, the same step the client sees in their portal
+ * (src/services/googleAccess.js), for 007 to check or finish on their behalf.
+ */
+router.get('/:id/google-access', authorize('admin'), (req, res) => {
+  try {
+    res.json(getGoogleAccess(Number(req.params.id)));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+router.post('/:id/google-access/check', authorize('admin'), async (req, res) => {
+  try {
+    const result = await checkGoogleAccess(Number(req.params.id), { ga4_property_id: req.body?.ga4_property_id });
+    logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'check', entityType: 'google_access', entityId: req.params.id, diff: { search_console: result.search_console.ok, ga4: result.ga4.ok }, ip: req.ip });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/:id/google-access/gbp-invite', authorize('admin'), (req, res) => {
+  try {
+    res.json(markGbpInviteSent(Number(req.params.id)));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
   }
 });
 

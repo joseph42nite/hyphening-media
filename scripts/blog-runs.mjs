@@ -10,13 +10,13 @@
  *   node scripts/blog-runs.mjs show <run_id>               # one draft in full, for review
  *   node scripts/blog-runs.mjs review <run_id> <approve|reject|needs-007> "<why>"   # Vesper
  *   node scripts/blog-runs.mjs retry <run_id>              # Q: put a failed run's topic back in tonight's queue
- *   node scripts/blog-runs.mjs topics <client_id> <file.json>  # Vesper: load an approved calendar
  *
  * Who is calling goes into the record: set BOT_NAME (e.g. BOT_NAME=Vesper).
  * Nothing here approves or publishes; that stays with 007 in the Blog Monitor.
+ * Topics are not loaded from here any more: they come from keywords 007
+ * approves in the Blog Monitor (src/services/keywordPlan.js).
  */
 
-import { readFile } from 'fs/promises';
 import { hook } from './lib/hook.mjs';
 
 const BY = process.env.BOT_NAME || 'agent';
@@ -29,7 +29,7 @@ const line = (r) => `#${r.id} ${r.status.toUpperCase()} · ${r.client_name} · $
   + (r.reject_reason ? `\n    sent back: ${r.reject_reason}` : '')
   + (r.blockers?.length ? `\n    problems: ${r.blockers.join(' | ')}` : '');
 
-const USAGE = 'usage: blog-runs.mjs start | list [statuses] [hours] | show <id> | review <id> <approve|reject|needs-007> "<why>" | retry <id> | topics <client_id> <file.json>';
+const USAGE = 'usage: blog-runs.mjs start | list [statuses] [hours] | show <id> | review <id> <approve|reject|needs-007> "<why>" | retry <id>';
 
 async function main() {
   const [cmd, a, b, ...rest] = process.argv.slice(2);
@@ -67,12 +67,6 @@ async function main() {
     }
     case 'retry': {
       const r = await hook('retry_blog_run', { run_id: parseInt(a, 10), by: BY });
-      console.log(r.message);
-      return;
-    }
-    case 'topics': {
-      const topics = JSON.parse(await readFile(b, 'utf8'));
-      const r = await hook('add_blog_topics', { client_id: parseInt(a, 10), topics, created_by: BY });
       console.log(r.message);
       return;
     }

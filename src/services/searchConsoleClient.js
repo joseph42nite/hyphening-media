@@ -34,6 +34,15 @@ async function searchAnalytics(property, body) {
   return json.rows || [];
 }
 
+/** Every property the service account can read: [{ siteUrl, permissionLevel }]. */
+export async function listSites() {
+  const token = await getAccessToken(SCOPE);
+  const res = await fetch('https://searchconsole.googleapis.com/webmasters/v3/sites', { headers: { Authorization: `Bearer ${token}` } });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Search Console ${res.status}: ${json?.error?.message || res.statusText}`);
+  return json.siteEntry || [];
+}
+
 /** Totals for a date range: { clicks, impressions, position }. */
 export async function getTotals(property, { since, until }) {
   const rows = await searchAnalytics(property, { startDate: since, endDate: until, dataState: 'final' });
