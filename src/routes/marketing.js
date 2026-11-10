@@ -13,6 +13,7 @@ import { extractAllPlatformIds } from '../services/linkExtractor.js';
 import { syncSingleContentMetrics } from '../services/metricSyncWorker.js';
 import { estimateBookingRevenue, withEfficiency } from '../services/bookingValue.js';
 import { countableLeadSql } from '../services/leadFilters.js';
+import { fillMonthlyReport, setReportStatus } from '../services/seoMonthly.js';
 
 const router = Router();
 
@@ -1250,19 +1251,34 @@ router.get('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manage
   }
 });
 
+// Columns the Add/Edit modal owns. Everything else in the row (Search Console
+// queries, fixes live, the old on-page/DA/keyword cells kept for history) is
+// left alone by a manual save, so editing a draft never wipes what the
+// month-end job filled in.
+const MONTHLY_MANUAL_FIELDS = [
+  'search_clicks', 'search_impressions', 'avg_position', 'website_traffic',
+  'gmb_views', 'map_views', 'gmb_clicks', 'calls', 'directions', 'reviews', 'avg_rating', 'blogs',
+];
+const MONTH_RE = /^\d{4}-\d{2}$/;
+
+function numOrNull(v, float = false) {
+  if (v === '' || v == null) return null;
+  const n = float ? parseFloat(v) : parseInt(v, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * POST /api/clients/:id/marketing/monthly
  * Create/update monthly report with auto-computed MoM growth.
  */
 router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
   try {
-    const { 
-      month, website_clicks, website_traffic, gmb_views, map_views, gmb_clicks,
-      on_page_score, off_page, blogs, calls, directions, reviews, avg_rating,
-      top_keywords, da, ai_overview_visible 
-    } = req.body;
+    const { month } = req.body;
+    if (!month || !MONTH_RE.test(month)) return res.status(400).json({ error: 'Month (YYYY-MM) is required' });
 
-    if (!month) return res.status(400).json({ error: 'Month (YYYY-MM) is required' });
+    const values = Object.fromEntries(MONTHLY_MANUAL_FIELDS.map(f => [
+      f, numOrNull(req.body[f], f === 'avg_position' || f === 'avg_rating'),
+    ]));
 
     // Get previous month data for MoM computation
     const [year, mon] = month.split('-').map(Number);
@@ -1277,64 +1293,24 @@ router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manag
     let mom_growth_gmb_views = null;
 
     if (prevReport) {
-      if (prevReport.website_traffic && prevReport.website_traffic > 0 && website_traffic) {
-        mom_growth_sessions = ((website_traffic - prevReport.website_traffic) / prevReport.website_traffic);
+      if (prevReport.website_traffic && prevReport.website_traffic > 0 && values.website_traffic) {
+        mom_growth_sessions = ((values.website_traffic - prevReport.website_traffic) / prevReport.website_traffic);
         mom_growth_sessions = Math.round(mom_growth_sessions * 10000) / 10000;
       }
-      if (prevReport.map_views && prevReport.map_views > 0 && map_views) {
-        mom_growth_gmb_views = ((map_views - prevReport.map_views) / prevReport.map_views);
+      if (prevReport.map_views && prevReport.map_views > 0 && values.map_views) {
+        mom_growth_gmb_views = ((values.map_views - prevReport.map_views) / prevReport.map_views);
         mom_growth_gmb_views = Math.round(mom_growth_gmb_views * 10000) / 10000;
       }
     }
 
-    // Upsert
+    const cols = [...MONTHLY_MANUAL_FIELDS, 'mom_growth_sessions', 'mom_growth_gmb_views'];
     db.prepare(`
-      INSERT INTO marketing_monthly_report (
-        client_id, month, website_clicks, website_traffic, gmb_views, map_views, gmb_clicks,
-        on_page_score, off_page, blogs, calls, directions, reviews, avg_rating,
-        top_keywords, da, mom_growth_sessions, mom_growth_gmb_views, ai_overview_visible
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO marketing_monthly_report (client_id, month, ${cols.join(', ')})
+      VALUES (@client_id, @month, ${cols.map(c => '@' + c).join(', ')})
       ON CONFLICT(client_id, month) DO UPDATE SET
-        website_clicks = excluded.website_clicks,
-        website_traffic = excluded.website_traffic,
-        gmb_views = excluded.gmb_views,
-        map_views = excluded.map_views,
-        gmb_clicks = excluded.gmb_clicks,
-        on_page_score = excluded.on_page_score,
-        off_page = excluded.off_page,
-        blogs = excluded.blogs,
-        calls = excluded.calls,
-        directions = excluded.directions,
-        reviews = excluded.reviews,
-        avg_rating = excluded.avg_rating,
-        top_keywords = excluded.top_keywords,
-        da = excluded.da,
-        mom_growth_sessions = excluded.mom_growth_sessions,
-        mom_growth_gmb_views = excluded.mom_growth_gmb_views,
-        ai_overview_visible = excluded.ai_overview_visible,
+        ${cols.map(c => `${c} = excluded.${c}`).join(',\n        ')},
         updated_at = datetime('now')
-    `).run(
-      req.params.id,
-      month,
-      website_clicks || null,
-      website_traffic || null,
-      gmb_views || null,
-      map_views || null,
-      gmb_clicks || null,
-      on_page_score || null,
-      off_page || null,
-      blogs || null,
-      calls || null,
-      directions || null,
-      reviews || null,
-      avg_rating || null,
-      top_keywords || null,
-      da || null,
-      mom_growth_sessions,
-      mom_growth_gmb_views,
-      ai_overview_visible || 'No'
-    );
+    `).run({ client_id: req.params.id, month, ...values, mom_growth_sessions, mom_growth_gmb_views });
 
     const report = db.prepare('SELECT * FROM marketing_monthly_report WHERE client_id = ? AND month = ?')
       .get(req.params.id, month);
@@ -1345,17 +1321,58 @@ router.post('/:id/marketing/monthly', authorize('admin', 'ops_social_media_manag
       action: 'upsert',
       entityType: 'monthly_report',
       entityId: report.id,
-      diff: { 
-        month, website_clicks, website_traffic, gmb_views, map_views, gmb_clicks,
-        on_page_score, off_page, blogs, calls, directions, reviews, avg_rating,
-        top_keywords, da, ai_overview_visible
-      },
+      diff: { month, ...values },
       ip: req.ip,
     });
 
     res.json(report);
   } catch (err) {
     console.error('[MARKETING] Monthly create error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/clients/:id/marketing/monthly/:month/autofill
+ * Runs the month-end fill now for one month (Search Console, GA4, our counts).
+ * Fills empty cells only and leaves the row as a draft.
+ */
+router.post('/:id/marketing/monthly/:month/autofill', authorize('admin', 'ops_social_media_manager'), async (req, res) => {
+  try {
+    if (!MONTH_RE.test(req.params.month)) return res.status(400).json({ error: 'Month must be YYYY-MM' });
+    const result = await fillMonthlyReport(Number(req.params.id), req.params.month);
+    const report = db.prepare('SELECT * FROM marketing_monthly_report WHERE client_id = ? AND month = ?')
+      .get(req.params.id, req.params.month);
+    logAction({
+      actorId: req.user.id, actorEmail: req.user.email, action: 'autofill', entityType: 'monthly_report',
+      entityId: report?.id, diff: result, ip: req.ip,
+    });
+    res.json({ ...result, report });
+  } catch (err) {
+    console.error('[MARKETING] Monthly autofill error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/clients/:id/marketing/monthly/:month/status  { status: 'draft' | 'published' }
+ * Publishing is what makes a month visible in the client portal.
+ */
+router.post('/:id/marketing/monthly/:month/status', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    const { status } = req.body || {};
+    if (!['draft', 'published'].includes(status)) return res.status(400).json({ error: 'status must be draft or published' });
+    const changed = setReportStatus(req.params.id, req.params.month, status);
+    if (!changed) return res.status(404).json({ error: 'No report for that month' });
+    const report = db.prepare('SELECT * FROM marketing_monthly_report WHERE client_id = ? AND month = ?')
+      .get(req.params.id, req.params.month);
+    logAction({
+      actorId: req.user.id, actorEmail: req.user.email, action: status === 'published' ? 'publish' : 'unpublish',
+      entityType: 'monthly_report', entityId: report.id, diff: { month: req.params.month, status }, ip: req.ip,
+    });
+    res.json(report);
+  } catch (err) {
+    console.error('[MARKETING] Monthly status error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -256,40 +256,10 @@ export function handleCreateSeoAudit(payload) {
     }
   }
 
-  // Sync overall scores with marketing_monthly_report (use first result's
-  // scores). Skipped for a failed run: its scores are zeros standing in for
-  // "no data", and writing them would silently overwrite a real score in the
-  // client's monthly report with a 0 caused by a rate limit.
-  if (!auditFailed) {
-    const firstResult = results[0];
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const existingReport = db.prepare('SELECT id FROM marketing_monthly_report WHERE client_id = ? AND month = ?').get(payload.client_id, currentMonth);
-
-    if (existingReport) {
-      db.prepare(`
-        UPDATE marketing_monthly_report SET
-          on_page_score = COALESCE(?, on_page_score),
-          da = COALESCE(?, da),
-          updated_at = datetime('now')
-        WHERE id = ?
-      `).run(
-        firstResult.on_page_score ?? firstResult.health_score ?? null,
-        firstResult.backlinks_score ?? null,
-        existingReport.id
-      );
-    } else {
-      db.prepare(`
-        INSERT INTO marketing_monthly_report (
-          client_id, month, on_page_score, da
-        ) VALUES (?, ?, ?, ?)
-      `).run(
-        payload.client_id,
-        currentMonth,
-        firstResult.on_page_score ?? firstResult.health_score ?? null,
-        firstResult.backlinks_score ?? null
-      );
-    }
-  }
+  // Audits no longer write into marketing_monthly_report. They used to copy
+  // their score into on_page_score and backlinks_score into "DA", which is not
+  // Domain Authority. The monthly report is filled at month end from Search
+  // Console and GA4 instead (src/services/seoMonthly.js).
 
   logAction({
     action: 'create',

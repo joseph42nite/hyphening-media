@@ -935,7 +935,7 @@ router.get('/:token/seo-reports', portalAuth, (req, res) => {
     const reports = db.prepare(`
       SELECT *
       FROM marketing_monthly_report
-      WHERE client_id = ?
+      WHERE client_id = ? AND status = 'published'
       ORDER BY month DESC
     `).all(req.portalClient.id);
 

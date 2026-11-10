@@ -8,6 +8,7 @@ import { runDailyCommentSync } from './dailyCommentSync.js';
 import { runDailyAdsWatch, runWeeklyAdsSweep } from './adsScheduler.js';
 import { syncAllClients } from './adsSyncWorker.js';
 import { getMode } from './automationMode.js';
+import { runMonthEnd } from './seoMonthly.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,6 +69,16 @@ export function initScheduler() {
   // routine in OpenMausBot starts it (queue_blog_runs webhook), so the night
   // is run, and visible, by the bots. The Blog fleet's Auto/Manual switch
   // still decides whether that start queues anything.
+
+  // Month-end SEO report — 06:00 IST on the 3rd, for the month before. Not the
+  // 1st: Search Console's final numbers lag 2-3 days. Plain API calls, no AI.
+  // Rows are left as drafts for someone to publish to the portal. Only the
+  // first pm2 instance runs it, so cluster mode does not repeat the API calls.
+  cron.schedule('0 6 3 * *', () => {
+    if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') return;
+    console.log('[SCHEDULER] Running month-end SEO report fill...');
+    runMonthEnd().catch(err => console.error('[SCHEDULER] SEO monthly fill failed:', err.message));
+  }, { timezone: 'Asia/Kolkata' });
 
   // Clean expired sessions — daily at 3 AM
   cron.schedule('0 3 * * *', () => {

@@ -5,6 +5,49 @@ import ContentModal from './ContentModal.jsx';
 import AllClientsMarketingDashboard from './AllClientsMarketingDashboard.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from './contentFormHelper.js';
 
+// Columns the monthly report modal edits; the rest of the row is filled by the
+// month-end job (src/services/seoMonthly.js).
+const MONTHLY_FORM_EMPTY = {
+  month: '', search_clicks: '', search_impressions: '', avg_position: '', website_traffic: '',
+  gmb_views: '', map_views: '', gmb_clicks: '', calls: '', directions: '', reviews: '', avg_rating: '', blogs: ''
+};
+
+function lastFinishedMonth() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function parseJson(text) {
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+const fmtNum = (v) => (v != null ? Number(v).toLocaleString() : '-');
+
+function Growth({ value }) {
+  if (value == null) return '-';
+  return (
+    <span style={{ color: value >= 0 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
+      {value >= 0 ? '+' : ''}{(value * 100).toFixed(2)}%
+    </span>
+  );
+}
+
+// Lower position is better, so a drop in the number is a move up.
+function PositionChange({ now, prev }) {
+  if (now == null) return null;
+  if (prev == null) return <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>new</span>;
+  const diff = Math.round((prev - now) * 10) / 10;
+  if (diff === 0) return null;
+  return (
+    <span style={{ color: diff > 0 ? '#065f46' : '#991b1b', fontWeight: 600 }}>
+      {diff > 0 ? '▲' : '▼'}{Math.abs(diff)}
+    </span>
+  );
+}
+
 export default function MarketingDataTab({
   auth,
   clients,
@@ -55,10 +98,8 @@ export default function MarketingDataTab({
   // Modal local states (Monthly Report)
   const [showMonthlyModal, setShowMonthlyModal] = useState(false);
   const [editingMonthly, setEditingMonthly] = useState(null);
-  const [monthlyFormData, setMonthlyFormData] = useState({
-    month: '', website_clicks: '', website_traffic: '', gmb_views: '', map_views: '', gmb_clicks: '', on_page_score: '', off_page: '',
-    blogs: '', calls: '', directions: '', reviews: '', avg_rating: '', top_keywords: '', da: '', ai_overview_visible: 'No'
-  });
+  const [monthlyFormData, setMonthlyFormData] = useState({ ...MONTHLY_FORM_EMPTY });
+  const [monthlyBusy, setMonthlyBusy] = useState(null);
 
   // Extract available months from content rows
   const availableContentMonths = useMemo(() => {
@@ -381,33 +422,10 @@ export default function MarketingDataTab({
 
   // Monthly Report CRUD Handlers
   const openMonthlyModal = (report = null) => {
-    if (report) {
-      setEditingMonthly(report);
-      setMonthlyFormData({
-        month: report.month || '',
-        website_clicks: report.website_clicks !== null && report.website_clicks !== undefined ? String(report.website_clicks) : '',
-        website_traffic: report.website_traffic !== null && report.website_traffic !== undefined ? String(report.website_traffic) : '',
-        gmb_views: report.gmb_views !== null && report.gmb_views !== undefined ? String(report.gmb_views) : '',
-        map_views: report.map_views !== null && report.map_views !== undefined ? String(report.map_views) : '',
-        gmb_clicks: report.gmb_clicks !== null && report.gmb_clicks !== undefined ? String(report.gmb_clicks) : '',
-        on_page_score: report.on_page_score !== null && report.on_page_score !== undefined ? String(report.on_page_score) : '',
-        off_page: report.off_page !== null && report.off_page !== undefined ? String(report.off_page) : '',
-        blogs: report.blogs !== null && report.blogs !== undefined ? String(report.blogs) : '',
-        calls: report.calls !== null && report.calls !== undefined ? String(report.calls) : '',
-        directions: report.directions !== null && report.directions !== undefined ? String(report.directions) : '',
-        reviews: report.reviews !== null && report.reviews !== undefined ? String(report.reviews) : '',
-        avg_rating: report.avg_rating !== null && report.avg_rating !== undefined ? String(report.avg_rating) : '',
-        top_keywords: report.top_keywords || '',
-        da: report.da !== null && report.da !== undefined ? String(report.da) : '',
-        ai_overview_visible: report.ai_overview_visible || 'No'
-      });
-    } else {
-      setEditingMonthly(null);
-      setMonthlyFormData({
-        month: '', website_clicks: '', website_traffic: '', gmb_views: '', map_views: '', gmb_clicks: '', on_page_score: '', off_page: '',
-        blogs: '', calls: '', directions: '', reviews: '', avg_rating: '', top_keywords: '', da: '', ai_overview_visible: 'No'
-      });
-    }
+    setEditingMonthly(report);
+    setMonthlyFormData(report
+      ? Object.fromEntries(Object.keys(MONTHLY_FORM_EMPTY).map(k => [k, report[k] != null ? String(report[k]) : '']))
+      : { ...MONTHLY_FORM_EMPTY });
     setShowMonthlyModal(true);
   };
 
@@ -419,24 +437,7 @@ export default function MarketingDataTab({
       const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/monthly`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          month: monthlyFormData.month,
-          website_clicks: monthlyFormData.website_clicks || null,
-          website_traffic: monthlyFormData.website_traffic !== '' ? parseInt(monthlyFormData.website_traffic) : null,
-          gmb_views: monthlyFormData.gmb_views !== '' ? parseInt(monthlyFormData.gmb_views) : null,
-          map_views: monthlyFormData.map_views !== '' ? parseInt(monthlyFormData.map_views) : null,
-          gmb_clicks: monthlyFormData.gmb_clicks !== '' ? parseInt(monthlyFormData.gmb_clicks) : null,
-          on_page_score: monthlyFormData.on_page_score || null,
-          off_page: monthlyFormData.off_page !== '' ? parseInt(monthlyFormData.off_page) : null,
-          blogs: monthlyFormData.blogs !== '' ? parseInt(monthlyFormData.blogs) : null,
-          calls: monthlyFormData.calls !== '' ? parseInt(monthlyFormData.calls) : null,
-          directions: monthlyFormData.directions !== '' ? parseInt(monthlyFormData.directions) : null,
-          reviews: monthlyFormData.reviews !== '' ? parseInt(monthlyFormData.reviews) : null,
-          avg_rating: monthlyFormData.avg_rating !== '' ? parseFloat(monthlyFormData.avg_rating) : null,
-          top_keywords: monthlyFormData.top_keywords || null,
-          da: monthlyFormData.da !== '' ? parseInt(monthlyFormData.da) : null,
-          ai_overview_visible: monthlyFormData.ai_overview_visible || 'No'
-        }),
+        body: JSON.stringify(monthlyFormData),
         credentials: 'include'
       });
       const data = await res.json();
@@ -445,13 +446,49 @@ export default function MarketingDataTab({
       showToast(`Monthly report ${editingMonthly ? 'updated' : 'saved'} successfully`, 'success');
       setShowMonthlyModal(false);
       setEditingMonthly(null);
-      setMonthlyFormData({
-        month: '', website_clicks: '', website_traffic: '', gmb_views: '', map_views: '', gmb_clicks: '', on_page_score: '', off_page: '',
-        blogs: '', calls: '', directions: '', reviews: '', avg_rating: '', top_keywords: '', da: '', ai_overview_visible: 'No'
-      });
+      setMonthlyFormData({ ...MONTHLY_FORM_EMPTY });
       fetchMarketingData(selectedClientForReports.id);
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  };
+
+  // Fills empty cells from Search Console, GA4 and our own counts; the row stays a draft.
+  const autofillMonthly = async (month) => {
+    if (!selectedClientForReports?.id) return;
+    setMonthlyBusy(month);
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/monthly/${month}/autofill`, {
+        method: 'POST', credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Auto-fill failed');
+      const filled = data.filled.length ? `Filled ${data.filled.length} field(s).` : 'Nothing new to fill.';
+      showToast([filled, ...data.notes].join(' '), data.notes.length ? 'warning' : 'success');
+      fetchMarketingData(selectedClientForReports.id);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setMonthlyBusy(null);
+    }
+  };
+
+  const setMonthlyStatus = async (month, status) => {
+    if (!selectedClientForReports?.id) return;
+    setMonthlyBusy(month);
+    try {
+      const res = await fetch(`${API_BASE}/api/clients/${selectedClientForReports.id}/marketing/monthly/${month}/status`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update report');
+      showToast(status === 'published' ? 'Published to the client portal' : 'Hidden from the client portal', 'success');
+      fetchMarketingData(selectedClientForReports.id);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setMonthlyBusy(null);
     }
   };
 
@@ -1018,36 +1055,44 @@ export default function MarketingDataTab({
           </div>
 
           {/* SEO Monthly Reports Table */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', marginTop: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', marginTop: '32px', gap: '8px', flexWrap: 'wrap' }}>
             <h3 style={{ margin: 0 }}>SEO & GMB Monthly Reports</h3>
             {canEdit && (
-              <button onClick={() => openMonthlyModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                <Plus size={14} style={{ marginRight: '4px' }} /> Add Monthly Report
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => autofillMonthly(lastFinishedMonth())} disabled={!!monthlyBusy} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                  <RefreshCw size={14} style={{ marginRight: '4px' }} /> Fill {formatMonthStr(lastFinishedMonth())} from Google
+                </button>
+                <button onClick={() => openMonthlyModal()} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                  <Plus size={14} style={{ marginRight: '4px' }} /> Add Monthly Report
+                </button>
+              </div>
             )}
           </div>
+          <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Filled automatically on the 3rd of each month from Search Console and GA4. Drafts stay hidden from the client portal until published.
+          </p>
           <div className="table-container table-scrollable-y" style={{ marginBottom: '32px' }}>
             <table>
               <thead>
                 <tr>
                   <th>Month</th>
-                  <th>Website Clicks</th>
+                  <th>Search Clicks</th>
+                  <th>Impressions</th>
+                  <th>Avg. Position</th>
+                  <th>Searches in Top 3 / Top 10</th>
+                  <th>Top Searches</th>
                   <th>Website Traffic</th>
+                  <th>MoM – Sessions</th>
                   <th>GMB Views</th>
                   <th>Map Views</th>
                   <th>GMB Clicks</th>
-                  <th>On Page Score</th>
-                  <th>Off Page</th>
-                  <th>Blogs</th>
                   <th>Calls</th>
                   <th>Directions</th>
                   <th>Reviews</th>
                   <th>Avg. Rating</th>
-                  <th>Top 3 Keywords</th>
-                  <th>DA</th>
-                  <th>MoM Growth – Sessions</th>
-                  <th>MoM Growth – GMB Views</th>
-                  <th>AI Overview Visible?</th>
+                  <th>MoM – Map Views</th>
+                  <th>Blogs</th>
+                  <th>SEO Fixes Live</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1059,55 +1104,69 @@ export default function MarketingDataTab({
                     </td>
                   </tr>
                 ) : (
-                  monthlyReports.map(item => (
-                    <tr key={item.id}>
-                      <td style={{ fontWeight: 'bold' }}>{formatMonthStr(item.month)}</td>
-                      <td>{item.website_clicks || '-'}</td>
-                      <td>{item.website_traffic?.toLocaleString() || '-'}</td>
-                      <td>{item.gmb_views?.toLocaleString() || '-'}</td>
-                      <td>{item.map_views?.toLocaleString() || '-'}</td>
-                      <td>{item.gmb_clicks?.toLocaleString() || '-'}</td>
-                      <td>{item.on_page_score || '-'}</td>
-                      <td>{item.off_page !== null && item.off_page !== undefined ? item.off_page : '-'}</td>
-                      <td>{item.blogs !== null && item.blogs !== undefined ? item.blogs : '-'}</td>
-                      <td>{item.calls !== null && item.calls !== undefined ? item.calls : '-'}</td>
-                      <td>{item.directions !== null && item.directions !== undefined ? item.directions : '-'}</td>
-                      <td>{item.reviews !== null && item.reviews !== undefined ? item.reviews : '-'}</td>
-                      <td>{item.avg_rating !== null && item.avg_rating !== undefined ? item.avg_rating.toFixed(1) : '-'}</td>
-                      <td>{item.top_keywords || '-'}</td>
-                      <td>{item.da !== null && item.da !== undefined ? item.da : '-'}</td>
-                      <td>
-                        {item.mom_growth_sessions !== null && item.mom_growth_sessions !== undefined ? (
-                          <span style={{ color: item.mom_growth_sessions >= 0 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
-                            {item.mom_growth_sessions >= 0 ? '+' : ''}{(item.mom_growth_sessions * 100).toFixed(2)}%
+                  monthlyReports.map(item => {
+                    const notes = parseJson(item.auto_sources)?.notes || [];
+                    const queries = parseJson(item.top_queries) || [];
+                    const busy = monthlyBusy === item.month;
+                    return (
+                      <tr key={item.id}>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <div style={{ fontWeight: 'bold' }}>{formatMonthStr(item.month)}</div>
+                          <span className={`badge badge-${item.status === 'draft' ? 'warning' : 'success'}`}>
+                            {item.status === 'draft' ? 'Draft' : 'Published'}
                           </span>
-                        ) : '-'}
-                      </td>
-                      <td>
-                        {item.mom_growth_gmb_views !== null && item.mom_growth_gmb_views !== undefined ? (
-                          <span style={{ color: item.mom_growth_gmb_views >= 0 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
-                            {item.mom_growth_gmb_views >= 0 ? '+' : ''}{(item.mom_growth_gmb_views * 100).toFixed(2)}%
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td>
-                        <span className={`badge badge-${item.ai_overview_visible === 'Yes' ? 'success' : 'muted'}`}>
-                          {item.ai_overview_visible || 'No'}
-                        </span>
-                      </td>
-                      <td>
-                        {canEdit && (
-                          <button
-                            onClick={() => openMonthlyModal(item)}
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                          {notes.length > 0 && (
+                            <div title={notes.join('\n')} style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '180px', whiteSpace: 'normal' }}>
+                              {notes.map(n => n.split(':')[0].replace(/ \(.*\)\.?$/, '')).join(' · ')}
+                            </div>
+                          )}
+                        </td>
+                        <td>{item.search_clicks != null ? item.search_clicks.toLocaleString() : (item.website_clicks || '-')}</td>
+                        <td>{fmtNum(item.search_impressions)}</td>
+                        <td>{item.avg_position != null ? item.avg_position.toFixed(1) : '-'}</td>
+                        <td>{item.queries_top3 != null ? `${item.queries_top3} / ${item.queries_top10 ?? '-'}` : '-'}</td>
+                        <td style={{ minWidth: '220px', fontSize: '0.8rem' }}>
+                          {queries.length ? queries.slice(0, 5).map(q => (
+                            <div key={q.query} style={{ whiteSpace: 'nowrap' }}>
+                              {q.query} <span style={{ color: 'var(--text-muted)' }}>#{q.position}</span> <PositionChange now={q.position} prev={q.prev_position} />
+                            </div>
+                          )) : '-'}
+                        </td>
+                        <td>{fmtNum(item.website_traffic)}</td>
+                        <td><Growth value={item.mom_growth_sessions} /></td>
+                        <td>{fmtNum(item.gmb_views)}</td>
+                        <td>{fmtNum(item.map_views)}</td>
+                        <td>{fmtNum(item.gmb_clicks)}</td>
+                        <td>{fmtNum(item.calls)}</td>
+                        <td>{fmtNum(item.directions)}</td>
+                        <td>{fmtNum(item.reviews)}</td>
+                        <td>{item.avg_rating != null ? item.avg_rating.toFixed(1) : '-'}</td>
+                        <td><Growth value={item.mom_growth_gmb_views} /></td>
+                        <td>{fmtNum(item.blogs)}</td>
+                        <td>{fmtNum(item.fixes_live)}</td>
+                        <td>
+                          {canEdit && (
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button onClick={() => openMonthlyModal(item)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
+                                Edit
+                              </button>
+                              <button onClick={() => autofillMonthly(item.month)} disabled={busy} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                Fill from Google
+                              </button>
+                              <button
+                                onClick={() => setMonthlyStatus(item.month, item.status === 'draft' ? 'published' : 'draft')}
+                                disabled={busy}
+                                className={`btn ${item.status === 'draft' ? 'btn-primary' : 'btn-secondary'}`}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                              >
+                                {item.status === 'draft' ? 'Publish' : 'Unpublish'}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1306,38 +1365,62 @@ export default function MarketingDataTab({
         <div className="modal-overlay" onClick={() => setShowMonthlyModal(false)}>
           <div className="modal-content glass-premium" onClick={e => e.stopPropagation()} style={{ textAlign: 'left', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box' }}>
             <h2>{editingMonthly ? 'Edit Monthly Report' : 'Add Monthly Report'}</h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+              Search Console and GA4 numbers fill in automatically when the client is connected. Type them here only if they aren't. GMB numbers are typed in for now.
+            </p>
             <form onSubmit={handleMonthlyReportSubmit} style={{ marginTop: '20px' }}>
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Month (YYYY-MM)</label>
-                  <input
-                    type="month"
-                    className="form-control"
-                    value={monthlyFormData.month}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, month: e.target.value })}
-                    required
-                    disabled={!!editingMonthly}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Website Clicks</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. 7.89k"
-                    value={monthlyFormData.website_clicks}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, website_clicks: e.target.value })}
-                  />
-                </div>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Month (YYYY-MM)</label>
+                <input
+                  type="month"
+                  className="form-control"
+                  value={monthlyFormData.month}
+                  onChange={e => setMonthlyFormData({ ...monthlyFormData, month: e.target.value })}
+                  required
+                  disabled={!!editingMonthly}
+                />
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div className="form-group">
-                  <label className="form-label">Website Traffic</label>
+                  <label className="form-label">Search Clicks</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 16000"
+                    placeholder="From Search Console"
+                    value={monthlyFormData.search_clicks}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, search_clicks: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Impressions</label>
+                  <input
+                    type="number"
+                    step="1"
+                    className="form-control"
+                    placeholder="From Search Console"
+                    value={monthlyFormData.search_impressions}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, search_impressions: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Avg. Position</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="form-control"
+                    placeholder="e.g. 12.4"
+                    value={monthlyFormData.avg_position}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, avg_position: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Website Traffic (sessions)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    className="form-control"
+                    placeholder="From GA4"
                     value={monthlyFormData.website_traffic}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, website_traffic: e.target.value })}
                   />
@@ -1346,21 +1429,20 @@ export default function MarketingDataTab({
                   <label className="form-label">GMB Views</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 52000"
+                    placeholder="e.g. 3200"
                     value={monthlyFormData.gmb_views}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, gmb_views: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Map Views</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 35000"
+                    placeholder="e.g. 21000"
                     value={monthlyFormData.map_views}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, map_views: e.target.value })}
                   />
@@ -1369,67 +1451,31 @@ export default function MarketingDataTab({
                   <label className="form-label">GMB Clicks</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 1200"
+                    placeholder="e.g. 250"
                     value={monthlyFormData.gmb_clicks}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, gmb_clicks: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">On Page Score</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. 85/100"
-                    value={monthlyFormData.on_page_score}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, on_page_score: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Off Page</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    placeholder="e.g. 45"
-                    value={monthlyFormData.off_page}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, off_page: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Blogs</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    placeholder="e.g. 4"
-                    value={monthlyFormData.blogs}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, blogs: e.target.value })}
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Calls</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 150"
+                    placeholder="e.g. 1300"
                     value={monthlyFormData.calls}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, calls: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Directions</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 450"
+                    placeholder="e.g. 1600"
                     value={monthlyFormData.directions}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, directions: e.target.value })}
                   />
@@ -1438,61 +1484,34 @@ export default function MarketingDataTab({
                   <label className="form-label">Reviews</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 12"
+                    placeholder="e.g. 1640"
                     value={monthlyFormData.reviews}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, reviews: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Avg. Rating</label>
                   <input
                     type="number"
                     step="0.1"
-                    min="1"
-                    max="5"
                     className="form-control"
-                    placeholder="e.g. 4.8"
+                    placeholder="e.g. 4.6"
                     value={monthlyFormData.avg_rating}
                     onChange={e => setMonthlyFormData({ ...monthlyFormData, avg_rating: e.target.value })}
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">DA</label>
+                  <label className="form-label">Blogs</label>
                   <input
                     type="number"
+                    step="1"
                     className="form-control"
-                    placeholder="e.g. 32"
-                    value={monthlyFormData.da}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, da: e.target.value })}
+                    placeholder="e.g. 4"
+                    value={monthlyFormData.blogs}
+                    onChange={e => setMonthlyFormData({ ...monthlyFormData, blogs: e.target.value })}
                   />
-                </div>
-              </div>
-
-              <div className="form-grid-2" style={{ marginBottom: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Top 3 Keywords</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="keyword1, keyword2..."
-                    value={monthlyFormData.top_keywords}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, top_keywords: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">AI Overview Visible?</label>
-                  <select
-                    className="form-control"
-                    value={monthlyFormData.ai_overview_visible}
-                    onChange={e => setMonthlyFormData({ ...monthlyFormData, ai_overview_visible: e.target.value })}
-                  >
-                    <option value="No">No</option>
-                    <option value="Yes">Yes</option>
-                  </select>
                 </div>
               </div>
 

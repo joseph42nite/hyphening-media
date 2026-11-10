@@ -2681,36 +2681,36 @@ export default function ClientPortal({ showToast }) {
                       <thead>
                         <tr>
                           <th>Month</th>
-                          <th>Traffic</th>
-                          <th>Clicks</th>
-                          <th>Map Views</th>
+                          <th>Google Clicks</th>
+                          <th>Google Impressions</th>
+                          <th>Avg. Position</th>
+                          <th>Searches in Top 10</th>
+                          <th>Website Visits</th>
                           <th>GMB Views</th>
+                          <th>Map Views</th>
                           <th>GMB Clicks</th>
                           <th>Calls</th>
                           <th>Directions</th>
-                          <th>DA</th>
                           <th>Blogs</th>
-                          <th>AI Overview</th>
+                          <th>SEO Fixes Live</th>
                         </tr>
                       </thead>
                       <tbody>
                         {seoReports.slice((seoPage - 1) * ITEMS_PER_PAGE_SEO, seoPage * ITEMS_PER_PAGE_SEO).map(r => (
                           <tr key={r.id}>
                             <td style={{ fontWeight: 600, color: '#dfe7e0', whiteSpace: 'nowrap' }}>{formatMonthName(r.month)}</td>
-                            <td>{r.website_traffic?.toLocaleString() || '-'}</td>
-                            <td>{r.website_clicks || '-'}</td>
-                            <td>{r.map_views?.toLocaleString() || '-'}</td>
-                            <td>{r.gmb_views?.toLocaleString() || '-'}</td>
-                            <td>{r.gmb_clicks?.toLocaleString() || '-'}</td>
-                            <td>{r.calls?.toLocaleString() || '-'}</td>
-                            <td>{r.directions?.toLocaleString() || '-'}</td>
-                            <td>{r.da || '-'}</td>
-                            <td>{r.blogs || '-'}</td>
-                            <td>
-                              <span className={`portal-badge ${r.ai_overview_visible === 'Yes' ? 'portal-badge-success' : 'portal-badge-muted'}`}>
-                                {r.ai_overview_visible || 'No'}
-                              </span>
-                            </td>
+                            <td>{r.search_clicks != null ? r.search_clicks.toLocaleString() : (r.website_clicks || '-')}</td>
+                            <td>{r.search_impressions?.toLocaleString() ?? '-'}</td>
+                            <td>{r.avg_position != null ? r.avg_position.toFixed(1) : '-'}</td>
+                            <td>{r.queries_top10 ?? '-'}</td>
+                            <td>{r.website_traffic?.toLocaleString() ?? '-'}</td>
+                            <td>{r.gmb_views?.toLocaleString() ?? '-'}</td>
+                            <td>{r.map_views?.toLocaleString() ?? '-'}</td>
+                            <td>{r.gmb_clicks?.toLocaleString() ?? '-'}</td>
+                            <td>{r.calls?.toLocaleString() ?? '-'}</td>
+                            <td>{r.directions?.toLocaleString() ?? '-'}</td>
+                            <td>{r.blogs ?? '-'}</td>
+                            <td>{r.fixes_live ?? '-'}</td>
                           </tr>
                         ))}
                       </tbody>
