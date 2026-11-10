@@ -38,7 +38,7 @@ const TIMEOUT_MINUTES = new Map([
   // With the 'seo' agent available, a run may be served by Nemotron 3 Ultra (a
   // reasoning model, markedly slower) or fall through its chain to DeepSeek V4
   // Flash. A window that fits DeepSeek would mark a live Nemotron run as dead,
-  // so these use OpenClaw's Nemotron estimates. The cost of being generous is
+  // so these use the Nemotron estimates. The cost of being generous is
   // only that a genuinely stuck run holds its queue slot longer.
   ['technical', 35],
   ['schema', 25],

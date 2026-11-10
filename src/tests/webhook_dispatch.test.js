@@ -9,15 +9,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../database.js';
 import { KNOWN_EVENTS, executeEvent } from '../routes/webhooks.js';
 
-// agent_activity_log broadcasts through server.js, which would start the server.
-const SKIP = new Set(['agent_activity_log']);
-
 beforeAll(() => db.exec('BEGIN'));
 afterAll(() => db.exec('ROLLBACK'));
 
 describe('webhook dispatch', () => {
   it('has a handler for every known event', () => {
-    for (const event of KNOWN_EVENTS.filter(e => !SKIP.has(e))) {
+    for (const event of KNOWN_EVENTS) {
       const result = executeEvent(event, {});
       expect(result, event).toBeTypeOf('object');
       expect(typeof result.success, event).toBe('boolean');
@@ -27,5 +24,12 @@ describe('webhook dispatch', () => {
 
   it('refuses an event it does not know', () => {
     expect(executeEvent('no_such_event', {}).success).toBe(false);
+  });
+
+  it('no longer accepts the removed OpenClaw-only events', () => {
+    for (const gone of ['create_task', 'upsert_monthly_report', 'create_client', 'send_chat_message', 'skill_inventory_report', 'agent_activity_log']) {
+      expect(KNOWN_EVENTS, gone).not.toContain(gone);
+      expect(executeEvent(gone, {}).success, gone).toBe(false);
+    }
   });
 });

@@ -169,7 +169,7 @@ TELEGRAM_VIDEOGRAPHER_CHAT_ID=887654321
 TELEGRAM_SMM_CHAT_ID=787654321
 
 # Webhooks
-OPENCLAW_HMAC_SECRET=your_hmac_secret_here
+HYPHENING_HMAC_SECRET=your_hmac_secret_here
 ```
 Press `Ctrl+O` then `Enter` to save, and `Ctrl+X` to exit.
 

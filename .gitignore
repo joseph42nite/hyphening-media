@@ -22,5 +22,5 @@ frontend/android/local.properties
 # IDE settings
 .idea/
 
-# OpenClaw Local Skills Source
+# Local claude-seo skills source
 temp_claude_seo/

@@ -27,11 +27,11 @@ function getRecs(auditId) {
   `).all(auditId);
 }
 
-// Which model produced this audit, as reported by OpenClaw at the time.
+// Which model produced this audit, as reported by the worker at the time.
 function getModel(auditId) {
   const run = db.prepare('SELECT actual_model, model FROM seo_agent_runs WHERE audit_id = ?').get(auditId);
   if (!run) return 'unknown (no run record — audit predates run tracking)';
-  return run.actual_model || `${run.model} (configured; OpenClaw reported nothing)`;
+  return run.actual_model || `${run.model} (configured; nothing reported)`;
 }
 
 function summarise(audit) {

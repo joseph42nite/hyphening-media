@@ -80,7 +80,7 @@ After any analysis command completes, offer to generate a PDF report via `script
 Every agent execution triggered under the Hyphening Marketing Ops Center must conform to the following verification gates before executing subagents or querying live APIs:
 
 1. **Pre-Execution Gate & Approvals**:
-   - Check if this audit run has an approved record in the dashboard queue (`openclaw_pending_actions`).
+   - Check if this audit run has an approved record in the dashboard queue (`pending_actions`).
    - If the task is triggered by an administrator, it is `auto_approved` and can execute immediately.
    - If triggered by an SMM or staff freelancer, it is `pending_approval`. **Refuse execution** and output a message directing them to request admin approval from the **Approvals Tab** in the dashboard.
 
@@ -101,8 +101,8 @@ Every agent execution triggered under the Hyphening Marketing Ops Center must co
    - **Kimi**: Use this model for judgment-heavy, strategic, and quality checks (content E-E-A-T, drift history comparisons, AI Overview/GEO optimization, keyword clustering, and backlinks competitor pitch generation).
 
 5. **Webhook Data Delivery**:
-   - Upon completion, the agent MUST pack the results and POST them as an HMAC-signed payload to `/api/openclaw/webhook`.
-   - Compute the signature using the SHA256 HMAC of the stringified payload and the `OPENCLAW_HMAC_SECRET`. Put it in the `x-openclaw-signature` header.
+   - Upon completion, the agent MUST pack the results and POST them as an HMAC-signed payload to `/api/webhooks/webhook`.
+   - Compute the signature using the SHA256 HMAC of the stringified payload and the `HYPHENING_HMAC_SECRET`. Put it in the `x-openclaw-signature` header.
    - The JSON payload must follow this exact schema:
 
 ```json

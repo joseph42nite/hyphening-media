@@ -184,7 +184,7 @@ app.use(cookieParser());
 // 4. JSON body parser
 //
 // The verify hook keeps the raw bytes on the request so HMAC verification can
-// hash exactly what was sent. Without it the OpenClaw webhook had to hash a
+// hash exactly what was sent. Without it the webhook had to hash a
 // re-serialisation of the parsed body, which made the signature depend on
 // matching Node's JSON formatting — a sender emitting 0.0 rather than 0 failed
 // with an unexplained 401. See verifySignature in src/routes/webhooks.js.
@@ -318,7 +318,7 @@ app.use('/api/public/leads', publicLeadRoutes);
 
 // Signed webhook for automation clients and agent workers
 app.use('/api/webhooks', webhookRoutes);
-app.use('/api/openclaw', webhookRoutes); // Backward-compatible alias
+app.use('/api/openclaw', webhookRoutes); // Old path; remove once no worker calls it
 
 // SEO & Audit integration routes
 app.use('/api/clients', seoRoutes);

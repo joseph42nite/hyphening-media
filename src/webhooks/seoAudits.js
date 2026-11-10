@@ -35,19 +35,14 @@ const AUDIT_TYPE_ALIASES = {
 };
 
 /**
- * Accepts OpenClaw's skill names as audit types.
+ * Accepts SEO skill names as audit types.
  *
- * Each SEO sub-skill's webhook template substitutes its own SKILL.md `name`
- * into audit_type, which yields 'seo-schema' or 'seo-image-gen' rather than
- * 'schema' or 'image_gen'. Only 2 of OpenClaw's 21 sub-skills happen to produce
- * a value our schema accepts (confirmed 2026-08-03). The orchestrator sends
- * hardcoded correct values, so hook-triggered runs were unaffected — but any
- * sub-skill invoked directly hit the CHECK constraint and the finished audit
- * was discarded with a 500, after the tokens had already been spent.
- *
- * Rewriting on receipt fixes both failure modes at once: the insert, and the
- * run correlation in finishActiveRunFor, which matches on seo_agent_runs
- * .agent_type ('geo') and would never match 'seo-geo' either.
+ * A skill may report its own SKILL.md `name` ('seo-schema', 'seo-image-gen')
+ * rather than our audit type ('schema', 'image_gen'). Unrewritten, that hits
+ * the CHECK constraint and a finished audit is discarded after the tokens are
+ * spent, and the run correlation in finishActiveRunFor (which matches
+ * seo_agent_runs.agent_type, 'geo') never matches 'seo-geo' either.
+ * Rewriting on receipt fixes both.
  *
  * Returns null for anything that is still unrecognised after rewriting, so a
  * genuinely unknown type is reported rather than silently coerced.
@@ -60,11 +55,9 @@ export function normaliseAuditType(raw) {
   const rewritten = trimmed.replace(/^seo[-_]/, '').replace(/-/g, '_');
   if (VALID_AUDIT_TYPES.has(rewritten)) return rewritten;
 
-  // 'full' is the one type whose name differs on both sides. We ask for it as
-  // "seo audit" (openclaw_seo_runner.js renames it when building the trigger),
-  // OpenClaw's skill is called seo-audit, so its payload reports 'seo-audit' or
-  // 'audit' — neither of which the prefix strip above can reach, since 'audit'
-  // is not a valid type on its own.
+  // 'full' is the one type whose name differs on both sides: the skill is
+  // seo-audit, so a payload may report 'seo-audit' or 'audit', neither of
+  // which the prefix strip above can reach.
   return AUDIT_TYPE_ALIASES[rewritten] || null;
 }
 
@@ -79,7 +72,7 @@ export function handleCreateSeoAudit(payload) {
   const auditType = normaliseAuditType(receivedAuditType);
 
   if (!auditType) {
-    console.warn(`[OPENCLAW] Rejected create_seo_audit: unrecognised audit_type ${JSON.stringify(receivedAuditType)} (client ${payload.client_id}).`);
+    console.warn(`[WEBHOOK] Rejected create_seo_audit: unrecognised audit_type ${JSON.stringify(receivedAuditType)} (client ${payload.client_id}).`);
     return {
       success: false,
       summary: `Unrecognised audit_type '${receivedAuditType}'. Accepted values: ${[...VALID_AUDIT_TYPES].join(', ')}`
@@ -87,7 +80,7 @@ export function handleCreateSeoAudit(payload) {
   }
 
   if (auditType !== receivedAuditType) {
-    console.log(`[OPENCLAW] Normalised audit_type ${JSON.stringify(receivedAuditType)} -> '${auditType}' (client ${payload.client_id}). OpenClaw is sending skill names; the sending skill's template should be corrected.`);
+    console.log(`[WEBHOOK] Normalised audit_type ${JSON.stringify(receivedAuditType)} -> '${auditType}' (client ${payload.client_id}). The sender is using skill names.`);
     payload.audit_type = auditType;
   }
 
@@ -154,7 +147,7 @@ export function handleCreateSeoAudit(payload) {
           // token_usage_log.model is NOT NULL, so a failure reporting usage
           // without naming a model used to throw and take the whole webhook
           // down with a 500 — losing the usage record it was trying to save,
-          // on exactly the path we ask OpenClaw to use for failures. The
+          // on exactly the path workers use for failures. The
           // success path below already defaults; this one did not.
           usage.model || 'unknown',
           payload.triggered_by || 'system',
@@ -295,18 +288,16 @@ export function handleCreateSeoAudit(payload) {
     actualModel: reportedModel
   };
 
-  // payload.run_id is the run id we send to OpenClaw as [run_id:N]. When it
-  // comes back the match is exact and none of the guesswork below applies.
+  // payload.run_id is the run id the worker claimed. When it comes back the
+  // match is exact and none of the guesswork below applies.
   let closedRun = null;
   let orphanRun = null;
 
   if (payload.run_id) {
     // The run says which skill we asked for; the payload says which one ran.
-    // When they disagree, OpenClaw resolved our trigger message to a different
-    // skill — "seo geo" was read as geographic SEO and served by the local
-    // skill on 2026-08-04, closing run #11 as a completed geo audit when no geo
-    // audit existed. Skill selection there is the model reading a reference
-    // table, not a lookup, so this will recur with any confusable pair.
+    // When they disagree the wrong skill ran — "seo geo" was once read as
+    // geographic SEO, closing run #11 as a completed geo audit when no geo
+    // audit existed.
     //
     // The audit itself is kept — it is real work and the tokens are spent — but
     // the run is failed rather than completed, so the card reports the truth and
@@ -314,17 +305,17 @@ export function handleCreateSeoAudit(payload) {
     const requestedRun = getRun(payload.run_id);
     if (requestedRun && requestedRun.agent_type !== payload.audit_type) {
       const mismatch =
-        `Skill mismatch: '${requestedRun.agent_type}' was requested but OpenClaw returned a ` +
+        `Skill mismatch: '${requestedRun.agent_type}' was requested but the worker returned a ` +
         `'${payload.audit_type}' audit (stored as #${firstAuditId}). The trigger message was ` +
         `resolved to the wrong skill; '${requestedRun.agent_type}' has NOT been audited.`;
-      console.warn(`[OPENCLAW] ${mismatch}`);
+      console.warn(`[WEBHOOK] ${mismatch}`);
       closedRun = finishRun(payload.run_id, 'failed', { ...finishOpts, error: mismatch });
     } else {
       closedRun = finishRun(payload.run_id, finalStatus, finishOpts);
     }
   } else {
     // No run_id: this result identifies itself only by client + audit type.
-    // A cancelled run is still out there working (OpenClaw cannot abort), so
+    // A cancelled run may still be working on the worker, so
     // give any outstanding cancelled run first claim before assuming this
     // belongs to whatever is in flight now — otherwise a stale result closes
     // a live run and the card reports done while the job is still going.
@@ -335,12 +326,11 @@ export function handleCreateSeoAudit(payload) {
   }
 
   if (orphanRun) {
-    console.log(`[OPENCLAW] create_seo_audit for client ${payload.client_id}/${payload.audit_type} attributed to cancelled run #${orphanRun.id}; audit stored, in-flight runs untouched.`);
+    console.log(`[WEBHOOK] create_seo_audit for client ${payload.client_id}/${payload.audit_type} attributed to cancelled run #${orphanRun.id}; audit stored, in-flight runs untouched.`);
   } else if (!closedRun) {
-    // Nothing matched: OpenClaw pushed an audit we never triggered (a
-    // scheduled run). The audit rows are kept either way — the tokens were
+    // Nothing matched: an audit we never queued (a scheduled run). The audit rows are kept either way — the tokens were
     // already spent, so discarding the data would waste them twice.
-    console.log(`[OPENCLAW] create_seo_audit for client ${payload.client_id}/${payload.audit_type} had no matching run (untracked).`);
+    console.log(`[WEBHOOK] create_seo_audit for client ${payload.client_id}/${payload.audit_type} had no matching run (untracked).`);
   }
 
   import('../../server.js').then(({ broadcastEvent }) => {
@@ -356,7 +346,7 @@ export function handleCreateSeoAudit(payload) {
       });
     }
     broadcastEvent('seo_audit_created', { clientId: payload.client_id, agentType: payload.audit_type });
-  }).catch(err => console.error('[OPENCLAW] Broadcast seo_audit_created failed:', err));
+  }).catch(err => console.error('[WEBHOOK] Broadcast seo_audit_created failed:', err));
 
   return {
     success: true,

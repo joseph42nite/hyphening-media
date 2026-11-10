@@ -1,5 +1,5 @@
 /**
- * One signed call to the Ops Center webhook (/api/openclaw/webhook), the same
+ * One signed call to the Ops Center webhook (/api/webhooks/webhook), the same
  * HMAC channel every worker uses. The secret comes from the repo .env and is
  * never printed. Returns the parsed reply; throws on an error status.
  */
@@ -24,7 +24,7 @@ export async function hook(event_type, payload, attempt = 0) {
   if (!API) throw new Error('HYPHENING_API_URL is not set in the repo .env');
   if (!SECRET) throw new Error('HYPHENING_HMAC_SECRET is not set in the repo .env');
   const body = JSON.stringify({ event_type, payload });
-  const res = await fetch(`${API}/api/openclaw/webhook`, {
+  const res = await fetch(`${API}/api/webhooks/webhook`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

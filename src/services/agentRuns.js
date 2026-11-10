@@ -127,26 +127,6 @@ export function createRun({
   }
 }
 
-/** OpenClaw accepted the hook — the audit is genuinely in flight now. */
-export function markRunning(runId, openClawRunId = null) {
-  db.prepare(`
-    UPDATE seo_agent_runs
-    SET status = 'running',
-        started_at = COALESCE(started_at, datetime('now')),
-        openclaw_run_id = COALESCE(?, openclaw_run_id)
-    WHERE id = ? AND status = 'queued'
-  `).run(openClawRunId, runId);
-
-  const run = getRun(runId);
-  if (run) broadcastRunStatus(run);
-  return run;
-}
-
-/** The gateway's runId arrives on the runner's stdout, mid-flight. */
-export function attachOpenClawRunId(runId, openClawRunId) {
-  db.prepare('UPDATE seo_agent_runs SET openclaw_run_id = ? WHERE id = ?').run(openClawRunId, runId);
-}
-
 /**
  * Terminal state. Only advances a run that is still in flight, so a late
  * webhook can never resurrect a run the operator already cancelled.
@@ -180,7 +160,7 @@ function wakeWaitingFixBatch(clientId) {
   if (db.prepare("SELECT 1 FROM seo_fix_batches WHERE client_id = ? AND status = 'queued'").get(clientId)) pushRunSignal('seo_fix');
 }
 
-/** Same as finishRun but addressed the way OpenClaw's webhook identifies work. */
+/** Same as finishRun but addressed by client and audit type, for results without a run_id. */
 export function finishActiveRunFor(clientId, agentType, status, opts = {}) {
   const run = getActiveRun(clientId, agentType);
   if (!run) return null;
@@ -190,11 +170,10 @@ export function finishActiveRunFor(clientId, agentType, status, opts = {}) {
 /**
  * A cancelled run whose result is still expected.
  *
- * OpenClaw confirmed (2026-07-28) it exposes no way to abort a run, so
- * cancelling here never stops the work — that job WILL report back later.
- * Until OpenClaw echoes our run_id in create_seo_audit, a late result carries
- * nothing to identify itself but client_id + audit_type, and would otherwise
- * be matched to whatever run is in flight now — closing a live run with a
+ * Cancelling never stops a run a worker has already started, so that job will
+ * report back later. A result without a run_id carries nothing to identify
+ * itself but client_id + audit_type, and would otherwise be matched to
+ * whatever run is in flight now — closing a live run with a
  * stale audit and flipping the card to "completed" while it is still working.
  *
  * Outstanding cancelled runs therefore get first claim on an unidentified
@@ -222,25 +201,25 @@ export function claimOrphanedCancelledRun(clientId, agentType, auditId) {
 
 /**
  * Operator-initiated cancel. This releases our slot and stops us waiting for
- * the result — it does NOT stop work already running inside OpenClaw, which
- * has no abort endpoint. Tokens keep being spent until that job finishes.
+ * the result — it does not stop a run a worker has already started; that
+ * job finishes on its own.
  */
 export function cancelRun(runId, cancelledBy = null) {
   const run = getRun(runId);
   if (!run) return { error: 'not_found' };
   if (!IN_FLIGHT.includes(run.status)) return { error: 'not_in_flight', run };
 
-  broadcastRunLog(run, `[SYSTEM] Run cancelled by ${cancelledBy || 'operator'}. Queue slot released. OpenClaw has no abort endpoint, so this job keeps running and keeps spending tokens until it finishes on its own; its result will be stored but will not reopen this card.`);
+  broadcastRunLog(run, `[SYSTEM] Run cancelled by ${cancelledBy || 'operator'}. Queue slot released. If a worker already started it, it finishes on its own; its result will be stored but will not reopen this card.`);
   const cancelled = finishRun(runId, 'cancelled', { error: `Cancelled by ${cancelledBy || 'operator'}` });
   return { run: cancelled };
 }
 
-/** Arms the "OpenClaw never called back" fallback for a run. */
+/** Arms the "worker never reported back" fallback for a run. */
 export function armTimeout(run, overrideMs = null) {
   registerPendingAudit(run.client_id, run.agent_type, () => {
     const current = getRun(run.id);
     if (!current || !IN_FLIGHT.includes(current.status)) return;
-    broadcastRunLog(current, '[TIMEOUT] No audit result received from OpenClaw within the expected window for this audit type.');
+    broadcastRunLog(current, '[TIMEOUT] No audit result received from the worker within the expected window for this audit type.');
     finishRun(run.id, 'timed_out', { error: 'No create_seo_audit webhook received before the timeout window elapsed.' });
   }, overrideMs);
 }

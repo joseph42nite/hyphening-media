@@ -27,14 +27,8 @@ function formatElapsed(sinceIso, now) {
 // 2026-08-03 — this map exists so a blocked skill reads as blocked before the
 // click, not so the block itself depends on the browser.
 //
-// Verified against OpenClaw's installed skill directory 2026-08-03. The three
-// with no SKILL.md are not merely useless: OpenClaw confirmed that a run with
-// no matching skill answers from training knowledge and POSTs a
-// create_seo_audit anyway, producing a fabricated audit row.
-//
-// 'full' was listed here as having no skill. It does — OpenClaw calls it
-// seo-audit, which is exactly what our trigger message already asks for, and
-// it is unblocked as of 2026-08-03.
+// A skill without its data source does not fail: it answers from training
+// knowledge and still submits an audit, producing a fabricated row.
 //
 // The server decides availability and sends it as `unavailableReason` on each
 // agent's status. This copy is the fallback for a stale cached response that
@@ -105,7 +99,7 @@ function getAuditScore(audit) {
 }
 
 // report_json is stored as a JSON-stringified column; it may itself be plain
-// text (not an object) if OpenClaw sent a long-form text report instead of
+// text (not an object) if a worker sent a long-form text report instead of
 // structured JSON — both are valid, so this never throws.
 export function parseReportJson(raw) {
   if (raw == null) return null;
@@ -386,9 +380,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
   const [pendingApprovals, setPendingApprovals] = useState({}); // agentType -> true, for non-admin staged runs
 
   // Global queue across all clients
-  // abortSupported flips once OpenClaw exposes a real abort route — the cancel
-  // wording depends on it, since without one cancelling saves nothing.
-  const [queue, setQueue] = useState({ active: [], recent: [], abortSupported: false });
+  const [queue, setQueue] = useState({ active: [], recent: [] });
   const [cancellingRunIds, setCancellingRunIds] = useState([]);
 
   // Terminal is one drawer with a tab per run ('all' = merged stream)
@@ -633,7 +625,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
     try {
       const res = await fetch(`${API_BASE}/api/seo/queue`, { credentials: 'include' });
       const data = await res.json();
-      if (res.ok) setQueue({ active: data.active || [], recent: data.recent || [], abortSupported: !!data.abortSupported });
+      if (res.ok) setQueue({ active: data.active || [], recent: data.recent || [] });
     } catch (err) {
       console.error('[SEO TAB] Queue fetch failed:', err);
     }
@@ -669,23 +661,6 @@ export default function SeoMonitorTab({ clients, showToast }) {
     }
   }, [selectedAuditId, selectedClientId]);
 
-  // Fetch initial activity log history on mount
-  useEffect(() => {
-    fetch(`${API_BASE}/api/webhooks/activity?limit=30`, { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        if (data?.logs && Array.isArray(data.logs)) {
-          const historicalLogs = data.logs.reverse().map(l => ({
-            type: 'agent_activity_log',
-            data: { action: l.action, status: l.status, summary: l.summary, client: l.client, details: l.details },
-            timestamp: new Date(l.created_at)
-          }));
-          setConsoleLogs(prev => [...historicalLogs, ...prev]);
-        }
-      })
-      .catch(err => console.error('[SEO TAB] Activity log prefetch error:', err));
-  }, []);
-
   // Set up SSE EventSource for real-time console log streaming
   useEffect(() => {
     const eventSource = new EventSource(`${API_BASE}/api/events`, { withCredentials: true });
@@ -702,7 +677,6 @@ export default function SeoMonitorTab({ clients, showToast }) {
       setConsoleLogs(prev => [...prev, { type: 'agent_webhook', data, timestamp: new Date() }]);
     };
     eventSource.addEventListener('agent_webhook', handleWebhookEvent);
-    eventSource.addEventListener('openclaw_webhook', handleWebhookEvent);
 
     eventSource.addEventListener('seo_agent_status', (e) => {
       const data = JSON.parse(e.data);
@@ -762,11 +736,6 @@ export default function SeoMonitorTab({ clients, showToast }) {
       const data = JSON.parse(e.data);
       showToast(`New trigger approval request queued for ${data.agentType}!`, 'info');
       fetchClientData(selectedClientId);
-    });
-
-    eventSource.addEventListener('agent_activity_log', (e) => {
-      const data = JSON.parse(e.data);
-      setConsoleLogs(prev => [...prev, { type: 'agent_activity_log', data, timestamp: new Date() }]);
     });
 
     eventSource.addEventListener('seo_audit_created', (e) => {
@@ -862,9 +831,8 @@ export default function SeoMonitorTab({ clients, showToast }) {
     }
   };
 
-  // Releases our queue slot only. OpenClaw confirmed it exposes no abort, so
-  // the job keeps running and keeps spending — the UI says so rather than
-  // implying a cancel saves anything.
+  // Releases our queue slot. A run a worker already started finishes there;
+  // the server's message says which happened.
   const cancelRun = async (runId, agentType) => {
     setCancellingRunIds(prev => [...prev, runId]);
     try {
@@ -875,7 +843,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || data.error);
 
-      showToast(data.message || `Run #${runId} cancelled.`, data.aborted ? 'success' : 'info');
+      showToast(data.message || `Run #${runId} cancelled.`, 'info');
       setActiveRuns(prev => {
         const next = { ...prev };
         if (agentType) delete next[agentType];
@@ -1839,7 +1807,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
                   {visibleLogs.map((logEntry, idx) => (
                     <div key={idx} style={{ marginBottom: '2px', wordBreak: 'break-word' }}>
                       <span style={{ color: '#64748b' }}>{new Date(logEntry.timestamp).toLocaleTimeString()}</span>{' '}
-                      {(logEntry.type === 'agent_webhook' || logEntry.type === 'openclaw_webhook') && (
+                      {logEntry.type === 'agent_webhook' && (
                         <span>
                           <span style={{ color: '#c084fc', fontWeight: 'bold' }}>[WEBHOOK INGESTED]</span>{' '}
                           <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{logEntry.data.event_type}</span>{' '}
@@ -1858,33 +1826,6 @@ export default function SeoMonitorTab({ clients, showToast }) {
                                   <span className={getStatusColor(logEntry.data.status)}>
                                     [AGENT {logEntry.data.agentType.toUpperCase()}{logEntry.data.runId ? ` #${logEntry.data.runId}` : ''}] Status: {logEntry.data.status}
                                   </span>
-                                )}
-                                {logEntry.type === 'agent_activity_log' && (
-                                  <>
-                                    <span className={getStatusColor(logEntry.data.status)}>[{logEntry.data.status.toUpperCase()}]</span>{' '}
-                                    <span className="text-cyan-400">{logEntry.data.action}</span>{' '}
-                                    <span>{logEntry.data.summary}</span>
-                                    {logEntry.data.client && <span className="text-purple-400"> (Client: {logEntry.data.client})</span>}
-                                    {logEntry.data.details && (() => {
-                                      const parsedDetails = JSON.parse(logEntry.data.details);
-                                      return (
-                                        <>
-                                          {parsedDetails.urls && parsedDetails.urls.length > 0 && (
-                                            <div className="mt-1 ml-4 text-gray-400" style={{ wordBreak: 'break-all' }}>
-                                              {parsedDetails.urls.map((url, urlIdx) => (
-                                                <a key={urlIdx} href={url} target="_blank" rel="noopener noreferrer" className="block text-blue-400 hover:underline" style={{ wordBreak: 'break-all' }}>{url}</a>
-                                              ))}
-                                            </div>
-                                          )}
-                                          {Object.keys(parsedDetails).filter(key => key !== 'urls').length > 0 && (
-                                            <pre className="text-xs text-gray-400 mt-1 ml-4 bg-gray-800 p-2 rounded" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowX: 'auto', maxWidth: '100%' }}>
-                                              {JSON.stringify(parsedDetails, null, 2)}
-                                            </pre>
-                                          )}
-                                        </>
-                                      );
-                                    })()}
-                                  </>
                                 )}
                                 {logEntry.type === 'system_message' && (
                                   <span className="text-gray-500" style={{ wordBreak: 'break-word' }}>{logEntry.data.log}</span>

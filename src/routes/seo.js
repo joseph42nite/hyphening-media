@@ -2,17 +2,15 @@ import { Router } from 'express';
 import db from '../../database.js';
 import { authenticate } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { cancelRun, getActiveRunsForClient, getRun, listQueue, broadcastRunLog } from '../services/agentRuns.js';
-import { startAgentRun, abortOpenClawRun, isAbortSupported } from '../services/agentRunner.js';
-
-const IN_FLIGHT_FOR_ABORT = ['queued', 'running'];
+import { cancelRun, getActiveRunsForClient, listQueue } from '../services/agentRuns.js';
+import { startAgentRun } from '../services/agentRunner.js';
 
 // Skills that cannot produce a real result, and why. Authoritative — the
 // trigger route rejects these, and /seo/agents/status reports the reason so the
 // dashboard can render it rather than keeping a second copy of this list.
 //
-// Rewritten 2026-08-04 when audits moved from OpenClaw to the claude-seo plugin
-// running on the local worker. All 25 skills are now installed, so the previous
+// Rewritten 2026-08-04 when audits moved to the claude-seo plugin running on
+// the local worker. All 25 skills are now installed, so the previous
 // "no skill exists" entries are gone; what remains is skills whose external
 // dependency is genuinely absent. That distinction matters — a skill with no
 // data source does not fail, it writes a plausible-looking audit from training
@@ -212,43 +210,6 @@ const ALL_SCORE_COLUMNS = [
 ];
 
 /**
- * Our audit type -> OpenClaw's skill name. Mirrors the trigger phrase built in
- * openclaw_seo_runner.js: underscores become hyphens, and 'full' is 'seo-audit'
- * on their side.
- */
-function skillNameForAuditType(agentType) {
-  return agentType === 'full' ? 'seo-audit' : `seo-${agentType.replace(/_/g, '-')}`;
-}
-
-/**
- * What OpenClaw last reported about the skill backing this audit type.
- *
- * `enforced` is false until an inventory has been received at all, so a fresh
- * install does not have every agent disabled by an empty table.
- */
-export function skillStateFor(agentType) {
-  const skillName = skillNameForAuditType(agentType);
-  const anyReport = db.prepare('SELECT COUNT(*) AS n FROM agent_skills').get().n > 0;
-  if (!anyReport) return { enforced: false, ok: true, skillName };
-
-  const row = db.prepare('SELECT * FROM agent_skills WHERE name = ?').get(skillName);
-  if (!row) {
-    return {
-      enforced: true, ok: false, skillName,
-      reason: `Agent runner has no skill named '${skillName}' installed`,
-      reportedAt: null,
-    };
-  }
-  if (!row.healthy) {
-    const why = !row.frontmatter_parsed
-      ? `'${skillName}' has unreadable frontmatter, so OpenClaw cannot discover it${row.frontmatter_error ? ` (${row.frontmatter_error})` : ''}`
-      : `'${skillName}' has a byte-order mark before its frontmatter, which prevents discovery`;
-    return { enforced: true, ok: false, skillName, reason: why, reportedAt: row.reported_at };
-  }
-  return { enforced: true, ok: true, skillName, reportedAt: row.reported_at };
-}
-
-/**
  * External data source each skill genuinely depends on.
  *
  * Only skills that are useless without a specific source are listed. `technical`
@@ -435,7 +396,6 @@ router.get('/:id/seo/agents/status', (req, res) => {
           createdAt: activeRun.created_at,
           startedAt: activeRun.started_at,
           requestedBy: activeRun.requested_by,
-          openclawRunId: activeRun.openclaw_run_id
         }
       });
     }
@@ -548,16 +508,11 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
       competitorDomain = competitor.domain;
     }
 
-    // Refuse skills OpenClaw cannot actually serve. This was previously
-    // enforced only in SeoMonitorTab, which meant it guarded the buttons and
-    // nothing else — a direct API call, a stale tab or a scheduled run went
-    // straight through.
-    //
-    // Not merely wasteful. OpenClaw confirmed 2026-08-03 that a run with no
-    // matching skill does not fail: the model answers from training knowledge,
-    // completes the workflow and POSTs a create_seo_audit anyway. The result is
-    // a fabricated audit row, indistinguishable from a real one, which then
-    // feeds the freshness gate and the client's report.
+    // Refuse skills that cannot produce a real result. Enforced here, not
+    // just on the dashboard buttons, so a direct API call or scheduled run is
+    // stopped too: a skill without its data source does not fail, it writes a
+    // plausible audit from training knowledge, which then feeds the freshness
+    // gate and the client's report.
     // Scoped to this client. A drift baseline belongs to a site, so an
     // unscoped lookup would clear the check for every client as soon as any one
     // of them had a baseline — unblocking in the unsafe direction, which for
@@ -569,21 +524,6 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
         error: 'skill_unavailable',
         agentType,
         message: `'${agentType}' cannot be run: ${unavailable}`
-      });
-    }
-
-    // Refuse a skill OpenClaw has reported as broken or absent.
-    //
-    // Only enforced once an inventory has actually been received — before the
-    // first report we know nothing, and blocking on an empty table would
-    // disable every agent. Skipped entirely in that case.
-    const skillState = skillStateFor(agentType);
-    if (skillState.enforced && !skillState.ok) {
-      return res.status(400).json({
-        error: 'skill_unhealthy',
-        agentType,
-        skill: skillState.skillName,
-        message: `'${agentType}' cannot be run: ${skillState.reason} (as of OpenClaw's inventory at ${skillState.reportedAt}).`
       });
     }
 
@@ -687,9 +627,7 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
         model: selectedModel,
         requestedBy: req.user.email,
         pendingActionId: actionResult.lastInsertRowid,
-        // Per-skill routing: conf.agent_id names the OpenClaw agent, and the
-        // agent determines the model. req.body.agentId allows a one-off
-        // override for comparing two agents on the same skill.
+        // Recorded on the run for reference; the worker does not route on it.
         agentId: req.body.agentId || conf.agent_id || null,
         competitorDomain
       });
@@ -707,8 +645,8 @@ router.post('/:id/seo/trigger/:agentType', (req, res) => {
       logAction({
         actorId: req.user.id,
         actorEmail: req.user.email,
-        action: 'openclaw_auto_approved',
-        entityType: 'openclaw_action',
+        action: 'seo_run_auto_approved',
+        entityType: 'pending_action',
         entityId: actionResult.lastInsertRowid,
         diff: { agentType, client: client.name, status: 'auto_approved' }
       });
@@ -1002,65 +940,12 @@ router.post('/:id/seo/competitors/:competitorId/audit/:agentType', (req, res) =>
 
 /**
  * Client-agnostic queue routes, mounted at /api/seo.
- * The dashboard reads these to answer "what is OpenClaw actually working on
+ * The dashboard reads these to answer "what is the worker actually doing
  * right now?" — the question that used to be unanswerable, which is how
  * duplicate jobs got queued in the first place.
  */
 export const queueRouter = Router();
 queueRouter.use(authenticate);
-
-/**
- * GET /api/seo/skills
- * What OpenClaw last reported it has installed, plus the diff against what we
- * expect. Drives the skill-health panel and explains a skill_unhealthy refusal.
- */
-queueRouter.get('/skills', (req, res) => {
-  try {
-    const report = db.prepare(
-      'SELECT * FROM agent_skill_reports ORDER BY id DESC LIMIT 1'
-    ).get();
-
-    if (!report) {
-      return res.json({
-        reported: false,
-        message: 'Agent runner has not reported a skill inventory yet. Skill health checks are not being enforced.',
-        skills: [],
-      });
-    }
-
-    const skills = db.prepare('SELECT * FROM agent_skills ORDER BY name ASC').all();
-
-    // Which audit types the dashboard can actually run, decided by the same
-    // rule the trigger route applies, so the UI cannot disagree with it.
-    const configured = db.prepare('SELECT audit_type FROM agent_run_config').all();
-    const byAuditType = {};
-    for (const { audit_type } of configured) {
-      const state = skillStateFor(audit_type);
-      byAuditType[audit_type] = {
-        skill: state.skillName,
-        ok: state.ok,
-        reason: state.reason || null,
-        blockedLocally: unavailableReason(audit_type) || null,
-      };
-    }
-
-    res.json({
-      reported: true,
-      reportedAt: report.reported_at,
-      trigger: report.trigger,
-      runnerModel: report.runner_model,
-      skillCount: report.skill_count,
-      unhealthyCount: report.unhealthy_count,
-      missingSkills: JSON.parse(report.missing_skills || '[]'),
-      unexpectedSkills: JSON.parse(report.unexpected_skills || '[]'),
-      skills,
-      byAuditType,
-    });
-  } catch (err) {
-    console.error('[SEO ROUTE] Skill inventory error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 /**
  * GET /api/seo/queue
@@ -1070,9 +955,7 @@ queueRouter.get('/queue', (req, res) => {
   try {
     const recentLimit = Math.min(parseInt(req.query.recentLimit, 10) || 20, 100);
     const { active, recent } = listQueue({ recentLimit });
-    // Drives the dashboard wording: without a real abort, cancelling frees the
-    // slot but saves nothing, and saying otherwise would be a lie.
-    res.json({ active, recent, abortSupported: isAbortSupported() });
+    res.json({ active, recent });
   } catch (err) {
     console.error('[SEO ROUTE] Queue fetch error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -1081,26 +964,12 @@ queueRouter.get('/queue', (req, res) => {
 
 /**
  * POST /api/seo/runs/:runId/cancel
- * Releases our queue slot and stops waiting for the result. This does not
- * interrupt work already running inside OpenClaw — see the OpenClaw asks in
- * the README for the gateway capability that would make it a true cancel.
+ * Releases the queue slot and stops waiting for the result. A run a worker has
+ * already picked up finishes there; its audit is kept when it arrives
+ * (claimOrphanedCancelledRun) but no longer closes a live run.
  */
-queueRouter.post('/runs/:runId/cancel', async (req, res) => {
+queueRouter.post('/runs/:runId/cancel', (req, res) => {
   try {
-    // Ask OpenClaw to stop the work first, while the run is still in flight.
-    // If that isn't configured or fails, the cancel still proceeds — freeing
-    // the slot must never depend on the gateway being reachable.
-    const target = getRun(req.params.runId);
-    let abort = { ok: false, reason: 'not_configured' };
-    if (target && IN_FLIGHT_FOR_ABORT.includes(target.status)) {
-      abort = await abortOpenClawRun(target);
-      if (abort.ok) {
-        broadcastRunLog(target, '[SYSTEM] OpenClaw confirmed the run was aborted. Token spend stopped.');
-      } else if (abort.reason !== 'not_configured') {
-        broadcastRunLog(target, `[SYSTEM] Abort request to OpenClaw failed (${abort.reason}). Freeing the slot anyway; the job may still be running.`);
-      }
-    }
-
     const { run, error } = cancelRun(req.params.runId, req.user.email);
 
     if (error === 'not_found') return res.status(404).json({ error: 'Run not found' });
@@ -1112,16 +981,15 @@ queueRouter.post('/runs/:runId/cancel', async (req, res) => {
       action: 'seo_run_cancelled',
       entityType: 'seo_agent_run',
       entityId: run.id,
-      diff: { agentType: run.agent_type, clientId: run.client_id, openclawRunId: run.openclaw_run_id, aborted: abort.ok }
+      diff: { agentType: run.agent_type, clientId: run.client_id },
     });
 
     res.json({
       success: true,
       run,
-      aborted: abort.ok,
-      message: abort.ok
-        ? 'Run aborted inside OpenClaw and cancelled here. Token spend stopped.'
-        : 'Run cancelled and the queue slot freed. OpenClaw was not interrupted, so this job keeps running until it finishes on its own.'
+      message: run.started_at
+        ? 'Run cancelled and the queue slot freed. The worker had already started it, so it finishes on its own.'
+        : 'Run cancelled before a worker picked it up.',
     });
   } catch (err) {
     console.error('[SEO ROUTE] Cancel run error:', err);

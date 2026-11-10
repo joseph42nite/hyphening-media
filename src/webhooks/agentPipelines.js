@@ -1,7 +1,6 @@
 /**
  * Handlers for the bots' and workers' own pipelines: the night blog and SEO
- * runs (claim, log, queue, review), competitor discovery, SEO run claims, the
- * skill inventory and agent activity lines.
+ * runs (claim, log, queue, review), competitor discovery and SEO run claims.
  * Dispatched from src/routes/webhooks.js after the signature check.
  */
 
@@ -26,7 +25,7 @@ import { getRun, broadcastRunLog } from '../services/agentRuns.js';
 export function handleClaimBlogRuns(payload) {
   const limit = Math.min(parseInt(payload?.limit, 10) || 1, 5);
   const runs = claimBlogRuns(payload?.worker_id || 'local', limit);
-  if (runs.length) console.log(`[OPENCLAW] Blog worker '${payload?.worker_id || 'local'}' claimed ${runs.length} run(s): ${runs.map(r => `#${r.run_id}`).join(', ')}`);
+  if (runs.length) console.log(`[WEBHOOK] Blog worker '${payload?.worker_id || 'local'}' claimed ${runs.length} run(s): ${runs.map(r => `#${r.run_id}`).join(', ')}`);
   return { success: true, summary: `Claimed ${runs.length} blog run(s)`, data: { runs } };
 }
 
@@ -124,8 +123,7 @@ export function handleBlogRunLog(payload) {
  * read because it spawned the process itself. A pull worker runs on another
  * machine, so it has to send its own progress — otherwise a run shows as
  * `running` for several minutes with nothing to indicate whether it is working
- * or hung, which is exactly the blindness that made the OpenClaw failures so
- * slow to diagnose.
+ * or hung.
  *
  * Not persisted, matching the existing terminal behaviour: this is a live view,
  * and the durable record is the audit plus the artifacts on the worker.
@@ -246,7 +244,7 @@ export function handleClaimSeoRuns(payload) {
 
   const runs = claim();
   if (runs.length) {
-    console.log(`[OPENCLAW] Worker '${worker}' claimed ${runs.length} SEO run(s): ${runs.map(r => `#${r.id} ${r.agent_type}`).join(', ')}`);
+    console.log(`[WEBHOOK] Worker '${worker}' claimed ${runs.length} SEO run(s): ${runs.map(r => `#${r.id} ${r.agent_type}`).join(', ')}`);
   }
 
   return {
@@ -282,104 +280,6 @@ export function handleClaimSeoRuns(payload) {
       })),
     },
   };
-}
-
-/**
- * Stores OpenClaw's report of what it actually has installed.
- *
- * Each report is a full snapshot, so the skills table is replaced wholesale —
- * a skill that vanishes from OpenClaw must vanish here rather than linger as a
- * stale healthy row and keep its trigger enabled.
- */
-export function handleSkillInventoryReport(payload) {
-  if (!Array.isArray(payload?.skills)) {
-    return { success: false, summary: 'skills must be an array' };
-  }
-
-  const reportedAt = payload.reported_at || new Date().toISOString();
-  const bool = (v) => (v ? 1 : 0);
-
-  // A skill is usable only if its frontmatter parsed and no BOM precedes it —
-  // the two conditions that made seo-geo undiscoverable. The webhook pointer is
-  // recorded but deliberately excluded here; see migration 058.
-  const isHealthy = (s) => bool(s.frontmatter_parsed && !s.bom_present);
-  const unhealthy = payload.skills.filter(s => !isHealthy(s)).map(s => s.name || s.dirname);
-
-  const store = db.transaction(() => {
-    const reportId = db.prepare(`
-      INSERT INTO agent_skill_reports (
-        reported_at, trigger, runner_model, skill_count, unhealthy_count,
-        missing_skills, unexpected_skills
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      reportedAt,
-      payload.trigger || 'on_demand',
-      payload.runner_model || null,
-      payload.skills.length,
-      unhealthy.length,
-      JSON.stringify(payload.missing_skills || []),
-      JSON.stringify(payload.unexpected_skills || [])
-    ).lastInsertRowid;
-
-    db.prepare('DELETE FROM agent_skills').run();
-
-    const insert = db.prepare(`
-      INSERT INTO agent_skills (
-        report_id, name, version, dirname, byte_size, sha256, lines,
-        frontmatter_parsed, frontmatter_error, bom_present, has_references,
-        has_templates, has_assets, webhook_pointer_present, last_modified,
-        healthy, reported_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    for (const s of payload.skills) {
-      const name = s.name || s.dirname;
-      if (!name) continue;
-      insert.run(
-        reportId, name, s.version || null, s.dirname || null,
-        s.byte_size ?? null, s.sha256 || null, s.lines ?? null,
-        bool(s.frontmatter_parsed), s.frontmatter_error || null,
-        bool(s.bom_present), bool(s.has_references), bool(s.has_templates),
-        bool(s.has_assets), bool(s.webhook_pointer_present),
-        s.last_modified || null, isHealthy(s), reportedAt
-      );
-    }
-
-    return reportId;
-  });
-
-  const reportId = store();
-
-  const missing = payload.missing_skills || [];
-  if (unhealthy.length || missing.length) {
-    console.warn(`[AGENT] Skill inventory #${reportId}: ${unhealthy.length} unhealthy${unhealthy.length ? ` (${unhealthy.join(', ')})` : ''}, ${missing.length} missing${missing.length ? ` (${missing.join(', ')})` : ''}.`);
-  } else {
-    console.log(`[AGENT] Skill inventory #${reportId}: ${payload.skills.length} skills, all healthy.`);
-  }
-
-  return {
-    success: true,
-    summary: `Skill inventory recorded: ${payload.skills.length} skills, ${unhealthy.length} unhealthy, ${missing.length} missing.`
-  };
-}
-
-export function handleAgentActivityLog(payload) {
-  const { action, status, summary, client, details } = payload;
-  if (!action || !status || !summary) {
-    return { success: false, summary: 'action, status, and summary are required for activity log' };
-  }
-
-  db.prepare(`
-    INSERT INTO agent_activity_log (action, status, summary, client, details)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(action, status, summary, client || null, details ? JSON.stringify(details) : null);
-
-  // Broadcast activity log to frontend in real-time
-  import('../../server.js').then(({ broadcastEvent }) => {
-    broadcastEvent('agent_activity_log', payload);
-  }).catch(err => console.error('[WEBHOOK] Broadcast agent_activity_log failed:', err));
-
-  return { success: true, summary: `Logged activity: ${summary}` };
 }
 
 /** Boothroyd's weekly start: one outreach run per SEO-on client, then wake the Mac's outreach worker. */

@@ -82,7 +82,7 @@ async function log(runId, line) {
  * on its own, both because this run arrives already past those checks:
  *
  * 1. Section "Gated Execution & Dashboard Integration" §1 (Pre-Execution Gate
- *    & Approvals) assumes the skill is checking `openclaw_pending_actions` and
+ *    & Approvals) assumes the skill is checking `pending_actions` and
  *    an "Approvals Tab" itself. That tab does not exist in this codebase (the
  *    Approval Center was built, then abandoned — src/routes/seo.js now hard-
  *    403s non-admins instead of staging an approval). A run only reaches this

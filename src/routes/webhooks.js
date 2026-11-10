@@ -1,20 +1,16 @@
 /**
- * Marketing Ops Center — signed webhook for automation clients.
+ * Marketing Ops Center — signed webhook for our own workers.
  *
  * HMAC-SHA256 verification over the raw request bytes, replay prevention via
- * nonce and timestamp, and handlers for every entity an automation client can
- * write.
+ * nonce and timestamp, and the event switch. The callers are the local SEO,
+ * blog, ads, outreach and fix workers (scripts/lib/hook.mjs): they claim queued
+ * runs, stream progress and submit results.
  *
- * Two callers share it. OpenClaw posts blog content and ops writes; the local
- * SEO worker claims queued runs, streams progress, and submits audits. It was
- * named after OpenClaw when it had one caller — the mount path is still
- * /api/openclaw because both sign against it and changing a wire format earns
- * nothing.
+ * The x-openclaw-* header names are from the system this replaced; the workers
+ * send them, so they stay as the wire format.
  *
- * This file is the door: signature, replay check and the event switch. The
- * handlers live in src/webhooks/ by area: agentPipelines (night blog and SEO,
- * competitors, skill inventory), records (tasks, content, clients, artists,
- * blog posts...), seoAudits and adsAudits.
+ * Handlers live in src/webhooks/ by area: agentPipelines (night blog and SEO,
+ * competitors), records (blog posts), seoAudits and adsAudits.
  */
 
 import { Router } from 'express';
@@ -22,7 +18,6 @@ import crypto from 'crypto';
 import db from '../../database.js';
 import { manualSummaryLines } from '../services/manualTasks.js';
 import { webhookLimiter } from '../middleware/rateLimit.js';
-import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import {
   submitBlogDraft,
@@ -53,48 +48,14 @@ import {
   handleSeoRunLog,
   handleReportCompetitors,
   handleClaimSeoRuns,
-  handleSkillInventoryReport,
-  handleAgentActivityLog,
 } from '../webhooks/agentPipelines.js';
-import {
-  handleCreateTask,
-  handleUpdateTask,
-  handleCreateContent,
-  handleUpdateContent,
-  handleCreateAdCampaign,
-  handleUpdateAdCampaign,
-  handleUpsertMonthlyReport,
-  handleCreateScript,
-  handleUpdateScript,
-  handleCreateClient,
-  handleUpdateClient,
-  handleCreateArtist,
-  handleUpdateArtist,
-  handleCreateVenue,
-  handleUpdateVenue,
-  handleCreateGig,
-  handleUpdateGig,
-  handleCreateFreelancer,
-  handleUpdateFreelancer,
-  handleSendChatMessage,
-  handleUpdateKnowledge,
-  handleOptimizeQueue,
-  handleCreateBlogPost,
-  handleUpdateBlogPost,
-} from '../webhooks/records.js';
+import { handleCreateBlogPost, handleUpdateBlogPost } from '../webhooks/records.js';
 import { handleCreateSeoAudit } from '../webhooks/seoAudits.js';
 import { handleClaimAdsRuns, handleAdsRunLog, handleCreateAdsAudit } from '../webhooks/adsAudits.js';
 
 // Every event a signed caller may send; each has a case in executeEvent below.
 export const KNOWN_EVENTS = [
-  'create_task', 'update_task', 'create_content', 'update_content',
-  'create_ad_campaign', 'update_ad_campaign', 'upsert_monthly_report',
-  'create_script', 'update_script', 'create_client', 'update_client',
-  'create_artist', 'update_artist', 'create_venue', 'update_venue',
-  'create_gig', 'update_gig', 'create_freelancer', 'update_freelancer',
-  'send_chat_message', 'update_knowledge', 'optimize_queue',
-  'create_blog_post', 'update_blog_post', 'create_seo_audit',
-  'agent_activity_log', 'skill_inventory_report', 'claim_seo_runs',
+  'create_blog_post', 'update_blog_post', 'create_seo_audit', 'claim_seo_runs',
   'seo_run_log', 'report_competitors',
   'claim_ads_runs', 'create_ads_audit', 'ads_run_log',
   'claim_blog_runs', 'submit_blog_draft', 'fail_blog_run', 'attach_blog_audio',
@@ -109,12 +70,9 @@ const router = Router();
 
 router.use(webhookLimiter);
 
-// HYPHENING_HMAC_SECRET is the current name — the shared secret now
-// authenticates our own local SEO worker as well as OpenClaw, so naming it
-// after one caller was misleading. OPENCLAW_HMAC_SECRET stays as a fallback so
-// an environment that has not been renamed yet keeps working: reading only the
-// new name on a server still using the old one leaves HMAC_SECRET empty, which
-// fails every signature check and takes the webhook down silently.
+// HYPHENING_HMAC_SECRET is the name. OPENCLAW_HMAC_SECRET stays as a fallback
+// for an environment that has not been renamed: reading only the new name there
+// leaves HMAC_SECRET empty, which fails every signature check silently.
 const HMAC_SECRET = process.env.HYPHENING_HMAC_SECRET
   || process.env.OPENCLAW_HMAC_SECRET
   || '';
@@ -186,9 +144,8 @@ function checkReplay(timestamp, nonce) {
 // ============================================================
 
 /**
- * POST /api/openclaw/webhook
- * Process incoming webhook events from OpenClaw.
- * Events are executed immediately.
+ * POST /api/webhooks/webhook (also mounted at /api/openclaw/webhook)
+ * Signed events from our workers, executed immediately.
  */
 router.post('/webhook', (req, res) => {
   try {
@@ -198,15 +155,14 @@ router.post('/webhook', (req, res) => {
 
     // Verify signature
     //
-    // Logged, because a silent 401 here is indistinguishable from OpenClaw
-    // never calling at all. A secret mismatch used to leave no trace on either
-    // side: OpenClaw reports "posted the result", our logs show nothing, and
+    // Logged, because a silent 401 here is indistinguishable from a worker
+    // never calling at all: a secret mismatch otherwise leaves no trace and
     // the run sits until it times out. The event_type is safe to log; the
     // signature itself is not, so only its length is recorded — enough to tell
     // a truncated header from a wrong secret.
     if (!signature || !verifySignature(req, signature)) {
       console.warn(
-        `[OPENCLAW] Rejected webhook (401): ${signature ? 'signature mismatch' : 'no x-openclaw-signature header'}. ` +
+        `[WEBHOOK] Rejected webhook (401): ${signature ? 'signature mismatch' : 'no x-openclaw-signature header'}. ` +
         `event_type=${req.body?.event_type || '(none)'} signature_length=${signature?.length ?? 0} ` +
         `hmac_secret_configured=${!!HMAC_SECRET}`
       );
@@ -229,7 +185,7 @@ router.post('/webhook', (req, res) => {
       // — rather than nested under "payload", which produces a 400 that is
       // otherwise indistinguishable from a genuinely malformed body.
       const received = Object.keys(req.body || {});
-      console.warn(`[OPENCLAW] Rejected webhook: missing ${!event_type ? 'event_type' : 'payload'}. Top-level keys received: ${received.join(', ') || '(none)'}`);
+      console.warn(`[WEBHOOK] Rejected webhook: missing ${!event_type ? 'event_type' : 'payload'}. Top-level keys received: ${received.join(', ') || '(none)'}`);
       return res.status(400).json({
         error: 'event_type and payload are required',
         missing: !event_type ? 'event_type' : 'payload',
@@ -241,7 +197,7 @@ router.post('/webhook', (req, res) => {
 
 
     if (!KNOWN_EVENTS.includes(event_type)) {
-      console.warn(`[OPENCLAW] Unknown event type: ${event_type}`);
+      console.warn(`[WEBHOOK] Unknown event type: ${event_type}`);
       return res.status(400).json({ error: `Unknown event type: ${event_type}`, known_events: KNOWN_EVENTS });
     }
 
@@ -264,7 +220,6 @@ router.post('/webhook', (req, res) => {
         timestamp: new Date().toISOString()
       };
       broadcastEvent('agent_webhook', payloadData);
-      broadcastEvent('openclaw_webhook', payloadData); // backward-compatible alias
     }).catch(err => console.error('[WEBHOOK] Broadcast agent_webhook failed:', err));
 
     if (!result.success) {
@@ -285,7 +240,7 @@ router.post('/webhook', (req, res) => {
       ...(result.data !== undefined ? { data: result.data } : {}),
     });
   } catch (err) {
-    console.error('[OPENCLAW] Webhook error:', err);
+    console.error('[WEBHOOK] Webhook error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -301,33 +256,9 @@ router.post('/webhook', (req, res) => {
 export function executeEvent(eventType, payload) {
   try {
     switch (eventType) {
-      case 'create_task': return handleCreateTask(payload);
-      case 'update_task': return handleUpdateTask(payload);
-      case 'create_content': return handleCreateContent(payload);
-      case 'update_content': return handleUpdateContent(payload);
-      case 'create_ad_campaign': return handleCreateAdCampaign(payload);
-      case 'update_ad_campaign': return handleUpdateAdCampaign(payload);
-      case 'upsert_monthly_report': return handleUpsertMonthlyReport(payload);
-      case 'create_script': return handleCreateScript(payload);
-      case 'update_script': return handleUpdateScript(payload);
-      case 'create_client': return handleCreateClient(payload);
-      case 'update_client': return handleUpdateClient(payload);
-      case 'create_artist': return handleCreateArtist(payload);
-      case 'update_artist': return handleUpdateArtist(payload);
-      case 'create_venue': return handleCreateVenue(payload);
-      case 'update_venue': return handleUpdateVenue(payload);
-      case 'create_gig': return handleCreateGig(payload);
-      case 'update_gig': return handleUpdateGig(payload);
-      case 'create_freelancer': return handleCreateFreelancer(payload);
-      case 'update_freelancer': return handleUpdateFreelancer(payload);
-      case 'send_chat_message': return handleSendChatMessage(payload);
-      case 'update_knowledge': return handleUpdateKnowledge(payload);
-      case 'optimize_queue': return handleOptimizeQueue(payload);
       case 'create_blog_post': return handleCreateBlogPost(payload);
       case 'update_blog_post': return handleUpdateBlogPost(payload);
       case 'create_seo_audit': return handleCreateSeoAudit(payload);
-      case 'agent_activity_log': return handleAgentActivityLog(payload);
-      case 'skill_inventory_report': return handleSkillInventoryReport(payload);
       case 'claim_seo_runs': return handleClaimSeoRuns(payload);
       case 'seo_run_log': return handleSeoRunLog(payload);
       case 'report_competitors': return handleReportCompetitors(payload);
@@ -367,13 +298,13 @@ export function executeEvent(eventType, payload) {
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }
   } catch (err) {
-    console.error(`[OPENCLAW] Error executing ${eventType}:`, err);
+    console.error(`[WEBHOOK] Error executing ${eventType}:`, err);
     // The error alone is not actionable. A CHECK constraint failure prints the
     // whole allowed-values list but never the value that violated it, so two
     // rejected create_seo_audit calls (2026-08-03) discarded finished audits
-    // without leaving any way to tell which audit_type OpenClaw had sent. The
+    // without leaving any way to tell which audit_type had been sent. The
     // tokens were already spent, so the payload is worth a log line.
-    console.error(`[OPENCLAW] Failed payload for ${eventType}: ${safeSummarisePayload(payload)}`);
+    console.error(`[WEBHOOK] Failed payload for ${eventType}: ${safeSummarisePayload(payload)}`);
     return { success: false, summary: `Error: ${err.message}` };
   }
 }
@@ -394,101 +325,5 @@ function safeSummarisePayload(payload) {
     .join(' ');
   return `${named || '(no identifying fields)'} | keys: ${Object.keys(payload).join(', ')}`;
 }
-
-// ============================================================
-// GET PENDING ACTIONS (for debugging / admin view)
-// ============================================================
-
-/**
- * GET /api/openclaw/pending
- * List all pending actions waiting for Telegram confirmation.
- *
- * Was unauthenticated — anyone, logged in or not, could read every pending
- * action's payload (client id, requested_by email, agent type). Confirmed
- * 2026-07-30 that an OpenClaw cron was polling this route on a schedule to
- * execute run_seo_agent items directly, bypassing the admin-approval flow
- * entirely (POST /api/approval/:id/approve was never called). The withheld
- * auto_approved rows only blocked one query shape; a caller asking for
- * ?status=pending was never filtered. Authentication closes the endpoint to
- * every caller, not just that one query pattern.
- */
-router.get('/pending', authenticate, authorize('admin'), (req, res) => {
-  try {
-    const status = req.query.status;
-
-    // Auto-approved run_seo_agent rows are never served here.
-    //
-    // These are written by the admin trigger path, which ALSO calls the
-    // OpenClaw hook gateway directly in the same request. When OpenClaw's
-    // seo-audit-queue-poller was polling this endpoint for auto_approved
-    // items, every admin trigger therefore ran twice and billed twice — and
-    // the in-flight guard on seo_agent_runs cannot catch it, because the
-    // poller path never reaches our backend at all.
-    //
-    // The poller has been disabled on OpenClaw's side (2026-07-28), but that
-    // is a config flag someone could flip back. Withholding the rows makes
-    // the duplicate impossible rather than merely switched off. The rows are
-    // still written, and still readable through the approval history views —
-    // they are just no longer a work queue anyone can pick up.
-    //
-    // The staff approval flow is unaffected: those rows are 'pending' until
-    // an admin resolves them, and approval.js reads them directly.
-    const conditions = ["NOT (action_type = 'run_seo_agent' AND status = 'auto_approved')"];
-    const params = [];
-
-    if (status) {
-      conditions.push('status = ?');
-      params.push(status);
-    }
-
-    const query = `SELECT * FROM pending_actions WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC LIMIT 50`;
-
-    const actions = db.prepare(query).all(...params);
-    res.json({ pending_actions: actions });
-  } catch (err) {
-    console.error('[WEBHOOK] Pending list error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * GET /api/webhooks/activity (and /api/openclaw/activity)
- * List all activity logs.
- */
-router.get('/activity', authenticate, (req, res) => {
-  try {
-    const { limit = 50, offset = 0, action } = req.query;
-
-    let query = 'SELECT * FROM agent_activity_log';
-    const params = [];
-
-    if (action) {
-      query += ' WHERE action = ?';
-      params.push(action);
-    }
-
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit, 10));
-    params.push(parseInt(offset, 10));
-
-    const logs = db.prepare(query).all(...params);
-    
-    // Also get total count for pagination
-    let countQuery = 'SELECT COUNT(*) as count FROM agent_activity_log';
-    if (action) {
-      countQuery += ' WHERE action = ?';
-      const countResult = db.prepare(countQuery).get(action);
-      res.json({ logs, total: countResult.count });
-    } else {
-      const countResult = db.prepare(countQuery).get();
-      res.json({ logs, total: countResult.count });
-    }
-
-  } catch (err) {
-    console.error('[WEBHOOK] Activity log fetch error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 
 export default router;

@@ -24,7 +24,7 @@ import { getMode } from './automationMode.js';
 const WORKER_AREAS = ['offsite', 'gbp', 'google', 'content', 'ad_account', 'business', 'other'];
 import { startAgentRun } from './agentRunner.js';
 import { getActiveRunsForClient } from './agentRuns.js';
-import { unavailableReason, skillStateFor, resolveAuditScore } from '../routes/seo.js';
+import { unavailableReason, resolveAuditScore } from '../routes/seo.js';
 
 export const NIGHT_FIXES_PER_CLIENT = 8;
 const TRIAGE_LIMIT = 40;
@@ -108,7 +108,6 @@ export function dueSkills(clientId) {
     })
     .filter((r) => r.overdue_days >= 0)
     .filter((r) => !unavailableReason(r.audit_type, clientId))
-    .filter((r) => { const s = skillStateFor(r.audit_type); return !s.enforced || s.ok; })
     .sort((a, b) => b.overdue_days - a.overdue_days);
 }
 
