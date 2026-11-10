@@ -29,6 +29,8 @@ import { tmpdir } from 'os';
 import dotenv from 'dotenv';
 import { hook, API } from './lib/hook.mjs';
 import { firstJsonObject, runClaude } from './lib/proc.mjs';
+import { probe as probeDataForSeo } from './lib/dataforseo.mjs';
+import { ensureDriftBaseline } from './lib/drift.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Explicit path, not dotenv's cwd-relative default: cron's working directory
@@ -60,7 +62,11 @@ if (!SECRET) {
  * and only the command token is valid after `/seo `.
  */
 function commandFor(job) {
-  return job.audit_type === 'full' ? 'audit' : job.audit_type.replace(/_/g, '-');
+  if (job.audit_type === 'full') return 'audit';
+  // seo-drift has three sub-commands; the card's job is comparing against the
+  // baseline the worker captures (lib/drift.mjs).
+  if (job.audit_type === 'drift') return 'drift compare';
+  return job.audit_type.replace(/_/g, '-');
 }
 
 
@@ -178,8 +184,15 @@ async function runJob(job) {
     // Identity is ours to assert, not the model's — same reasoning as
     // ads_worker.mjs: a reply that renamed its own audit_type would be stored
     // against the wrong card.
+    // What this Mac can reach, checked by us rather than claimed by the model:
+    // src/routes/seo.js unlocks the DataForSEO cards only on this field.
+    const report = parsed.report_json && typeof parsed.report_json === 'object' ? parsed.report_json : {};
+    const { balance, ...dataforseo } = await probeDataForSeo();
+    // Drift baselines belong to our own clients' sites, never a competitor's.
+    const drift_baseline = job.is_competitor ? undefined : await ensureDriftBaseline(job.url);
     const payload = {
       ...parsed,
+      report_json: { ...report, capabilities: { ...(report.capabilities || {}), dataforseo, ...(drift_baseline && { drift_baseline }) } },
       run_id: job.run_id,
       client_id: job.client_id,
       audit_type: job.audit_type,

@@ -33,6 +33,32 @@ export function hasLogin() {
 }
 
 /**
+ * Whether DataForSEO answers for this login right now, for the SEO worker's
+ * capabilities report (src/routes/seo.js reads report_json.capabilities.dataforseo
+ * to unlock the DataForSEO, Maps and Backlink gap cards). Uses appendix/user_data,
+ * which is free. Never throws: { available, reason?, balance? }.
+ */
+export async function probe() {
+  if (!hasLogin()) return { available: false, reason: 'missing' };
+  const auth = Buffer.from(`${process.env.DATAFORSEO_LOGIN}:${process.env.DATAFORSEO_PASSWORD}`).toString('base64');
+  try {
+    const res = await fetch(`${BASE}/appendix/user_data`, {
+      headers: { Authorization: `Basic ${auth}` },
+      signal: AbortSignal.timeout(20000),
+    });
+    const body = await res.json().catch(() => ({}));
+    const task = body.tasks?.[0];
+    const code = task?.status_code ?? body.status_code ?? res.status;
+    if (code !== 20000) return { available: false, reason: classify(code, task?.status_message || body.status_message) };
+    const balance = task.result?.[0]?.money?.balance;
+    if (typeof balance === 'number' && balance <= 0) return { available: false, reason: 'funds', balance };
+    return { available: true, balance };
+  } catch (err) {
+    return { available: false, reason: 'other', error: err.message };
+  }
+}
+
+/**
  * One live call; returns { items, cost }. `cost` is DataForSEO's own figure in USD.
  * A server error on their side (HTTP 5xx or 5xxxx) is tried once more.
  */

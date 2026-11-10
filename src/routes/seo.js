@@ -25,8 +25,8 @@ const UNAVAILABLE_SKILLS = new Map([
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
   // 'google' was unblocked 2026-08-04: the worker reports tier 0, so PageSpeed,
   // CrUX and CrUX History return real field data. Search Console, Indexing and
-  // GA4 still need a service account, and facts.mjs records that per run so the
-  // report states them as unavailable instead of estimating.
+  // GA4 still need a service account; the worker's prompt has the skill say so
+  // in data_availability instead of estimating.
 ]);
 
 /**
@@ -41,9 +41,9 @@ const UNAVAILABLE_SKILLS = new Map([
  * silently, and this list is copied into two other files, so it decays three
  * times over.
  *
- * The worker already reports what it can reach: facts.mjs probes DataForSEO on
- * every run and the capabilities land in seo_audits.report_json, which
- * detectDataGap() below already reads for exactly this purpose.
+ * The worker reports what it can reach: scripts/seo_worker.mjs probes DataForSEO
+ * (lib/dataforseo.mjs probe) and the client's drift baseline (lib/drift.mjs)
+ * after every run, and writes them to seo_audits.report_json.capabilities.
  */
 // backlink_gap belongs here too: the comparison it exists to make comes from
 // backlinks_domain_intersection, which has no free equivalent at all. Moz
