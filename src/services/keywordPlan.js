@@ -53,6 +53,9 @@ export function scoreKeyword({ search_volume: volume, difficulty, intent, positi
   if (intent === 'navigational') return { keep: false, reason: 'someone looking for a specific site' };
   if (volume == null && !nearMiss) return { keep: false, reason: 'no search data' };
   if ((volume ?? 0) < MIN_VOLUME && !nearMiss) return { keep: false, reason: 'too few searches' };
+  // DataForSEO gives misspellings ("digiatl marketing") the real keyword's
+  // volume but no difficulty, so an unscored idea is not a keyword to write for.
+  if (difficulty == null && !nearMiss) return { keep: false, reason: 'no difficulty score, often a misspelling' };
   if ((difficulty ?? 0) > MAX_DIFFICULTY && !(nearMiss && position <= 20)) return { keep: false, reason: 'too hard to rank for yet' };
 
   // Search Console impressions cover 90 days; a third is a rough month.
@@ -129,7 +132,12 @@ export async function refreshKeywords(clientId, { sources = defaultSources, now 
         for (const item of r.items) { const k = fromDfs(item); merge(k.keyword, k); }
       }
       if (seeds.length) {
-        const r = await sources.dfs('dataforseo_labs/google/keyword_ideas/live', { ...INDIA, keywords: seeds.slice(0, 20), limit: IDEAS_LIMIT });
+        // Ask only for ideas that pass the rules, in DataForSEO's relevance order;
+        // otherwise typos and big generic terms fill the limit.
+        const r = await sources.dfs('dataforseo_labs/google/keyword_ideas/live', {
+          ...INDIA, keywords: seeds.slice(0, 20), limit: IDEAS_LIMIT,
+          filters: [['keyword_properties.keyword_difficulty', '<=', MAX_DIFFICULTY], 'and', ['keyword_info.search_volume', '>=', MIN_VOLUME]],
+        });
         cost += r.cost;
         for (const item of r.items) {
           const k = fromDfs(item);

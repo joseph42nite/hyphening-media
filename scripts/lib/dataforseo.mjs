@@ -32,8 +32,21 @@ export function hasLogin() {
   return Boolean(process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD);
 }
 
-/** One live call; returns { items, cost }. `cost` is DataForSEO's own figure in USD. */
-export async function dfs(path, task) {
+/**
+ * One live call; returns { items, cost }. `cost` is DataForSEO's own figure in USD.
+ * A server error on their side (HTTP 5xx or 5xxxx) is tried once more.
+ */
+export async function dfs(path, task, { retryDelayMs = 3000 } = {}) {
+  try {
+    return await dfsOnce(path, task);
+  } catch (err) {
+    if (!err.retryable) throw err;
+    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+    return dfsOnce(path, task);
+  }
+}
+
+async function dfsOnce(path, task) {
   if (!hasLogin()) throw new DataForSeoError('missing', 'DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD are not in the Mac\'s .env');
   const auth = Buffer.from(`${process.env.DATAFORSEO_LOGIN}:${process.env.DATAFORSEO_PASSWORD}`).toString('base64');
   let res;
@@ -45,17 +58,18 @@ export async function dfs(path, task) {
       signal: AbortSignal.timeout(120000),
     });
   } catch (err) {
-    throw new DataForSeoError('other', `DataForSEO unreachable: ${err.cause?.code || err.message}`);
+    throw Object.assign(new DataForSeoError('other', `DataForSEO unreachable: ${err.cause?.code || err.message}`), { retryable: true });
   }
   const json = await res.json().catch(() => ({}));
-  const top = json.status_code;
-  if (!res.ok || (top && top !== 20000)) {
-    const code = top && top !== 20000 ? top : res.status;
-    throw new DataForSeoError(classify(code, json.status_message), `DataForSEO ${path}: ${code} ${json.status_message || res.statusText}`);
-  }
   const t = json.tasks?.[0];
-  if (t && t.status_code !== 20000) {
-    throw new DataForSeoError(classify(t.status_code, t.status_message), `DataForSEO ${path}: ${t.status_code} ${t.status_message}`);
+  // The most specific failure wins: the call's, then the task's, then HTTP's.
+  const failed = [[json.status_code, json.status_message], [t?.status_code, t?.status_message]]
+    .find(([code]) => code && code !== 20000);
+  if (failed || !res.ok) {
+    const [code, message] = failed || [res.status, `HTTP error ${res.statusText || ''}`.trim()];
+    const err = new DataForSeoError(classify(code, message), `DataForSEO ${path}: ${code} ${message || ''}`.trim());
+    err.retryable = (code >= 500 && code < 600) || (code >= 50000 && code < 60000);
+    throw err;
   }
   const result = t?.result?.[0] || {};
   return { items: result.items || [], cost: Number(json.cost) || 0 };

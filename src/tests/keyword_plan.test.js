@@ -57,6 +57,8 @@ describe('scoreKeyword', () => {
     expect(scoreKeyword({ search_volume: 500, difficulty: MAX_DIFFICULTY + 1, intent: 'commercial' }).reason).toBe('too hard to rank for yet');
     expect(scoreKeyword({ search_volume: 500, difficulty: 5, intent: 'navigational' }).keep).toBe(false);
     expect(scoreKeyword({ search_volume: null, difficulty: null, intent: null }).reason).toBe('no search data');
+    // DataForSEO's misspellings come with the real keyword's volume but no difficulty.
+    expect(scoreKeyword({ search_volume: 246000, difficulty: null, intent: 'commercial' }).reason).toMatch(/no difficulty score/);
   });
 
   it('gives near misses leeway and a boost', () => {
@@ -77,6 +79,7 @@ describe('refreshKeywords', () => {
         item('dentist in hsr layout', 260, 12, 'transactional'),
         item('dental clinic hsr', 30, 70, 'commercial'),   // too hard
         item('teeth trivia', 5, 2, 'informational'),       // too few searches
+        item('dentsit in hsr layout', 260, null, 'transactional'), // a typo: no difficulty
       ],
     });
     const r = await refreshKeywords(id, { sources });
@@ -86,10 +89,21 @@ describe('refreshKeywords', () => {
     // Only near misses go to keyword_overview; the page already at #1.2 does not.
     expect(sources.calls[0].task.keywords).toEqual(['root canal cost bangalore']);
     expect(sources.calls[1].task.keywords).toEqual(['dentist hsr layout']);
+    // Only ideas that can pass the rules are asked for.
+    expect(sources.calls[1].task.filters).toEqual([
+      ['keyword_properties.keyword_difficulty', '<=', MAX_DIFFICULTY], 'and', ['keyword_info.search_volume', '>=', MIN_VOLUME],
+    ]);
 
     const saved = rows(id);
     expect(saved.map(k => k.keyword)).toEqual(['dentist in hsr layout', 'root canal cost bangalore']);
     expect(saved[1]).toMatchObject({ source: 'search_console', position: 12.3, impressions: 120, search_volume: 90, status: 'candidate' });
+  });
+
+  it('drops an unscored candidate saved before the misspelling rule', async () => {
+    const id = makeClient({ seeds: null });
+    db.prepare("INSERT INTO seo_keywords (client_id, keyword, source, search_volume, intent, score) VALUES (?, 'digiatl marketing', 'ideas', 246000, 'commercial', 255840)").run(id);
+    await refreshKeywords(id, { sources: fakeSources({ queries: [] }) });
+    expect(rows(id)).toEqual([]);
   });
 
   it('notes what is missing instead of failing', async () => {

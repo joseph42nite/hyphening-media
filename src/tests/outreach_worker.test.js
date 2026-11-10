@@ -112,4 +112,25 @@ describe('dataforseo client', () => {
     answer({ status_code: 20000, cost: 0.02, tasks: [{ status_code: 20000, result: [{ items: [{ domain: 'a' }] }] }] });
     await expect(dfs('x', {})).resolves.toEqual({ items: [{ domain: 'a' }], cost: 0.02 });
   });
+
+  it('tries a DataForSEO server error once more and names the real error', async () => {
+    process.env.DATAFORSEO_LOGIN = 'l';
+    process.env.DATAFORSEO_PASSWORD = 'p';
+    let calls = 0;
+    const ok = { status_code: 20000, cost: 0.01, tasks: [{ status_code: 20000, result: [{ items: [{ keyword: 'a' }] }] }] };
+    globalThis.fetch = async () => (++calls === 1
+      ? { ok: false, status: 500, statusText: '', json: async () => ({ status_code: 20000, status_message: 'Ok.' }) }
+      : { ok: true, status: 200, json: async () => ok });
+    await expect(dfs('x', {}, { retryDelayMs: 0 })).resolves.toEqual({ items: [{ keyword: 'a' }], cost: 0.01 });
+    expect(calls).toBe(2);
+
+    answer({ status_code: 20000, tasks: [{ status_code: 50000, status_message: 'Internal Error.' }] });
+    await expect(dfs('x', {}, { retryDelayMs: 0 })).rejects.toThrow('x: 50000 Internal Error.');
+    answer({ status_code: 40501, status_message: 'Invalid Field' });
+    calls = 0;
+    const once = globalThis.fetch;
+    globalThis.fetch = async (...a) => { calls++; return once(...a); };
+    await expect(dfs('x', {}, { retryDelayMs: 0 })).rejects.toThrow(/40501/);
+    expect(calls).toBe(1); // a mistake in our request is not retried
+  });
 });
