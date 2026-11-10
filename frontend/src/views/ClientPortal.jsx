@@ -11,6 +11,7 @@ import logoImg from '../assets/logo.png';
 import SEOHead from '../components/SEOHead.jsx';
 import PortalBlogReviews from '../components/PortalBlogReviews.jsx';
 import GoogleAccessCard from '../components/GoogleAccessCard.jsx';
+import { formatWatchSeconds } from '../components/dashboard/contentFormHelper.js';
 
 const PRESET_REASON_OPTIONS = [
   'Out of Budget',
@@ -721,6 +722,59 @@ body.portal-active {
 }
 `;
 
+const fmtCount = (n) => (n === null || n === undefined ? '-' : Number(n).toLocaleString());
+
+/**
+ * One line per platform a post is on, each with that platform's own figures.
+ * Instagram: views, likes, comments, shares, saves, reel watch time and skip
+ * rate. YouTube: views, likes, comments, shares, average view duration and %
+ * watched. A figure the platform does not report shows as "-".
+ */
+function portalPlatformRows(item) {
+  const platform = (item.platform || '').toLowerCase();
+  const rows = [];
+  const onInstagram = !!item.instagram_media_id || platform.includes('instagram');
+  const onYouTube = !!item.youtube_video_id || platform.includes('youtube') || platform.includes('shorts');
+
+  if (onInstagram) {
+    const isReel = (item.post_type || '').toLowerCase() === 'reel';
+    rows.push({
+      platform: 'instagram',
+      label: 'Instagram',
+      views: item.views,
+      likes: item.likes,
+      comments: item.comments,
+      shares: item.shares,
+      saves: item.saves,
+      watch: item.avg_watch_time_sec != null
+        ? formatWatchSeconds(item.avg_watch_time_sec)
+        : (isReel && item.avg_watch_time_pct != null ? `${item.avg_watch_time_pct}%` : '-'),
+      skip: item.skip_rate_pct != null ? `${item.skip_rate_pct}%` : '-',
+      link: item.instagram_link || (platform.includes('instagram') ? item.link : null),
+    });
+  }
+  if (onYouTube) {
+    const duration = item.youtube_avg_view_duration;
+    const pct = item.youtube_avg_view_pct;
+    rows.push({
+      platform: 'youtube',
+      label: 'YouTube',
+      views: item.youtube_views,
+      likes: item.youtube_likes,
+      comments: item.youtube_comments,
+      shares: item.youtube_shares,
+      saves: null,
+      watch: duration ? (pct != null ? `${duration} (${pct}%)` : duration) : '-',
+      skip: '-',
+      link: item.youtube_link || (item.youtube_video_id ? `https://youtu.be/${item.youtube_video_id}` : (onInstagram ? null : item.link)),
+    });
+  }
+  if (rows.length === 0) {
+    rows.push({ platform: platform || 'other', label: item.platform || 'Other', views: item.views, likes: item.likes, comments: item.comments, shares: item.shares, saves: item.saves, watch: '-', skip: '-', link: item.link });
+  }
+  return rows;
+}
+
 function PlatformDistributionDonut({ breakdown }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isChartHovered, setIsChartHovered] = useState(false);
@@ -976,7 +1030,8 @@ function EngagementBreakdownDonut({ stats }) {
 }
 
 function PerformanceTrendChart({ data }) {
-  const [metric, setMetric] = useState('views'); // 'views' or 'engagement'
+  // Instagram + YouTube views per post, as the platforms report them.
+  const metric = 'views';
   
   if (!data || data.length === 0) {
     return (
@@ -999,12 +1054,12 @@ function PerformanceTrendChart({ data }) {
   const isViews = metric === 'views';
   
   // Calculate max val
-  const maxVal = Math.max(...data.map(d => isViews ? (d.views || 0) : (d.engagement_rate_pct || 0)), 1);
+  const maxVal = Math.max(...data.map(d => d.views || 0), 1);
   const roundedMax = isViews ? Math.ceil(maxVal / 1000) * 1000 : Math.ceil(maxVal);
 
   const points = data.map((d, index) => {
     const x = paddingLeft + (data.length > 1 ? (index / (data.length - 1)) * chartWidth : chartWidth / 2);
-    const currVal = isViews ? (d.views || 0) : (d.engagement_rate_pct || 0);
+    const currVal = d.views || 0;
     const y = paddingTop + chartHeight - (currVal / roundedMax) * chartHeight;
     return { x, y, val: currVal, date: d.date, title: d.title };
   });
@@ -1042,46 +1097,7 @@ function PerformanceTrendChart({ data }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <h3 style={{ fontSize: '0.95rem', margin: 0, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.08em', color: '#dfe7e0' }}>Content Performance Trend</h3>
-        <div style={{ display: 'flex', border: '1px solid rgba(223, 231, 224, 0.14)', borderRadius: '9999px', overflow: 'hidden', background: 'rgba(5, 7, 10, 0.85)', padding: '2px' }}>
-          <button 
-            onClick={() => setMetric('views')}
-            style={{
-              padding: '6px 16px',
-              border: 'none',
-              fontWeight: '600',
-              fontSize: '0.75rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              borderRadius: '9999px',
-              cursor: 'pointer',
-              background: isViews ? '#e0231c' : 'transparent',
-              color: isViews ? '#ffffff' : '#aab4ad',
-              boxShadow: isViews ? '0 0 14px rgba(224, 35, 28, 0.35)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            Video Views
-          </button>
-          <button 
-            onClick={() => setMetric('engagement')}
-            style={{
-              padding: '6px 16px',
-              border: 'none',
-              fontWeight: '600',
-              fontSize: '0.75rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              borderRadius: '9999px',
-              cursor: 'pointer',
-              background: !isViews ? '#e0231c' : 'transparent',
-              color: !isViews ? '#ffffff' : '#aab4ad',
-              boxShadow: !isViews ? '0 0 14px rgba(224, 35, 28, 0.35)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            Engagement %
-          </button>
-        </div>
+        <span style={{ fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500 }}>Instagram + YouTube views</span>
       </div>
 
       <div style={{ width: '100%', background: 'rgba(10, 14, 18, 0.88)', border: '1px solid rgba(223, 231, 224, 0.12)', borderTop: '1px solid rgba(223, 231, 224, 0.22)', borderRadius: '18px', padding: '20px', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.75)', boxSizing: 'border-box' }}>
@@ -2527,37 +2543,37 @@ export default function ClientPortal({ showToast }) {
               {overview.content && (
                 <>
                   <div className="portal-metric-card">
-                    <span className="portal-metric-label">Total Video Views</span>
+                    <span className="portal-metric-label">Instagram Views</span>
                     <span className="portal-metric-value">
-                      {overview.content.total_views?.toLocaleString() || 0}
+                      {(overview.content.ig_views || 0).toLocaleString()}
                     </span>
                   </div>
 
                   <div className="portal-metric-card">
-                    <span className="portal-metric-label">Avg Engagement</span>
-                    <span className="portal-metric-value" style={{ color: '#e0231c' }}>
-                      {overview.content.avg_engagement_rate || 0}%
+                    <span className="portal-metric-label">YouTube Views</span>
+                    <span className="portal-metric-value">
+                      {(overview.content.yt_views || 0).toLocaleString()}
                     </span>
                   </div>
 
                   <div className="portal-metric-card">
-                    <span className="portal-metric-label">Avg Watch Time</span>
+                    <span className="portal-metric-label">Avg Reel Watch Time</span>
                     <span className="portal-metric-value" style={{ color: '#10b981' }}>
-                      {overview.content.avg_watch_time ? `${overview.content.avg_watch_time}s` : '-'}
+                      {overview.content.avg_watch_time ? formatWatchSeconds(overview.content.avg_watch_time) : '-'}
                     </span>
                   </div>
 
                   <div className="portal-metric-card">
                     <span className="portal-metric-label">Avg Skip Rate</span>
                     <span className="portal-metric-value" style={{ color: overview.content.avg_skip_rate <= 30 ? '#10b981' : '#e0231c' }}>
-                      {overview.content.avg_skip_rate ? `${overview.content.avg_skip_rate}%` : '-'}
+                      {overview.content.avg_skip_rate != null ? `${overview.content.avg_skip_rate}%` : '-'}
                     </span>
                   </div>
 
                   <div className="portal-metric-card">
-                    <span className="portal-metric-label">Quality Score</span>
+                    <span className="portal-metric-label">YouTube Watch Time</span>
                     <span className="portal-metric-value">
-                      {overview.content.avg_content_score || 0}
+                      {overview.content.yt_watch_hours ? `${overview.content.yt_watch_hours} hrs` : '-'}
                     </span>
                   </div>
                 </>
@@ -2744,47 +2760,39 @@ export default function ClientPortal({ showToast }) {
                           <th>Comments</th>
                           <th>Shares</th>
                           <th>Saves</th>
-                          <th>Avg Watch Time %</th>
-                          <th>Skip Rate %</th>
-                          <th>Engagement %</th>
-                          <th>Score</th>
+                          <th title="Instagram reels: average watch time. YouTube: average view duration and % of the video watched.">Avg Watch Time</th>
+                          <th title="Instagram reels: views that skipped in the first 3 seconds">Skip Rate</th>
                           <th>Date</th>
                           <th>Link</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {contentList.slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT).map(item => (
-                          <tr key={item.id}>
+                        {contentList.slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT).flatMap(item => portalPlatformRows(item).map(r => (
+                          <tr key={`${item.id}-${r.platform}`}>
                             <td>
-                              <span className={`portal-badge ${item.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>
-                                {item.platform}
+                              <span className={`portal-badge ${r.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>
+                                {r.label}
                               </span>
                             </td>
                             <td style={{ textTransform: 'capitalize' }}>{item.post_type}</td>
                             <td style={{ fontWeight: 600, color: '#dfe7e0' }}>{item.title || 'Untitled Post'}</td>
-                            <td>
-                              {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
-                            </td>
-                            <td>{item.likes?.toLocaleString() || 0}</td>
-                            <td>{item.comments?.toLocaleString() || 0}</td>
-                            <td>{item.shares?.toLocaleString() || 0}</td>
-                            <td>{item.saves?.toLocaleString() || 0}</td>
-                            <td>{item.avg_watch_time_pct ? `${item.avg_watch_time_pct}%` : '-'}</td>
-                            <td>{item.skip_rate_pct ? `${item.skip_rate_pct}%` : '-'}</td>
-                            <td style={{ fontWeight: 600, color: item.engagement_rate_pct >= 5 ? '#34d399' : '#dfe7e0' }}>
-                              {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
-                            </td>
-                            <td style={{ fontWeight: 600, color: '#dfe7e0' }}>{item.content_score || 0}</td>
+                            <td>{fmtCount(r.views)}</td>
+                            <td>{fmtCount(r.likes)}</td>
+                            <td>{fmtCount(r.comments)}</td>
+                            <td>{fmtCount(r.shares)}</td>
+                            <td>{fmtCount(r.saves)}</td>
+                            <td>{r.watch}</td>
+                            <td>{r.skip}</td>
                             <td style={{ whiteSpace: 'nowrap' }}>{formatDateStr(item.date)}</td>
                             <td>
-                              {item.link ? (
-                                <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#dfe7e0', fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,231,224,0.16)' }}>
+                              {r.link ? (
+                                <a href={r.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#dfe7e0', fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,231,224,0.16)' }}>
                                   <ExternalLink size={12} />
                                 </a>
                               ) : '-'}
                             </td>
                           </tr>
-                        ))}
+                        )))}
                       </tbody>
                     </table>
                   </div>
@@ -2793,49 +2801,40 @@ export default function ClientPortal({ showToast }) {
                   <div className="portal-content-mobile-list">
                     {contentList.slice((contentPage - 1) * ITEMS_PER_PAGE_CONTENT, contentPage * ITEMS_PER_PAGE_CONTENT).map(item => (
                       <div key={item.id} className="portal-bento-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                          <div>
-                            <div style={{ display: 'inline-flex', gap: '6px', marginBottom: '6px' }}>
-                              <span className={`portal-badge ${item.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>
-                                {item.platform}
-                              </span>
-                              <span className="portal-badge portal-badge-muted" style={{ textTransform: 'capitalize' }}>
-                                {item.post_type}
-                              </span>
-                            </div>
-                            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#dfe7e0', wordBreak: 'break-word' }}>
-                              {item.title || 'Untitled Post'}
-                            </h4>
+                        <div>
+                          <div style={{ display: 'inline-flex', gap: '6px', marginBottom: '6px' }}>
+                            <span className="portal-badge portal-badge-muted" style={{ textTransform: 'capitalize' }}>
+                              {item.post_type}
+                            </span>
                           </div>
-                          {item.link && (
-                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#dfe7e0', fontWeight: 600, flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,231,224,0.16)' }}>
-                              <ExternalLink size={12} />
-                            </a>
-                          )}
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#dfe7e0', wordBreak: 'break-word' }}>
+                            {item.title || 'Untitled Post'}
+                          </h4>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
-                          <div>
-                            <div style={{ fontSize: '0.68rem', color: '#8b9b90', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>Views</div>
-                            <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#dfe7e0', marginTop: '2px' }}>
-                              {item.platform === 'youtube' ? (item.youtube_views?.toLocaleString() || 0) : (item.views?.toLocaleString() || 0)}
+                        {portalPlatformRows(item).map(r => (
+                          <div key={r.platform} style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(223, 231, 224, 0.1)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span className={`portal-badge ${r.platform === 'instagram' ? 'portal-badge-info' : 'portal-badge-success'}`}>{r.label}</span>
+                              {r.link && (
+                                <a href={r.link} target="_blank" rel="noopener noreferrer" className="portal-badge" style={{ textDecoration: 'none', color: '#dfe7e0', fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(223,231,224,0.16)' }}>
+                                  <ExternalLink size={12} />
+                                </a>
+                              )}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                              {[['Views', fmtCount(r.views)], ['Likes', fmtCount(r.likes)], ['Comments', fmtCount(r.comments)], ['Shares', fmtCount(r.shares)], ['Avg Watch', r.watch], ['Skip Rate', r.skip]].map(([label, value]) => (
+                                <div key={label}>
+                                  <div style={{ fontSize: '0.68rem', color: '#8b9b90', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>{label}</div>
+                                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#dfe7e0', marginTop: '2px' }}>{value}</div>
+                                </div>
+                              ))}
                             </div>
                           </div>
-                          <div>
-                            <div style={{ fontSize: '0.68rem', color: '#8b9b90', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>Likes</div>
-                            <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#dfe7e0', marginTop: '2px' }}>{item.likes?.toLocaleString() || 0}</div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '0.68rem', color: '#8b9b90', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>Engagement</div>
-                            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginTop: '2px', color: item.engagement_rate_pct >= 5 ? '#34d399' : '#dfe7e0' }}>
-                              {item.engagement_rate_pct ? `${item.engagement_rate_pct}%` : '0%'}
-                            </div>
-                          </div>
-                        </div>
+                        ))}
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500 }}>
-                          <span>Score: <strong style={{ color: '#dfe7e0' }}>{item.content_score || 0}</strong></span>
-                          <span>Date: {formatDateStr(item.date)}</span>
+                        <div style={{ fontSize: '0.75rem', color: '#8b9b90', fontWeight: 500 }}>
+                          Date: {formatDateStr(item.date)}
                         </div>
                       </div>
                     ))}

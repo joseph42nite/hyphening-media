@@ -301,12 +301,76 @@ async function primeYouTubeStats(clientId, videoIds) {
 }
 
 /**
+ * YouTube Analytics per video: watch time, average view duration, average %
+ * watched, shares and subscribers gained. These are YouTube's own figures; the
+ * Data API used for views/likes/comments does not carry them.
+ *
+ * One YOUTUBE_QUERY_ANALYTICS call covers up to 200 videos (dimension=video,
+ * filtered to the IDs). Analytics runs 2-3 days behind, so a video too new to
+ * have a row is cached as null and its columns are left as they were.
+ */
+const YT_ANALYTICS_BATCH = 200;
+const YT_ANALYTICS_METRICS = ['views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage', 'shares', 'subscribersGained'];
+const ytAnalyticsCache = new Map();
+async function primeYouTubeAnalytics(clientId, videoIds) {
+  let cache = ytAnalyticsCache.get(clientId);
+  if (!cache) {
+    cache = new Map();
+    ytAnalyticsCache.set(clientId, cache);
+  }
+
+  const missing = [...new Set(videoIds)].filter(id => id && !cache.has(id));
+  const endDate = new Date().toISOString().slice(0, 10);
+  for (let i = 0; i < missing.length; i += YT_ANALYTICS_BATCH) {
+    const chunk = missing.slice(i, i + YT_ANALYTICS_BATCH);
+    try {
+      const res = await executeClientAction(clientId, 'YOUTUBE_QUERY_ANALYTICS', {
+        ids: 'channel==MINE',
+        startDate: '2005-01-01',
+        endDate,
+        metrics: YT_ANALYTICS_METRICS.join(','),
+        dimensions: 'video',
+        filters: `video==${chunk.join(',')}`,
+        sort: '-views',
+        maxResults: YT_ANALYTICS_BATCH
+      });
+      const data = res?.data || {};
+      if (res?.successful === false && !data.rows) throw new Error(String(res.error || 'YouTube Analytics refused the request').slice(0, 200));
+      if (data.http_error || data.error) throw new Error(String(data.http_error || data.error?.message || data.error).slice(0, 200));
+      const headers = (data.columnHeaders || []).map(h => h.name);
+      for (const row of (data.rows || [])) {
+        const rec = Object.fromEntries(headers.map((h, idx) => [h, row[idx]]));
+        if (rec.video) cache.set(rec.video, rec);
+      }
+    } catch (e) {
+      console.warn(`[METRIC-SYNC] YouTube Analytics failed for client #${clientId}:`, e.message);
+    }
+    for (const id of chunk) {
+      if (!cache.has(id)) cache.set(id, null);
+    }
+  }
+
+  return cache;
+}
+
+/** Seconds as YouTube shows a duration: "1:04", "12:30", "1:02:05". */
+function formatDuration(totalSeconds) {
+  const t = Math.round(totalSeconds);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = String(t % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+}
+
+/**
  * Resolve a YouTube video ID for the item and pull live statistics into `metrics`.
  * Returns the resolved video ID, or null if the post could not be matched.
  *
- * Note: views/likes/comments come from the YouTube Data API. Watch time, average
- * view duration and CTR live in the YouTube Analytics API, which the Composio
- * youtube toolkit does not expose — those columns are left untouched.
+ * Views, likes and comments come from the YouTube Data API (live). Watch time,
+ * average view duration, % watched, shares and subscribers gained come from
+ * YouTube Analytics. Likes and comments go to youtube_likes/youtube_comments so
+ * a reel cross-posted to Instagram keeps both platforms' figures. CTR is not
+ * available per video from the API and stays as entered.
  */
 async function syncYouTubeMetrics(item, metrics) {
   const { videoId } = await resolveYouTubeVideoId(item);
@@ -329,8 +393,8 @@ async function syncYouTubeMetrics(item, metrics) {
 
   const stats = video.statistics || {};
   metrics.youtube_views = toCount(stats.viewCount, metrics.youtube_views);
-  metrics.likes = toCount(stats.likeCount, metrics.likes);
-  metrics.comments = toCount(stats.commentCount, metrics.comments);
+  metrics.youtube_likes = toCount(stats.likeCount, metrics.youtube_likes);
+  metrics.youtube_comments = toCount(stats.commentCount, metrics.youtube_comments);
 
   // Performance context: age and length, so a video can be judged against its
   // own format and how long it has had to accumulate views.
@@ -343,8 +407,24 @@ async function syncYouTubeMetrics(item, metrics) {
     ? null
     : (durationSeconds <= SHORTS_MAX_SECONDS ? 'Short' : 'Long');
   updateFields.youtube_views_per_day = viewsPerDay(metrics.youtube_views, publishedAt);
-  updateFields.youtube_like_rate_pct = ratePct(metrics.likes, metrics.youtube_views);
-  updateFields.youtube_comment_rate_pct = ratePct(metrics.comments, metrics.youtube_views);
+  updateFields.youtube_like_rate_pct = ratePct(metrics.youtube_likes, metrics.youtube_views);
+  updateFields.youtube_comment_rate_pct = ratePct(metrics.youtube_comments, metrics.youtube_views);
+
+  const analytics = (await primeYouTubeAnalytics(item.client_id, [videoId])).get(videoId);
+  if (analytics) {
+    if (Number.isFinite(analytics.estimatedMinutesWatched)) {
+      updateFields.youtube_watch_time = Math.round((analytics.estimatedMinutesWatched / 60) * 100) / 100;
+    }
+    if (Number.isFinite(analytics.averageViewDuration)) {
+      updateFields.youtube_avg_view_duration = formatDuration(analytics.averageViewDuration);
+    }
+    if (Number.isFinite(analytics.averageViewPercentage)) {
+      updateFields.youtube_avg_view_pct = Math.round(analytics.averageViewPercentage * 100) / 100;
+    }
+    if (Number.isFinite(analytics.shares)) updateFields.youtube_shares = analytics.shares;
+    if (Number.isFinite(analytics.subscribersGained)) updateFields.youtube_subscribers_gained = analytics.subscribersGained;
+    updateFields.youtube_analytics_synced_at = new Date().toISOString();
+  }
 
   if (!item.title && video.snippet?.title) {
     updateFields.title = video.snippet.title;
@@ -360,6 +440,64 @@ async function syncYouTubeMetrics(item, metrics) {
   }
 
   return videoId;
+}
+
+/**
+ * Instagram media insights by post type, as Instagram accepts them (checked
+ * against the live API, Nov 2026): every type takes the universal set; reels
+ * add watch time and skip rate; carousels and single posts add follows and
+ * profile visits, which Instagram refuses for reels. "impressions" was retired
+ * in favour of views and is not requested.
+ */
+const IG_UNIVERSAL_METRICS = ['views', 'reach', 'likes', 'comments', 'saved', 'shares', 'total_interactions'];
+export function instagramMetricsFor(postType) {
+  const t = (postType || '').toLowerCase();
+  if (t === 'story') return ['views', 'reach', 'shares', 'total_interactions', 'follows', 'profile_visits'];
+  if (['carousel', 'static', 'post', 'image', 'photo'].includes(t)) {
+    return [...IG_UNIVERSAL_METRICS, 'follows', 'profile_visits'];
+  }
+  return [...IG_UNIVERSAL_METRICS, 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time', 'reels_skip_rate'];
+}
+
+/**
+ * Composio returns a refused request (e.g. a metric this media type does not
+ * support) as { successful: false, error } rather than throwing; turn that
+ * into an error so the fallbacks run.
+ */
+async function fetchIgInsights(clientId, mediaId, metric) {
+  const res = await executeClientAction(clientId, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', { ig_media_id: mediaId, metric });
+  if (res?.successful === false || (res?.error && !Array.isArray(res?.data?.data))) {
+    throw new Error(String(res.error || res?.data?.message || 'Instagram refused the request').slice(0, 300));
+  }
+  return res;
+}
+
+/**
+ * Copy Instagram's figures into the row. Only metrics Instagram returned are
+ * written; anything it left out keeps its stored value. Nothing is derived:
+ * watch time arrives in milliseconds and is stored in seconds, skip rate is a
+ * percentage as given.
+ */
+export function applyInstagramInsights(res, metrics, extra) {
+  const list = res?.data?.data || res?.data || [];
+  if (!Array.isArray(list)) return;
+  for (const m of list) {
+    const v = m.values?.[0]?.value;
+    if (typeof v !== 'number') continue;
+    switch (m.name) {
+      case 'views': metrics.views = v; break;
+      case 'likes': metrics.likes = v; break;
+      case 'comments': metrics.comments = v; break;
+      case 'saved': metrics.saves = v; break;
+      case 'shares': metrics.shares = v; break;
+      case 'reach': extra.ig_reach = v; break;
+      case 'total_interactions': extra.ig_total_interactions = v; break;
+      case 'profile_visits': extra.ig_profile_visits = v; break;
+      case 'follows': extra.follows = v; break;
+      case 'ig_reels_avg_watch_time': if (v > 0) metrics.avg_watch_time_sec = Math.round((v / 1000) * 100) / 100; break;
+      case 'reels_skip_rate': metrics.skip_rate_pct = v; break;
+    }
+  }
 }
 
 /**
@@ -392,8 +530,12 @@ export async function syncSingleContentMetrics(contentId, { bulk = false } = {})
     likes: item.likes || 0,
     comments: item.comments || 0,
     shares: item.shares || 0,
-    saves: item.saves || 0
+    saves: item.saves || 0,
+    youtube_likes: item.youtube_likes || 0,
+    youtube_comments: item.youtube_comments || 0
   };
+  // Instagram-only extras, written only when Instagram returned them.
+  const igExtra = {};
   let youtubeSynced = false;
 
   // Single-post refreshes are deliberate — an operator asked for this row — so
@@ -451,52 +593,27 @@ export async function syncSingleContentMetrics(contentId, { bulk = false } = {})
       //    reaches this point is meant to hit the API.
       if (numericMediaId && /^\d+$/.test(numericMediaId)) {
         try {
-          const postType = (item.post_type || '').toLowerCase();
-          const isCarousel = postType === 'carousel';
-          const isStatic = postType === 'static' || postType === 'story';
+          const metricsToFetch = instagramMetricsFor(item.post_type);
+          const fetchInsights = metric => fetchIgInsights(item.client_id, numericMediaId, metric);
 
-          // Carousels and static images do not support video/reel specific metrics like avg_watch_time or views in Graph API
-          let metricsToFetch = ['views', 'reach', 'likes', 'comments', 'saved', 'shares', 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time'];
-          if (isCarousel || isStatic) {
-            metricsToFetch = ['impressions', 'reach', 'saved', 'shares', 'total_interactions'];
+          let insightsRes;
+          try {
+            insightsRes = await fetchInsights(metricsToFetch);
+          } catch (e) {
+            // reels_skip_rate is newer than the other reel metrics; if Instagram
+            // refuses it for this reel, still take everything else.
+            if (!metricsToFetch.includes('reels_skip_rate')) throw e;
+            console.warn(`[METRIC-SYNC] Skip rate unavailable for post #${contentId}, retrying without it:`, e.message);
+            insightsRes = await fetchInsights(metricsToFetch.filter(m => m !== 'reels_skip_rate'));
           }
 
-          const insightsRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
-            ig_media_id: numericMediaId,
-            metric: metricsToFetch
-          });
-
-          const insightArray = insightsRes?.data?.data || insightsRes?.data || [];
-          if (Array.isArray(insightArray)) {
-            insightArray.forEach(m => {
-              const val = m.values?.[0]?.value || 0;
-              if (m.name === 'views' || (m.name === 'impressions' && !metrics.views)) metrics.views = val;
-              if (m.name === 'likes') metrics.likes = val;
-              if (m.name === 'comments') metrics.comments = val;
-              if (m.name === 'saved') metrics.saves = val;
-              if (m.name === 'shares') metrics.shares = val;
-              if (m.name === 'ig_reels_avg_watch_time' && val > 0) {
-                // Convert ms to seconds (e.g. 10.67s)
-                metrics.avg_watch_time_pct = Math.round((val / 1000) * 100) / 100;
-              }
-            });
-          }
+          applyInstagramInsights(insightsRes, metrics, igExtra);
         } catch (e) {
           console.warn(`[METRIC-SYNC] Insights fetch failed for post #${contentId}:`, e.message);
           // If the error was a media type mismatch or invalid parameter, retry with minimal safe metrics
           try {
-            const fallbackRes = await executeClientAction(item.client_id, 'INSTAGRAM_GET_IG_MEDIA_INSIGHTS', {
-              ig_media_id: numericMediaId,
-              metric: ['reach', 'saved', 'shares']
-            });
-            const fallbackArray = fallbackRes?.data?.data || fallbackRes?.data || [];
-            if (Array.isArray(fallbackArray)) {
-              fallbackArray.forEach(m => {
-                const val = m.values?.[0]?.value || 0;
-                if (m.name === 'saved') metrics.saves = val;
-                if (m.name === 'shares') metrics.shares = val;
-              });
-            }
+            const fallbackRes = await fetchIgInsights(item.client_id, numericMediaId, IG_UNIVERSAL_METRICS);
+            applyInstagramInsights(fallbackRes, metrics, igExtra);
           } catch (fallbackErr) {
             // Clear invalid media ID so it re-resolves on next sync
             db.prepare('UPDATE marketing_content_tracker SET instagram_media_id = NULL WHERE id = ?').run(contentId);
@@ -516,21 +633,30 @@ export async function syncSingleContentMetrics(contentId, { bulk = false } = {})
 
   // Calculate engagement rate, save rate & content score against the channel the
   // post actually belongs to.
+  // These ratios are for the internal tracker only; the client portal shows
+  // platform figures alone.
   const effectiveViews = isYouTubePrimary ? metrics.youtube_views : metrics.views;
+  const likesFor = isYouTubePrimary ? metrics.youtube_likes : metrics.likes;
+  const commentsFor = isYouTubePrimary ? metrics.youtube_comments : metrics.comments;
   const viewsVal = Math.max(effectiveViews, 1);
-  const totalEngagements = metrics.likes + metrics.comments + metrics.shares + metrics.saves;
+  const totalEngagements = likesFor + commentsFor + metrics.shares + metrics.saves;
   const engagementRatePct = Math.round((totalEngagements / viewsVal) * 10000) / 100;
   const saveRatePct = Math.round((metrics.saves / viewsVal) * 10000) / 100;
-  const contentScore = Math.round(effectiveViews * 0.1 + metrics.likes * 0.5 + metrics.comments * 1.5 + metrics.shares * 2.0 + metrics.saves * 2.0);
+  const contentScore = Math.round(effectiveViews * 0.1 + likesFor * 0.5 + commentsFor * 1.5 + metrics.shares * 2.0 + metrics.saves * 2.0);
 
-  const avgWatchTimePct = metrics.avg_watch_time_pct !== undefined ? metrics.avg_watch_time_pct : (item.avg_watch_time_pct || null);
-  const skipRatePct = avgWatchTimePct !== null && avgWatchTimePct !== undefined ? Math.max(0, Math.round((100 - avgWatchTimePct) * 100) / 100) : (item.skip_rate_pct || null);
+  // Instagram's own figures when it gave them, otherwise whatever the row held.
+  // Skip rate is never worked out here: it is Instagram's reels_skip_rate or
+  // a value someone typed in.
+  const avgWatchTimeSec = metrics.avg_watch_time_sec ?? item.avg_watch_time_sec ?? null;
+  const skipRatePct = metrics.skip_rate_pct ?? item.skip_rate_pct ?? null;
+  const avgWatchTimePct = item.avg_watch_time_pct ?? null;
   const boostedVal = item.boosted ? item.boosted : 'No';
 
   db.prepare(`
     UPDATE marketing_content_tracker
     SET views = ?, youtube_views = ?, likes = ?, comments = ?, shares = ?, saves = ?,
-        avg_watch_time_pct = ?, skip_rate_pct = ?, boosted = ?,
+        youtube_likes = ?, youtube_comments = ?,
+        avg_watch_time_sec = ?, skip_rate_pct = ?, boosted = ?,
         engagement_rate_pct = ?, save_rate_pct = ?, content_score = ?,
         metrics_synced_at = datetime('now')
     WHERE id = ?
@@ -541,7 +667,9 @@ export async function syncSingleContentMetrics(contentId, { bulk = false } = {})
     metrics.comments,
     metrics.shares,
     metrics.saves,
-    avgWatchTimePct,
+    metrics.youtube_likes,
+    metrics.youtube_comments,
+    avgWatchTimeSec,
     skipRatePct,
     boostedVal,
     engagementRatePct,
@@ -550,9 +678,16 @@ export async function syncSingleContentMetrics(contentId, { bulk = false } = {})
     contentId
   );
 
+  if (Object.keys(igExtra).length > 0) {
+    const setClauses = Object.keys(igExtra).map(k => `${k} = ?`).join(', ');
+    db.prepare(`UPDATE marketing_content_tracker SET ${setClauses} WHERE id = ?`)
+      .run(...Object.values(igExtra), contentId);
+  }
+
   return {
     ...metrics,
     avg_watch_time_pct: avgWatchTimePct,
+    avg_watch_time_sec: avgWatchTimeSec,
     skip_rate_pct: skipRatePct,
     boosted: boostedVal,
     engagement_rate_pct: engagementRatePct,
@@ -583,6 +718,7 @@ async function prefetchYouTubeStats(items) {
     }
     if (videoIds.length > 0) {
       await primeYouTubeStats(clientId, videoIds);
+      await primeYouTubeAnalytics(clientId, videoIds);
       console.log(`[METRIC-SYNC] Primed ${videoIds.length} YouTube video(s) for client #${clientId} in ${Math.ceil(videoIds.length / YT_BATCH_SIZE)} call(s).`);
     }
   }
@@ -612,6 +748,7 @@ export async function runMetricSyncWorker({ clientId = null } = {}) {
     ytVideoListCache.clear();
     ytStatsCache.clear();
     ytStatsErrors.clear();
+    ytAnalyticsCache.clear();
 
     // Sync ALL posted items, not just those with links
     const itemsToRefresh = db.prepare(`

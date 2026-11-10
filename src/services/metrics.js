@@ -4,18 +4,15 @@
 export function computeContentMetrics(row) {
   const { views, likes, comments, shares, saves, avg_watch_time_pct } = row;
 
+  // Skip rate is not derived here: it comes from Instagram (reels_skip_rate)
+  // or is typed in. It is not 100 minus watch time.
   let engagement_rate_pct = null;
   let save_rate_pct = null;
-  let skip_rate_pct = null;
   let content_score = null;
 
   if (views && views > 0) {
     engagement_rate_pct = ((likes + comments + shares + saves) / views) * 100;
     save_rate_pct = (saves / views) * 100;
-  }
-
-  if (avg_watch_time_pct !== null && avg_watch_time_pct !== undefined) {
-    skip_rate_pct = 100 - avg_watch_time_pct;
   }
 
   if (engagement_rate_pct !== null && save_rate_pct !== null && avg_watch_time_pct !== null) {
@@ -26,7 +23,6 @@ export function computeContentMetrics(row) {
   return {
     engagement_rate_pct: engagement_rate_pct !== null ? Math.round(engagement_rate_pct * 100) / 100 : null,
     save_rate_pct: save_rate_pct !== null ? Math.round(save_rate_pct * 100) / 100 : null,
-    skip_rate_pct: skip_rate_pct !== null ? Math.round(skip_rate_pct * 100) / 100 : null,
     content_score,
   };
 }

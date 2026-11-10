@@ -542,7 +542,7 @@ function pricesSection(clientId) {
 function contentSection(clientId) {
   const rows = db.prepare(`
     SELECT platform, post_type, title, date, views, likes, comments, shares, saves,
-           avg_watch_time_pct, engagement_rate_pct, save_rate_pct, content_score, boosted
+           avg_watch_time_pct, avg_watch_time_sec, skip_rate_pct, engagement_rate_pct, save_rate_pct, content_score, boosted
     FROM marketing_content_tracker
     WHERE client_id = ? AND is_tracked = 1 AND status = 'Posted' AND views > 0
     ORDER BY date DESC
@@ -559,6 +559,8 @@ function contentSection(clientId) {
     engagement_rate_pct: r.engagement_rate_pct ?? pct((r.likes || 0) + (r.comments || 0) + (r.shares || 0) + (r.saves || 0), r.views),
     save_rate_pct: r.save_rate_pct ?? pct(r.saves, r.views),
     avg_watch_time_pct: r.avg_watch_time_pct,
+    avg_watch_time_sec: r.avg_watch_time_sec,
+    skip_rate_pct: r.skip_rate_pct,
     boosted: r.boosted === 'Yes',
   }));
 

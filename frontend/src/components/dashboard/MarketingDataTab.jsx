@@ -3,7 +3,7 @@ import { Plus, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../../api.js';
 import ContentModal from './ContentModal.jsx';
 import AllClientsMarketingDashboard from './AllClientsMarketingDashboard.jsx';
-import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from './contentFormHelper.js';
+import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState, formatWatchSeconds } from './contentFormHelper.js';
 
 // Columns the monthly report modal edits; the rest of the row is filled by the
 // month-end job (src/services/seoMonthly.js).
@@ -593,7 +593,7 @@ export default function MarketingDataTab({
                 <tr>
                   <th colSpan="8" style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: '#0c1016', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Metadata</th>
                   <th colSpan="12" style={{ borderBottom: '1px solid rgba(224, 35, 28, 0.3)', textAlign: 'center', background: 'linear-gradient(rgba(224, 35, 28, 0.22), rgba(224, 35, 28, 0.22)), #0c1016', color: '#fca5a5', whiteSpace: 'nowrap', fontWeight: '800' }}>Instagram Metrics</th>
-                  <th colSpan="8" style={{ borderBottom: '1px solid rgba(56, 189, 248, 0.3)', textAlign: 'center', background: 'linear-gradient(rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.22)), #0c1016', color: '#7dd3fc', whiteSpace: 'nowrap', fontWeight: '800' }}>YouTube Metrics</th>
+                  <th colSpan="10" style={{ borderBottom: '1px solid rgba(56, 189, 248, 0.3)', textAlign: 'center', background: 'linear-gradient(rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.22)), #0c1016', color: '#7dd3fc', whiteSpace: 'nowrap', fontWeight: '800' }}>YouTube Metrics</th>
                   <th style={{ borderBottom: '1px solid rgba(223, 231, 224, 0.15)', textAlign: 'center', background: '#0c1016', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontWeight: '800' }}>Actions</th>
                 </tr>
                 <tr>
@@ -611,7 +611,7 @@ export default function MarketingDataTab({
                   <th>Shares</th>
                   <th>Saves</th>
                   <th>Follows</th>
-                  <th>Avg Watch Time %</th>
+                  <th title="Seconds from Instagram; % for rows entered by hand">Avg Watch Time</th>
                   <th>Skip Rate %</th>
                   <th>Boosted?</th>
                   <th>Engagement %</th>
@@ -621,6 +621,8 @@ export default function MarketingDataTab({
                   <th title="Views per day since publish — comparable across video ages">Views/Day</th>
                   <th title="Short (≤60s) or long-form">Format</th>
                   <th>Length</th>
+                  <th>YT Likes</th>
+                  <th>YT Comments</th>
                   <th title="Likes as a percentage of views">Like %</th>
                   <th>Watch Time (hrs)</th>
                   <th>Avg Duration</th>
@@ -631,7 +633,7 @@ export default function MarketingDataTab({
               <tbody>
                 {visibleContent.length === 0 ? (
                   <tr>
-                    <td colSpan="29" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    <td colSpan="31" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                       No content items tracked yet{contentMonthFilter !== 'all' ? ` for ${formatMonthStr(contentMonthFilter)}` : ''}.
                     </td>
                   </tr>
@@ -723,7 +725,11 @@ export default function MarketingDataTab({
                       <td>{item.saves?.toLocaleString() || '0'}</td>
                       <td>{item.follows?.toLocaleString() || '0'}</td>
                       <td>
-                        {item.avg_watch_time_pct !== null && item.avg_watch_time_pct !== undefined ? (
+                        {item.avg_watch_time_sec !== null && item.avg_watch_time_sec !== undefined ? (
+                          <span style={{ fontWeight: 'bold' }} title="Average watch time, from Instagram">
+                            {formatWatchSeconds(item.avg_watch_time_sec)}
+                          </span>
+                        ) : item.avg_watch_time_pct !== null && item.avg_watch_time_pct !== undefined ? (
                           <span style={{ color: item.avg_watch_time_pct >= 50 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
                             {item.avg_watch_time_pct}%
                           </span>
@@ -771,6 +777,8 @@ export default function MarketingDataTab({
                         ) : '-'}
                       </td>
                       <td>{formatDuration(item.youtube_duration_seconds)}</td>
+                      <td>{item.youtube_likes != null ? item.youtube_likes.toLocaleString() : '-'}</td>
+                      <td>{item.youtube_comments != null ? item.youtube_comments.toLocaleString() : '-'}</td>
                       <td>
                         {item.youtube_like_rate_pct !== null && item.youtube_like_rate_pct !== undefined ? (
                           <span style={{ color: item.youtube_like_rate_pct >= 1 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>
@@ -779,7 +787,7 @@ export default function MarketingDataTab({
                         ) : '-'}
                       </td>
                       <td>{item.youtube_watch_time !== null && item.youtube_watch_time !== undefined ? item.youtube_watch_time.toLocaleString() : '0'}</td>
-                      <td>{item.youtube_avg_view_duration || '-'}</td>
+                      <td>{item.youtube_avg_view_duration ? (item.youtube_avg_view_pct != null ? `${item.youtube_avg_view_duration} (${item.youtube_avg_view_pct}%)` : item.youtube_avg_view_duration) : '-'}</td>
                       <td>
                         {item.youtube_ctr !== null && item.youtube_ctr !== undefined ? (
                           <span style={{ color: item.youtube_ctr >= 4 ? '#065f46' : '#991b1b', fontWeight: 'bold' }}>

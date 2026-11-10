@@ -59,6 +59,8 @@ router.get('/:id/export/content', authorize('admin', 'ops_social_media_manager')
         saves AS [Insta Saves],
         follows AS [Follows (from post)],
         avg_watch_time_pct AS [Avg Watch Time %],
+        avg_watch_time_sec AS [Avg Watch Time (sec)],
+        skip_rate_pct AS [Skip Rate %],
         boosted AS [Boosted? (Yes/No + Spend ₹)],
         engagement_rate_pct AS [Engagement Rate % (auto)],
         save_rate_pct AS [Save Rate % (auto)],

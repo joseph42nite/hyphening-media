@@ -154,19 +154,28 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       contentParams.push(monthFilter);
     }
 
+    // Only figures a platform reports. Totals are sums of those per-post
+    // figures; averages are over posts that have the figure. No engagement
+    // rates or scores of our own.
+    //   views/likes/comments/shares/saves  Instagram
+    //   youtube_*                          YouTube Data API + YouTube Analytics
     const contentStats = db.prepare(`
-      SELECT 
+      SELECT
         COUNT(*) as total_posts,
-        ROUND(AVG(engagement_rate_pct), 2) as avg_engagement_rate,
-        ROUND(AVG(content_score), 1) as avg_content_score,
-        ROUND(AVG(avg_watch_time_pct), 1) as avg_watch_time,
+        ROUND(AVG(avg_watch_time_sec), 1) as avg_watch_time,
         ROUND(AVG(skip_rate_pct), 1) as avg_skip_rate,
-        SUM(views) as total_views,
-        SUM(likes) as total_likes,
-        SUM(comments) as total_comments,
-        SUM(shares) as total_shares,
-        SUM(saves) as total_saves
-      FROM marketing_content_tracker 
+        COALESCE(SUM(views), 0) as ig_views,
+        COALESCE(SUM(ig_reach), 0) as ig_reach,
+        COALESCE(SUM(follows), 0) as ig_follows,
+        COALESCE(SUM(youtube_views), 0) as yt_views,
+        ROUND(COALESCE(SUM(youtube_watch_time), 0), 1) as yt_watch_hours,
+        COALESCE(SUM(youtube_subscribers_gained), 0) as yt_subscribers,
+        COALESCE(SUM(views), 0) + COALESCE(SUM(youtube_views), 0) as total_views,
+        COALESCE(SUM(likes), 0) + COALESCE(SUM(youtube_likes), 0) as total_likes,
+        COALESCE(SUM(comments), 0) + COALESCE(SUM(youtube_comments), 0) as total_comments,
+        COALESCE(SUM(shares), 0) + COALESCE(SUM(youtube_shares), 0) as total_shares,
+        COALESCE(SUM(saves), 0) as total_saves
+      FROM marketing_content_tracker
       ${contentWhere}
     `).get(...contentParams);
 
@@ -192,12 +201,22 @@ router.get('/:token/overview', portalAuth, (req, res) => {
       WHERE client_id = ? AND status = 'Pending Client Approval'
     `).get(clientId);
 
-    const platformBreakdown = db.prepare(`
-      SELECT platform, COUNT(*) as count, SUM(views) as views
+    // A reel posted to Instagram and YouTube counts once on each.
+    const pb = db.prepare(`
+      SELECT
+        SUM(CASE WHEN instagram_media_id IS NOT NULL OR LOWER(COALESCE(platform, '')) LIKE '%instagram%' THEN 1 ELSE 0 END) as ig_posts,
+        SUM(CASE WHEN youtube_video_id IS NOT NULL OR LOWER(COALESCE(platform, '')) LIKE '%youtube%' THEN 1 ELSE 0 END) as yt_posts,
+        SUM(CASE WHEN facebook_post_id IS NOT NULL OR LOWER(COALESCE(platform, '')) LIKE '%facebook%' THEN 1 ELSE 0 END) as fb_posts,
+        COALESCE(SUM(views), 0) as ig_views,
+        COALESCE(SUM(youtube_views), 0) as yt_views
       FROM marketing_content_tracker
       ${contentWhere}
-      GROUP BY platform
-    `).all(...contentParams);
+    `).get(...contentParams);
+    const platformBreakdown = [
+      { platform: 'instagram', count: pb.ig_posts || 0, views: pb.ig_views },
+      { platform: 'youtube', count: pb.yt_posts || 0, views: pb.yt_views },
+      { platform: 'facebook', count: pb.fb_posts || 0, views: null },
+    ].filter(p => p.count > 0);
 
     const adsBreakdown = db.prepare(`
       SELECT 
@@ -227,7 +246,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     }
 
     const viewsTrend = db.prepare(`
-      SELECT date, title, (COALESCE(views, 0) + COALESCE(youtube_views, 0)) AS views, COALESCE(engagement_rate_pct, 0.0) AS engagement_rate_pct
+      SELECT date, title, (COALESCE(views, 0) + COALESCE(youtube_views, 0)) AS views
       FROM marketing_content_tracker
       ${trendWhere}
       ORDER BY date DESC
@@ -348,10 +367,11 @@ router.get('/:token/bookings', portalAuth, (req, res) => {
 router.get('/:token/content', portalAuth, (req, res) => {
   try {
     const content = db.prepare(`
-      SELECT id, date, platform, post_type, title, status, views, likes, comments, shares, saves,
-        avg_watch_time_pct, skip_rate_pct,
-        engagement_rate_pct, content_score, boosted, link, time, caption, follows,
-        youtube_views, youtube_watch_time, youtube_avg_view_duration, youtube_ctr
+      SELECT id, date, platform, post_type, title, status, link, time, caption, boosted,
+        instagram_media_id, instagram_link, views, likes, comments, shares, saves, follows,
+        ig_reach, ig_profile_visits, avg_watch_time_pct, avg_watch_time_sec, skip_rate_pct,
+        youtube_video_id, youtube_link, youtube_views, youtube_likes, youtube_comments, youtube_shares,
+        youtube_watch_time, youtube_avg_view_duration, youtube_avg_view_pct, youtube_subscribers_gained
       FROM marketing_content_tracker 
       WHERE client_id = ? AND is_tracked = 1 AND status IN ('Posted', 'Client Approved')
       ORDER BY date DESC

@@ -115,3 +115,16 @@ export function buildContentFormState(content) {
     freelancer_id: content.freelancer_id !== null && content.freelancer_id !== undefined ? String(content.freelancer_id) : ''
   };
 }
+
+/**
+ * Instagram's average watch time, held in seconds: "28.6s", or "1m 05s" once
+ * it passes a minute.
+ */
+export function formatWatchSeconds(sec) {
+  const n = Number(sec);
+  if (!Number.isFinite(n)) return '-';
+  if (n < 60) return `${Math.round(n * 10) / 10}s`;
+  const m = Math.floor(n / 60);
+  const s = Math.round(n % 60);
+  return `${m}m ${String(s).padStart(2, '0')}s`;
+}
