@@ -56,6 +56,68 @@ router.get('/marketing/review-queue', authorize('admin', 'ops_social_media_manag
   }
 });
 
+router.get('/:id/marketing/content', authorize('admin', 'ops_social_media_manager', 'ops_video_editor'), (req, res) => {
+  try {
+    if (req.user.role === 'ops_video_editor') {
+      const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+      if (!hasTask) {
+        return res.status(403).json({ error: 'Access denied: you have no video assignments for this client' });
+      }
+    }
+
+    const { is_tracked, platform, status } = req.query;
+    let query = `
+      SELECT t.*, r.script_id, s.title AS script_title, s.script_text AS script_text,
+             u.name AS assignee_name,
+             f.name AS freelancer_name
+      FROM marketing_content_tracker t
+      LEFT JOIN marketing_content_script_relation r ON t.id = r.content_id
+      LEFT JOIN marketing_scripts s ON r.script_id = s.id
+      LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN freelancers f ON t.freelancer_id = f.id
+      WHERE t.client_id = ?
+    `;
+    const params = [req.params.id];
+
+    if (req.user.role === 'ops_video_editor') {
+      query += " AND t.post_type IN ('Reel', 'Youtube', 'Short')";
+    }
+
+    if (is_tracked !== undefined) {
+      query += ' AND t.is_tracked = ?';
+      params.push(parseInt(is_tracked));
+    }
+    if (platform) {
+      query += ' AND t.platform = ?';
+      params.push(platform);
+    }
+    if (status) {
+      query += ' AND t.status = ?';
+      params.push(status);
+    }
+
+    query += ' ORDER BY t.date DESC';
+    res.json({ content: db.prepare(query).all(...params) });
+  } catch (err) {
+    console.error('[MARKETING] Content list error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Video editors only see video rows, and only on clients they hold a video task
+// for (see the content list above). Their writes are held to the same rows.
+const VIDEO_POST_TYPES = ['reel', 'youtube', 'short'];
+
+function videoEditorContentDenial(req, postType) {
+  if (req.user.role !== 'ops_video_editor') return null;
+  const hasTask = db.prepare("SELECT 1 FROM kanban_tasks WHERE client_id = ? AND assigned_to = ? AND task_type = 'video' LIMIT 1").get(req.params.id, req.user.id);
+  if (!hasTask) return 'Access denied: you have no video assignments for this client';
+  if (!VIDEO_POST_TYPES.includes(String(postType || '').toLowerCase())) {
+    return 'Video editors can only add or edit Reel, YouTube and Short rows';
+  }
+  return null;
+}
+
 /**
  * POST /api/clients/:id/marketing/content
  * Create draft content plan.
