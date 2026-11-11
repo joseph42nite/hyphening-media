@@ -27,7 +27,11 @@ import { getActiveRunsForClient } from './agentRuns.js';
 import { unavailableReason, resolveAuditScore } from '../routes/seo.js';
 
 export const NIGHT_FIXES_PER_CLIENT = 8;
-const TRIAGE_LIMIT = 40;
+// How many open findings the night sort looks at per client. 40 left a day of
+// running many cards half sorted (41 waiting after 2026-11-10); sorting is one
+// read-only Claude call (40 took 46 s), so this only grows that step. The fixes
+// themselves stay at NIGHT_FIXES_PER_CLIENT.
+export const TRIAGE_LIMIT = 100;
 
 // The card's cadence decides what runs: every skill past its stale_after_days
 // is queued (9999 = on demand, never queued). The only things that hold a due

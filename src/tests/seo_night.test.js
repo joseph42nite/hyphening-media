@@ -313,3 +313,23 @@ describe('ads website-code findings share the client\'s fix batch', () => {
     expect(night.parseRecKey('ads-x')).toBeNull();
   });
 });
+
+describe('how much one night sorts', () => {
+  it('hands over up to TRIAGE_LIMIT findings, most urgent first, and still fixes at most 8', () => {
+    setMode('seo', 'auto');
+    const clientId = makeClient();
+    const a = audit(clientId, 'plan', 1);
+    const low = Array.from({ length: night.TRIAGE_LIMIT + 5 }, () => rec(clientId, a, { priority: 'Low' }));
+    const critical = rec(clientId, a, { priority: 'Critical' });
+
+    const batchId = night.queueSeoFixes({ clientId }).queued[0].batch_id;
+    const claimed = night.claimSeoFixBatches('test').find(b => b.batch_id === batchId);
+
+    expect(night.TRIAGE_LIMIT).toBe(100);
+    expect(claimed.candidates).toHaveLength(night.TRIAGE_LIMIT);
+    expect(claimed.candidates[0].id).toBe(critical);
+    expect(low.length).toBeGreaterThan(night.TRIAGE_LIMIT);
+    expect(claimed.max_fixes).toBe(night.NIGHT_FIXES_PER_CLIENT);
+    expect(night.NIGHT_FIXES_PER_CLIENT).toBe(8);
+  });
+});
