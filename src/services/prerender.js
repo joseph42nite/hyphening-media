@@ -4,8 +4,9 @@
  * The React app ships an empty <div id="root">, so crawlers that don't run JS
  * (GPTBot, ClaudeBot, PerplexityBot, most link unfurlers) saw no article body,
  * capability copy or case-study text. This builds the same content as plain
- * HTML for server.js to inject in a <noscript> block — the same pattern the
- * homepage already uses — so browsers that run the app never see it.
+ * HTML for server.js to put inside #root in place of the shell's homepage
+ * <main> — the same pattern the homepage uses. createRoot() replaces it once
+ * the app mounts, and the raw HTML keeps exactly one <h1>: this page's.
  *
  * Rendered per request from the DB rather than at build time: blog posts and
  * case studies are published straight to the DB without a frontend rebuild,
@@ -66,7 +67,7 @@ export function markdownToHtml(md) {
   }).filter(Boolean).join('\n');
 }
 
-const wrap = (inner) => `<noscript>\n<main>\n${inner}\n</main>\n</noscript>`;
+const wrap = (inner) => `<main>\n${inner}\n</main>`;
 const isoDate = (d) => (d ? String(d).slice(0, 10) : '');
 
 function safeQuery(fn, label) {
@@ -214,7 +215,24 @@ const absoluteUrl = (url) => {
   return url.startsWith('/') ? `${SITE_URL}${url}` : '';
 };
 
+// Listing pages: the same title/description the React views pass to SEOHead.
+const INDEX_META = {
+  '/blog': {
+    title: 'Journal & Insights — Hyphening Media | Marketing & Creative Operations',
+    description: 'Expert insights on social media marketing, content strategy, video production, and high-performance brand growth from Hyphening Media.',
+  },
+  '/case-studies': {
+    title: 'Case Studies — Hyphening Media | Client Results',
+    description: 'Real client results from Hyphening Media — brand growth, content engines, and measurable performance gains.',
+  },
+  '/capabilities': {
+    title: 'Nine Pillars of Growth — Hyphening Media Capabilities',
+    description: 'Nine core disciplines engineered for full-spectrum execution, viral distribution, and real enterprise ROI — from cinema production to custom software.',
+  },
+};
+
 function pageMeta(pathname) {
+  if (INDEX_META[pathname]) return { ...INDEX_META[pathname], type: 'website' };
   const m = pathname.match(/^\/(blog|case-studies|capabilities)\/([^/]+)$/);
   if (!m) return null;
   let slug;
@@ -226,7 +244,7 @@ function pageMeta(pathname) {
   // Same title/description/image the React views pass to SEOHead.
   if (m[1] === 'capabilities') {
     const p = PILLARS_BY_SLUG[slug];
-    return p && { title: `${p.title} — Hyphening Media Capabilities`, description: p.summary, image: p.image };
+    return p && { title: `${p.title} — Hyphening Media Capabilities`, description: p.summary, image: p.image, type: 'article' };
   }
   if (m[1] === 'blog') {
     const p = safeQuery(() => db.prepare(
@@ -236,19 +254,21 @@ function pageMeta(pathname) {
       title: `${p.meta_title || p.title} — Hyphening Media`,
       description: p.meta_description || p.excerpt,
       image: p.cover_image_url,
+      type: 'article',
     };
   }
   const c = safeQuery(() => db.prepare(
     `SELECT title, summary, cover_image_url FROM case_studies WHERE slug = ? AND status = 'published'`
   ).get(slug), 'case study meta');
-  return c && { title: `${c.title} — Hyphening Media Case Study`, description: c.summary, image: c.cover_image_url };
+  return c && { title: `${c.title} — Hyphening Media Case Study`, description: c.summary, image: c.cover_image_url, type: 'article' };
 }
 
 /**
- * Rewrites index.html's Open Graph / Twitter tags for a blog post, case study
- * or capability page. Link unfurlers (WhatsApp, LinkedIn, Slack, X) read only
- * the served HTML, so without this every shared link previewed as the
- * homepage card even though SEOHead swaps the tags once React runs.
+ * Rewrites index.html's <title>, meta description and Open Graph / Twitter
+ * tags for the blog, case study and capability pages (lists and detail).
+ * Crawlers and link unfurlers (WhatsApp, LinkedIn, Slack, X) read the served
+ * HTML, so without this every one of these URLs carried the homepage's title
+ * and description even though SEOHead swaps them once React runs.
  */
 export function injectSocialMeta(html, pathname, canonicalUrl) {
   const meta = pageMeta(pathname);
@@ -258,8 +278,10 @@ export function injectSocialMeta(html, pathname, canonicalUrl) {
     const re = new RegExp(`(<meta ${attr}="${key}" content=")[^"]*"`);
     html = html.replace(re, (m, head) => `${head}${escapeHtml(value)}"`);
   };
+  html = html.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(meta.title)}</title>`);
+  set('name', 'description', meta.description);
   const image = absoluteUrl(meta.image);
-  set('property', 'og:type', 'article');
+  set('property', 'og:type', meta.type);
   set('property', 'og:url', canonicalUrl);
   set('property', 'og:title', meta.title);
   set('property', 'og:description', meta.description);

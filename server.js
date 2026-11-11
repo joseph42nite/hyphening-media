@@ -671,9 +671,11 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
         updatedHtml = updatedHtml.replace(/<div id="root">[\s\S]*?<\/main>/, () => `<div id="root">\n      ${homepageHtml}`);
       } else if (!onAdminHost) {
         // Blog, case study and capability bodies for non-JS crawlers (rec 1968).
+        // Their own <title>/description, and their body in place of the
+        // shell's homepage <main>, so the raw HTML has one <h1>, this page's.
         updatedHtml = injectSocialMeta(updatedHtml, cleanPath, canonicalUrl);
         const crawlerHtml = prerenderPath(cleanPath);
-        if (crawlerHtml) updatedHtml = updatedHtml.replace('</body>', `  ${crawlerHtml}\n  </body>`);
+        if (crawlerHtml) updatedHtml = updatedHtml.replace(/<div id="root">[\s\S]*?<\/main>/, () => `<div id="root">\n      ${crawlerHtml}`);
         const capabilityLd = capabilityJsonLd(cleanPath, canonicalUrl);
         if (capabilityLd) updatedHtml = updatedHtml.replace('</head>', `  ${capabilityLd}\n</head>`);
         // Article/Person JSON-LD for blog posts (recs 1970, 1971).
