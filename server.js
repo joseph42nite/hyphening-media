@@ -584,7 +584,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
           <a href="mailto:deepanjan@hypheningmedia.com">deepanjan@hypheningmedia.com</a><br>
           <a href="tel:+917278178402">+91 72781 78402</a><br>
           <a href="https://www.instagram.com/hypheningmedia/">Instagram</a> ·
-          <a href="https://www.linkedin.com/company/are-you-hyphening/">LinkedIn</a>
+          <a href="https://www.linkedin.com/company/hyphening-media/">LinkedIn</a>
         </address>
       </main>`;
   }
