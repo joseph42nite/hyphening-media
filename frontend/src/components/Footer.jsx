@@ -403,7 +403,7 @@ export default function Footer({ showCta = true }) {
         
         {/* Bottom Bar */}
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} HYPHENING MEDIA. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} HYPHENING MEDIA (Hyphening Marketing LLP). All rights reserved.</span>
           <span>Creative Operations Agency</span>
         </div>
       </footer>
