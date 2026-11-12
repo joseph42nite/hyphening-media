@@ -124,11 +124,14 @@ function fixPrompt(job, manifest, rec) {
     `- Edit ONLY these files or folders: ${manifest.seo_fixes.paths.join(', ')}. Never: ${['.env', ...(manifest.seo_fixes.never_touch || [])].join(', ')}. Edits anywhere else are thrown away and the fix fails.`,
     '- Make the smallest change that does the job. Don\'t reformat, reorder or "tidy" anything else.',
     '- Don\'t change claims, prices, legal text, medical wording or design. Don\'t invent facts, numbers, reviews or addresses.',
-    '- If the code already does what the recommendation asks, or you can\'t do it within these rules, change nothing and say why.',
+    '- If the code already does what the recommendation asks, change nothing, answer "already_done": true, and say what you found and where (e.g. "index.html already has a 148-character meta description").',
+    '- If you can\'t do it within these rules (it needs other files, copy or design changes, or facts we don\'t have), change nothing, answer "already_done": false, and say what it would need.',
     job.client.blog_compliance_profile === 'healthcare' ? '- Healthcare client: no health or outcome claims of any kind.' : '',
     '',
     'When done, answer between <json> and </json>:',
     '<json>{"changed": true, "summary": "what changed, before → after, in one or two plain sentences"}</json>',
+    'or, when you changed nothing:',
+    '<json>{"changed": false, "already_done": true, "summary": "what already does it, and where"}</json>',
   ].filter((s) => s !== '').join('\n');
 }
 
@@ -188,7 +191,16 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
       const answer = jsonBetweenTags(res.out) || {};
       const files = await changedFiles(wt, linked);
       if (files.length === 0) {
-        fixes.push({ rec_id: rec.id, ok: false, summary: answer.summary, error: `No change made: ${answer.summary || tail(res.out || res.err, 300)}` });
+        // Nothing changed is not a failure: already done, or beyond the safe list
+        // (seoNight.submitSeoFixBatch closes it or hands it to 007). Without a
+        // clear answer from Claude (it crashed, timed out) it is a failure, and so
+        // is one 007 already approved ("Fix tonight") that still couldn't be done.
+        const said = typeof answer.already_done === 'boolean' && answer.summary;
+        const noChange = !said ? undefined : answer.already_done ? 'already_done' : rec.fix_approved ? undefined : 'blocked';
+        fixes.push({
+          rec_id: rec.id, ok: false, summary: answer.summary, no_change: noChange,
+          error: `No change made: ${answer.summary || tail(res.out || res.err, 300)}`,
+        });
         continue;
       }
       const outside = files.filter((f) => !fixMayTouch(manifest, f));
@@ -227,7 +239,10 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
   await hookFn('submit_seo_fix_batch', {
     batch_id: job.batch_id, status: ok.length ? 'ready' : 'empty', branch: ok.length ? branch : null, base_commit: base, fixes,
   });
-  await appendNightReport(`SEO FIXES · ${name} · ${ok.length} ready to deploy${fixes.length - ok.length ? ` · ${fixes.length - ok.length} failed` : ''} (Site changes, in the SEO and Ads Monitors)`);
+  const done = fixes.filter((f) => f.no_change === 'already_done').length;
+  const blocked = fixes.filter((f) => f.no_change === 'blocked').length;
+  const failed = fixes.length - ok.length - done - blocked;
+  await appendNightReport(`SEO FIXES · ${name} · ${ok.length} ready to deploy${failed ? ` · ${failed} failed` : ''}${done ? ` · ${done} already done` : ''}${blocked ? ` · ${blocked} need you` : ''} (Site changes, in the SEO and Ads Monitors)`);
   return { status: ok.length ? 'ready' : 'empty', branch, fixes };
 }
 

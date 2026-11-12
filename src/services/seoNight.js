@@ -61,6 +61,12 @@ const runBoth = (sql, ...params) => TABLES.forEach((t) => db.prepare(sql.replace
 // An ads finding goes to the worker when it is website code, or not sorted yet
 // (from before cards set `kind`); the worker calls the others not_code.
 const ADS_CANDIDATE = "(r.kind = 'site_code' OR r.kind IS NULL)";
+// What a night batch looks at: findings never sorted, ones 007 pressed "Fix
+// tonight" on, and ones sorted safe on an earlier night that didn't make that
+// night's 8 fixes. Without the last, a safe finding past the cap was never
+// picked up again (11 waiting, some since 2026-11-03). They are sorted again,
+// which also catches any that an earlier fix has since done.
+const NIGHT_CANDIDATE = "(r.fix_triage IS NULL OR r.fix_triage = 'safe' OR r.fix_approved = 1)";
 const PRIORITY_RANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 
 /** Which fleets' findings the night worker takes for a client: enabled for the client and on Auto. */
@@ -175,7 +181,7 @@ export function queueSeoFixes({ by = 'agent', clientId = null } = {}) {
       skipped.push({ client_name: client.name, reason: ['ready', 'deploy_failed'].includes(open.status) ? 'last night\'s fixes are waiting for Deploy or Discard' : `a batch is already ${open.status}` });
       continue;
     }
-    const isCandidate = 'r.client_id = ? AND r.status = \'open\' AND (r.fix_triage IS NULL OR r.fix_approved = 1)';
+    const isCandidate = `r.client_id = ? AND r.status = 'open' AND ${NIGHT_CANDIDATE}`;
     const candidates = (fleets.includes('seo') ? db.prepare(`SELECT COUNT(*) AS n FROM seo_recommendations r WHERE ${isCandidate}`).get(client.id).n : 0)
       + (fleets.includes('ads') ? db.prepare(`SELECT COUNT(*) AS n FROM ads_recommendations r WHERE ${isCandidate} AND ${ADS_CANDIDATE}`).get(client.id).n : 0);
     if (candidates === 0) { skipped.push({ client_name: client.name, reason: 'no new recommendations to look at' }); continue; }
@@ -211,7 +217,7 @@ export function claimSeoFixBatches(worker = 'mac') {
     const { seo_enabled: seoOn, ads_enabled: adsOn, ...client } = db.prepare(
       'SELECT id, name, website_url, repo_path, blog_compliance_profile, seo_enabled, ads_enabled FROM crm_clients WHERE id = ?',
     ).get(b.client_id);
-    const open = 'r.client_id = ? AND r.status = \'open\' AND (r.fix_triage IS NULL OR r.fix_approved = 1)';
+    const open = `r.client_id = ? AND r.status = 'open' AND ${NIGHT_CANDIDATE}`;
     const seo = seoOn ? db.prepare(`
       SELECT r.id, r.priority, r.metric, r.issue, r.action_required, r.observation, r.page_url, r.fix_approved, r.fix_triage,
              a.audit_type
@@ -333,8 +339,21 @@ export function submitSeoFixBatch(payload) {
   const apply = db.transaction(() => {
     for (const f of fixes) {
       const k = parseRecKey(f.rec_id);
-      const rec = k && db.prepare(`SELECT id FROM ${k.table} WHERE id = ? AND client_id = ?`).get(k.id, batch.client_id);
+      const rec = k && db.prepare(`SELECT id, fix_approved FROM ${k.table} WHERE id = ? AND client_id = ?`).get(k.id, batch.client_id);
       if (!rec) continue;
+      // The fix changed nothing. Not a failure: either the code already does it
+      // (closed as already done), or it can't be done inside the safe list
+      // (007 decides, as for any other code change). Something 007 already
+      // approved that still couldn't be done stays failed, with the reason.
+      const reason = String(f.summary || f.error || '').slice(0, 400);
+      if (f.no_change === 'already_done') {
+        setTriage(k.table, rec.id, { triage: 'already_done', reason, status: 'completed', batch: batch.id });
+        continue;
+      }
+      if (f.no_change === 'blocked' && !rec.fix_approved) {
+        setTriage(k.table, rec.id, { triage: 'needs_007', reason, status: 'needs_007', batch: batch.id });
+        continue;
+      }
       if (f.ok && f.commit && status === 'ready') {
         db.prepare(`
           UPDATE ${k.table} SET status = 'ready_to_deploy', fix_commit = ?, fix_summary = ?, fix_diff = ?,
@@ -348,7 +367,7 @@ export function submitSeoFixBatch(payload) {
     }
     const needs = sumBoth("SELECT COUNT(*) AS n FROM {recs} WHERE client_id = ? AND status = 'needs_007'", batch.client_id);
     const done = sumBoth("SELECT COUNT(*) AS n FROM {recs} WHERE fix_batch_id = ? AND fix_triage = 'already_done'", batch.id);
-    const failed = fixes.length - ok.length;
+    const failed = sumBoth("SELECT COUNT(*) AS n FROM {recs} WHERE fix_batch_id = ? AND status = 'fix_failed'", batch.id);
     const summary = status === 'failed'
       ? `Fixes did not run: ${String(payload.error || 'unknown error').slice(0, 200)}`
       : `${ok.length} fix(es) ready${failed ? ` · ${failed} failed` : ''}${done ? ` · ${done} already done` : ''}${needs ? ` · ${needs} need you` : ''}`;

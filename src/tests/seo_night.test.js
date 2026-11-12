@@ -333,3 +333,54 @@ describe('how much one night sorts', () => {
     expect(night.NIGHT_FIXES_PER_CLIENT).toBe(8);
   });
 });
+
+describe('safe findings past a night\'s cap', () => {
+  it('are picked up again the next night', () => {
+    setMode('seo', 'auto');
+    const clientId = makeClient();
+    const a = audit(clientId, 'schema', 1);
+    const r = rec(clientId, a, { metric: 'Favicon 404' });
+
+    const first = night.queueSeoFixes({ clientId }).queued[0].batch_id;
+    night.claimSeoFixBatches('test');
+    night.submitSeoTriage({ batch_id: first, results: [{ id: r, triage: 'safe', reason: 'add favicon.ico' }] });
+    // The 8 fixes went to other findings: this one was sorted safe but not attempted.
+    night.submitSeoFixBatch({ batch_id: first, status: 'empty', fixes: [] });
+    expect(db.prepare('SELECT status, fix_triage FROM seo_recommendations WHERE id = ?').get(r)).toEqual({ status: 'open', fix_triage: 'safe' });
+
+    const next = night.queueSeoFixes({ clientId });
+    expect(next.queued).toHaveLength(1);
+    const claimed = night.claimSeoFixBatches('test').find(b => b.batch_id === next.queued[0].batch_id);
+    expect(claimed.candidates.map(c => c.id)).toEqual([r]);
+  });
+});
+
+describe('a fix that changed nothing', () => {
+  it('is closed as already done, or handed to 007, not counted as failed', () => {
+    setMode('seo', 'auto');
+    const clientId = makeClient();
+    const a = audit(clientId, 'plan', 1);
+    const [done, blocked, approved, broke] = [rec(clientId, a), rec(clientId, a), rec(clientId, a), rec(clientId, a)];
+    db.prepare('UPDATE seo_recommendations SET fix_approved = 1 WHERE id = ?').run(approved);
+
+    const batchId = night.queueSeoFixes({ clientId }).queued[0].batch_id;
+    night.claimSeoFixBatches('test');
+    night.submitSeoTriage({ batch_id: batchId, results: [done, blocked, approved, broke].map(id => ({ id, triage: 'safe', reason: 'x' })) });
+    night.submitSeoFixBatch({ batch_id: batchId, status: 'empty', fixes: [
+      { rec_id: done, ok: false, no_change: 'already_done', summary: 'the /capabilities pages already exist', error: 'No change made: ...' },
+      { rec_id: blocked, ok: false, no_change: 'blocked', summary: 'needs the React components', error: 'No change made: ...' },
+      // 007 asked for it and it still couldn't be done: that is a failure he should see.
+      { rec_id: approved, ok: false, no_change: 'blocked', summary: 'needs facts we do not have', error: 'No change made: ...' },
+      { rec_id: broke, ok: false, error: '"npm run build" failed' },
+    ] });
+
+    const st = (id) => db.prepare('SELECT status, fix_triage, fix_reason FROM seo_recommendations WHERE id = ?').get(id);
+    expect(st(done)).toEqual({ status: 'completed', fix_triage: 'already_done', fix_reason: 'the /capabilities pages already exist' });
+    expect(st(blocked)).toEqual({ status: 'needs_007', fix_triage: 'needs_007', fix_reason: 'needs the React components' });
+    expect(st(approved).status).toBe('fix_failed');
+    expect(st(broke).status).toBe('fix_failed');
+    const batch = db.prepare('SELECT status, summary FROM seo_fix_batches WHERE id = ?').get(batchId);
+    expect(batch.status).toBe('empty');
+    expect(batch.summary).toBe('0 fix(es) ready · 2 failed · 1 already done · 1 need you');
+  });
+});

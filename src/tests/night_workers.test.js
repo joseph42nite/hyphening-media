@@ -198,3 +198,33 @@ describe('deploy_worker', GIT_TIMEOUT, () => {
     expect(sh(remote, 'log', '-2', '--format=%s', 'main').split('\n')).toEqual(['SEO: step 2 (#20)', 'SEO: step 1 (#30)']);
   });
 });
+
+describe('seo_fix_worker: fixes that change nothing', GIT_TIMEOUT, () => {
+  it('says whether it was already done or beyond the safe list; an unclear answer stays a failure', async () => {
+    const calls = [];
+    const reportFile = path.join(process.env.VAULT_DIR, 'Companies/Hyphening/Docs/Hyphening - Night Report.md');
+    fs.mkdirSync(path.dirname(reportFile), { recursive: true });
+    const answers = {
+      11: '<json>{"changed": false, "already_done": true, "summary": "index.html already has a title"}</json>',
+      12: '<json>{"changed": false, "already_done": false, "summary": "needs the React components"}</json>',
+      13: '<json>{"changed": false, "already_done": false, "summary": "needs facts we do not have"}</json>',
+      14: 'claude timed out',
+    };
+    const claudeFn = async (prompt, cwd, tools) => {
+      if (tools === 'Read,Glob,Grep') return { code: 0, out: `<json>${JSON.stringify([11, 12, 13, 14].map(id => ({ id, triage: 'safe', reason: 'x' })))}</json>`, err: '' };
+      return { code: 0, out: answers[Number(prompt.match(/Recommendation #(\d+)/)[1])], err: '' };
+    };
+    const job = { batch_id: 9, night: '2026-11-13', client: client(), max_fixes: 8,
+      candidates: [candidate(11, 'Title'), candidate(12, 'Headings'), { ...candidate(13, 'Comparison page'), fix_approved: 1 }, candidate(14, 'Schema')] };
+    const r = await fixWorker.runBatch(job, { claudeFn, hookFn: fakeHook(calls) });
+
+    expect(r.status).toBe('empty');
+    const byId = Object.fromEntries(calls[1][1].fixes.map(f => [f.rec_id, f]));
+    expect(byId[11].no_change).toBe('already_done');
+    expect(byId[12].no_change).toBe('blocked');
+    expect(byId[13].no_change).toBeUndefined(); // 007 approved it: still a failure
+    expect(byId[14].no_change).toBeUndefined();
+    expect(byId[14].error).toMatch(/No change made: claude timed out/);
+    expect(fs.readFileSync(reportFile, 'utf8')).toMatch(/0 ready to deploy · 2 failed · 1 already done · 1 need you/);
+  });
+});
