@@ -384,3 +384,39 @@ describe('a fix that changed nothing', () => {
     expect(batch.summary).toBe('0 fix(es) ready · 2 failed · 1 already done · 1 need you');
   });
 });
+
+describe('Fix tonight with a note', () => {
+  it('stores the note, hands it to the worker, and shows it while it waits', () => {
+    setMode('seo', 'auto');
+    const clientId = makeClient();
+    const a = audit(clientId, 'local', 1);
+    const r = rec(clientId, a, { metric: 'LocalBusiness schema' });
+    db.prepare("UPDATE seo_recommendations SET status = 'needs_007', fix_triage = 'needs_007' WHERE id = ?").run(r);
+
+    const res = night.approveFixTonight(r, { email: 'jo@test' }, { note: '  Use the Bengaluru address from the footer.  ' });
+    expect(res).toEqual({ status: 200, note: 'Use the Bengaluru address from the footer.' });
+    expect(db.prepare('SELECT status, fix_approved, fix_note FROM seo_recommendations WHERE id = ?').get(r))
+      .toEqual({ status: 'open', fix_approved: 1, fix_note: 'Use the Bengaluru address from the footer.' });
+
+    const row = night.nightReport().clients.find(c => c.client_id === clientId);
+    expect(row.approved_for_tonight).toBe(1);
+    expect(row.tonight.map(t => [t.id, t.fix_note])).toEqual([[r, 'Use the Bengaluru address from the footer.']]);
+
+    const batchId = night.queueSeoFixes({ clientId }).queued[0].batch_id;
+    const claimed = night.claimSeoFixBatches('test').find(b => b.batch_id === batchId);
+    expect(claimed.candidates[0]).toMatchObject({ id: r, fix_approved: 1, fix_note: 'Use the Bengaluru address from the footer.' });
+  });
+
+  it('works without a note, clears an old one on retry, and refuses one that is too long', () => {
+    const clientId = makeClient();
+    const r = rec(clientId, audit(clientId, 'local', 1));
+    db.prepare("UPDATE seo_recommendations SET status = 'fix_failed', fix_note = 'old note' WHERE id = ?").run(r);
+    expect(night.approveFixTonight(r, { email: 'jo@test' }).status).toBe(200);
+    expect(db.prepare('SELECT fix_note FROM seo_recommendations WHERE id = ?').get(r).fix_note).toBeNull();
+
+    db.prepare("UPDATE seo_recommendations SET status = 'needs_007', fix_approved = 0 WHERE id = ?").run(r);
+    expect(night.approveFixTonight(r, {}, { note: 'x'.repeat(night.FIX_NOTE_MAX + 1) }).status).toBe(400);
+    expect(night.approveFixTonight(r, {}, { note: 42 }).status).toBe(400);
+    expect(db.prepare('SELECT status FROM seo_recommendations WHERE id = ?').get(r).status).toBe('needs_007');
+  });
+});

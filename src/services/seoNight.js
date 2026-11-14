@@ -219,14 +219,14 @@ export function claimSeoFixBatches(worker = 'mac') {
     ).get(b.client_id);
     const open = `r.client_id = ? AND r.status = 'open' AND ${NIGHT_CANDIDATE}`;
     const seo = seoOn ? db.prepare(`
-      SELECT r.id, r.priority, r.metric, r.issue, r.action_required, r.observation, r.page_url, r.fix_approved, r.fix_triage,
+      SELECT r.id, r.priority, r.metric, r.issue, r.action_required, r.observation, r.page_url, r.fix_approved, r.fix_triage, r.fix_note,
              a.audit_type
       FROM seo_recommendations r JOIN seo_audits a ON a.id = r.audit_id WHERE ${open} ORDER BY r.id DESC
     `).all(b.client_id).map((r) => ({ ...r, fleet: 'seo' })) : [];
     // Ads findings say "ads <card>" as their audit, and carry the campaign they
     // are about; the worker sorts the unsorted ones like any other.
     const ads = adsOn ? db.prepare(`
-      SELECT r.id, r.priority, r.metric, r.issue, r.action_required, r.observation, r.page_url, r.fix_approved, r.fix_triage,
+      SELECT r.id, r.priority, r.metric, r.issue, r.action_required, r.observation, r.page_url, r.fix_approved, r.fix_triage, r.fix_note,
              'ads ' || a.agent_type AS audit_type, r.campaign_name, r.kind
       FROM ads_recommendations r JOIN ads_audits a ON a.id = r.audit_id WHERE ${open} AND ${ADS_CANDIDATE} ORDER BY r.id DESC
     `).all(b.client_id).map((r) => ({ ...r, id: recKey('ads', r.id), fleet: 'ads' })) : [];
@@ -464,17 +464,27 @@ export function finishSeoDeploy(payload) {
 
 // ------------------------------------------------------- one recommendation
 
-/** "Fix tonight": 007 lets the night worker make a change outside the safe list (or retry a failed one). */
-export function approveFixTonight(recId, user) {
+export const FIX_NOTE_MAX = 1000;
+
+/**
+ * "Fix tonight": 007 lets the night worker make a change outside the safe list
+ * (or retry a failed one). An optional note says how: it goes into the fix
+ * prompt and outranks the recommendation's own wording. No note clears an
+ * earlier one, so a retry without a note isn't steered by an old one.
+ */
+export function approveFixTonight(recId, user, { note = null } = {}) {
   const k = parseRecKey(recId);
   const rec = k && db.prepare(`SELECT * FROM ${k.table} WHERE id = ?`).get(k.id);
   if (!rec) return { status: 404, error: 'Recommendation not found' };
   if (!['needs_007', 'fix_failed', 'open'].includes(rec.status)) return { status: 409, error: `This recommendation is ${rec.status}` };
+  if (note != null && typeof note !== 'string') return { status: 400, error: 'note must be text' };
+  const text = note?.trim() || null;
+  if (text && text.length > FIX_NOTE_MAX) return { status: 400, error: `The note is too long (${text.length} characters, at most ${FIX_NOTE_MAX})` };
   db.prepare(`
     UPDATE ${k.table} SET status = 'open', fix_approved = 1, fix_triage = 'safe', fix_error = NULL,
-      fix_reason = ? WHERE id = ?
-  `).run(`Approved for tonight by ${user?.email || 'admin'}`, rec.id);
-  return { status: 200 };
+      fix_reason = ?, fix_note = ? WHERE id = ?
+  `).run(`Approved for tonight by ${user?.email || 'admin'}`, text, rec.id);
+  return { status: 200, note: text };
 }
 
 export function ignoreRecommendation(recId) {
@@ -498,7 +508,7 @@ export function nightReport({ hours = 30 } = {}) {
     SELECT id, name, repo_path, seo_enabled, ads_enabled FROM crm_clients
     WHERE is_active = 1 AND (seo_enabled = 1 OR ads_enabled = 1) ORDER BY name
   `).all();
-  const recFields = 'id, priority, metric, issue, action_required, page_url, status, fix_triage, fix_reason, fix_summary, fix_diff, fix_commit, fix_error, fix_batch_id, fix_approved';
+  const recFields = 'id, priority, metric, issue, action_required, page_url, status, fix_triage, fix_reason, fix_summary, fix_diff, fix_commit, fix_error, fix_batch_id, fix_approved, fix_note';
   // One query on both tables; ads ids become 'ads-<id>'.
   const recs = (where, ...params) => Object.entries(REC_TABLES)
     .flatMap(([fleet, table]) => db.prepare(`SELECT ${recFields} FROM ${table} WHERE ${where}`).all(...params)
@@ -521,7 +531,7 @@ export function nightReport({ hours = 30 } = {}) {
     const ready = batch ? recs("fix_batch_id = ? AND status IN ('ready_to_deploy', 'completed') AND fix_commit IS NOT NULL", batch.id) : [];
     const failed = batch ? recs("fix_batch_id = ? AND status = 'fix_failed'", batch.id) : [];
     const needs = byPriority(recs("client_id = ? AND status = 'needs_007'", c.id));
-    const tonight = sumBoth("SELECT COUNT(*) AS n FROM {recs} WHERE client_id = ? AND status = 'open' AND fix_approved = 1", c.id);
+    const tonight = byPriority(recs("client_id = ? AND status = 'open' AND fix_approved = 1", c.id));
     const alreadyDone = batch ? recs("fix_batch_id = ? AND fix_triage = 'already_done'", batch.id) : [];
 
     let setup = null;
@@ -531,7 +541,7 @@ export function nightReport({ hours = 30 } = {}) {
     const retryable = batch?.status === 'deploy_failed' && ready.some((f) => f.status === 'ready_to_deploy');
     return {
       client_id: c.id, client_name: c.name, seo_enabled: !!c.seo_enabled, ads_enabled: !!c.ads_enabled, setup, runs, batch, retryable,
-      fixes: ready, failed, needs_007: needs, already_done: alreadyDone, approved_for_tonight: tonight,
+      fixes: ready, failed, needs_007: needs, already_done: alreadyDone, approved_for_tonight: tonight.length, tonight,
     };
   });
 

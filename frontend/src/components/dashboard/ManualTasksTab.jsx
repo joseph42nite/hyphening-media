@@ -3,6 +3,7 @@ import { RefreshCw, Check, X, ExternalLink, Moon } from 'lucide-react';
 import { api, card, muted, label } from './blogMonitorShared.js';
 import OutreachPanel from './OutreachPanel.jsx';
 import { gapSummary } from './outreachShared.js';
+import FixNoteBox from './FixNoteBox.jsx';
 
 /**
  * Manual tasks: every open SEO and ads finding a person has to do by hand, one
@@ -38,6 +39,7 @@ function GapLine({ competitors }) {
 
 function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onFixTonight }) {
   const [skipping, setSkipping] = useState(false);
+  const [noting, setNoting] = useState(false);
   const [reason, setReason] = useState('');
   const disabled = busy === task.key;
 
@@ -76,7 +78,7 @@ function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onF
         {!skipping ? (
           <div style={{ display: 'flex', gap: '6px' }}>
             {task.area === 'site' && isAdmin && (
-              <button className="btn btn-secondary" disabled={disabled} onClick={() => onFixTonight(task)} title="Let the night worker make this change tonight">
+              <button className="btn btn-secondary" disabled={disabled || noting} onClick={() => setNoting(true)} title="Let the night worker make this change tonight, with a note on how">
                 <Moon size={13} /> Fix tonight
               </button>
             )}
@@ -97,6 +99,13 @@ function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onF
           </div>
         )}
       </div>
+      {noting && (
+        <FixNoteBox
+          disabled={disabled}
+          onConfirm={(note) => { setNoting(false); onFixTonight(task, note); }}
+          onCancel={() => setNoting(false)}
+        />
+      )}
     </div>
   );
 }
@@ -144,7 +153,7 @@ export default function ManualTasksTab({ clients, showToast, isAdmin }) {
     onAssign: (t, to) => act(t, () => post(`/api/manual-tasks/${t.key}/assign`, { assigned_to: to }), to ? `Assigned to ${shortName(to)}` : 'Unassigned'),
     onDone: (t) => act(t, () => post(`/api/manual-tasks/${t.key}/done`), 'Marked done'),
     onSkip: (t, reason) => act(t, () => post(`/api/manual-tasks/${t.key}/skip`, { reason }), 'Marked not doing'),
-    onFixTonight: (t) => act(t, () => post(`/api/seo-night/recommendations/${t.key}/fix-tonight`), 'The night worker will make this change tonight'),
+    onFixTonight: (t, note) => act(t, () => post(`/api/seo-night/recommendations/${t.key}/fix-tonight`, { note: note || null }), note ? 'The night worker will make this change tonight, with your note' : 'The night worker will make this change tonight'),
   };
 
   const visible = (tasks) => tasks.filter(t => who === 'all' || (who === 'none' ? !t.assigned_to : t.assigned_to === who));

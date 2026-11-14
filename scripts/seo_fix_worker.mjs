@@ -119,6 +119,7 @@ function fixPrompt(job, manifest, rec) {
     `- Action: ${rec.action_required}`,
     rec.page_url ? `- Page: ${rec.page_url}` : '',
     rec.fix_approved ? '- 007 approved this change himself ("Fix tonight"), so it may go beyond the usual safe list, but keep it as small as the recommendation allows.' : `- It is on the safe list: ${SAFE_LIST.join('; ')}. Stay inside that.`,
+    rec.fix_approved && rec.fix_note ? `\n007's instructions for this change (follow them; where they differ from the recommendation above, they win, but the rules below still apply):\n"""\n${rec.fix_note}\n"""` : '',
     '',
     'Rules:',
     `- Edit ONLY these files or folders: ${manifest.seo_fixes.paths.join(', ')}. Never: ${['.env', ...(manifest.seo_fixes.never_touch || [])].join(', ')}. Edits anywhere else are thrown away and the fix fails.`,

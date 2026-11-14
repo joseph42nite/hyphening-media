@@ -228,3 +228,19 @@ describe('seo_fix_worker: fixes that change nothing', GIT_TIMEOUT, () => {
     expect(fs.readFileSync(reportFile, 'utf8')).toMatch(/0 ready to deploy · 2 failed · 1 already done · 1 need you/);
   });
 });
+
+describe('seo_fix_worker: 007\'s note', GIT_TIMEOUT, () => {
+  it('goes into the fix prompt of an approved finding', async () => {
+    const prompts = [];
+    const claudeFn = async (prompt, cwd, tools) => {
+      if (tools === 'Read,Glob,Grep') return { code: 0, out: '<json>[]</json>', err: '' };
+      prompts.push(prompt);
+      return { code: 0, out: '<json>{"changed": false, "already_done": true, "summary": "already there"}</json>', err: '' };
+    };
+    const job = { batch_id: 10, night: '2026-11-14', client: client(), max_fixes: 8,
+      candidates: [{ ...candidate(21, 'Address'), fix_approved: 1, fix_note: 'Use the Bengaluru address from the footer.' }, { ...candidate(22, 'Plain'), fix_approved: 1 }] };
+    await fixWorker.runBatch(job, { claudeFn, hookFn: fakeHook([]) });
+    expect(prompts[0]).toMatch(/007's instructions for this change[\s\S]*Use the Bengaluru address from the footer\./);
+    expect(prompts[1]).not.toMatch(/007's instructions/);
+  });
+});

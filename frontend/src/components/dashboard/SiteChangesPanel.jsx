@@ -88,7 +88,7 @@ export default function SiteChangesPanel({ showToast, clientId, clientName, repo
     if (!window.confirm(`Discard last night's fixes for ${c.client_name}? They move to "needs you" so they aren't redone tonight.`)) return;
     act(`x${c.batch.id}`, () => api(`/api/seo-night/batches/${c.batch.id}/discard`, { method: 'POST' }), 'Discarded');
   };
-  const fixTonight = (rec) => act(`f${rec.id}`, () => api(`/api/seo-night/recommendations/${rec.id}/fix-tonight`, { method: 'POST' }), 'Will be fixed tonight');
+  const fixTonight = (rec, note) => act(`f${rec.id}`, () => api(`/api/seo-night/recommendations/${rec.id}/fix-tonight`, { method: 'POST', body: JSON.stringify({ note: note || null }) }), note ? 'Will be fixed tonight, with your note' : 'Will be fixed tonight');
   const ignore = (rec) => act(`i${rec.id}`, () => api(`/api/seo-night/recommendations/${rec.id}/ignore`, { method: 'POST' }), 'Ignored');
 
   if (!report || report.hidden || !clientId) return null;

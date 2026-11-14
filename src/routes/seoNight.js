@@ -42,9 +42,9 @@ router.post('/batches/:id/discard', authorize('admin'), (req, res) => {
 
 /** POST /api/seo-night/recommendations/:id/fix-tonight — :id is an SEO id, or 'ads-<id>' for an ads finding. */
 router.post('/recommendations/:id/fix-tonight', authorize('admin'), (req, res) => {
-  const r = approveFixTonight(req.params.id, req.user);
+  const r = approveFixTonight(req.params.id, req.user, { note: req.body?.note ?? null });
   if (r.status !== 200) return res.status(r.status).json({ error: r.error });
-  logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'seo_fix_approved', entityType: String(req.params.id).startsWith('ads-') ? 'ads_recommendation' : 'seo_recommendation', entityId: parseInt(String(req.params.id).replace(/^ads-/, ''), 10) });
+  logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'seo_fix_approved', entityType: String(req.params.id).startsWith('ads-') ? 'ads_recommendation' : 'seo_recommendation', entityId: parseInt(String(req.params.id).replace(/^ads-/, ''), 10), diff: r.note ? { note: r.note } : undefined });
   res.json({ success: true });
 });
 
