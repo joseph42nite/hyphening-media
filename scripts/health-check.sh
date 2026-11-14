@@ -133,7 +133,7 @@ def manifest_check(repo):
     missing = [k for k in ("client_id", "branch", "deploy", "health_check") if k not in m]
     if missing:
         return WARN, f"deploy manifest missing {', '.join(missing)}"
-    if m.get("deploy", {}).get("type") not in ("git_push", "ssh_pull_build", "cms_api", "handoff"):
+    if m.get("deploy", {}).get("type") not in ("git_push", "ssh_pull_build", "ssh_rsync_static", "cms_api", "handoff"):
         return WARN, "deploy manifest has an unknown deploy.type"
     return OK, f"deploy manifest OK ({m['deploy']['type']})"
 

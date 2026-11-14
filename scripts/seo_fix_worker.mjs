@@ -34,7 +34,7 @@ import { appendNightReport } from './lib/nightReport.mjs';
 import { hook } from './lib/hook.mjs';
 import { run, git, sh, tail, jsonBetweenTags } from './lib/proc.mjs';
 import { loadManifest, fixMayTouch } from './lib/deployManifest.mjs';
-import { linkNodeModules } from './lib/worktree.mjs';
+import { prepareWorktree } from './lib/worktree.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLAUDE_BIN = process.env.SEO_FIX_CLAUDE_BIN || 'claude';
@@ -175,7 +175,7 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
 
   const fixes = [];
   try {
-    const linked = await linkNodeModules(repo, wt);
+    const linked = await prepareWorktree(repo, wt, manifest);
 
     // 1. Sort.
     const t = await claudeFn(triagePrompt(job, manifest), wt, 'Read,Glob,Grep', TRIAGE_TIMEOUT_MS);

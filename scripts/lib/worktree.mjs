@@ -6,6 +6,7 @@
 import path from 'path';
 import { existsSync } from 'fs';
 import { symlink, readdir } from 'fs/promises';
+import { sh, tail } from './proc.mjs';
 
 /**
  * The real repo's node_modules (root and each first-level folder with a
@@ -28,4 +29,22 @@ export async function linkNodeModules(repo, wt) {
     }
   }
   return linked;
+}
+
+/**
+ * Gets a worktree ready for the manifest's checks and build. With a manifest
+ * `install` list, those commands install the packages inside the worktree (on
+ * the internal disk, from npm's cache): needed where node_modules can't be a
+ * link, as Turbopack refuses one that points outside the project ("Symlink
+ * node_modules is invalid, it points out of the filesystem root"). Otherwise
+ * the repo's node_modules are linked. Returns the linked paths; throws when an
+ * install command fails.
+ */
+export async function prepareWorktree(repo, wt, manifest) {
+  if (!manifest.install?.length) return linkNodeModules(repo, wt);
+  for (const cmd of manifest.install) {
+    const res = await sh(cmd, wt, 15 * 60 * 1000);
+    if (res.code !== 0) throw new Error(`install "${cmd}" failed: ${tail(res.err || res.out, 300)}`);
+  }
+  return [];
 }

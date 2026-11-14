@@ -168,7 +168,7 @@ export default function ClientBlogPipelineSection({ client, showToast }) {
       </div>
       <div className="form-group" style={{ marginBottom: '12px' }}>
         <label className="form-label">Site repo on the Mac <span style={hintStyle}>— absolute path, leave empty if there's none</span></label>
-        <input type="text" className="form-control" placeholder="/Volumes/Mac Valhalla/Projects/..." value={form.repo_path} onChange={set('repo_path')} />
+        <input type="text" className="form-control" placeholder="/Users/josephgeorge/Projects/..." value={form.repo_path} onChange={set('repo_path')} />
       </div>
       <div className="form-grid-3" style={{ marginBottom: '12px' }}>
         <div className="form-group">
