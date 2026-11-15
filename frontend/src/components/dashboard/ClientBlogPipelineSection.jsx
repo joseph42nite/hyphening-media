@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../api.js';
 
 /**
- * "Blog pipeline" and "Publishing access" in the admin Onboarding modal.
+ * "Website code", "Blog pipeline" and "Publishing access" in the admin
+ * Onboarding modal.
+ *
+ * Website code is the site repo on the Mac (repo_path): the night SEO and ads
+ * fixes and the Deploy button work in it, and so do repo_file blog posts. It's
+ * saved with the pipeline settings (same endpoint, same Save button).
  *
  * Pipeline settings (migration 094) say what this client's blog pipeline
  * includes and where approved posts go. They're admin-only: the client sees
@@ -87,7 +92,7 @@ export default function ClientBlogPipelineSection({ client, showToast }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save blog pipeline');
       setForm(f => ({ ...f, blog_languages: languagesToText(data.blog_languages) }));
-      showToast('Blog pipeline saved', 'success');
+      showToast('Saved', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -153,6 +158,15 @@ export default function ClientBlogPipelineSection({ client, showToast }) {
 
   return (
     <>
+      <h4 style={h4Style}>Website code <span style={{ ...hintStyle, fontSize: '0.8rem' }}>— admin only</span></h4>
+      <div className="form-group" style={{ marginBottom: '12px' }}>
+        <label className="form-label">Site repo on the Mac <span style={hintStyle}>— absolute path</span></label>
+        <input type="text" className="form-control" placeholder="/Users/josephgeorge/Projects/..." value={form.repo_path} onChange={set('repo_path')} />
+        <div style={{ ...hintStyle, fontSize: '0.8rem', marginTop: '4px' }}>
+          The night SEO and ads fixes edit this folder and the Deploy button deploys from it. Blog posts use it only when they're published into the site's code. Leave it empty for audits only.
+        </div>
+      </div>
+
       <h4 style={h4Style}>Blog pipeline <span style={{ ...hintStyle, fontSize: '0.8rem' }}>— admin only; the night pipeline reads this</span></h4>
       <div className="form-grid-2" style={{ marginBottom: '12px' }}>
         <div className="form-group">
@@ -165,10 +179,6 @@ export default function ClientBlogPipelineSection({ client, showToast }) {
           <label className="form-label">Blog URL <span style={hintStyle}>— live blog index</span></label>
           <input type="text" className="form-control" placeholder="https://example.com/blog" value={form.blog_site_url} onChange={set('blog_site_url')} />
         </div>
-      </div>
-      <div className="form-group" style={{ marginBottom: '12px' }}>
-        <label className="form-label">Site repo on the Mac <span style={hintStyle}>— absolute path, leave empty if there's none</span></label>
-        <input type="text" className="form-control" placeholder="/Users/josephgeorge/Projects/..." value={form.repo_path} onChange={set('repo_path')} />
       </div>
       <div className="form-grid-3" style={{ marginBottom: '12px' }}>
         <div className="form-group">
