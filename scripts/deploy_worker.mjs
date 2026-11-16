@@ -166,7 +166,7 @@ export async function deployBatch(job, { hookFn = hook, health = healthCheck, ne
       const pick = await git(wt, ['cherry-pick', c.commit_sha], { allowFail: true });
       if (pick.code !== 0) {
         await git(wt, ['cherry-pick', '--abort'], { allowFail: true });
-        return finish('deploy_failed', { error: `fix #${c.rec_id} (${c.metric}) clashes with newer changes on ${target}. Discard; tonight's run redoes it on the new code.` });
+        return finish('deploy_failed', { error: `fix #${c.rec_id} (${c.metric}) clashes with newer changes on ${target}. Nothing was pushed. Discard, then press "Fix tonight" on the fixes you still want: discarded fixes go to Needs you and aren't redone on their own.` });
       }
     }
     log(`replayed ${job.commits.length} commit(s)`);
