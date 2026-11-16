@@ -407,24 +407,35 @@ router.patch('/:id/marketing/content/:contentId', authorize('admin', 'ops_social
       }
     }
 
+    // The edit form sends script_id on every save, linked script unchanged or
+    // not. Copying the script onto the row each time overwrote whatever the
+    // user had just set — "Posted" snapped back to the script's "Client
+    // Approved" (shown as Pending) and edited titles reverted. Only a newly
+    // linked script is copied over, and a status the user changed in this
+    // same request still wins over the script's.
     const { script_id } = req.body;
-    if (script_id !== undefined) {
+    const currentScriptId = db.prepare('SELECT script_id FROM marketing_content_script_relation WHERE content_id = ?')
+      .get(req.params.contentId)?.script_id ?? null;
+    const newScriptId = script_id === '' || script_id == null ? null : script_id;
+    if (script_id !== undefined && String(newScriptId) !== String(currentScriptId)) {
       db.prepare('DELETE FROM marketing_content_script_relation WHERE content_id = ?').run(req.params.contentId);
-      if (script_id && script_id !== null && script_id !== '') {
+      if (newScriptId !== null) {
         db.prepare('INSERT INTO marketing_content_script_relation (content_id, script_id) VALUES (?, ?)')
-          .run(req.params.contentId, script_id);
-        
-        const scriptObj = db.prepare('SELECT title, script_text, status, client_comments FROM marketing_scripts WHERE id = ?').get(script_id);
+          .run(req.params.contentId, newScriptId);
+
+        const scriptObj = db.prepare('SELECT title, script_text, status, client_comments FROM marketing_scripts WHERE id = ?').get(newScriptId);
         if (scriptObj) {
-          const clientApproved = ['Client Approved', 'Posted'].includes(scriptObj.status) ? 1 : 0;
+          const userChangedStatus = req.body.status !== undefined && req.body.status !== content.status;
+          const status = userChangedStatus ? req.body.status : (scriptObj.status || 'Draft');
+          const clientApproved = ['Client Approved', 'Posted'].includes(status) ? 1 : 0;
           db.prepare(`
-            UPDATE marketing_content_tracker 
+            UPDATE marketing_content_tracker
             SET title = ?, script = ?, status = ?, client_comments = ?, client_approved = ?, updated_at = ?
             WHERE id = ?
           `).run(
-            scriptObj.title, 
-            scriptObj.script_text, 
-            scriptObj.status || 'Draft', 
+            scriptObj.title,
+            scriptObj.script_text,
+            status,
             scriptObj.client_comments || null, 
             clientApproved, 
             new Date().toISOString(),
