@@ -5,4 +5,17 @@ Disallow: /dashboard
 Disallow: /portal/
 Disallow: /api/
 
+# AI search crawlers: public pages allowed, private areas still blocked
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+User-agent: Google-Extended
+Allow: /
+Disallow: /dashboard
+Disallow: /portal/
+Disallow: /api/
+
 Sitemap: https://hypheningmedia.com/sitemap.xml
