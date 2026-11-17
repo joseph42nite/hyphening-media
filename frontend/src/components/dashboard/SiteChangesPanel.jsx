@@ -78,10 +78,10 @@ export default function SiteChangesPanel({ showToast, clientId, clientName, repo
 
   const deploy = (c) => {
     const n = c.fixes.filter(f => f.status === 'ready_to_deploy').length;
-    if (!window.confirm(`Deploy ${n} fix(es) to ${c.client_name}'s live site? The Mac pushes them, deploys, and checks the site; if the check fails it rolls them back.`)) return;
+    if (!window.confirm(`Queue ${n} fix(es) for ${c.client_name}'s live site? They deploy tonight at 00:30 IST: the Mac pushes them, deploys, and checks the site; if the check fails it rolls them back.`)) return;
     act(`d${c.batch.id}`, async () => {
       const d = await api(`/api/seo-night/batches/${c.batch.id}/deploy`, { method: 'POST' });
-      return { note: d.connector_online ? `Deploying ${c.client_name}…` : 'Deploy queued; the Mac connector is offline, it starts when the connector next connects' };
+      return { note: `Queued: ${c.client_name} deploys tonight at ${d.deploy_at || '00:30 IST'}` };
     });
   };
   const discard = (c) => {

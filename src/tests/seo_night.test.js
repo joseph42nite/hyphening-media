@@ -21,6 +21,9 @@ afterAll(() => {
   setMode('seo', savedMode);
 });
 
+// 01:00 IST, inside the night deploy window.
+const NIGHT = new Date('2026-11-17T19:30:00Z');
+
 function makeClient(overrides = {}) {
   return db.prepare(`
     INSERT INTO crm_clients (name, client_type, is_active, seo_enabled, website_url, repo_path, contact_phone, is_ecommerce)
@@ -166,7 +169,11 @@ describe('fix batches, from queue to deploy', () => {
   it('Deploy → live marks the fixes completed', () => {
     expect(night.requestDeploy(batchId, { email: 'jo@test' }).status).toBe(200);
     expect(night.requestDeploy(batchId, { email: 'jo@test' }).status).toBe(409);
-    const d = night.claimSeoDeploys('test').find(x => x.batch_id === batchId);
+    // Daytime: the queued deploy is not handed out, and stays queued.
+    expect(night.claimSeoDeploys('test', { now: new Date('2026-11-17T09:30:00Z') })).toEqual([]);
+    expect(night.claimSeoDeploys('test', { now: new Date('2026-11-17T21:30:00Z') })).toEqual([]); // 03:00 IST, window closed
+    expect(db.prepare('SELECT status FROM seo_fix_batches WHERE id = ?').get(batchId).status).toBe('deploy_queued');
+    const d = night.claimSeoDeploys('test', { now: NIGHT }).find(x => x.batch_id === batchId);
     expect(d.commits).toEqual([{ rec_id: recs[0], commit_sha: 'c0ffee', metric: 'Meta description' }]);
     night.finishSeoDeploy({ batch_id: batchId, status: 'live', live_commit: 'live1', log: 'ok' });
     expect(db.prepare('SELECT status FROM seo_recommendations WHERE id = ?').get(recs[0]).status).toBe('completed');
@@ -180,7 +187,7 @@ describe('fix batches, from queue to deploy', () => {
     night.claimSeoFixBatches('test');
     night.submitSeoFixBatch({ batch_id: b, status: 'ready', branch: 'seo/x', base_commit: 'a', fixes: [{ rec_id: r1, ok: true, commit: 'beef', summary: 's' }] });
     night.requestDeploy(b, {});
-    night.claimSeoDeploys('test');
+    night.claimSeoDeploys('test', { now: NIGHT });
     night.finishSeoDeploy({ batch_id: b, status: 'rolled_back', error: 'health check failed: / → 500' });
     const r = db.prepare('SELECT status, fix_error FROM seo_recommendations WHERE id = ?').get(r1);
     expect(r.status).toBe('fix_failed');
@@ -216,7 +223,7 @@ describe('retry after a deploy that failed before pushing', () => {
     night.claimSeoFixBatches('test');
     night.submitSeoFixBatch({ batch_id: b, status: 'ready', branch: 'seo/z', base_commit: 'a', fixes: [{ rec_id: r1, ok: true, commit: 'abc1', summary: 's' }] });
     night.requestDeploy(b, {});
-    night.claimSeoDeploys('test');
+    night.claimSeoDeploys('test', { now: NIGHT });
     night.finishSeoDeploy({ batch_id: b, status: 'deploy_failed', pushed: false, error: 'check failed: vite: command not found' });
 
     expect(db.prepare('SELECT status FROM seo_recommendations WHERE id = ?').get(r1).status).toBe('ready_to_deploy');
@@ -230,7 +237,7 @@ describe('retry after a deploy that failed before pushing', () => {
       .toEqual({ error: null, previous_error: 'check failed: vite: command not found' });
 
     // Failing after the push is different: those fixes are done for.
-    night.claimSeoDeploys('test');
+    night.claimSeoDeploys('test', { now: NIGHT });
     night.finishSeoDeploy({ batch_id: b, status: 'deploy_failed', pushed: true, error: 'ROLLBACK PUSH FAILED' });
     expect(db.prepare('SELECT status FROM seo_recommendations WHERE id = ?').get(r1).status).toBe('fix_failed');
     expect(night.nightReport().clients.find(c => c.client_id === id).retryable).toBe(false);
@@ -294,7 +301,7 @@ describe('ads website-code findings share the client\'s fix batch', () => {
       expect(row.fixes).toEqual([expect.objectContaining({ id: `ads-${site}`, fleet: 'ads', status: 'ready_to_deploy' })]);
 
       night.requestDeploy(job.batch_id, {});
-      const d = night.claimSeoDeploys('test').find(x => x.batch_id === job.batch_id);
+      const d = night.claimSeoDeploys('test', { now: NIGHT }).find(x => x.batch_id === job.batch_id);
       expect(d.commits).toEqual([{ rec_id: `ads-${site}`, commit_sha: 'c0de', metric: 'Form attribution' }]);
       night.finishSeoDeploy({ batch_id: job.batch_id, status: 'live', live_commit: 'l' });
       expect(db.prepare('SELECT status FROM ads_recommendations WHERE id = ?').get(site).status).toBe('completed');
