@@ -102,7 +102,7 @@ app.use(helmet({
       // data: URIs, so data: has to be allowed or every face is blocked.
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "http://localhost", "capacitor://localhost", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com"],
+      connectSrc: ["'self'", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com"],
       frameSrc: [
         "'self'",
         "https://www.youtube.com",
