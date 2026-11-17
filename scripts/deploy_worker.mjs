@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Deploy worker: runs when 007 presses Deploy in the SEO Monitor's "Last
- * night" section. A plain script, no AI; it does exactly what the repo's
- * deploy manifest says, in this order:
+ * Deploy worker: deploys the batches 007 pressed Deploy on in the SEO
+ * Monitor's "Last night" section. Deploy only queues them; the server hands
+ * them out from 00:30 to 03:00 IST, so this runs at night. A plain script,
+ * no AI; it does exactly what the repo's deploy manifest says, in this order:
  *
  *   1. Fresh worktree at origin/<branch>; replay the night's fix commits on it.
  *      A clash with newer work on <branch> stops here; nothing is pushed.

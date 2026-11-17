@@ -10,6 +10,7 @@ import { syncAllClients } from './adsSyncWorker.js';
 import { getMode } from './automationMode.js';
 import { runMonthEnd } from './seoMonthly.js';
 import { runMonthlyKeywords } from './keywordPlan.js';
+import { pushRunSignal } from './macConnector.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,6 +89,16 @@ export function initScheduler() {
     if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') return;
     console.log('[SCHEDULER] Running monthly keyword check...');
     runMonthlyKeywords().catch(err => console.error('[SCHEDULER] Keyword check failed:', err.message));
+  }, { timezone: 'Asia/Kolkata' });
+
+  // Night deploys — 00:30 IST. Deploy in the SEO Monitor only queues a batch;
+  // this wakes the Mac's deploy worker for every client's queued batch at once.
+  // claimSeoDeploys() refuses outside 00:30-03:00 IST, and the connector's
+  // 10-minute sweep catches up inside the window if the Mac was asleep at 00:30.
+  cron.schedule('30 0 * * *', () => {
+    if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') return;
+    console.log('[SCHEDULER] Starting night deploys...');
+    pushRunSignal('deploy');
   }, { timezone: 'Asia/Kolkata' });
 
   // Clean expired sessions — daily at 3 AM

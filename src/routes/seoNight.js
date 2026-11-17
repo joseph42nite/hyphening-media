@@ -7,8 +7,8 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { pushRunSignal, connectorStatus } from '../services/macConnector.js';
-import { nightReport, requestDeploy, discardBatch, approveFixTonight, ignoreRecommendation } from '../services/seoNight.js';
+import { connectorStatus } from '../services/macConnector.js';
+import { nightReport, requestDeploy, DEPLOY_WINDOW_IST, discardBatch, approveFixTonight, ignoreRecommendation } from '../services/seoNight.js';
 
 const router = Router();
 router.use(authenticate);
@@ -23,13 +23,13 @@ router.get('/report', authorize('admin', 'api_readonly'), (req, res) => {
   }
 });
 
-/** POST /api/seo-night/batches/:id/deploy — the approval: push and deploy that night's fixes. */
+/** POST /api/seo-night/batches/:id/deploy — the approval: queues the fixes for the 00:30 IST night deploy. */
 router.post('/batches/:id/deploy', authorize('admin'), (req, res) => {
   const r = requestDeploy(parseInt(req.params.id, 10), req.user);
   if (r.status !== 200) return res.status(r.status).json({ error: r.error });
-  const delivered = pushRunSignal('deploy');
+  // No run signal: the deploy waits for the night window (scheduler.js, 00:30 IST).
   logAction({ actorId: req.user.id, actorEmail: req.user.email, action: 'seo_fixes_deploy_requested', entityType: 'seo_fix_batch', entityId: r.batch.id, diff: { client_id: r.batch.client_id } });
-  res.json({ batch: r.batch, connector_online: delivered });
+  res.json({ batch: r.batch, deploy_at: `${DEPLOY_WINDOW_IST.start} IST` });
 });
 
 /** POST /api/seo-night/batches/:id/discard */

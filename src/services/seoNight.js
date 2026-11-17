@@ -9,8 +9,13 @@
  *                already done in the code, fixes the safe ones on a branch, and reports
  *                back (claim / triage / submit below). A client's batch waits until that
  *                client's night audits have finished, so it works on their findings.
- *   morning    007 reads nightReport() in the SEO Monitor and presses Deploy or Discard
- *              → the Mac's deploy_worker pushes and deploys per the repo's manifest
+ *   day        007 reads nightReport() in the SEO Monitor and presses Deploy or Discard;
+ *              Deploy only queues the batch (deploy_queued)
+ *   00:30 IST  the scheduler signals the Mac; its deploy_worker pushes and deploys every
+ *              queued batch per the repo's manifest. claimSeoDeploys() hands nothing out
+ *              outside 00:30-03:00 IST, so a daytime sweep never takes a site live. The
+ *              window sits before the 01:15 audits (they check the fixed site) and ends
+ *              before the 03:30 fix queue, which skips a client still waiting to deploy.
  *
  * Both queue steps do nothing unless the SEO fleet is on Auto. Nothing reaches a
  * live site without the Deploy button; the decision is in the vault:
@@ -415,8 +420,18 @@ export function discardBatch(batchId, user) {
   return { status: 200 };
 }
 
-/** The deploy worker takes every batch 007 pressed Deploy on. */
-export function claimSeoDeploys(worker = 'mac') {
+/** Deploys only go out at night: a daytime deploy can break a site while people use it. */
+export const DEPLOY_WINDOW_IST = { start: '00:30', end: '03:00' };
+
+/** True when `d` is inside the night deploy window (IST). */
+export function inDeployWindow(d = new Date()) {
+  const hhmm = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  return hhmm >= DEPLOY_WINDOW_IST.start && hhmm < DEPLOY_WINDOW_IST.end;
+}
+
+/** The deploy worker takes every batch 007 pressed Deploy on, but only inside the night window. */
+export function claimSeoDeploys(worker = 'mac', { now = new Date() } = {}) {
+  if (!inDeployWindow(now)) return [];
   const claim = db.transaction(() => {
     const batches = db.prepare("SELECT * FROM seo_fix_batches WHERE status = 'deploy_queued' ORDER BY id").all();
     for (const b of batches) {
