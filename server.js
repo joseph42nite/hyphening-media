@@ -436,6 +436,10 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
   // build. The landing page's own hand-written HTML/CSS/JS carry stable
   // names, so they revalidate instead — an ETag 304 costs one small round
   // trip and guarantees a deploy is never half-applied in someone's cache.
+  // Crawlers/browsers request /favicon.ico by default; answer with the PNG icon instead of the SPA 404 shell.
+  app.get('/favicon.ico', (req, res) => {
+    res.type('image/png').set('Cache-Control', 'public, max-age=86400').sendFile(path.join(frontendPath, 'favicon.png'));
+  });
   const IMMUTABLE = /\.(webp|avif|png|jpe?g|gif|svg|ico|woff2?|mp4|webm)$/i;
   const VENDOR = /three\.min\.js$/i;
   app.use(express.static(frontendPath, {
