@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Rocket, Trash2, X, Moon, EyeOff } from 'lucide-react';
+import { Rocket, Trash2, X, Moon, EyeOff, MessageSquare } from 'lucide-react';
 import { muted, label } from './blogMonitorShared.js';
 import { BATCH_LABEL, BATCH_COLOR, ddmmyyyy } from './seoNightShared.js';
 import FixNoteBox, { FixNote } from './FixNoteBox.jsx';
@@ -26,8 +26,9 @@ function Diff({ text }) {
 }
 
 /**
- * A finding 007 can send to tonight's fixes (Needs you, Failed). The button
- * opens a note box under the item instead of approving at once.
+ * A finding 007 can send to tonight's fixes (Needs you, Failed). The main
+ * button sends it in one click; "Add note" opens a note box under the item
+ * for instructions on how to do it.
  */
 function ApprovableItem({ f, busy, buttonLabel, buttonTitle, onFixTonight, onIgnore, children }) {
   const [noting, setNoting] = useState(false);
@@ -35,14 +36,15 @@ function ApprovableItem({ f, busy, buttonLabel, buttonTitle, onFixTonight, onIgn
     <div style={{ ...item, display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
       <div style={{ flex: '1 1 400px', minWidth: 0 }}>{children}</div>
       {!noting && (
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-          <button className="btn btn-secondary" disabled={busy === `f${f.id}`} onClick={() => setNoting(true)} title={buttonTitle}><Moon size={14} /> {buttonLabel}</button>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" disabled={busy === `f${f.id}`} onClick={() => onFixTonight(f, null)} title={buttonTitle}><Moon size={14} /> {buttonLabel}</button>
+          <button className="btn btn-secondary" disabled={busy === `f${f.id}`} onClick={() => setNoting(true)} title="Add a note on how the night worker should do it"><MessageSquare size={14} /> Add note</button>
           <button className="btn btn-secondary" disabled={busy === `i${f.id}`} onClick={() => onIgnore(f)} title="Ignore this recommendation"><EyeOff size={14} /></button>
         </div>
       )}
       {noting && (
         <FixNoteBox
-          confirmLabel={buttonLabel}
+          confirmLabel={`${buttonLabel} with note`}
           disabled={busy === `f${f.id}`}
           onConfirm={(note) => { setNoting(false); onFixTonight(f, note); }}
           onCancel={() => setNoting(false)}
@@ -113,7 +115,7 @@ export default function SeoNightDrawer({ client, busy, onClose, onDeploy, onDisc
               <div style={{ ...label, color: '#facc15' }}>Needs you ({client.needs_007.length})</div>
               <div style={{ ...muted, marginTop: '2px' }}>Outside the safe list. "Fix tonight" lets the night worker make the change; it still waits for Deploy.</div>
               {client.needs_007.map(f => (
-                <ApprovableItem key={f.id} f={f} busy={busy} buttonLabel="Fix tonight" buttonTitle="Let the night worker make this change, with a note on how" onFixTonight={onFixTonight} onIgnore={onIgnore}>
+                <ApprovableItem key={f.id} f={f} busy={busy} buttonLabel="Fix tonight" buttonTitle="Let the night worker make this change tonight" onFixTonight={onFixTonight} onIgnore={onIgnore}>
                   <div style={{ fontWeight: 700 }}>{f.metric} <span style={muted}>· {f.priority}</span></div>
                   <div style={{ fontSize: '0.82rem', marginTop: '2px' }}>{f.action_required}</div>
                   {f.fix_reason && <div style={{ ...muted, marginTop: '2px' }}>Why it needs you: {f.fix_reason}</div>}
@@ -153,7 +155,7 @@ export default function SeoNightDrawer({ client, busy, onClose, onDeploy, onDisc
             <div style={section}>
               <div style={{ ...label, color: '#f87171' }}>Failed ({client.failed.length})</div>
               {client.failed.map(f => (
-                <ApprovableItem key={f.id} f={f} busy={busy} buttonLabel="Try again tonight" buttonTitle="Try this fix again tonight, with a note on what to do differently" onFixTonight={onFixTonight} onIgnore={onIgnore}>
+                <ApprovableItem key={f.id} f={f} busy={busy} buttonLabel="Try again tonight" buttonTitle="Try this fix again tonight" onFixTonight={onFixTonight} onIgnore={onIgnore}>
                   <div style={{ fontWeight: 700 }}>{f.metric}</div>
                   <div style={{ fontSize: '0.8rem', color: '#fca5a5', marginTop: '2px', overflowWrap: 'anywhere' }}>{f.fix_error}</div>
                   <FixNote note={f.fix_note} />

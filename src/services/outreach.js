@@ -207,17 +207,23 @@ export function dataForSeoStatus() {
 
 const PROSPECT_FIELDS = `p.*, c.name AS client_name, u.name AS assignee_name, u.email AS assignee_email`;
 
-/** Admins see everything; anyone else only what is assigned to them. */
+/**
+ * Admins and the social media manager (Omkar, who runs backlink outreach) see
+ * every prospect; anyone else only what is assigned to them. Approving stays 007's.
+ */
+const SEES_ALL = ['admin', 'super_admin', 'ops_social_media_manager'];
+
 export function outreachReport(user) {
   const admin = ['admin', 'super_admin'].includes(user.role);
+  const seesAll = SEES_ALL.includes(user.role);
   const rows = db.prepare(`
     SELECT ${PROSPECT_FIELDS} FROM outreach_prospects p
     JOIN crm_clients c ON c.id = p.client_id LEFT JOIN users u ON u.id = p.assigned_to
-    WHERE p.status <> 'rejected' ${admin ? '' : 'AND p.assigned_to = ?'}
+    WHERE p.status <> 'rejected' ${seesAll ? '' : 'AND p.assigned_to = ?'}
     ORDER BY CASE p.status WHEN 'to_approve' THEN 0 WHEN 'follow_up_to_approve' THEN 1 WHEN 'to_send' THEN 2 WHEN 'follow_up_to_send' THEN 3 ELSE 4 END,
              p.domain_rank DESC, p.id DESC
     LIMIT 500
-  `).all(...(admin ? [] : [user.id]));
+  `).all(...(seesAll ? [] : [user.id]));
   const runs = db.prepare(`
     SELECT r.*, c.name AS client_name FROM outreach_runs r JOIN crm_clients c ON c.id = r.client_id
     WHERE r.id IN (SELECT MAX(id) FROM outreach_runs GROUP BY client_id) ORDER BY c.name
@@ -264,7 +270,7 @@ export function rejectProspect(id) {
   return res.changes ? { status: 200 } : { status: 409, error: 'Only prospects waiting for approval can be rejected' };
 }
 
-const mayAct = (p, user) => ['admin', 'super_admin'].includes(user.role) || p.assigned_to === user.id;
+const mayAct = (p, user) => SEES_ALL.includes(user.role) || p.assigned_to === user.id;
 
 /** The staff member sent it from Gmail. */
 export function markSent(id, user) {

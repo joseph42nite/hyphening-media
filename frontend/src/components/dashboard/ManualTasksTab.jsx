@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Check, X, ExternalLink, Moon } from 'lucide-react';
+import { RefreshCw, Check, X, ExternalLink, Moon, MessageSquare } from 'lucide-react';
 import { api, card, muted, label } from './blogMonitorShared.js';
 import OutreachPanel from './OutreachPanel.jsx';
 import { gapSummary } from './outreachShared.js';
@@ -76,11 +76,16 @@ function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onF
           <span style={muted}>{shortName(task.assigned_to)}</span>
         )}
         {!skipping ? (
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {task.area === 'site' && isAdmin && (
-              <button className="btn btn-secondary" disabled={disabled || noting} onClick={() => setNoting(true)} title="Let the night worker make this change tonight, with a note on how">
-                <Moon size={13} /> Fix tonight
-              </button>
+              <>
+                <button className="btn btn-secondary" disabled={disabled || noting} onClick={() => onFixTonight(task, null)} title="Let the night worker make this change tonight">
+                  <Moon size={13} /> Fix tonight
+                </button>
+                <button className="btn btn-secondary" disabled={disabled || noting} onClick={() => setNoting(true)} title="Fix tonight, with a note on how the night worker should do it">
+                  <MessageSquare size={13} /> Add note
+                </button>
+              </>
             )}
             {task.area !== 'site' && (
               <button className="btn" style={doneStyle} disabled={disabled} onClick={() => onDone(task)}><Check size={13} /> Done</button>
@@ -88,7 +93,7 @@ function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onF
             <button className="btn" style={notDoingStyle} disabled={disabled} onClick={() => setSkipping(true)}><X size={13} /> Not doing</button>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <input
               autoFocus value={reason} onChange={e => setReason(e.target.value)} placeholder="Why not?"
               onKeyDown={e => { if (e.key === 'Enter' && reason.trim()) onSkip(task, reason); if (e.key === 'Escape') setSkipping(false); }}
@@ -101,6 +106,7 @@ function TaskRow({ task, isAdmin, assignees, busy, onAssign, onDone, onSkip, onF
       </div>
       {noting && (
         <FixNoteBox
+          confirmLabel="Fix tonight with note"
           disabled={disabled}
           onConfirm={(note) => { setNoting(false); onFixTonight(task, note); }}
           onCancel={() => setNoting(false)}
