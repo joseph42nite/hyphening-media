@@ -87,11 +87,15 @@ describe('approval, sending and the outcome', () => {
     expect(r.prospect).toMatchObject({ status: 'to_send', email_subject: 'Edited subject', assigned_to: staffA, approved_by: 'jo@test' });
   });
 
-  it('only the sender (or an admin) sees it and marks it sent', () => {
-    expect(o.outreachReport({ id: staffB, role: 'ops_social_media_manager' }).prospects.map(p => p.id)).not.toContain(id);
-    expect(o.outreachReport({ id: staffA, role: 'ops_social_media_manager' }).prospects.map(p => p.id)).toContain(id);
-    expect(o.markSent(id, { id: staffB, role: 'ops_social_media_manager' }).status).toBe(403);
-    expect(o.markSent(id, { id: staffA, role: 'ops_social_media_manager' }).status).toBe(200);
+  it('only the sender, an admin or the social media manager sees it and marks it sent', () => {
+    const editor = { id: staffB, role: 'ops_video_editor' };
+    expect(o.outreachReport(editor).prospects.map(p => p.id)).not.toContain(id);
+    expect(o.markSent(id, editor).status).toBe(403);
+    // Omkar's role sees and can act on every prospect, assigned to him or not.
+    expect(o.outreachReport({ id: staffB, role: 'ops_social_media_manager' }).prospects.map(p => p.id)).toContain(id);
+    expect(o.outreachReport({ id: staffB, role: 'ops_social_media_manager' }).admin).toBe(false);
+    expect(o.outreachReport({ id: staffA, role: 'ops_video_editor' }).prospects.map(p => p.id)).toContain(id);
+    expect(o.markSent(id, { id: staffB, role: 'ops_social_media_manager' }).status).toBe(200);
   });
 
   it('drafts a follow-up after 5 days, which needs approval again', () => {

@@ -6,12 +6,12 @@ import { muted } from './blogMonitorShared.js';
 export const FIX_NOTE_MAX = 1000;
 
 /**
- * What opens under an item when 007 presses "Fix tonight": an optional note on
- * how the change should be made, which the night worker follows (it outranks
- * the recommendation's wording). Empty is fine: that's the old one-click approve.
+ * What opens under an item when 007 presses "Add note" next to "Fix tonight":
+ * a note on how the change should be made, which the night worker follows (it
+ * outranks the recommendation's wording). "Fix tonight" itself is one click.
  * Ctrl/Cmd+Enter confirms, Esc cancels.
  */
-export default function FixNoteBox({ confirmLabel = 'Fix tonight', disabled, onConfirm, onCancel }) {
+export default function FixNoteBox({ confirmLabel = 'Fix tonight with note', disabled, onConfirm, onCancel }) {
   const [note, setNote] = useState('');
   const tooLong = note.trim().length > FIX_NOTE_MAX;
   const confirm = () => { if (!disabled && !tooLong) onConfirm(note.trim()); };
@@ -27,10 +27,11 @@ export default function FixNoteBox({ confirmLabel = 'Fix tonight', disabled, onC
           if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) confirm();
         }}
-        placeholder={'How should it be done? (optional)\ne.g. "use the Bengaluru address from the footer" or "keep the hero headline as it is"'}
+        placeholder={'How should it be done?\ne.g. "use the Bengaluru address from the footer" or "keep the hero headline as it is"'}
         rows={3}
         style={{
-          width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '8px 10px', fontSize: '0.85rem', fontFamily: 'inherit',
+          // 16px: below that, iPhones zoom the page in when the box is tapped.
+          width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '8px 10px', fontSize: '16px', fontFamily: 'inherit',
           border: `1px solid ${tooLong ? '#f87171' : 'rgba(223, 231, 224, 0.18)'}`, borderRadius: '6px',
           background: 'rgba(5, 7, 10, 0.85)', color: 'var(--text-primary)',
         }}
