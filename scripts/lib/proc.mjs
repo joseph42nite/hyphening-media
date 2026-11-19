@@ -20,9 +20,23 @@ export function run(cmd, args, { input, timeoutMs, cwd, env } = {}) {
   });
 }
 
+/**
+ * Who the night workers' commits (fixes, the Deploy button's cherry-picks and
+ * rollbacks) are by. Set here rather than left to git: with no user.email
+ * configured, git guesses one from the Mac's hostname, and at night that can be
+ * a bare "MacBookAir" it cannot use, so every commit failed with "Author
+ * identity unknown". Override with NIGHT_GIT_NAME / NIGHT_GIT_EMAIL.
+ */
+const NIGHT_GIT_NAME = process.env.NIGHT_GIT_NAME || 'Hyphening night fixes';
+const NIGHT_GIT_EMAIL = process.env.NIGHT_GIT_EMAIL || '205165067+joseph42nite@users.noreply.github.com';
+const GIT_IDENTITY = {
+  GIT_AUTHOR_NAME: NIGHT_GIT_NAME, GIT_AUTHOR_EMAIL: NIGHT_GIT_EMAIL,
+  GIT_COMMITTER_NAME: NIGHT_GIT_NAME, GIT_COMMITTER_EMAIL: NIGHT_GIT_EMAIL,
+};
+
 /** git in a folder; throws with git's own message unless `allowFail`. */
 export async function git(cwd, args, { allowFail = false } = {}) {
-  const res = await run('git', args, { cwd });
+  const res = await run('git', args, { cwd, env: GIT_IDENTITY });
   if (res.code !== 0 && !allowFail) throw new Error(`git ${args[0]} failed: ${(res.err || res.out).trim().slice(-400)}`);
   return allowFail ? res : res.out.trim();
 }
