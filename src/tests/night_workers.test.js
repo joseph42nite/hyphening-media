@@ -56,6 +56,7 @@ function fakeHook(calls) {
 
 // Plays Claude: sorts, then makes one good fix, one outside the allowed files, one that breaks the checks.
 async function fakeClaude(prompt, cwd, tools) {
+  if (prompt.startsWith('You are reviewing')) return { code: 0, out: '<json>{"verdict": "pass", "reason": "fine"}</json>', err: '' };
   if (tools === 'Read,Glob,Grep') {
     return { code: 0, out: '<json>[{"id":1,"triage":"safe","reason":"title"},{"id":2,"triage":"safe","reason":"x"},{"id":3,"triage":"safe","reason":"x"},{"id":4,"triage":"needs_007","reason":"copy"}]</json>', err: '' };
   }
@@ -242,5 +243,36 @@ describe('seo_fix_worker: 007\'s note', GIT_TIMEOUT, () => {
     await fixWorker.runBatch(job, { claudeFn, hookFn: fakeHook([]) });
     expect(prompts[0]).toMatch(/007's instructions for this change[\s\S]*Use the Bengaluru address from the footer\./);
     expect(prompts[1]).not.toMatch(/007's instructions/);
+  });
+});
+
+describe('seo_fix_worker: the night review', { timeout: 120000 }, () => {
+  it('holds a fix that adds a claim, or that the reviewer holds, and sends both to 007', async () => {
+    const calls = [];
+    const reviewed = [];
+    const claudeFn = async (prompt, cwd, tools) => {
+      if (prompt.startsWith('You are reviewing')) {
+        reviewed.push(Number(prompt.match(/recommendation #(\d+)/)[1]));
+        const verdict = prompt.includes('#42') ? '{"verdict": "hold", "reason": "names the clinic twice"}' : prompt.includes('#43') ? 'no idea' : '{"verdict": "pass", "reason": "ok"}';
+        return { code: 0, out: `<json>${verdict}</json>`, err: '' };
+      }
+      if (tools === 'Read,Glob,Grep') return { code: 0, out: `<json>${JSON.stringify([41, 42, 43, 44].map(id => ({ id, triage: 'safe', reason: 'x' })))}</json>`, err: '' };
+      const id = Number(prompt.match(/Recommendation #(\d+)/)[1]);
+      const title = { 41: 'Best Skin Clinic', 42: 'Clinic | Clinic', 43: 'Unclear', 44: 'Fine title' }[id];
+      fs.writeFileSync(path.join(cwd, 'index.html'), `<html><head><title>${title}</title></head></html>\n`);
+      return { code: 0, out: `<json>{"changed": true, "summary": "title ${id}"}</json>`, err: '' };
+    };
+    const job = { batch_id: 11, night: '2026-11-19', client: client(), max_fixes: 8,
+      candidates: [candidate(41, 'Title'), candidate(42, 'Title'), candidate(43, 'Title'), candidate(44, 'Title')] };
+    const r = await fixWorker.runBatch(job, { claudeFn, hookFn: fakeHook(calls) });
+
+    const byId = Object.fromEntries(calls[1][1].fixes.map(f => [f.rec_id, f]));
+    expect(byId[41]).toMatchObject({ ok: false, no_change: 'blocked' });
+    expect(byId[41].error).toMatch(/adds "Best"/);
+    expect(reviewed).not.toContain(41); // the rules held it; no review needed
+    expect(byId[42].error).toMatch(/names the clinic twice/);
+    expect(byId[43].error).toMatch(/no clear answer/); // unclear review = hold
+    expect(byId[44].ok).toBe(true);
+    expect(sh(repo, 'log', '--format=%s', `${r.fixes.length && calls[1][1].base_commit}..${r.branch}`)).toBe('SEO: Title (#44)');
   });
 });
