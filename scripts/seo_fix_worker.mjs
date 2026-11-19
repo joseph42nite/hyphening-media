@@ -35,6 +35,7 @@ import { hook } from './lib/hook.mjs';
 import { run, git, sh, tail, jsonBetweenTags } from './lib/proc.mjs';
 import { loadManifest, fixMayTouch } from './lib/deployManifest.mjs';
 import { prepareWorktree } from './lib/worktree.mjs';
+import { snapshotHeads, headChanges, ruleProblems, reviewPrompt, readVerdict } from './lib/fixReview.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLAUDE_BIN = process.env.SEO_FIX_CLAUDE_BIN || 'claude';
@@ -42,6 +43,7 @@ const MODEL = process.env.SEO_FIX_MODEL || 'claude-sonnet-5-5';
 const WORKER = os.hostname();
 const TRIAGE_TIMEOUT_MS = 10 * 60 * 1000;
 const FIX_TIMEOUT_MS = 12 * 60 * 1000;
+const REVIEW_TIMEOUT_MS = 8 * 60 * 1000;
 const BRANCH_KEEP_DAYS = 7;
 
 export const SAFE_LIST = [
@@ -185,7 +187,18 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
     const triage = new Map(sorted.map((s) => [s.id, s.triage]));
     const todo = job.candidates.filter((c) => c.fix_approved || triage.get(c.id) === 'safe').slice(0, job.max_fixes);
 
-    // 2. Fix, one commit each.
+    // The built site before any fix, so the review can compare each page's
+    // rendered title and description (layouts add " | Brand" to page titles).
+    const builtDir = manifest.deploy?.local_dir ? path.join(wt, manifest.deploy.local_dir) : null;
+    let heads = null;
+    if (todo.length && builtDir) {
+      let built = true;
+      for (const check of manifest.checks || []) if ((await sh(check, wt)).code !== 0) { built = false; break; }
+      if (built) heads = await snapshotHeads(builtDir);
+    }
+    const healthcare = job.client.blog_compliance_profile === 'healthcare';
+
+    // 2. Fix, check, review, one commit each.
     for (const rec of todo) {
       console.log(`[seo-fix] ${name} #${rec.id} ${rec.metric}`);
       const res = await claudeFn(fixPrompt(job, manifest, rec), wt, 'Read,Edit,Write,Glob,Grep', FIX_TIMEOUT_MS);
@@ -220,7 +233,27 @@ export async function runBatch(job, { claudeFn = claude, hookFn = hook } = {}) {
         fixes.push({ rec_id: rec.id, ok: false, summary: answer.summary, error: broke });
         continue;
       }
-      await git(wt, ['add', '--', ...files]);
+      // 3. Review. A fix the rules or the reviewer hold is undone and goes to
+      // 007 with the reason (one 007 already approved stays a failure).
+      await git(wt, ['add', '-A', '--', ...files]);
+      const staged = await git(wt, ['diff', '--cached', '--stat', '--patch']);
+      const after = heads ? await snapshotHeads(builtDir) : null;
+      const changes = headChanges(heads, after);
+      let held = ruleProblems({ diff: staged, changes, healthcare }).join('; ') || null;
+      if (!held) {
+        const r = await claudeFn(reviewPrompt({ client: job.client, rec, diff: staged, changes, healthcare }), wt, 'Read,Glob,Grep', REVIEW_TIMEOUT_MS);
+        const v = readVerdict(jsonBetweenTags(r.out), r.out || r.err);
+        if (!v.pass) held = v.reason;
+      }
+      if (held) {
+        await undo(wt, linked);
+        fixes.push({
+          rec_id: rec.id, ok: false, no_change: rec.fix_approved ? undefined : 'blocked',
+          summary: `Held by the night review: ${held}`.slice(0, 400), error: `Held by the night review: ${held}`,
+        });
+        continue;
+      }
+      if (after) heads = after;
       const label = rec.fleet === 'ads' ? 'Ads' : 'SEO';
       await git(wt, ['commit', '--quiet', '-m', `${label}: ${rec.metric} (#${rec.id})`, '-m', `${answer.summary || ''}\n\nNight ${label} fix for recommendation #${rec.id}. Goes live only when 007 presses Deploy.`]);
       const commit = await git(wt, ['rev-parse', 'HEAD']);
