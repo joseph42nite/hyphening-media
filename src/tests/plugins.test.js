@@ -6,7 +6,7 @@ import db from '../../database.js';
 import * as p from '../services/plugins.js';
 import pluginRouter from '../routes/plugins.js';
 import { executeEvent } from '../routes/webhooks.js';
-import { lostPieces, lastJson, latestRelease, skillNames, clearSetupLeftovers } from '../../scripts/plugin_update_worker.mjs';
+import { lostPieces, lastJson, latestRelease, skillNames, clearSetupLeftovers, setupKB } from '../../scripts/plugin_update_worker.mjs';
 import { run } from '../../scripts/lib/proc.mjs';
 import { existsSync } from 'fs';
 import { installedPlugin } from '../../scripts/lib/plugins.mjs';
@@ -204,6 +204,36 @@ describe('the Mac worker', () => {
     const res = await tree(grouped, true);
     expect(res.err).toMatch(/timed out/);
     expect(await survivor(grouped)).toBe('');
+  });
+
+  it('stops a setup whose downloads stopped growing, but not a slow one that keeps going', async () => {
+    const sleeper = (ms) => ['-e', `setTimeout(()=>{}, ${ms})`];
+    // Nothing grows: stopped at the stall limit, well before the hard cap.
+    const t0 = Date.now();
+    const stuck = await run('node', sleeper(10000), { timeoutMs: 20000, killTree: true, stallMs: 400, checkMs: 100, progress: () => 7 });
+    expect(stuck.err).toMatch(/stalled: no progress/);
+    expect(Date.now() - t0).toBeLessThan(5000);
+    // Always growing (a slow download): runs to the end and exits normally.
+    let kb = 0;
+    const slow = await run('node', sleeper(1200), { timeoutMs: 20000, killTree: true, stallMs: 400, checkMs: 100, progress: async () => ++kb });
+    expect(slow.code).toBe(0);
+    expect(slow.err).not.toMatch(/stalled|timed out/);
+  });
+
+  it('counts what a setup has fetched: staging venv, Chromium and temp downloads', async () => {
+    const data = path.join(tmp, 'kb-data');
+    const t = path.join(tmp, 'kb-tmp');
+    for (const d of ['.venv', '.venv.next-1', 'ms-playwright']) mkdirSync(path.join(data, d), { recursive: true });
+    for (const d of ['pip-unpack-x', 'playwright-download-y', 'unrelated']) mkdirSync(path.join(t, d), { recursive: true });
+    const before = await setupKB(data, t);
+    writeFileSync(path.join(t, 'pip-unpack-x', 'big.whl'), Buffer.alloc(512 * 1024));
+    expect(await setupKB(data, t)).toBeGreaterThanOrEqual(before + 500);
+    // The live .venv and unrelated temp files don't count.
+    const mid = await setupKB(data, t);
+    writeFileSync(path.join(data, '.venv', 'x'), Buffer.alloc(512 * 1024));
+    writeFileSync(path.join(t, 'unrelated', 'x'), Buffer.alloc(512 * 1024));
+    expect(await setupKB(data, t)).toBe(mid);
+    expect(await setupKB(path.join(tmp, 'none'), path.join(tmp, 'none'))).toBe(0);
   });
 
   it('finds the JSON line a smoke run ends with', () => {
