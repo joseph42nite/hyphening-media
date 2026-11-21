@@ -45,6 +45,9 @@ const WORKERS = {
   seo_fix: { cmd: 'node', args: ['scripts/seo_fix_worker.mjs', '--once'] },
   deploy: { cmd: 'node', args: ['scripts/deploy_worker.mjs', '--once'] },
   outreach: { cmd: 'node', args: ['scripts/outreach_worker.mjs', '--once'] },
+  // Plugin versions every sweep (the server says when a status report is due)
+  // and the SEO/Ads Monitor's Update & test button.
+  plugins: { cmd: 'node', args: ['scripts/plugin_update_worker.mjs', '--once'] },
 };
 
 function runWorker(kind, { sweep = false } = {}) {
@@ -72,7 +75,8 @@ function runWorker(kind, { sweep = false } = {}) {
   });
 }
 
-const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy', 'outreach']);
+// plugins: two updates at once would both rewrite installed_plugins.json.
+const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy', 'outreach', 'plugins']);
 const running = new Map(); // kind -> how many are running
 
 let stopping = false;
@@ -128,6 +132,7 @@ function connect() {
     runWorker('seo_fix');
     runWorker('deploy');
     runWorker('outreach');
+    runWorker('plugins');
   });
 
   socket.on('message', (data) => {

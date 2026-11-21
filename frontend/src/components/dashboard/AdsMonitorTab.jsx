@@ -7,6 +7,7 @@ import {
 import { API_BASE } from '../../api.js';
 import { MarkdownBlock, ReportValue, parseReportJson } from './SeoMonitorTab.jsx';
 import SiteChangesPanel from './SiteChangesPanel.jsx';
+import PluginVersionsPanel from './PluginVersionsPanel.jsx';
 import FleetModeToggle from './FleetModeToggle.jsx';
 
 const IN_FLIGHT = ['queued', 'running'];
@@ -433,6 +434,7 @@ export default function AdsMonitorTab({ auth, clients, showToast }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <FleetModeToggle scope="ads" showToast={showToast} confirmText="Turn the Ads fleet to AUTO? Scheduled ads runs will start queueing on their own and spend API tokens without you clicking anything." />
       </div>
+      <PluginVersionsPanel monitor="ads" showToast={showToast} isAdmin={isAdmin} />
       {/* ---------------- All clients: the monitoring surface ---------------- */}
       {overview && (
         <div className="card glass-premium" style={{ ...panel, marginBottom: 20, padding: '18px 20px' }}>

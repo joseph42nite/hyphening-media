@@ -85,12 +85,39 @@ system.append((OK if vault_ok else BLOCKED, "Vault drive", vault if vault_ok els
 
 system.append((OK, "Claude CLI", claude_bin) if claude_bin else (BLOCKED, "Claude CLI", "`claude` not on PATH; night workers can't run"))
 
-plugins = {
-    "claude-blog plugin": f"{HOME}/.claude/plugins/marketplaces/agricidaniel-blog",
-    "claude-seo plugin": f"{HOME}/.claude/plugins/cache/agricidaniel-claude-seo",
+# The version Claude Code runs (installed_plugins.json), not whichever folder
+# exists: on 2026-11-21 the cache held claude-seo 2.5.0 while 2.4.2 ran.
+plugin_ids = {
+    "claude-seo plugin": "claude-seo@agricidaniel-claude-seo",
+    "claude-blog plugin": "claude-blog@agricidaniel-blog",
+    "claude-ads plugin": "claude-ads@ai-marketing-hub-claude-ads",
 }
-for name, path in plugins.items():
-    system.append((OK, name, "installed") if os.path.isdir(path) else (WARN, name, f"missing at {path}"))
+try:
+    installed = json.load(open(f"{HOME}/.claude/plugins/installed_plugins.json")).get("plugins", {})
+except Exception:
+    installed = {}
+seo_version = None
+for name, pid in plugin_ids.items():
+    entry = next(iter(installed.get(pid) or []), None)
+    if entry and os.path.isdir(entry.get("installPath", "")):
+        system.append((OK, name, entry.get("version") or "installed"))
+        if pid.startswith("claude-seo@"):
+            seo_version = entry.get("version")
+    else:
+        system.append((WARN, name, "not installed in Claude Code"))
+
+# The claude-seo Python runtime is built for one version. Built for another,
+# every tool says "runtime is not ready" and SEO cards run shallow.
+try:
+    rt = json.load(open(f"{HOME}/.claude/plugins/data/claude-seo-agricidaniel-claude-seo/runtime-state.json"))
+    built = rt.get("plugin_version")
+    if seo_version and built != seo_version:
+        system.append((WARN, "claude-seo runtime", f"built for {built}, but {seo_version} runs: SEO cards run without their tools. Press Update & test in the SEO Monitor, or rerun /seo setup"))
+    elif seo_version:
+        system.append((OK, "claude-seo runtime", f"ready for {built}"))
+except Exception:
+    if seo_version:
+        system.append((WARN, "claude-seo runtime", "never set up: SEO cards run without their tools"))
 
 if os.path.isdir(vault):
     free_gb = shutil.disk_usage(vault).free / 1e9

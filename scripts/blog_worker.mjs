@@ -35,6 +35,7 @@ import { existsSync } from 'fs';
 import dotenv from 'dotenv';
 import { appendNightReport } from './lib/nightReport.mjs';
 import { hook, API } from './lib/hook.mjs';
+import { installedRoot } from './lib/plugins.mjs';
 import { run } from './lib/proc.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -46,7 +47,9 @@ const WORKER = process.env.BLOG_WORKER_ID || os.hostname();
 const CLAUDE_BIN = process.env.BLOG_CLAUDE_BIN || 'claude';
 const MODEL = process.env.BLOG_MODEL || 'claude-sonnet-5-5';
 const HOME = os.homedir();
-const PLUGIN = path.join(HOME, '.claude/plugins/marketplaces/agricidaniel-blog');
+// The installed version (what Claude Code's skills load), not the marketplace
+// checkout, which moves ahead of it on every marketplace refresh.
+const PLUGIN = installedRoot('claude-blog@agricidaniel-blog') || path.join(HOME, '.claude/plugins/marketplaces/agricidaniel-blog');
 const PYTHON = process.env.BLOG_PYTHON || path.join(HOME, '.openmausbot/workspaces/3ee73451-c9f3-402f-9f9a-2677050c11e5/blogvenv/bin/python');
 const VAULT = process.env.VAULT_DIR || '/Volumes/Mac Valhalla/Vault';
 const AUDIO_QUEUE = path.join(VAULT, 'Companies/Hyphening/Content/_audio-queue');
