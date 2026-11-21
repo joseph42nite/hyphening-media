@@ -58,6 +58,12 @@ export function validateManifest(m) {
   if (!isStrList(m.health_check) || m.health_check.length === 0 || !m.health_check.every((u) => /^https:\/\//.test(u))) {
     errors.push('health_check must list at least one https:// URL');
   }
+  if (m.tooling_paths !== undefined && !(isStrList(m.tooling_paths) && m.tooling_paths.every(relPath))) {
+    errors.push('tooling_paths must be a list of files or folders relative to the repo (e.g. "scripts/")');
+  }
+  if (m.site_uses !== undefined && !(isStrList(m.site_uses) && m.site_uses.every(relPath))) {
+    errors.push('site_uses must be a list of files inside tooling_paths that the live site still runs (e.g. "scripts/backup-db.mjs")');
+  }
   if (m.rollback !== undefined && m.rollback !== 'git_revert') errors.push('rollback must be "git_revert"');
   if (m.blog !== undefined && !BLOG_TYPES.includes(m.blog?.type)) errors.push(`blog.type must be one of ${BLOG_TYPES.join(', ')}`);
 
@@ -104,4 +110,19 @@ export function fixMayTouch(manifest, file) {
   const never = [...ALWAYS_NEVER, ...(manifest.seo_fixes?.never_touch || [])];
   if (never.some((e) => under(f, e) || f === norm(e).replace(/\/$/, ''))) return false;
   return (manifest.seo_fixes?.paths || []).some((e) => under(f, e));
+}
+
+/**
+ * The files the live site depends on, from a list of changed repo-relative
+ * files: everything not under the manifest's tooling_paths (scripts, tests,
+ * docs: files that run on this Mac or nowhere), plus the tooling files the
+ * site still runs: site_uses, and any file a deploy command names. The
+ * manifest itself always counts as the site's.
+ */
+export function siteFiles(manifest, files) {
+  const tooling = manifest.tooling_paths || [];
+  const uses = (manifest.site_uses || []).map(norm);
+  const commands = [...(manifest.deploy?.commands || []), ...(manifest.deploy?.build || [])].join('\n');
+  return files.map(norm).filter((f) => f === MANIFEST_FILE || uses.includes(f) || commands.includes(f)
+    || !tooling.some((e) => under(f, e)));
 }
