@@ -6,7 +6,9 @@ import db from '../../database.js';
 import * as p from '../services/plugins.js';
 import pluginRouter from '../routes/plugins.js';
 import { executeEvent } from '../routes/webhooks.js';
-import { lostPieces, lastJson, latestRelease, skillNames } from '../../scripts/plugin_update_worker.mjs';
+import { lostPieces, lastJson, latestRelease, skillNames, clearSetupLeftovers } from '../../scripts/plugin_update_worker.mjs';
+import { run } from '../../scripts/lib/proc.mjs';
+import { existsSync } from 'fs';
 import { installedPlugin } from '../../scripts/lib/plugins.mjs';
 
 // One transaction, rolled back at the end: the local database is left as it was.
@@ -171,6 +173,37 @@ describe('the Mac worker', () => {
     writeFileSync(file, JSON.stringify({ version: 2, plugins: { 'claude-seo@m': [{ scope: 'user', installPath: '/x/2.4.2', version: '2.4.2', gitCommitSha: 'abc' }] } }));
     expect(installedPlugin('claude-seo@m', file)).toEqual({ version: '2.4.2', installPath: '/x/2.4.2', sha: 'abc' });
     expect(installedPlugin('nope@m', file)).toBe(null);
+  });
+
+  it('clears a killed setup\'s lock and staging folder, never the live runtime or a running setup', async () => {
+    const data = path.join(tmp, 'seo-data');
+    mkdirSync(path.join(data, '.venv'), { recursive: true });
+    mkdirSync(path.join(data, '.venv.next-999999'), { recursive: true });
+    mkdirSync(path.join(data, `.venv.next-${process.pid}`), { recursive: true });
+    writeFileSync(path.join(data, '.setup.lock'), '999999\n1795250619\n');
+    const removed = await clearSetupLeftovers(data);
+    expect(removed.sort()).toEqual(['.setup.lock', '.venv.next-999999']);
+    expect(existsSync(path.join(data, '.venv'))).toBe(true);
+    expect(existsSync(path.join(data, `.venv.next-${process.pid}`))).toBe(true);
+    writeFileSync(path.join(data, '.setup.lock'), `${process.pid}\n1\n`);
+    expect(await clearSetupLeftovers(data)).toEqual([]);
+  });
+
+  it('stops the whole process tree on a timeout, not just the direct child', async () => {
+    // Like pip under claude-seo's setup: a grandchild whose output is not ours.
+    const tree = (marker, killTree) => run('/bin/sh', ['-c', `node -e "setTimeout(()=>{},5000)" ${marker} >/dev/null 2>&1 & wait`], { timeoutMs: 800, killTree });
+    const survivor = async (marker) => { await new Promise((r) => setTimeout(r, 600)); return (await run('pgrep', ['-f', marker])).out.trim(); };
+
+    const plain = `/tmp/plugin-test-plain-${process.pid}-${Date.now()}`;
+    await tree(plain, false);
+    const left = await survivor(plain);
+    expect(left).not.toBe(''); // the bug: only the direct child was stopped
+    await run('kill', [left]);
+
+    const grouped = `/tmp/plugin-test-tree-${process.pid}-${Date.now()}`;
+    const res = await tree(grouped, true);
+    expect(res.err).toMatch(/timed out/);
+    expect(await survivor(grouped)).toBe('');
   });
 
   it('finds the JSON line a smoke run ends with', () => {
