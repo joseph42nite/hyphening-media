@@ -136,6 +136,7 @@ function connect() {
     runWorker('deploy');
     runWorker('outreach');
     runWorker('plugins');
+    runWorker('ig');
   });
 
   socket.on('message', (data) => {
