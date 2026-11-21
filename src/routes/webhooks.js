@@ -34,6 +34,7 @@ import {
   nightSummaryText,
 } from '../services/seoNight.js';
 import { claimOutreachRuns, submitOutreachResults, failOutreachRun, outreachSummaryText } from '../services/outreach.js';
+import { claimReelLabRuns, submitReelLabResult, failReelLabRun, appendReelLabLog } from '../services/reelLab.js';
 import { claimPluginUpdates, reportPluginStatus, reportPluginReview, pluginUpdateLog, finishPluginUpdate, pluginSummaryLines } from '../services/plugins.js';
 import {
   handleClaimBlogRuns,
@@ -65,7 +66,8 @@ export const KNOWN_EVENTS = [
   'queue_seo_night', 'queue_seo_fixes', 'seo_night_summary',
   'claim_seo_fix_batches', 'submit_seo_triage', 'submit_seo_fix_batch', 'claim_seo_deploys', 'finish_seo_deploy',
   'queue_outreach_runs', 'claim_outreach_runs', 'submit_outreach_results', 'fail_outreach_run', 'outreach_summary',
-  'claim_plugin_updates', 'report_plugin_status', 'report_plugin_review', 'plugin_update_log', 'finish_plugin_update'
+  'claim_plugin_updates', 'report_plugin_status', 'report_plugin_review', 'plugin_update_log', 'finish_plugin_update',
+  'claim_reel_lab_runs', 'submit_reel_lab_result', 'fail_reel_lab_run', 'reel_lab_log'
 ];
 
 const router = Router();
@@ -306,6 +308,13 @@ export function executeEvent(eventType, payload) {
       case 'report_plugin_review': return reportPluginReview(payload);
       case 'plugin_update_log': return pluginUpdateLog(payload);
       case 'finish_plugin_update': return finishPluginUpdate(payload);
+      case 'claim_reel_lab_runs': {
+        const runs = claimReelLabRuns(payload?.worker_id || 'local', Math.min(parseInt(payload?.limit, 10) || 1, 3));
+        return { success: true, summary: `Claimed ${runs.length} Reel Lab run(s)`, data: { runs } };
+      }
+      case 'submit_reel_lab_result': return submitReelLabResult(payload);
+      case 'fail_reel_lab_run': return failReelLabRun(payload);
+      case 'reel_lab_log': return appendReelLabLog(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }

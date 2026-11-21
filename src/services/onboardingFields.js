@@ -17,6 +17,8 @@ export const ONBOARDING_FIELDS = [
   'persona_sentence_length_mean', 'persona_sentence_length_std',
   'persona_vocabulary_tier', 'persona_contraction_frequency', 'persona_summary_label',
   'brand_niche_keywords', 'brand_publishing_cadence',
+  // Instagram voice (Reel Lab): plain text, not JSON.
+  'ig_on_camera_style', 'ig_signature_phrases',
 ];
 
 // JSON-array fields arrive from the caller already stringified.

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { API_BASE, authFetch } from '../../api.js';
+import ReelLabModal from './ReelLabModal.jsx';
 
 export default function ScriptTrackerTab({
   auth,
@@ -20,6 +21,8 @@ export default function ScriptTrackerTab({
   // Modal local states
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [editingScript, setEditingScript] = useState(null);
+  // Reel Lab: { script: null } for a new reel, { script } for "Improve hooks".
+  const [reelLab, setReelLab] = useState(null);
   const [scriptFormData, setScriptFormData] = useState({
     title: '', script_text: '', month: new Date().toISOString().substring(0, 7), reference_video_link: '', reaction_video_link: '', format: 'reel', status: 'Pending Client Approval', client_comments: ''
   });
@@ -161,6 +164,15 @@ export default function ScriptTrackerTab({
               ✓ Mark All Seen ({unseenCount})
             </button>
           )}
+          <button
+            className="btn btn-secondary"
+            onClick={() => selectedScriptClient && setReelLab({ script: null })}
+            disabled={!selectedScriptClient}
+            title="Paste viral reels; get five scored hooks and a timed script"
+            style={{ padding: '8px 16px' }}
+          >
+            ✨ From viral reel
+          </button>
           <button
             className="btn btn-primary"
             onClick={() => {
@@ -356,7 +368,17 @@ export default function ScriptTrackerTab({
                   </span>
                 </h4>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {item.format !== 'long_format' && (
+                    <button
+                      onClick={() => setReelLab({ script: item })}
+                      className="btn btn-secondary"
+                      title="Five new scored hooks for this script"
+                      style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                    >
+                      ✨ Improve hooks
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setEditingScript(item);
@@ -399,6 +421,12 @@ export default function ScriptTrackerTab({
               }}>
                 {item.script_text}
               </div>
+
+              {item.hook_formula && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  🪝 Hook: {item.hook_formula}{item.hook_score != null ? ` · scored ${item.hook_score}` : ''}
+                </div>
+              )}
 
               {(item.reference_video_link || item.reaction_video_link) && (
                 <div style={{ display: 'flex', gap: '12px', fontSize: '0.8rem', marginTop: '4px', flexWrap: 'wrap' }}>
@@ -462,6 +490,20 @@ export default function ScriptTrackerTab({
         </div>
       )}
 
+      {reelLab && selectedScriptClient && (
+        <ReelLabModal
+          client={selectedScriptClient}
+          month={reelLab.script?.month || scriptMonth}
+          script={reelLab.script}
+          showToast={showToast}
+          onClose={() => setReelLab(null)}
+          onSaved={() => {
+            fetchMarketingData(selectedScriptClient.id);
+            if (fetchTabCounts) fetchTabCounts();
+          }}
+        />
+      )}
+
       {/* Script Modal */}
       {showScriptModal && (
         <div className="modal-overlay" onClick={() => {
@@ -517,6 +559,8 @@ export default function ScriptTrackerTab({
                     onChange={e => setScriptFormData({ ...scriptFormData, status: e.target.value })}
                     required
                   >
+                    {/* Reel Lab saves new scripts as Draft: staff-only until moved on. */}
+                    {scriptFormData.status === 'Draft' && <option value="Draft">Draft (staff only)</option>}
                     <option value="Pending Client Approval">Pending Client Approval</option>
                     <option value="Client Approved">Client Approved</option>
                     <option value="Client Rejected">Client Rejected</option>

@@ -18,7 +18,8 @@ const EMPTY_ONBOARDING_FIELDS = {
   persona_tone_respectful_irreverent: 0.5, persona_tone_enthusiastic_matter_of_fact: 0.5,
   persona_sentence_length_mean: 18, persona_sentence_length_std: 6,
   persona_vocabulary_tier: 'professional', persona_contraction_frequency: 0.5, persona_summary_label: 'Key Takeaways',
-  brand_niche_keywords: '', brand_publishing_cadence: ''
+  brand_niche_keywords: '', brand_publishing_cadence: '',
+  ig_on_camera_style: '', ig_signature_phrases: ''
 };
 
 // The venue name follows the client name while the two match (or the venue
@@ -296,7 +297,9 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
         persona_contraction_frequency: data.persona_contraction_frequency ?? 0.5,
         persona_summary_label: data.persona_summary_label || 'Key Takeaways',
         brand_niche_keywords: arrayToLines(data.brand_niche_keywords),
-        brand_publishing_cadence: data.brand_publishing_cadence || ''
+        brand_publishing_cadence: data.brand_publishing_cadence || '',
+        ig_on_camera_style: data.ig_on_camera_style || '',
+        ig_signature_phrases: data.ig_signature_phrases || ''
       });
       setOnboardingMeta({ brand_onboarded_at: data.brand_onboarded_at });
     } catch (err) {
@@ -961,6 +964,18 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
               <div className="form-group">
                 <label className="form-label">Publishing Cadence / Content Mix</label>
                 <input type="text" className="form-control" placeholder="e.g. 2x/week, 70% educational / 30% promo" value={onboardingForm.brand_publishing_cadence} onChange={e => setOnboardingForm({ ...onboardingForm, brand_publishing_cadence: e.target.value })} />
+              </div>
+            </div>
+
+            {/* Read by Reel Lab (Script Tracker) with the rest of onboarding. */}
+            <div className="form-grid-2" style={{ marginBottom: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Instagram: How They Talk on Camera</label>
+                <textarea className="form-control" rows="2" placeholder="e.g. Dr. Divya, calm and direct, explains with one analogy, never salesy" value={onboardingForm.ig_on_camera_style} onChange={e => setOnboardingForm({ ...onboardingForm, ig_on_camera_style: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Instagram: Phrases They Actually Say</label>
+                <textarea className="form-control" rows="2" placeholder={'e.g. "Let\'s talk honestly", "Here\'s what I tell every patient"'} value={onboardingForm.ig_signature_phrases} onChange={e => setOnboardingForm({ ...onboardingForm, ig_signature_phrases: e.target.value })} />
               </div>
             </div>
 
