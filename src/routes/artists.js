@@ -8,6 +8,7 @@ import db from '../../database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
 import { encrypt, decrypt } from '../services/encryption.js';
+import { isTemplateType, venueExists, getVenueTemplate, saveVenueTemplate, clearVenueTemplate } from '../services/artistTemplates.js';
 
 const router = Router();
 
@@ -551,6 +552,76 @@ router.put('/templates', authorize('admin', 'ops_social_media_manager'), (req, r
   } catch (err) {
     console.error('[TEMPLATES] Save error:', err);
     res.status(500).json({ error: 'Failed to save artist message template' });
+  }
+});
+
+
+/**
+ * Per-venue artist templates. A venue without its own text gets the default.
+ * GET/PUT/DELETE /api/artists/templates/venues/:venueId/:type
+ */
+function checkVenueTemplateParams(req, res) {
+  const { venueId, type } = req.params;
+  if (!isTemplateType(type)) {
+    res.status(400).json({ error: 'Invalid template type. Must be onboarding or confirmation.' });
+    return false;
+  }
+  if (!/^\d+$/.test(venueId) || !venueExists(venueId)) {
+    res.status(404).json({ error: 'Venue not found' });
+    return false;
+  }
+  return true;
+}
+
+router.get('/templates/venues/:venueId/:type', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    if (!checkVenueTemplateParams(req, res)) return;
+    res.json({ template: getVenueTemplate(req.params.venueId, req.params.type) });
+  } catch (err) {
+    console.error('[TEMPLATES] Venue fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch venue artist template' });
+  }
+});
+
+router.put('/templates/venues/:venueId/:type', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    if (!checkVenueTemplateParams(req, res)) return;
+    const { venueId, type } = req.params;
+    const template = saveVenueTemplate(venueId, type, req.body?.text);
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'update_venue_artist_template',
+      entityType: 'venue_artist_template',
+      entityId: `${venueId}:${type}`,
+      diff: { venueId: Number(venueId), type, text: template.text },
+      ip: req.ip,
+    });
+    res.json({ success: true, template });
+  } catch (err) {
+    console.error('[TEMPLATES] Venue save error:', err);
+    res.status(500).json({ error: 'Failed to save venue artist template' });
+  }
+});
+
+router.delete('/templates/venues/:venueId/:type', authorize('admin', 'ops_social_media_manager'), (req, res) => {
+  try {
+    if (!checkVenueTemplateParams(req, res)) return;
+    const { venueId, type } = req.params;
+    const template = clearVenueTemplate(venueId, type);
+    logAction({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'clear_venue_artist_template',
+      entityType: 'venue_artist_template',
+      entityId: `${venueId}:${type}`,
+      diff: { venueId: Number(venueId), type },
+      ip: req.ip,
+    });
+    res.json({ success: true, template });
+  } catch (err) {
+    console.error('[TEMPLATES] Venue clear error:', err);
+    res.status(500).json({ error: 'Failed to clear venue artist template' });
   }
 });
 
