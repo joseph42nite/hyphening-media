@@ -32,3 +32,21 @@ export function installedRoot(installId) {
   const p = installedPlugin(installId);
   return p && existsSync(p.installPath) ? p.installPath : null;
 }
+
+/**
+ * The Python claude-seo's tool launcher must use on this Mac.
+ *
+ * Left to itself, inside a Claude Code skill run the launcher finds
+ * /usr/bin/python3 (3.9.6 on this Intel Mac) and refuses with "requires
+ * Python 3.10 or newer", so until 2026-11-21 no SEO card ever had its crawl
+ * and render tools. The runtime is built with python3.12, and the launcher
+ * also requires the same minor version it was built with.
+ *
+ *   SEO_PYTHON  override (default ~/.local/bin/python3.12)
+ */
+export const SEO_PYTHON = process.env.SEO_PYTHON || process.env.CLAUDE_SEO_PYTHON || path.join(os.homedir(), '.local/bin/python3.12');
+
+/** { CLAUDE_SEO_PYTHON } for a child process, or {} when that Python is not on this machine. */
+export function seoPythonEnv() {
+  return existsSync(SEO_PYTHON) ? { CLAUDE_SEO_PYTHON: SEO_PYTHON } : {};
+}

@@ -20,7 +20,7 @@ import os from 'os';
 import path from 'path';
 import { readdirSync, existsSync } from 'fs';
 import { execFile } from 'child_process';
-import { installedRoot } from './plugins.mjs';
+import { installedRoot, seoPythonEnv } from './plugins.mjs';
 
 const CACHE = path.join(os.homedir(), '.claude/plugins/cache/agricidaniel-claude-seo/claude-seo');
 const DATA = process.env.SEO_PLUGIN_DATA || path.join(os.homedir(), '.claude/plugins/data/claude-seo-agricidaniel-claude-seo');
@@ -42,7 +42,7 @@ function runTool(root, args, timeoutMs) {
   return new Promise((resolve) => {
     execFile(path.join(root, 'scripts/claude-seo'), ['run', ...args], {
       cwd: os.tmpdir(), timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024,
-      env: { ...process.env, CLAUDE_PLUGIN_ROOT: root, CLAUDE_PLUGIN_DATA: DATA },
+      env: { ...process.env, ...seoPythonEnv(), CLAUDE_PLUGIN_ROOT: root, CLAUDE_PLUGIN_DATA: DATA },
     }, (err, stdout, stderr) => resolve({ ok: !err, stdout: String(stdout || ''), stderr: String(stderr || '') }));
   });
 }
