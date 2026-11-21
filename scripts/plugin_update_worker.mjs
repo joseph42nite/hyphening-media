@@ -178,7 +178,8 @@ export async function smokeCheck(job, root) {
       if (!existsSync(BLOG_PYTHON)) return { ok: false, detail: `no blog Python at ${BLOG_PYTHON}` };
       const file = path.join(dir, 'post.md');
       await writeFile(file, SMOKE_POST, 'utf8');
-      const res = await run(BLOG_PYTHON, ['-I', path.join(root, 'scripts/quality_gate.py'), '--format', 'json', '--threshold', '0', file], { cwd: dir, timeoutMs: 5 * MIN });
+      // Threshold 1: only the score matters here, and 2.3.2 refuses anything below 1.
+      const res = await run(BLOG_PYTHON, ['-I', path.join(root, 'scripts/quality_gate.py'), '--format', 'json', '--threshold', '1', file], { cwd: dir, timeoutMs: 5 * MIN });
       try {
         const score = JSON.parse(res.out).checked?.[0]?.score;
         return Number.isFinite(score) ? { ok: true, detail: `quality gate scored the sample post ${Math.round(score)}` } : { ok: false, detail: 'quality gate returned no score' };
