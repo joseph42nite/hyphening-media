@@ -3,6 +3,7 @@
  */
 
 import { spawn } from 'child_process';
+import { seoPythonEnv } from './plugins.mjs';
 
 /**
  * Run a command; resolves { code, out, err }. Never rejects on a non-zero exit.
@@ -11,8 +12,13 @@ import { spawn } from 'child_process';
  * timeout. Without it only the direct child is stopped: on 2026-11-21 a
  * timed-out claude-seo setup left its pip running for an hour, holding the
  * setup lock, so the rollback's own setup was refused.
+ *
+ * `stallMs` + `progress`: also stop it when `progress()` (sync or async, any
+ * number that grows while work happens, e.g. bytes downloaded) has not changed
+ * for `stallMs`, checked every `checkMs`. A slow but moving download is left
+ * alone; `timeoutMs` stays the hard cap.
  */
-export function run(cmd, args, { input, timeoutMs, cwd, env, killTree = false } = {}) {
+export function run(cmd, args, { input, timeoutMs, cwd, env, killTree = false, stallMs, progress, checkMs = 60000 } = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args, { cwd, env: env ? { ...process.env, ...env } : process.env, stdio: ['pipe', 'pipe', 'pipe'], detached: killTree });
     let out = '';
@@ -26,11 +32,31 @@ export function run(cmd, args, { input, timeoutMs, cwd, env, killTree = false } 
         proc.kill('SIGTERM');
       }
     };
-    const timer = timeoutMs ? setTimeout(() => { stop(); err += `\n[timed out after ${Math.round(timeoutMs / 60000)} min]`; }, timeoutMs) : null;
+    let stopped = false;
+    const timer = timeoutMs ? setTimeout(() => { stopped = true; stop(); err += `\n[timed out after ${Math.round(timeoutMs / 60000)} min]`; }, timeoutMs) : null;
+    let watch = null;
+    if (stallMs && progress) {
+      let last;
+      let lastChange = Date.now();
+      let busy = false;
+      watch = setInterval(async () => {
+        if (busy || stopped) return;
+        busy = true;
+        try {
+          let v;
+          try { v = await progress(); } catch { v = undefined; }
+          if (v !== last) { last = v; lastChange = Date.now(); } else if (Date.now() - lastChange >= stallMs && !stopped) {
+            stopped = true;
+            stop();
+            err += `\n[stalled: no progress for ${Math.round(stallMs / 60000)} min]`;
+          }
+        } finally { busy = false; }
+      }, checkMs);
+    }
     proc.stdout.on('data', (d) => { out += d; });
     proc.stderr.on('data', (d) => { err += d; });
     proc.on('error', reject);
-    proc.on('close', (code) => { if (timer) clearTimeout(timer); resolve({ code, out, err }); });
+    proc.on('close', (code) => { if (timer) clearTimeout(timer); if (watch) clearInterval(watch); resolve({ code, out, err }); });
     if (input !== undefined) proc.stdin.write(input);
     proc.stdin.end();
   });
@@ -73,12 +99,14 @@ export const tail = (s, n = 600) => String(s || '').trim().slice(-n);
  * or a `permissionMode`. With neither, the run cannot read a file or fetch a
  * page — which is how the ads fleet's brand and landing cards came back empty.
  */
-export async function runClaude({ prompt, model, cwd, allowedTools, permissionMode, timeoutMs, bin = 'claude' }) {
+export async function runClaude({ prompt, model, cwd, allowedTools, permissionMode, timeoutMs, bin = 'claude', env }) {
   const args = ['-p', '--output-format', 'text'];
   if (permissionMode) args.push('--permission-mode', permissionMode);
   if (allowedTools) args.push('--allowedTools', allowedTools);
   if (model) args.push('--model', model);
-  const res = await run(bin, args, { input: prompt, cwd, timeoutMs });
+  // CLAUDE_SEO_PYTHON reaches the skill's Bash calls through Claude's own
+  // environment; without it claude-seo's tools refuse to start (lib/plugins.mjs).
+  const res = await run(bin, args, { input: prompt, cwd, timeoutMs, env: { ...seoPythonEnv(), ...env } });
   if (res.code !== 0) throw new Error(`claude exited ${res.code}: ${String(res.err || res.out).trim().slice(0, 500)}`);
   return res.out;
 }

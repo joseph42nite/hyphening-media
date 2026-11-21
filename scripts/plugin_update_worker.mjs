@@ -27,7 +27,9 @@
  *   PLUGIN_WORKER_ID   name in the logs (default hostname)
  *   SEO_PYTHON         Python for the claude-seo runtime (default ~/.local/bin/python3.12;
  *                      this Intel Mac's system python3 is 3.9, below the plugin's floor)
- *   SEO_SETUP_MINUTES  how long the claude-seo runtime setup may take (default 90)
+ *   SEO_SETUP_MINUTES  hard cap on the claude-seo runtime setup (default 240)
+ *   SEO_SETUP_STALL_MINUTES  stop the setup sooner only if its downloads make no
+ *                      progress for this long (default 20)
  *   BLOG_PYTHON        Python the blog worker scores with (same default as blog_worker.mjs)
  *   GITHUB_TOKEN       optional, raises the GitHub API rate limit
  *
@@ -42,7 +44,7 @@ import { copyFile, mkdtemp, rm, writeFile } from 'fs/promises';
 import dotenv from 'dotenv';
 import { hook } from './lib/hook.mjs';
 import { run, runClaude, tail } from './lib/proc.mjs';
-import { installedPlugin, INSTALLED_FILE } from './lib/plugins.mjs';
+import { installedPlugin, INSTALLED_FILE, SEO_PYTHON } from './lib/plugins.mjs';
 import { recaptureDriftBaseline } from './lib/drift.mjs';
 import { appendNightReport } from './lib/nightReport.mjs';
 
@@ -53,11 +55,11 @@ const HOME = os.homedir();
 const WORKER = process.env.PLUGIN_WORKER_ID || os.hostname();
 const CLAUDE_BIN = process.env.SEO_CLAUDE_BIN || 'claude';
 const MODEL = process.env.SEO_MODEL || 'claude-sonnet-5-5';
-const SEO_PYTHON = process.env.SEO_PYTHON || path.join(HOME, '.local/bin/python3.12');
 const SEO_DATA = process.env.SEO_PLUGIN_DATA || path.join(HOME, '.claude/plugins/data/claude-seo-agricidaniel-claude-seo');
 const BLOG_PYTHON = process.env.BLOG_PYTHON || path.join(HOME, '.openmausbot/workspaces/3ee73451-c9f3-402f-9f9a-2677050c11e5/blogvenv/bin/python');
 const MIN = 60 * 1000;
-const SETUP_MINUTES = Number(process.env.SEO_SETUP_MINUTES) || 90;
+const SETUP_MINUTES = Number(process.env.SEO_SETUP_MINUTES) || 240;
+const STALL_MINUTES = Number(process.env.SEO_SETUP_STALL_MINUTES) || 20;
 
 // ------------------------------------------------------------ status
 
@@ -167,11 +169,31 @@ function stagedPackages(dataDir = SEO_DATA) {
 }
 
 /**
+ * KB the setup has on disk so far: its staging venvs, the Chromium folder, and
+ * the half-finished downloads pip and Playwright keep in the temp folder. It grows while anything downloads or installs, so a flat number
+ * means the setup is stuck rather than slow.
+ */
+export async function setupKB(dataDir = SEO_DATA, tmp = os.tmpdir()) {
+  const paths = [];
+  const add = (dir, keep) => {
+    try { for (const n of readdirSync(dir)) if (keep(n)) paths.push(path.join(dir, n)); } catch { /* missing */ }
+  };
+  add(dataDir, (n) => n.startsWith('.venv.next-') || n === 'ms-playwright');
+  add(tmp, (n) => n.startsWith('pip-') || n.startsWith('playwright'));
+  if (!paths.length) return 0;
+  const res = await run('du', ['-sk', ...paths], { timeoutMs: 60000 });
+  return res.out.split('\n').reduce((sum, l) => sum + (Number(l.split('\t')[0]) || 0), 0);
+}
+
+/**
  * The claude-seo Python runtime, built for one install (memory: python3.12 +
  * prebuilt cryptography). It builds in a staging folder and only replaces the
  * live .venv on success, so a failure here leaves the old runtime as it was.
- * Up to SEO_SETUP_MINUTES (default 90): on a slow link PyPI downloads have run
- * at 34 KB/s, and 25 minutes was not enough.
+ *
+ * No fixed short limit: on 2026-11-21 PyPI ran at 34-43 KB/s and 2.6.2 also
+ * needed a new Chromium (playwright 1.65), so even 90 minutes was too little
+ * for a setup that was downloading the whole time. It is stopped only when
+ * nothing has grown for SEO_SETUP_STALL_MINUTES, or at the SEO_SETUP_MINUTES cap.
  */
 async function seoSetup(root, log = async () => {}) {
   const env = { CLAUDE_PLUGIN_ROOT: root, CLAUDE_PLUGIN_DATA: SEO_DATA, PIP_ONLY_BINARY: 'cryptography' };
@@ -179,13 +201,22 @@ async function seoSetup(root, log = async () => {}) {
   const cleared = await clearSetupLeftovers();
   if (cleared.length) await log(`cleared a killed setup's leftovers: ${cleared.join(', ')}`);
   const started = Date.now();
+  const startKB = await setupKB();
+  let lastKB = startKB;
+  let lastAt = started;
   const progress = setInterval(() => {
     const n = stagedPackages();
-    log(`runtime setup ${Math.round((Date.now() - started) / MIN)} min in${n == null ? '' : `, ${n} packages installed so far`}`).catch(() => {});
+    const kb = lastKB;
+    const rate = Math.max(0, kb - startKB) / Math.max(1, (lastAt - started) / 1000);
+    log(`runtime setup ${Math.round((Date.now() - started) / MIN)} min in, ${Math.round((kb - startKB) / 1024)} MB fetched (~${Math.round(rate)} KB/s)${n == null ? '' : `, ${n} packages installed so far`}`).catch(() => {});
   }, 5 * MIN);
+  const measure = async () => { lastKB = await setupKB(); lastAt = Date.now(); return lastKB; };
   let res;
   try {
-    res = await run(path.join(root, 'scripts/claude-seo'), ['setup'], { env, cwd: os.tmpdir(), timeoutMs: SETUP_MINUTES * MIN, killTree: true });
+    res = await run(path.join(root, 'scripts/claude-seo'), ['setup'], {
+      env, cwd: os.tmpdir(), timeoutMs: SETUP_MINUTES * MIN, killTree: true,
+      stallMs: STALL_MINUTES * MIN, progress: measure,
+    });
   } finally {
     clearInterval(progress);
   }
@@ -356,7 +387,7 @@ export async function updatePlugin(job, { hookFn = hook } = {}) {
   await log(`all ${(job.required_skills || []).length} skills and ${(job.required_scripts || []).length} scripts our workers call are still there`);
 
   if (job.plugin === 'claude-seo') {
-    await log(`rebuilding the claude-seo Python runtime (several minutes; up to ${SETUP_MINUTES} on a slow link)`);
+    await log(`rebuilding the claude-seo Python runtime (several minutes; on a slow link it keeps going while downloads progress, up to ${SETUP_MINUTES} min)`);
     const s = await seoSetup(after.installPath, log);
     runtimeReplaced = !!s.replaced;
     if (!s.ok) return rollback(`runtime setup failed: ${s.reason}`);

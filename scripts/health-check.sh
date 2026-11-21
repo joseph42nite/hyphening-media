@@ -119,6 +119,32 @@ except Exception:
     if seo_version:
         system.append((WARN, "claude-seo runtime", "never set up: SEO cards run without their tools"))
 
+# Matching versions are not enough: the launcher must also find the Python the
+# runtime was built with. Inside a skill run it only has Claude Code's own
+# environment, and without CLAUDE_SEO_PYTHON it finds /usr/bin/python3 (3.9)
+# and refuses. Run it the way a skill does: only the setting from
+# ~/.claude/settings.json, not this shell's.
+seo_root = next(iter(installed.get("claude-seo@agricidaniel-claude-seo") or []), {}).get("installPath")
+if seo_root and os.path.isfile(f"{seo_root}/scripts/claude-seo"):
+    try:
+        claude_env = json.load(open(f"{HOME}/.claude/settings.json")).get("env") or {}
+    except Exception:
+        claude_env = {}
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_SEO_PYTHON"}
+    env.update({"CLAUDE_PLUGIN_ROOT": seo_root, "CLAUDE_PLUGIN_DATA": f"{HOME}/.claude/plugins/data/claude-seo-agricidaniel-claude-seo"})
+    if claude_env.get("CLAUDE_SEO_PYTHON"):
+        env["CLAUDE_SEO_PYTHON"] = claude_env["CLAUDE_SEO_PYTHON"]
+    try:
+        probe = subprocess.run([f"{seo_root}/scripts/claude-seo", "run", "drift_history.py", "https://example.com/"],
+                               env=env, cwd="/tmp", capture_output=True, text=True, timeout=120)
+        if probe.returncode == 0:
+            system.append((OK, "claude-seo tools", "start in a skill run"))
+        else:
+            why = (probe.stderr or probe.stdout).strip().splitlines()[-1:] or ["no output"]
+            system.append((WARN, "claude-seo tools", f"refuse to start in a skill run: {why[0][:160].rstrip('.')}. Set CLAUDE_SEO_PYTHON in ~/.claude/settings.json env"))
+    except Exception as e:
+        system.append((WARN, "claude-seo tools", f"could not check: {e}"))
+
 if os.path.isdir(vault):
     free_gb = shutil.disk_usage(vault).free / 1e9
     lvl = BLOCKED if free_gb < 2 else WARN if free_gb < 10 else OK
