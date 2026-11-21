@@ -27,6 +27,7 @@
  *   PLUGIN_WORKER_ID   name in the logs (default hostname)
  *   SEO_PYTHON         Python for the claude-seo runtime (default ~/.local/bin/python3.12;
  *                      this Intel Mac's system python3 is 3.9, below the plugin's floor)
+ *   SEO_SETUP_MINUTES  how long the claude-seo runtime setup may take (default 90)
  *   BLOG_PYTHON        Python the blog worker scores with (same default as blog_worker.mjs)
  *   GITHUB_TOKEN       optional, raises the GitHub API rate limit
  *
@@ -36,7 +37,7 @@
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { copyFile, mkdtemp, rm, writeFile } from 'fs/promises';
 import dotenv from 'dotenv';
 import { hook } from './lib/hook.mjs';
@@ -56,6 +57,7 @@ const SEO_PYTHON = process.env.SEO_PYTHON || path.join(HOME, '.local/bin/python3
 const SEO_DATA = process.env.SEO_PLUGIN_DATA || path.join(HOME, '.claude/plugins/data/claude-seo-agricidaniel-claude-seo');
 const BLOG_PYTHON = process.env.BLOG_PYTHON || path.join(HOME, '.openmausbot/workspaces/3ee73451-c9f3-402f-9f9a-2677050c11e5/blogvenv/bin/python');
 const MIN = 60 * 1000;
+const SETUP_MINUTES = Number(process.env.SEO_SETUP_MINUTES) || 90;
 
 // ------------------------------------------------------------ status
 
@@ -116,17 +118,89 @@ export function lostPieces({ oldRoot, newRoot, skills, scripts }) {
   return { lostSkills, lostScripts, added };
 }
 
-/** The claude-seo Python runtime, built for one install (memory: python3.12 + prebuilt cryptography). */
-async function seoSetup(root) {
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (err) { return err.code === 'EPERM'; } };
+
+/** Whether any running process still has this path on its command line (an orphaned pip, say). */
+async function inUse(dir) {
+  const res = await run('pgrep', ['-f', dir]);
+  return res.code === 0 && res.out.trim() !== '';
+}
+
+/**
+ * What a killed claude-seo setup leaves behind: its .setup.lock (refuses the
+ * next setup for a while) and its .venv.next-<pid> staging folder. Only what
+ * no running process owns is removed; the live .venv is never touched.
+ */
+export async function clearSetupLeftovers(dataDir = SEO_DATA) {
+  const removed = [];
+  let entries = [];
+  try { entries = readdirSync(dataDir); } catch { return removed; }
+  for (const name of entries) {
+    const m = name.match(/^\.venv\.next-(\d+)$/);
+    if (!m) continue;
+    const dir = path.join(dataDir, name);
+    if (alive(Number(m[1])) || await inUse(dir)) continue;
+    await rm(dir, { recursive: true, force: true });
+    removed.push(name);
+  }
+  const lock = path.join(dataDir, '.setup.lock');
+  if (existsSync(lock)) {
+    const pid = Number(readFileSync(lock, 'utf8').split('\n')[0]);
+    const staging = path.join(dataDir, `.venv.next-${pid}`);
+    if (!(pid && alive(pid)) && !(existsSync(staging) && await inUse(staging))) {
+      await rm(lock, { force: true });
+      removed.push('.setup.lock');
+    }
+  }
+  return removed;
+}
+
+/** Packages pip has installed so far into the newest staging venv, for the progress line. */
+function stagedPackages(dataDir = SEO_DATA) {
+  try {
+    const staged = readdirSync(dataDir).filter((n) => n.startsWith('.venv.next-')).sort().pop();
+    if (!staged) return null;
+    const lib = path.join(dataDir, staged, 'lib');
+    const py = readdirSync(lib).find((n) => n.startsWith('python'));
+    return readdirSync(path.join(lib, py, 'site-packages')).filter((n) => n.endsWith('.dist-info')).length;
+  } catch { return null; }
+}
+
+/**
+ * The claude-seo Python runtime, built for one install (memory: python3.12 +
+ * prebuilt cryptography). It builds in a staging folder and only replaces the
+ * live .venv on success, so a failure here leaves the old runtime as it was.
+ * Up to SEO_SETUP_MINUTES (default 90): on a slow link PyPI downloads have run
+ * at 34 KB/s, and 25 minutes was not enough.
+ */
+async function seoSetup(root, log = async () => {}) {
   const env = { CLAUDE_PLUGIN_ROOT: root, CLAUDE_PLUGIN_DATA: SEO_DATA, PIP_ONLY_BINARY: 'cryptography' };
   if (existsSync(SEO_PYTHON)) env.CLAUDE_SEO_PYTHON = SEO_PYTHON;
-  const res = await run(path.join(root, 'scripts/claude-seo'), ['setup'], { env, cwd: os.tmpdir(), timeoutMs: 25 * MIN });
-  if (res.code !== 0) return { ok: false, reason: tail(res.err || res.out, 400) };
+  const cleared = await clearSetupLeftovers();
+  if (cleared.length) await log(`cleared a killed setup's leftovers: ${cleared.join(', ')}`);
+  const started = Date.now();
+  const progress = setInterval(() => {
+    const n = stagedPackages();
+    log(`runtime setup ${Math.round((Date.now() - started) / MIN)} min in${n == null ? '' : `, ${n} packages installed so far`}`).catch(() => {});
+  }, 5 * MIN);
+  let res;
+  try {
+    res = await run(path.join(root, 'scripts/claude-seo'), ['setup'], { env, cwd: os.tmpdir(), timeoutMs: SETUP_MINUTES * MIN, killTree: true });
+  } finally {
+    clearInterval(progress);
+  }
+  if (res.code !== 0) {
+    // A timeout stops the whole tree; give it a moment, then clear what it left.
+    await new Promise((r) => setTimeout(r, 12000));
+    await clearSetupLeftovers();
+    return { ok: false, reason: tail(res.err || res.out, 400) };
+  }
   // Ready means a tool actually runs, not just that setup exited 0.
   const probe = await run(path.join(root, 'scripts/claude-seo'), ['run', 'drift_history.py', 'https://example.com/'], { env, cwd: os.tmpdir(), timeoutMs: 2 * MIN });
   const out = `${probe.out}\n${probe.err}`;
-  if (/not ready/i.test(out)) return { ok: false, reason: 'setup finished but the runtime still reports not ready' };
-  return { ok: true };
+  // Setup exited 0, so the new runtime is live either way.
+  if (/not ready/i.test(out)) return { ok: false, replaced: true, reason: 'setup finished but the runtime still reports not ready' };
+  return { ok: true, replaced: true };
 }
 
 /** Last JSON object in some text. */
@@ -251,11 +325,17 @@ export async function updatePlugin(job, { hookFn = hook } = {}) {
   if (!after || after.version === before.version) return finish('failed', { error: `still on ${before.version} after the update (the marketplace may not have the release yet)` });
   await log(`now on ${after.version}`);
 
+  // Whether the new runtime replaced the live one. Setup builds in a staging
+  // folder, so until it succeeds the old runtime is untouched and a rollback
+  // has nothing to rebuild (rebuilding then only fought the killed setup's lock).
+  let runtimeReplaced = false;
   const rollback = async (why) => {
     await log(`rolling back to ${before.version}: ${why}`);
     await copyFile(backup, INSTALLED_FILE);
-    if (job.plugin === 'claude-seo') {
-      const s = await seoSetup(before.installPath);
+    if (job.plugin === 'claude-seo' && !runtimeReplaced) {
+      await log('the runtime was not replaced, so the old one is still in place');
+    } else if (job.plugin === 'claude-seo') {
+      const s = await seoSetup(before.installPath, log);
       await log(s.ok ? `runtime rebuilt for ${before.version}` : `runtime rebuild for ${before.version} failed: ${s.reason}`);
     }
     return finish('rolled_back', { to_version: before.version, error: why });
@@ -276,8 +356,9 @@ export async function updatePlugin(job, { hookFn = hook } = {}) {
   await log(`all ${(job.required_skills || []).length} skills and ${(job.required_scripts || []).length} scripts our workers call are still there`);
 
   if (job.plugin === 'claude-seo') {
-    await log('rebuilding the claude-seo Python runtime (several minutes)');
-    const s = await seoSetup(after.installPath);
+    await log(`rebuilding the claude-seo Python runtime (several minutes; up to ${SETUP_MINUTES} on a slow link)`);
+    const s = await seoSetup(after.installPath, log);
+    runtimeReplaced = !!s.replaced;
     if (!s.ok) return rollback(`runtime setup failed: ${s.reason}`);
     await log('runtime ready');
   }

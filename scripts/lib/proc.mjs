@@ -4,13 +4,29 @@
 
 import { spawn } from 'child_process';
 
-/** Run a command; resolves { code, out, err }. Never rejects on a non-zero exit. */
-export function run(cmd, args, { input, timeoutMs, cwd, env } = {}) {
+/**
+ * Run a command; resolves { code, out, err }. Never rejects on a non-zero exit.
+ *
+ * `killTree`: run it in its own process group and stop the whole group on a
+ * timeout. Without it only the direct child is stopped: on 2026-11-21 a
+ * timed-out claude-seo setup left its pip running for an hour, holding the
+ * setup lock, so the rollback's own setup was refused.
+ */
+export function run(cmd, args, { input, timeoutMs, cwd, env, killTree = false } = {}) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd, env: env ? { ...process.env, ...env } : process.env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const proc = spawn(cmd, args, { cwd, env: env ? { ...process.env, ...env } : process.env, stdio: ['pipe', 'pipe', 'pipe'], detached: killTree });
     let out = '';
     let err = '';
-    const timer = timeoutMs ? setTimeout(() => { proc.kill('SIGTERM'); err += `\n[timed out after ${Math.round(timeoutMs / 60000)} min]`; }, timeoutMs) : null;
+    const stop = () => {
+      if (killTree) {
+        try { process.kill(-proc.pid, 'SIGTERM'); } catch { /* already gone */ }
+        // Anything that ignores SIGTERM (pip mid-download can) goes 10 s later.
+        setTimeout(() => { try { process.kill(-proc.pid, 'SIGKILL'); } catch { /* gone */ } }, 10000).unref();
+      } else {
+        proc.kill('SIGTERM');
+      }
+    };
+    const timer = timeoutMs ? setTimeout(() => { stop(); err += `\n[timed out after ${Math.round(timeoutMs / 60000)} min]`; }, timeoutMs) : null;
     proc.stdout.on('data', (d) => { out += d; });
     proc.stderr.on('data', (d) => { err += d; });
     proc.on('error', reject);
