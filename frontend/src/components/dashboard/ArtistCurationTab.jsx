@@ -110,7 +110,7 @@ function MessageTemplateCard({
   return (
     <div style={{ background: 'rgba(16, 22, 32, 0.75)', border: '1px solid rgba(223, 231, 224, 0.1)', borderRadius: '10px', padding: '12px 14px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '160px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.05em', background: badgeBg, border: `1px solid ${badgeBorder}`, color: badgeColor, whiteSpace: 'nowrap' }}>
             {badge}
           </span>
@@ -254,6 +254,54 @@ export default function ArtistCurationTab({
   const [selectedVenueMessageId, setSelectedVenueMessageId] = useState('');
   const currentVenue = (venues || []).find(v => String(v.id) === String(selectedVenueMessageId)) || (venues && venues[0]) || null;
 
+  // Per-venue Confirmation Message ('' = the default template for all venues)
+  const [confirmVenueId, setConfirmVenueId] = useState('');
+  const [venueConfirmTemplate, setVenueConfirmTemplate] = useState(null);
+  const [venueConfirmLoading, setVenueConfirmLoading] = useState(false);
+  const confirmVenue = confirmVenueId ? (venues || []).find(v => String(v.id) === String(confirmVenueId)) || null : null;
+  const venueConfirmIsCustom = !!(confirmVenue && venueConfirmTemplate?.isCustom);
+  const confirmationText = venueConfirmIsCustom ? venueConfirmTemplate.text : confirmationMsg;
+  const confirmationLabel = confirmVenue ? `${confirmVenue.name} Confirmation Message` : 'Confirmation Message';
+
+  useEffect(() => {
+    if (!confirmVenueId) {
+      setVenueConfirmTemplate(null);
+      return;
+    }
+    let cancelled = false;
+    setVenueConfirmLoading(true);
+    setVenueConfirmTemplate(null);
+    fetch(`${API_BASE}/api/artists/templates/venues/${confirmVenueId}/confirmation`, { credentials: 'include' })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load venue template');
+        if (!cancelled) setVenueConfirmTemplate(data.template);
+      })
+      .catch(err => { if (!cancelled) showToast(err.message, 'error'); })
+      .finally(() => { if (!cancelled) setVenueConfirmLoading(false); });
+    return () => { cancelled = true; };
+  }, [confirmVenueId]);
+
+  const saveVenueConfirmTemplate = async (text) => {
+    const clearing = !text.trim();
+    const res = await fetch(`${API_BASE}/api/artists/templates/venues/${confirmVenueId}/confirmation`, {
+      method: clearing ? 'DELETE' : 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: clearing ? undefined : JSON.stringify({ text }),
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save venue template');
+    setVenueConfirmTemplate(data.template);
+    setEditingMsgType(null);
+    showToast(
+      clearing
+        ? `${confirmVenue?.name || 'Venue'} now uses the default confirmation message`
+        : `Confirmation message saved for ${confirmVenue?.name || 'venue'}!`,
+      clearing ? 'info' : 'success'
+    );
+  };
+
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
@@ -289,6 +337,11 @@ export default function ArtistCurationTab({
 
   const handleSaveTemplate = async (type) => {
     try {
+      if (type === 'venue_confirmation') {
+        if (!confirmVenueId) throw new Error('No venue selected');
+        await saveVenueConfirmTemplate(tempMsgText);
+        return;
+      }
       if (type === 'venue') {
         const venueId = currentVenue?.id;
         if (!venueId) throw new Error('No venue selected');
@@ -331,6 +384,12 @@ export default function ArtistCurationTab({
 
   const handleClearTemplate = async (type) => {
     try {
+      if (type === 'venue_confirmation') {
+        if (!confirmVenueId) throw new Error('No venue selected');
+        await saveVenueConfirmTemplate('');
+        setTempMsgText('');
+        return;
+      }
       if (type === 'venue') {
         const venueId = currentVenue?.id;
         if (!venueId) throw new Error('No venue selected');
@@ -765,10 +824,53 @@ export default function ArtistCurationTab({
             badgeBg="rgba(34, 197, 94, 0.12)"
             badgeBorder="rgba(34, 197, 94, 0.3)"
             badgeColor="#4ade80"
-            text={confirmationMsg}
-            emptyText="No template set yet. Click 'Edit' to enter your template."
-            onCopy={() => handleCopyTemplate(confirmationMsg, 'Confirmation Message')}
-            onEdit={() => { setEditingMsgType('confirmation'); setTempMsgText(confirmationMsg); }}
+            disabled={venueConfirmLoading}
+            extraHeaderControls={
+              venues && venues.length > 0 ? (
+                <>
+                  <select
+                    className="form-control"
+                    value={confirmVenueId}
+                    onChange={e => setConfirmVenueId(e.target.value)}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '2px 8px',
+                      height: '26px',
+                      background: 'rgba(5, 7, 10, 0.8)',
+                      borderColor: 'rgba(223, 231, 224, 0.18)',
+                      color: 'var(--text-primary)',
+                      borderRadius: '6px',
+                      minWidth: '130px',
+                      maxWidth: '190px'
+                    }}
+                    title="Select Venue"
+                    aria-label="Confirmation message venue"
+                  >
+                    <option value="">Default (all venues)</option>
+                    {venues.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}{v.client_name ? ` (${v.client_name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {confirmVenue && !venueConfirmLoading && (
+                    <span
+                      style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: venueConfirmIsCustom ? '#4ade80' : 'var(--text-muted)', whiteSpace: 'nowrap' }}
+                      title={venueConfirmIsCustom ? 'This venue has its own confirmation message' : 'This venue has no custom message, so the default is shown'}
+                    >
+                      {venueConfirmIsCustom ? 'Custom' : 'Using default'}
+                    </span>
+                  )}
+                </>
+              ) : null
+            }
+            text={venueConfirmLoading ? null : confirmationText}
+            emptyText={venueConfirmLoading ? 'Loading venue template...' : "No template set yet. Click 'Edit' to enter your template."}
+            onCopy={() => handleCopyTemplate(confirmationText, confirmationLabel)}
+            onEdit={() => {
+              setEditingMsgType(confirmVenue ? 'venue_confirmation' : 'confirmation');
+              setTempMsgText(confirmationText || '');
+            }}
           />
 
           <MessageTemplateCard
@@ -960,7 +1062,7 @@ export default function ArtistCurationTab({
             }}
           >
             <h3 style={{ margin: '0 0 14px', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : editingMsgType === 'confirmation' ? 'General Confirmation Message' : `${currentVenue?.name || 'Venue'} Confirmation Message`} Template
+              Edit {editingMsgType === 'onboarding' ? 'Onboarding Message' : editingMsgType === 'confirmation' ? 'General Confirmation Message' : editingMsgType === 'venue_confirmation' ? confirmationLabel : `${currentVenue?.name || 'Venue'} Confirmation Message`} Template
             </h3>
             <div style={{ marginBottom: '18px' }}>
               <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>
@@ -984,6 +1086,13 @@ export default function ArtistCurationTab({
                   borderRadius: '8px'
                 }}
               />
+              {editingMsgType === 'venue_confirmation' && (
+                <div style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {venueConfirmIsCustom
+                    ? `Saved only for ${confirmVenue?.name}. "Use Default" removes it so this venue gets the default message again.`
+                    : `${confirmVenue?.name} has no custom message yet, so this starts from the default. Saving creates one just for this venue.`}
+                </div>
+              )}
               {editingMsgType === 'venue' && (
                 <div style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   <strong>Supported variables:</strong> <code style={{ color: '#7dd3fc' }}>{'{{artist_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{gig_date}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{venue_name}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{address}}'}</code>, <code style={{ color: '#7dd3fc' }}>{'{{map_link}}'}</code>
@@ -1006,7 +1115,7 @@ export default function ArtistCurationTab({
                   padding: '6px 12px'
                 }}
               >
-                Clear Text
+                {editingMsgType === 'venue_confirmation' ? 'Use Default' : 'Clear Text'}
               </button>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
