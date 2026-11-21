@@ -48,6 +48,8 @@ const WORKERS = {
   // Plugin versions every sweep (the server says when a status report is due)
   // and the SEO/Ads Monitor's Update & test button.
   plugins: { cmd: 'node', args: ['scripts/plugin_update_worker.mjs', '--once'] },
+  // Reel Lab: the Script Tracker's "From viral reel" and "Improve hooks".
+  ig: { cmd: 'node', args: ['scripts/ig_worker.mjs', '--once'] },
 };
 
 function runWorker(kind, { sweep = false } = {}) {
@@ -76,7 +78,8 @@ function runWorker(kind, { sweep = false } = {}) {
 }
 
 // plugins: two updates at once would both rewrite installed_plugins.json.
-const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy', 'outreach', 'plugins']);
+// ig: it drains the whole queue, so a second click while it runs is already covered.
+const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy', 'outreach', 'plugins', 'ig']);
 const running = new Map(); // kind -> how many are running
 
 let stopping = false;

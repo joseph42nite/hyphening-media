@@ -1,0 +1,21 @@
+{
+  "note": "Reel Lab rules for clients on the healthcare compliance profile (crm_clients.blog_compliance_profile = 'healthcare'). Formula ids are from skills/ig-reel/hooks.json.",
+  "excluded_formulas": {
+    "1": "Cost Confession: a money-mistake story does not belong under a clinic's name",
+    "4": "The Replacement: price-versus-price claims about treatment",
+    "5": "Time Collapse: reads as a promise of faster results",
+    "6": "The Receipt: patient outcome numbers",
+    "13": "Before And After: patient before/after results",
+    "17": "Head To Head: comparing treatments or providers",
+    "25": "Someone Else's Result: a patient's outcome used as a hook",
+    "26": "The Superlative: best / fastest / only claims"
+  },
+  "rules": [
+    "No promise or guarantee of a result, success rate or recovery time.",
+    "No patient stories, testimonials, outcomes or before/after unless the staff notes say the patient consented and give the exact wording.",
+    "No comparison with other doctors, clinics or treatments, and no best / only / number one claims.",
+    "Any statistic must come from the staff notes; otherwise write {{source + number}} and list it in placeholders.",
+    "Educational, not diagnostic: say what to ask the doctor about, never what the viewer has or should take.",
+    "The ask is to book a consultation, comment a keyword, or save the reel. Never 'DM us your reports'."
+  ]
+}

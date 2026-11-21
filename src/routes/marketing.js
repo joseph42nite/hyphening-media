@@ -1295,6 +1295,7 @@ router.get('/:id/marketing/scripts', authorize('admin', 'ops_social_media_manage
     const { month } = req.query;
     let query = `
       SELECT s.id, s.client_id, s.month, s.title, s.script_text, s.format, s.reference_video_link, s.reaction_video_link, s.has_unseen_changes, s.last_changed_by, s.created_at, s.updated_at,
+             s.hook_formula, s.hook_score,
              t.id AS content_id, COALESCE(t.status, s.status) AS content_status, COALESCE(t.client_comments, s.client_comments) AS client_comments
       FROM marketing_scripts s
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id

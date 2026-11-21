@@ -937,6 +937,8 @@ router.get('/:token/scripts', portalAuth, (req, res) => {
       LEFT JOIN marketing_content_script_relation r ON s.id = r.script_id
       LEFT JOIN marketing_content_tracker t ON r.content_id = t.id
       WHERE s.client_id = ?
+        -- A Reel Lab draft is staff-only until someone moves it on.
+        AND NOT (s.reel_lab_run_id IS NOT NULL AND s.status = 'Draft')
       ORDER BY s.month DESC, s.created_at DESC
     `).all(req.portalClient.id);
 

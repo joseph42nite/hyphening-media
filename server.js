@@ -58,6 +58,7 @@ import seoNightRoutes from './src/routes/seoNight.js';
 import pluginRoutes from './src/routes/plugins.js';
 import manualTaskRoutes from './src/routes/manualTasks.js';
 import outreachRoutes from './src/routes/outreach.js';
+import reelLabRoutes from './src/routes/reelLab.js';
 import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 
 // Import services
@@ -336,6 +337,7 @@ app.use('/api/seo-night', seoNightRoutes);
 app.use('/api/plugins', pluginRoutes);
 app.use('/api/manual-tasks', manualTaskRoutes);
 app.use('/api/outreach', outreachRoutes);
+app.use('/api/reel-lab', reelLabRoutes);
 app.use('/api/approval', approvalRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/notifications', notificationRoutes);
