@@ -34,6 +34,7 @@ import {
   nightSummaryText,
 } from '../services/seoNight.js';
 import { claimOutreachRuns, submitOutreachResults, failOutreachRun, outreachSummaryText } from '../services/outreach.js';
+import { claimPluginUpdates, reportPluginStatus, reportPluginReview, pluginUpdateLog, finishPluginUpdate, pluginSummaryLines } from '../services/plugins.js';
 import {
   handleClaimBlogRuns,
   handleAddBlogTopics,
@@ -63,7 +64,8 @@ export const KNOWN_EVENTS = [
   'queue_blog_runs', 'list_blog_runs', 'get_blog_run', 'review_blog_run', 'retry_blog_run',
   'queue_seo_night', 'queue_seo_fixes', 'seo_night_summary',
   'claim_seo_fix_batches', 'submit_seo_triage', 'submit_seo_fix_batch', 'claim_seo_deploys', 'finish_seo_deploy',
-  'queue_outreach_runs', 'claim_outreach_runs', 'submit_outreach_results', 'fail_outreach_run', 'outreach_summary'
+  'queue_outreach_runs', 'claim_outreach_runs', 'submit_outreach_results', 'fail_outreach_run', 'outreach_summary',
+  'claim_plugin_updates', 'report_plugin_status', 'report_plugin_review', 'plugin_update_log', 'finish_plugin_update'
 ];
 
 const router = Router();
@@ -281,7 +283,9 @@ export function executeEvent(eventType, payload) {
       case 'seo_night_summary': {
         // Manual tasks ride along so the morning brief shows the hand work waiting too.
         const manual = manualSummaryLines();
-        const text = [nightSummaryText(), ...(manual.length ? ['Manual tasks (SEO and ads, Manual tasks tab):', ...manual] : [])].join('\n');
+        const plugins = pluginSummaryLines();
+        const text = [nightSummaryText(), ...(manual.length ? ['Manual tasks (SEO and ads, Manual tasks tab):', ...manual] : []),
+          ...(plugins.length ? ['Plugins behind (Update & test in the SEO or Ads Monitor):', ...plugins] : [])].join('\n');
         return { success: true, summary: text, data: { text } };
       }
       case 'claim_seo_fix_batches': { const batches = claimSeoFixBatches(payload?.worker); return { success: true, summary: `Claimed ${batches.length} fix batch(es)`, data: { batches } }; }
@@ -294,6 +298,14 @@ export function executeEvent(eventType, payload) {
       case 'submit_outreach_results': return submitOutreachResults(payload);
       case 'fail_outreach_run': return failOutreachRun(payload);
       case 'outreach_summary': return { success: true, summary: outreachSummaryText(), data: { text: outreachSummaryText() } };
+      case 'claim_plugin_updates': {
+        const r = claimPluginUpdates(payload?.worker);
+        return { success: true, summary: r.held ? `Plugin updates held: ${r.held}` : `Claimed ${r.jobs.length} plugin update(s)`, data: r };
+      }
+      case 'report_plugin_status': return reportPluginStatus(payload);
+      case 'report_plugin_review': return reportPluginReview(payload);
+      case 'plugin_update_log': return pluginUpdateLog(payload);
+      case 'finish_plugin_update': return finishPluginUpdate(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }

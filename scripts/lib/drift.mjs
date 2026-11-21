@@ -20,12 +20,17 @@ import os from 'os';
 import path from 'path';
 import { readdirSync, existsSync } from 'fs';
 import { execFile } from 'child_process';
+import { installedRoot } from './plugins.mjs';
 
 const CACHE = path.join(os.homedir(), '.claude/plugins/cache/agricidaniel-claude-seo/claude-seo');
 const DATA = process.env.SEO_PLUGIN_DATA || path.join(os.homedir(), '.claude/plugins/data/claude-seo-agricidaniel-claude-seo');
 
-function pluginRoot() {
+export function pluginRoot() {
   if (process.env.SEO_PLUGIN_ROOT) return process.env.SEO_PLUGIN_ROOT;
+  // The version Claude Code runs, not the newest cache folder: a downloaded but
+  // unused version would give baselines from different code than the skills.
+  const running = installedRoot('claude-seo@agricidaniel-claude-seo');
+  if (running) return running;
   try {
     const versions = readdirSync(CACHE).filter((v) => /^\d+\.\d+\.\d+$/.test(v))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
@@ -67,4 +72,15 @@ export async function ensureDriftBaseline(url) {
   const capture = await runTool(root, ['drift_baseline.py', url, '--skip-cwv'], 180_000);
   if (!capture.ok) return { present: false, reason: (capture.stderr.trim().split('\n').pop() || 'drift_baseline failed').slice(0, 200) };
   return { present: true, captured: true };
+}
+
+/**
+ * Capture a fresh baseline, replacing the comparison point. After a claude-seo
+ * update whose parser fixes change stored values (2.5.1, 2.6.0, 2.6.2), the old
+ * baselines would read as one-off changes on every page.
+ */
+export async function recaptureDriftBaseline(url, root = pluginRoot()) {
+  if (!root || !existsSync(path.join(root, 'scripts/claude-seo'))) return { ok: false, reason: 'claude-seo plugin not found' };
+  const capture = await runTool(root, ['drift_baseline.py', url, '--skip-cwv'], 180_000);
+  return capture.ok ? { ok: true } : { ok: false, reason: (capture.stderr.trim().split('\n').pop() || 'drift_baseline failed').slice(0, 200) };
 }

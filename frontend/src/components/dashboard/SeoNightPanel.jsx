@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import FleetModeToggle from './FleetModeToggle.jsx';
 import SiteChangesPanel, { BUSY } from './SiteChangesPanel.jsx';
+import PluginVersionsPanel from './PluginVersionsPanel.jsx';
 import { api, card, muted } from './blogMonitorShared.js';
 
 /**
@@ -88,6 +89,8 @@ export default function SeoNightPanel({ showToast, clientId, clientName, onSelec
           ))}
         </div>
       )}
+
+      <PluginVersionsPanel monitor="seo" showToast={showToast} />
 
       {selector}
 
