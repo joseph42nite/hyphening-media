@@ -79,6 +79,7 @@ beforeAll(async () => {
   fs.writeFileSync(path.join(repo, 'hyphening.deploy.json'), JSON.stringify({
     client_id: 98, branch: 'main', checks: ['node build.js'], deploy,
     health_check: ['https://static.test/'], rollback: 'git_revert',
+    tooling_paths: ['tools/'], site_uses: ['tools/used-by-site.mjs'],
     seo_fixes: { enabled: true, paths: ['src.html'] },
   }, null, 2));
   sh(repo, 'add', '-A');
@@ -144,6 +145,45 @@ describe('ssh_rsync_static deploy', { timeout: 120000 }, () => {
     expect(live()).toBe(sh(remote, 'rev-parse', 'main'));
   });
 
+  /** A commit straight to main (a merged PR), leaving the live site behind it. */
+  function mergeToMain(file, text) {
+    sh(repo, 'checkout', '--quiet', '--detach', 'origin/main');
+    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(repo, file), text);
+    sh(repo, 'add', file);
+    sh(repo, 'commit', '--quiet', '-m', `merge ${file}`);
+    sh(repo, 'push', '--quiet', 'origin', 'HEAD:main');
+    sh(repo, 'checkout', '--quiet', '--detach');
+  }
+
+  it('goes ahead when main is ahead of the live site only by tooling', async () => {
+    fs.writeFileSync(path.join(webRoot, DEPLOYED_COMMIT_FILE), `${sh(remote, 'rev-parse', 'main')}\n`); // live at main
+    const before = live();
+    mergeToMain('tools/night-helper.mjs', 'export const x = 1;\n');
+    const job = nightFix('seo/night-t', 'Tooling ok', 5);
+    const r = await deployWorker.deployBatch(job, { hookFn: fakeHook([]), health: async () => ({ ok: true }), net });
+    expect(r.status).toBe('live');
+    expect(live()).not.toBe(before);
+    expect(live()).toBe(sh(remote, 'rev-parse', 'main'));
+  });
+
+  it('still refuses when the gap includes a site file or a tooling file the site uses', async () => {
+    for (const [file, name, rec] of [['src.html', 'seo/night-s', 6], ['tools/used-by-site.mjs', 'seo/night-u', 7]]) {
+      const stamp = live();
+      mergeToMain(file, `<!-- ${name} -->\n`);
+      const head = sh(remote, 'rev-parse', 'main');
+      const calls = [];
+      const r = await deployWorker.deployBatch(nightFix(name, 'Blocked', rec), { hookFn: fakeHook(calls), health: async () => ({ ok: true }), net });
+      expect(r.status).toBe('deploy_failed');
+      expect(r.error).toMatch(new RegExp(`other changes are waiting to deploy \\(site files: ${file.replace('.', '\\.')}\\)`));
+      expect(calls[0][1].pushed).toBe(false);
+      expect(sh(remote, 'rev-parse', 'main')).toBe(head);
+      expect(live()).toBe(stamp);
+      // Deploy main by hand, as the error says, before the next case.
+      fs.writeFileSync(path.join(webRoot, DEPLOYED_COMMIT_FILE), `${head}\n`);
+    }
+  });
+
   it('refuses when the live site is not at main, pushing nothing', async () => {
     const job = nightFix('seo/night-c', 'Other', 3);
     fs.writeFileSync(path.join(webRoot, DEPLOYED_COMMIT_FILE), 'deadbeef\n'); // someone uploaded other work
@@ -151,7 +191,7 @@ describe('ssh_rsync_static deploy', { timeout: 120000 }, () => {
     const calls = [];
     const r = await deployWorker.deployBatch(job, { hookFn: fakeHook(calls), health: async () => ({ ok: true }), net });
     expect(r.status).toBe('deploy_failed');
-    expect(r.error).toMatch(/the server is at deadbeef/);
+    expect(r.error).toMatch(/the server is at deadbeef.*\(the live commit is not on the branch\)/);
     expect(calls[0][1].pushed).toBe(false);
     expect(sh(remote, 'rev-parse', 'main')).toBe(head);
   });

@@ -11,7 +11,9 @@
  *   3. ssh_pull_build and ssh_rsync_static: the server must be at
  *      origin/<branch> (its git HEAD, or the .deployed-commit file an upload
  *      leaves), so a Deploy never takes other, unapproved commits live along
- *      with the fixes.
+ *      with the fixes. The one exception: the server is behind <branch> only
+ *      by commits under the manifest's tooling_paths (scripts, tests), which
+ *      the site never runs; they ride along and the log names them.
  *   4. Push to <branch>, run the deploy (ssh commands; a local build uploaded
  *      with rsync; or nothing for git_push, where the host deploys on push),
  *      then check every health URL.
@@ -31,7 +33,7 @@ import { fileURLToPath } from 'url';
 import { appendNightReport } from './lib/nightReport.mjs';
 import { hook } from './lib/hook.mjs';
 import { run, git, sh, tail, healthCheck } from './lib/proc.mjs';
-import { loadManifest, NIGHT_DEPLOY_TYPES, DEPLOYED_COMMIT_FILE } from './lib/deployManifest.mjs';
+import { loadManifest, siteFiles, NIGHT_DEPLOY_TYPES, DEPLOYED_COMMIT_FILE } from './lib/deployManifest.mjs';
 import { prepareWorktree } from './lib/worktree.mjs';
 
 const WORKER = os.hostname();
@@ -66,6 +68,22 @@ async function serverCommit(d, net) {
     return { error: `can't reach the server over SSH (alias "${d.host_alias}"): ${why}` };
   }
   return { commit: res.out.trim().split('\n').pop() };
+}
+
+/**
+ * Whether the only commits between the live server and <branch> touch the
+ * manifest's tooling_paths, so a Deploy carrying them along changes nothing on
+ * the site. { ok, files } or { ok: false, why }. The server must be behind
+ * <branch> (an ancestor of it), never on a commit of its own.
+ */
+export async function toolingOnlyGap(repo, manifest, serverHead, remoteHead) {
+  if (!(manifest.tooling_paths || []).length) return { ok: false, why: '' };
+  const anc = await git(repo, ['merge-base', '--is-ancestor', serverHead, remoteHead], { allowFail: true });
+  if (anc.code !== 0) return { ok: false, why: ' (the live commit is not on the branch)' };
+  const files = (await git(repo, ['diff', '--name-only', serverHead, remoteHead])).split('\n').filter(Boolean);
+  const site = siteFiles(manifest, files);
+  if (site.length) return { ok: false, why: ` (site files: ${site.slice(0, 3).join(', ')}${site.length > 3 ? ` and ${site.length - 3} more` : ''})` };
+  return { ok: true, files };
 }
 
 /** rsync arguments for uploading <wt>/<local_dir> to <alias>:<remote_dir>. */
@@ -154,7 +172,11 @@ export async function deployBatch(job, { hookFn = hook, health = healthCheck, ne
     if (live.error) return finish('deploy_failed', { error: live.error });
     const serverHead = live.commit;
     if (serverHead !== remoteHead) {
-      return finish('deploy_failed', { error: `the server is at ${serverHead.slice(0, 8)} but ${target} is at ${remoteHead.slice(0, 8)}: other changes are waiting to deploy. Deploy those first (normal approval), then press Deploy again.` });
+      const behind = await toolingOnlyGap(repo, manifest, serverHead, remoteHead);
+      if (!behind.ok) {
+        return finish('deploy_failed', { error: `the server is at ${serverHead.slice(0, 8)} but ${target} is at ${remoteHead.slice(0, 8)}: other changes are waiting to deploy${behind.why}. Deploy those first (normal approval), then press Deploy again.` });
+      }
+      log(`the server is at ${serverHead.slice(0, 8)}; going ahead, since ${target} only adds tooling the site doesn't use: ${behind.files.join(', ')}`);
     }
   }
 

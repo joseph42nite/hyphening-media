@@ -27,6 +27,8 @@
     "https://hypheningmedia.com/sitemap.xml"
   ],
   "rollback": "git_revert",
+  "tooling_paths": ["scripts/", "src/tests/", "docs/", ".claude/", "aws_deployment_guide.md"],
+  "site_uses": ["scripts/lib/dataforseo.mjs", "scripts/backup-db.mjs"],
   "blog": { "type": "hyphening_webhook" },
   "seo_fixes": {
     "enabled": true,
