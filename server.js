@@ -452,6 +452,17 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
   });
   const IMMUTABLE = /\.(webp|avif|png|jpe?g|gif|svg|ico|woff2?|mp4|webm)$/i;
   const VENDOR = /three\.min\.js$/i;
+  // Landing pages: extensionless URL is canonical; the .html form 301s to it.
+  const LANDING_SLUGS = ['digital-marketing-agency-bengaluru', 'd2c-marketing-agency-bengaluru'];
+  app.get('/landing-pages/:slug.html', (req, res, next) => {
+    if (!LANDING_SLUGS.includes(req.params.slug)) return next();
+    const query = req.url.slice(req.path.length);
+    res.redirect(301, `/landing-pages/${req.params.slug}${query}`);
+  });
+  app.get('/landing-pages/:slug', (req, res, next) => {
+    if (!LANDING_SLUGS.includes(req.params.slug)) return next();
+    res.set('Cache-Control', 'no-cache').sendFile(path.join(frontendPath, 'landing-pages', `${req.params.slug}.html`));
+  });
   app.use(express.static(frontendPath, {
     // "/" must not be answered with dist/index.html straight off disk: that
     // short-circuits the SPA fallback below, and with it the canonical tag it
@@ -551,7 +562,7 @@ if (IS_PROD || fs.existsSync(frontendPath)) {
 
         <h2>Our Capabilities</h2>
         <p>Hyphening Media offers nine capabilities, each with its own page covering what we do and how we work. Explore them below, from content strategy and video production to analytics, campaigns, brand development and news media PR, or see our <a href="/case-studies">case studies</a> and <a href="/blog">blog</a> for examples of the work.</p>
-        <p>Based in Bengaluru (Bangalore)? See our <a href="/landing-pages/digital-marketing-agency-bengaluru.html">digital marketing and social media agency in Bengaluru</a> page, or our <a href="/landing-pages/d2c-marketing-agency-bengaluru.html">D2C marketing agency in Bengaluru</a> page.</p>
+        <p>Based in Bengaluru (Bangalore)? See our <a href="/landing-pages/digital-marketing-agency-bengaluru">digital marketing and social media agency in Bengaluru</a> page, or our <a href="/landing-pages/d2c-marketing-agency-bengaluru">D2C marketing agency in Bengaluru</a> page.</p>
         <ul>
           <li><a href="/capabilities/content-strategy">Content Strategy</a></li>
           <li><a href="/capabilities/video-production">Video Production</a></li>

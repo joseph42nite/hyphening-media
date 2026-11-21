@@ -95,8 +95,8 @@ router.get('/sitemap.xml', (req, res) => {
       { url: '/blog', lastmod: blogLastmod },
       { url: '/case-studies', lastmod: caseStudiesLastmod },
       { url: '/capabilities', lastmod: CAPABILITIES_LASTMOD },
-      { url: '/landing-pages/digital-marketing-agency-bengaluru.html', lastmod: '2026-11-05' },
-      { url: '/landing-pages/d2c-marketing-agency-bengaluru.html', lastmod: '2026-11-08' },
+      { url: '/landing-pages/digital-marketing-agency-bengaluru', lastmod: '2026-11-05' },
+      { url: '/landing-pages/d2c-marketing-agency-bengaluru', lastmod: '2026-11-08' },
       ...CAPABILITY_SLUGS.map((slug) => ({ url: `/capabilities/${slug}`, lastmod: CAPABILITIES_LASTMOD })),
     ];
 
