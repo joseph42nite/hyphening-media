@@ -54,7 +54,7 @@ export function imageFromResponse(body) {
 }
 
 /** PNG → JPEG with macOS sips, so a cover is ~300 KB rather than ~2 MB. Keeps the original if sips can't. */
-async function shrink(img) {
+export async function shrink(img) {
   if (process.platform !== 'darwin' || img.mime !== 'image/png') return img;
   const dir = await mkdtemp(path.join(os.tmpdir(), 'cover-'));
   try {

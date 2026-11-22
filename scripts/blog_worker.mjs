@@ -23,6 +23,7 @@
  *   VAULT_DIR              vault root                 (default /Volumes/Mac Valhalla/Vault)
  *   GEMINI_API_KEY         covers from Gemini (lib/geminiImage.mjs); without it the Unsplash pick is used
  *   GEMINI_IMAGE_MODEL     Gemini image model         (default gemini-2.5-flash-image)
+ *   COVERS_VIA_ANTIGRAVITY=0  don't leave cover requests for Antigravity (lib/coverQueue.mjs)
  *
  * Usage:
  *   node scripts/blog_worker.mjs --once     # drain the queue and exit (it always does;
@@ -39,7 +40,8 @@ import { appendNightReport } from './lib/nightReport.mjs';
 import { hook, API } from './lib/hook.mjs';
 import { installedRoot } from './lib/plugins.mjs';
 import { run } from './lib/proc.mjs';
-import { coverPrompt, generateCover } from './lib/geminiImage.mjs';
+import { coverPrompt, generateCover, shrink } from './lib/geminiImage.mjs';
+import * as coverQueue from './lib/coverQueue.mjs';
 import { loadManifest } from './lib/deployManifest.mjs';
 import { readRepoPosts } from './lib/repoBlog.mjs';
 
@@ -115,7 +117,8 @@ function buildPrompt(job, livePosts) {
   const o = config.onboarding;
   const prefs = config.preferences;
   const healthcare = p.blog_compliance_profile === 'healthcare';
-  const geminiCover = !!process.env.GEMINI_API_KEY;
+  // A drawn cover (Gemini now, or Antigravity overnight) needs the scene from the writer.
+  const geminiCover = !!process.env.GEMINI_API_KEY || coverQueue.enabled();
 
   return [
     `You are writing ONE blog post for **${c.name}** (client_id ${c.id}), for their blog at ${p.blog_site_url || c.website_url || 'their website'}.`,
@@ -315,6 +318,7 @@ async function runJob(job) {
       const coverProblem = await checkCover(coverUrl, livePosts);
       if (coverProblem) blockers.push(coverProblem);
     }
+    const healthcareCover = config.pipeline.blog_compliance_profile === 'healthcare';
     const dup = livePosts.find(l => normTitle(l.title) === normTitle(meta.title));
     if (dup) blockers.push(`same title as a live post: ${dup.url}`);
     if ((meta.meta_title || '').length > 60) blockers.push(`meta title is ${meta.meta_title.length} characters (max 60)`);
@@ -332,6 +336,14 @@ async function runJob(job) {
         worker_notes: Array.isArray(meta.notes) ? meta.notes.filter(Boolean).map(String) : [],
       },
     });
+
+    if (!generated && coverQueue.enabled() && meta.cover_prompt) {
+      await coverQueue.requestCover({
+        runId: job.run_id, client: name, title: meta.title, topic: job.topic?.topic,
+        prompt: coverPrompt(meta.cover_prompt, { healthcare: healthcareCover, brand: config.onboarding?.brand_positioning || '' }),
+      });
+      await log(job.run_id, 'Cover requested from Antigravity (drawn overnight); the Unsplash pick stands until then.');
+    }
 
     if (config.pipeline.blog_audio_enabled) {
       let script = '';
@@ -379,6 +391,18 @@ async function healthBlocked() {
 
 async function main() {
   console.log(`[blog-worker] ${WORKER} -> ${API}, model ${MODEL}`);
+  // Covers Antigravity drew since the last pass go onto their drafts first.
+  if (coverQueue.enabled()) {
+    const attached = await coverQueue.attachDrawn(
+      (runId, buf) => hook('attach_blog_cover', { run_id: runId, image_base64: buf.toString('base64'), source: 'antigravity' }),
+      { shrink },
+    ).catch((err) => { console.error(`[blog-worker] cover queue: ${err.message}`); return []; });
+    for (const a of attached) {
+      await log(a.run_id, a.status === 'attached' ? 'Antigravity cover attached.' : `Antigravity cover not used (${a.status}${a.note ? `: ${a.note}` : ''}).`);
+      if (a.status === 'attached') await appendNightReport(`COVER · run #${a.run_id} · drawn by Antigravity`);
+    }
+  }
+
   const blocked = await healthBlocked();
   let handled = 0;
   for (;;) {
