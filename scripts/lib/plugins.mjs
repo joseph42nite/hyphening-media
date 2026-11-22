@@ -46,7 +46,15 @@ export function installedRoot(installId) {
  */
 export const SEO_PYTHON = process.env.SEO_PYTHON || process.env.CLAUDE_SEO_PYTHON || path.join(os.homedir(), '.local/bin/python3.12');
 
-/** { CLAUDE_SEO_PYTHON } for a child process, or {} when that Python is not on this machine. */
+/**
+ * The one claude-seo runtime folder. A skill's Bash calls get no
+ * CLAUDE_PLUGIN_DATA, so without this the launcher falls back to
+ * ~/Library/Application Support/claude-seo, a runtime no update rebuilds
+ * (2026-11-22: why 2.6.2 failed its smoke check). The override wins everywhere.
+ */
+export const SEO_DATA = process.env.SEO_PLUGIN_DATA || process.env.CLAUDE_SEO_DATA_DIR || path.join(os.homedir(), '.claude/plugins/data/claude-seo-agricidaniel-claude-seo');
+
+/** { CLAUDE_SEO_PYTHON, CLAUDE_SEO_DATA_DIR } for a child process (the Python only when it is on this machine). */
 export function seoPythonEnv() {
-  return existsSync(SEO_PYTHON) ? { CLAUDE_SEO_PYTHON: SEO_PYTHON } : {};
+  return { ...(existsSync(SEO_PYTHON) ? { CLAUDE_SEO_PYTHON: SEO_PYTHON } : {}), CLAUDE_SEO_DATA_DIR: SEO_DATA };
 }

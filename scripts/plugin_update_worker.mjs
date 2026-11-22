@@ -44,7 +44,7 @@ import { copyFile, mkdtemp, rm, writeFile } from 'fs/promises';
 import dotenv from 'dotenv';
 import { hook } from './lib/hook.mjs';
 import { run, runClaude, tail } from './lib/proc.mjs';
-import { installedPlugin, INSTALLED_FILE, SEO_PYTHON } from './lib/plugins.mjs';
+import { installedPlugin, INSTALLED_FILE, SEO_PYTHON, SEO_DATA } from './lib/plugins.mjs';
 import { recaptureDriftBaseline } from './lib/drift.mjs';
 import { appendNightReport } from './lib/nightReport.mjs';
 
@@ -55,7 +55,6 @@ const HOME = os.homedir();
 const WORKER = process.env.PLUGIN_WORKER_ID || os.hostname();
 const CLAUDE_BIN = process.env.SEO_CLAUDE_BIN || 'claude';
 const MODEL = process.env.SEO_MODEL || 'claude-sonnet-5-5';
-const SEO_DATA = process.env.SEO_PLUGIN_DATA || path.join(HOME, '.claude/plugins/data/claude-seo-agricidaniel-claude-seo');
 const BLOG_PYTHON = process.env.BLOG_PYTHON || path.join(HOME, '.openmausbot/workspaces/3ee73451-c9f3-402f-9f9a-2677050c11e5/blogvenv/bin/python');
 const MIN = 60 * 1000;
 const SETUP_MINUTES = Number(process.env.SEO_SETUP_MINUTES) || 240;
@@ -196,7 +195,7 @@ export async function setupKB(dataDir = SEO_DATA, tmp = os.tmpdir()) {
  * nothing has grown for SEO_SETUP_STALL_MINUTES, or at the SEO_SETUP_MINUTES cap.
  */
 async function seoSetup(root, log = async () => {}) {
-  const env = { CLAUDE_PLUGIN_ROOT: root, CLAUDE_PLUGIN_DATA: SEO_DATA, PIP_ONLY_BINARY: 'cryptography' };
+  const env = { CLAUDE_PLUGIN_ROOT: root, CLAUDE_PLUGIN_DATA: SEO_DATA, CLAUDE_SEO_DATA_DIR: SEO_DATA, PIP_ONLY_BINARY: 'cryptography' };
   if (existsSync(SEO_PYTHON)) env.CLAUDE_SEO_PYTHON = SEO_PYTHON;
   const cleared = await clearSetupLeftovers();
   if (cleared.length) await log(`cleared a killed setup's leftovers: ${cleared.join(', ')}`);
