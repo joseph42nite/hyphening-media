@@ -47,6 +47,9 @@ const UNAVAILABLE_SKILLS = new Map([
   // blocked is the safe direction, since running drift without a baseline
   // reports every element as changed rather than failing.
   ['drift', 'Needs a stored baseline first — capture one before comparing'],
+  // Same conservative fallback; the server decides both per client.
+  ['bing', 'Needs a Bing Webmaster API key and the site verified under it'],
+  ['shopify', 'Turned off: no Shopify client yet'],
 ]);
 
 /**
@@ -902,6 +905,8 @@ export default function SeoMonitorTab({ clients, showToast }) {
     const activeAgents = getFilteredAgents().filter(agent =>
       agent.agentType !== 'full' &&
       agent.agentType !== 'backlink_gap' &&
+      // A full-store crawl is a deliberate single run, never part of a bulk click.
+      agent.agentType !== 'shopify' &&
       !isAgentUnavailable(agent) &&
       agent.freshness !== 'fresh' &&
       !activeRuns[agent.agentType]

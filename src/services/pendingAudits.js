@@ -26,6 +26,8 @@ const TIMEOUT_MINUTES = new Map([
   ['competitor_pages', 45],
   ['image_gen', 45],
   ['maps', 45],
+  // An uncapped crawl of every product and collection page
+  ['shopify', 45],
   // Topic modeling
   ['cluster', 30],
   // Research- and generation-heavy, scale with word count
@@ -45,6 +47,8 @@ const TIMEOUT_MINUTES = new Map([
   ['images', 25],
   ['sitemap', 20],
   ['hreflang', 20],
+  // Bing's API rate-limits to one call a second; links pages through up to ten
+  ['bing', 25],
 ]);
 
 function key(clientId, agentType) {
