@@ -130,10 +130,17 @@ if seo_root and os.path.isfile(f"{seo_root}/scripts/claude-seo"):
         claude_env = json.load(open(f"{HOME}/.claude/settings.json")).get("env") or {}
     except Exception:
         claude_env = {}
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_SEO_PYTHON"}
-    env.update({"CLAUDE_PLUGIN_ROOT": seo_root, "CLAUDE_PLUGIN_DATA": f"{HOME}/.claude/plugins/data/claude-seo-agricidaniel-claude-seo"})
-    if claude_env.get("CLAUDE_SEO_PYTHON"):
-        env["CLAUDE_SEO_PYTHON"] = claude_env["CLAUDE_SEO_PYTHON"]
+    # A skill's Bash calls get no CLAUDE_PLUGIN_DATA, so the launcher uses
+    # CLAUDE_SEO_DATA_DIR or else ~/Library/Application Support/claude-seo,
+    # which no update rebuilds (2026-11-22: 2.6.2 failed its smoke check so).
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_SEO_PYTHON", "CLAUDE_SEO_DATA_DIR", "CLAUDE_PLUGIN_DATA")}
+    env["CLAUDE_PLUGIN_ROOT"] = seo_root
+    for k in ("CLAUDE_SEO_PYTHON", "CLAUDE_SEO_DATA_DIR"):
+        if claude_env.get(k):
+            env[k] = claude_env[k]
+    seo_data = f"{HOME}/.claude/plugins/data/claude-seo-agricidaniel-claude-seo"
+    if os.path.realpath(claude_env.get("CLAUDE_SEO_DATA_DIR") or "") != os.path.realpath(seo_data):
+        system.append((WARN, "claude-seo runtime folder", f"skill runs do not use the runtime updates rebuild. Set CLAUDE_SEO_DATA_DIR={seo_data} in ~/.claude/settings.json env"))
     try:
         probe = subprocess.run([f"{seo_root}/scripts/claude-seo", "run", "drift_history.py", "https://example.com/"],
                                env=env, cwd="/tmp", capture_output=True, text=True, timeout=120)
@@ -141,7 +148,7 @@ if seo_root and os.path.isfile(f"{seo_root}/scripts/claude-seo"):
             system.append((OK, "claude-seo tools", "start in a skill run"))
         else:
             why = (probe.stderr or probe.stdout).strip().splitlines()[-1:] or ["no output"]
-            system.append((WARN, "claude-seo tools", f"refuse to start in a skill run: {why[0][:160].rstrip('.')}. Set CLAUDE_SEO_PYTHON in ~/.claude/settings.json env"))
+            system.append((WARN, "claude-seo tools", f"refuse to start in a skill run: {why[0][:160].rstrip('.')}. Check CLAUDE_SEO_PYTHON and CLAUDE_SEO_DATA_DIR in ~/.claude/settings.json env"))
     except Exception as e:
         system.append((WARN, "claude-seo tools", f"could not check: {e}"))
 
