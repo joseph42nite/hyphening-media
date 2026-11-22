@@ -89,8 +89,10 @@ export async function attachDrawn(attach, { dir = QUEUE_DIR, shrink = async (img
     const mime = buf[0] === 0xff ? 'image/jpeg' : buf.subarray(8, 12).toString() === 'WEBP' ? 'image/webp' : 'image/png';
     const img = await shrink({ buf, mime });
     let reply;
+    // hook() resolves { status: 'executed', ... } on success and throws on any
+    // refusal, so "didn't throw and didn't say success: false" is success.
     try { reply = await attach(req.run_id, img.buf, img.mime); } catch (err) { reply = { success: false, summary: err.message }; }
-    if (reply?.success) {
+    if (reply && reply.success !== false) {
       await close(req, 'attached');
       done.push({ run_id: req.run_id, status: 'attached' });
     } else if (/ is (approved|published|rejected|failed)\b/.test(reply?.summary || '') || /not found/.test(reply?.summary || '')) {

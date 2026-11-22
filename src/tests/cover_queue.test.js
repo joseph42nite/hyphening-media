@@ -41,6 +41,21 @@ describe('cover queue', () => {
     expect(await attachDrawn(attach, { dir })).toEqual([]);
   });
 
+  it('reads the real webhook replies: executed is attached, a thrown refusal closes it', async () => {
+    await requestCover({ runId: 18, client: 'C', title: 'T', prompt: 'p' }, dir);
+    await requestCover({ runId: 19, client: 'C', title: 'T', prompt: 'p' }, dir);
+    for (const r of await listRequests(dir)) draw(r);
+    // What scripts/lib/hook.mjs does: resolve on success, throw on an error status.
+    const attach = async (runId) => {
+      if (runId === 19) throw new Error('attach_blog_cover -> HTTP 500: Blog run #19 is approved');
+      return { status: 'executed', message: 'Cover stored', data: { cover_image_url: '/blog-covers/x.png' } };
+    };
+    expect(await attachDrawn(attach, { dir })).toEqual([
+      { run_id: 18, status: 'attached' },
+      { run_id: 19, status: 'too_late', note: 'attach_blog_cover -> HTTP 500: Blog run #19 is approved' },
+    ]);
+  });
+
   it('takes an image Antigravity saved but forgot to mark drawn', async () => {
     await requestCover({ runId: 13, client: 'C', title: 'T', prompt: 'p' }, dir);
     draw((await listRequests(dir))[0], 'pending');
