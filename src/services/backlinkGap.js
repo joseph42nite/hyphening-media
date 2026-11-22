@@ -113,12 +113,18 @@ export function outreachGapCandidates(clientId, knownPages = []) {
 
 /**
  * The latest gap report against each competitor of a client, summarised:
- * { [domain]: { auditId, checkedAt, directories, news_pr, outreach, irrelevant, untyped } }.
+ * { [domain]: { auditId, checkedAt, score, directories, news_pr, outreach, irrelevant, untyped } }.
  * What the Competitors panel, the gap card's picker and Manual tasks show.
+ * score follows resolveAuditScore's order (src/routes/seo.js) for a type with
+ * no dedicated column, so the gap card shows the same number the audit list does.
  */
 export function gapStatusByCompetitor(clientId) {
   const rows = db.prepare(`
-    SELECT a.id, a.competitor_domain, a.created_at, a.report_json FROM seo_audits a
+    SELECT a.id, a.competitor_domain, a.created_at, a.report_json,
+           COALESCE(a.health_score, a.audit_score, a.technical_score, a.content_score, a.on_page_score,
+                    a.schema_score, a.performance_score, a.geo_score, a.backlinks_score, a.local_score,
+                    a.sxo_score) AS score
+    FROM seo_audits a
     WHERE a.client_id = ? AND a.audit_type = 'backlink_gap' AND COALESCE(a.is_competitor, 0) = 0
       AND a.competitor_domain IS NOT NULL
       AND a.id = (SELECT MAX(b.id) FROM seo_audits b WHERE b.client_id = a.client_id AND b.audit_type = 'backlink_gap'
@@ -133,6 +139,7 @@ export function gapStatusByCompetitor(clientId) {
     out[r.competitor_domain] = {
       auditId: r.id,
       checkedAt: r.created_at,
+      score: r.score ?? null,
       directories: n(['directory']),
       news_pr: n(['news_pr']),
       outreach: n(OUTREACH_TYPES),

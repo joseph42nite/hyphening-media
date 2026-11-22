@@ -124,6 +124,16 @@ describe('storing a gap report', () => {
     expect(status['nicodigital.com']).toMatchObject({ directories: 1, outreach: 0 });
   });
 
+  it('carries each competitor\'s own latest score, not the other\'s', () => {
+    // The gap card reads its score from here, per selected competitor.
+    const ids = gapStatusByCompetitor(clientId);
+    db.prepare('UPDATE seo_audits SET audit_score = 41 WHERE id = ?').run(ids['socialee.in'].auditId);
+    db.prepare('UPDATE seo_audits SET audit_score = 77 WHERE id = ?').run(ids['nicodigital.com'].auditId);
+    const status = gapStatusByCompetitor(clientId);
+    expect(status['socialee.in'].score).toBe(41);
+    expect(status['nicodigital.com'].score).toBe(77);
+  });
+
   it('hands them to the worker with the run', () => {
     db.prepare("INSERT INTO outreach_runs (client_id, requested_by) VALUES (?, 'test')").run(clientId);
     const job = claimOutreachRuns('test').find(j => j.client.id === clientId);

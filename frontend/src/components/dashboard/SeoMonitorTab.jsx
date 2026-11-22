@@ -936,6 +936,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
     switch (freshness) {
       case 'fresh': return '#22c55e'; // Green
       case 'stale': return '#eab308'; // Amber
+      case 'pick_competitor': return '#94a3b8'; // Grey (backlink_gap, nothing selected)
       default: return '#ef4444'; // Red (never run)
     }
   };
@@ -954,6 +955,32 @@ export default function SeoMonitorTab({ clients, showToast }) {
       if (type === 'ecommerce' && selectedClient.client_type === 'artist_curation') return false;
       return true;
     });
+  };
+
+  // The backlink_gap card describes one comparison: this client against the
+  // competitor picked in its dropdown. The server's status row is the latest
+  // gap run against *any* competitor, so reading it as-is showed FRESH and a
+  // score for competitor A while B was selected and had never been checked.
+  // The per-competitor summary (gap on each competitor) replaces those fields.
+  const cardView = (agent) => {
+    if (agent.agentType !== 'backlink_gap') return agent;
+    if (!gapCompetitor) {
+      return { ...agent, freshness: 'pick_competitor', lastRunAt: null, score: null, dataGap: null };
+    }
+    const gap = competitors.find(c => c.domain === gapCompetitor)?.gap || null;
+    if (!gap) {
+      return { ...agent, freshness: 'never_run', lastRunAt: null, score: null, dataGap: null };
+    }
+    const ageDays = Math.floor((Date.now() - new Date(gap.checkedAt).getTime()) / 86400000);
+    return {
+      ...agent,
+      freshness: ageDays < agent.staleAfterDays ? 'fresh' : 'stale',
+      lastRunAt: gap.checkedAt,
+      score: gap.score ?? null,
+      // The server judges a data gap on its latest gap audit only, so it
+      // applies here only when that audit is this competitor's.
+      dataGap: agent.lastRunAt === gap.checkedAt ? agent.dataGap : null,
+    };
   };
 
   // Reason a card is unavailable for the *currently selected client*, as
@@ -1128,7 +1155,8 @@ export default function SeoMonitorTab({ clients, showToast }) {
               Agent Fleet Matrix ({getFilteredAgents().length} active)
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px', marginBottom: '28px' }}>
-              {getFilteredAgents().map(agent => {
+              {getFilteredAgents().map(rawAgent => {
+                const agent = cardView(rawAgent);
                 const run = activeRuns[agent.agentType];
                 const isRunning = !!run;
                 const isPending = !run && !!pendingApprovals[agent.agentType];
@@ -1192,7 +1220,7 @@ export default function SeoMonitorTab({ clients, showToast }) {
                       
                       <div style={{ margin: '10px 0', fontSize: '0.78rem', color: 'rgba(223, 231, 224, 0.65)', lineHeight: 1.5 }}>
                         <div>Cadence: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.staleAfterDays} days</span></div>
-                        <div>Last Run: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleDateString() : 'Never'}</span></div>
+                        <div>Last Run{agent.agentType === 'backlink_gap' && gapCompetitor ? ` vs ${gapCompetitor}` : ''}: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{agent.freshness === 'pick_competitor' ? 'Pick a competitor' : agent.lastRunAt ? new Date(agent.lastRunAt).toLocaleDateString() : 'Never'}</span></div>
                         {agent.dataGap && (
                           <div style={{ marginTop: '6px', color: '#fbbf24', fontWeight: 600, lineHeight: 1.35, background: 'rgba(234, 179, 8, 0.1)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(234, 179, 8, 0.25)' }}>
                             ⚠ {agent.dataGap}
