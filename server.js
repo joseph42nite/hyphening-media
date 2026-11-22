@@ -416,6 +416,12 @@ if (process.env.AUDIO_DIR) {
   app.use('/audio', express.static(process.env.AUDIO_DIR, audioStaticOpts));
 }
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio'), audioStaticOpts));
+// Blog covers the night worker generated (attach_blog_cover). BLOG_COVER_DIR
+// (outside the repo) first, same as AUDIO_DIR; public/blog-covers as fallback.
+if (process.env.BLOG_COVER_DIR) {
+  app.use('/blog-covers', express.static(process.env.BLOG_COVER_DIR, audioStaticOpts));
+}
+app.use('/blog-covers', express.static(path.join(__dirname, 'public', 'blog-covers'), audioStaticOpts));
 
 // ============================================================
 // STATIC FILES — admin-uploaded cover images (case studies, etc.)

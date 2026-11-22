@@ -17,6 +17,7 @@ import { getMode } from './automationMode.js';
 import { buildBlogConfig, QUALITY_BAR } from './blogPipeline.js';
 import { markdownToHtml } from './markdown.js';
 import { logAction } from './auditLogger.js';
+import { pushRunSignal } from './macConnector.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://hypheningmedia.com').replace(/\/$/, '');
@@ -234,6 +235,37 @@ export function attachBlogAudio(payload) {
   return { success: true, summary: `Audio stored for blog run #${run.id}` };
 }
 
+const COVER_TYPES = {
+  png: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  jpg: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  webp: (b) => b.subarray(0, 4).toString() === 'RIFF' && b.subarray(8, 12).toString() === 'WEBP',
+};
+
+/**
+ * Store a cover the worker generated (Gemini) where /blog-covers serves it
+ * (BLOG_COVER_DIR, else public/blog-covers) and point the draft at it. Sent
+ * while the run is still running, before submit_blog_draft, which then
+ * carries the returned URL.
+ */
+export function attachBlogCover(payload) {
+  const run = getRunRow(payload?.run_id);
+  if (!run) return { success: false, summary: `Blog run #${payload?.run_id} not found` };
+  if (!['running', 'ready', 'client_review'].includes(run.status)) return { success: false, summary: `Blog run #${run.id} is ${run.status}` };
+  const buf = Buffer.from(String(payload.image_base64 || ''), 'base64');
+  const ext = Object.keys(COVER_TYPES).find((k) => buf.length > 1024 && COVER_TYPES[k](buf));
+  if (!ext) return { success: false, summary: 'image_base64 is not a PNG, JPEG or WebP image' };
+  if (buf.length > 3.5 * 1024 * 1024) return { success: false, summary: 'cover image is larger than 3.5 MB' };
+
+  const dir = process.env.BLOG_COVER_DIR || path.join(__dirname, '..', '..', 'public', 'blog-covers');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = `blog-run-${run.id}.${ext}`;
+  fs.writeFileSync(path.join(dir, file), buf);
+  const url = `/blog-covers/${file}`;
+  db.prepare("UPDATE blog_agent_runs SET cover_image_url = ?, cover_alt = COALESCE(?, cover_alt), cover_source = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(url, payload.cover_alt || null, String(payload.source || 'generated').slice(0, 40), run.id);
+  return { success: true, summary: `Cover stored for blog run #${run.id}`, data: { cover_image_url: url } };
+}
+
 /** Bots load a calendar: [{ topic, target_keyword?, planned_for?, notes? }]. */
 export function addBlogTopics(clientId, topics, createdBy = 'agent') {
   const client = db.prepare('SELECT id FROM crm_clients WHERE id = ?').get(clientId);
@@ -309,7 +341,12 @@ export async function approveBlogRun(id, actor) {
   try {
     if (client.blog_publish_target === 'hyphening_webhook') published = publishToHypheningBlog(run);
     else if (client.blog_publish_target === 'cms_api') published = await publishToWordPress(run);
-    if (!published) {
+    else if (client.blog_publish_target === 'repo_file') {
+      db.prepare("UPDATE blog_agent_runs SET publish_state = 'queued', publish_log = NULL, error = NULL, updated_at = datetime('now') WHERE id = ?").run(run.id);
+      pushRunSignal('blog_publish');
+      note = 'Approved. The Mac adds it to the site repo, deploys the site and checks the post loads; the Blog tab shows it as published once it is live.';
+    }
+    if (!published && !note) {
       note = {
         cms_api: 'Approved. This CMS has no automatic publishing yet: Q publishes it per SOPs/Publish adapter - site CMS API.',
         repo_file: 'Approved. Q commits it to the site repo and deploys per SOPs/Publish adapter - repo file.',
@@ -336,8 +373,61 @@ export async function approveBlogRun(id, actor) {
 export async function retryPublish(id, actor) {
   const run = getRunRow(id);
   if (!run || run.status !== 'approved') return { status: 409, error: 'Only approved, unpublished posts can be retried' };
+  if (['queued', 'running'].includes(run.publish_state)) return { status: 409, error: `Publishing is already ${run.publish_state}` };
   db.prepare("UPDATE blog_agent_runs SET status = 'ready', updated_at = datetime('now') WHERE id = ?").run(run.id);
   return approveBlogRun(id, actor);
+}
+
+// ------------------------------------------------- repo_file publishing (Mac)
+
+/**
+ * Hand the Mac's blog publish worker the approved repo posts waiting to go
+ * out, with what it needs to write them into the client's site repo.
+ */
+export function claimBlogPublishes(worker = 'local', limit = 3) {
+  const claim = db.transaction(() => {
+    const rows = db.prepare(`
+      SELECT r.id FROM blog_agent_runs r JOIN crm_clients c ON c.id = r.client_id
+      WHERE r.status = 'approved' AND r.publish_state = 'queued' AND c.blog_publish_target = 'repo_file'
+      ORDER BY r.id LIMIT ?
+    `).all(limit);
+    const mark = db.prepare("UPDATE blog_agent_runs SET publish_state = 'running', worker = ?, updated_at = datetime('now') WHERE id = ? AND publish_state = 'queued'");
+    return rows.filter((r) => mark.run(worker, r.id).changes === 1).map((r) => r.id);
+  });
+  return claim().map((id) => {
+    const run = serializeRun(getRunRow(id));
+    const client = db.prepare('SELECT id, name, repo_path, website_url, blog_site_url, blog_author_name FROM crm_clients WHERE id = ?').get(run.client_id);
+    return {
+      run_id: id,
+      client,
+      post: {
+        title: run.title, slug: run.slug, excerpt: run.excerpt, content: run.content, category: run.category,
+        tags: run.tags, internal_links: run.internal_links, cover_image_url: run.cover_image_url, cover_alt: run.cover_alt,
+        meta_title: run.meta_title, meta_description: run.meta_description,
+      },
+    };
+  });
+}
+
+/** The publish worker's result: live → published; anything else → failed, Retry publish in the Blog tab. */
+export function finishBlogPublish(payload) {
+  const run = getRunRow(payload?.run_id);
+  if (!run) return { success: false, summary: `Blog run #${payload?.run_id} not found` };
+  if (run.status !== 'approved' || run.publish_state !== 'running') return { success: false, summary: `Blog run #${run.id} is not being published` };
+  const log = payload.log ? String(payload.log).slice(-8000) : null;
+  if (payload.status === 'live') {
+    db.prepare(`
+      UPDATE blog_agent_runs SET status = 'published', publish_state = 'live', published_url = ?, publish_commit = ?, publish_log = ?,
+        published_at = datetime('now'), error = NULL, updated_at = datetime('now') WHERE id = ?
+    `).run(payload.published_url || null, payload.commit || null, log, run.id);
+    if (run.topic_id) db.prepare("UPDATE blog_topics SET status = 'published', updated_at = datetime('now') WHERE id = ?").run(run.topic_id);
+    logAction({ action: 'blog_run_published', entityType: 'blog_run', entityId: run.id, diff: { target: 'repo_file', url: payload.published_url || null } });
+    return { success: true, summary: `Blog run #${run.id} is live` };
+  }
+  const why = String(payload.error || payload.status || 'publish failed').slice(0, 1000);
+  db.prepare("UPDATE blog_agent_runs SET publish_state = 'failed', publish_log = ?, error = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(log, `Publish failed: ${why}`, run.id);
+  return { success: true, summary: `Blog run #${run.id} publish failed` };
 }
 
 /** Every ready post that passes its bar, for clients on morning-batch approval. */

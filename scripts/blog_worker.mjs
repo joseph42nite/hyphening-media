@@ -21,6 +21,8 @@
  *   BLOG_PYTHON            Python with the plugin's dependencies (default: Leiter's blogvenv)
  *   BLOG_TIMEOUT_MINUTES   one post's Claude run      (default 45)
  *   VAULT_DIR              vault root                 (default /Volumes/Mac Valhalla/Vault)
+ *   GEMINI_API_KEY         covers from Gemini (lib/geminiImage.mjs); without it the Unsplash pick is used
+ *   GEMINI_IMAGE_MODEL     Gemini image model         (default gemini-2.5-flash-image)
  *
  * Usage:
  *   node scripts/blog_worker.mjs --once     # drain the queue and exit (it always does;
@@ -37,6 +39,9 @@ import { appendNightReport } from './lib/nightReport.mjs';
 import { hook, API } from './lib/hook.mjs';
 import { installedRoot } from './lib/plugins.mjs';
 import { run } from './lib/proc.mjs';
+import { coverPrompt, generateCover } from './lib/geminiImage.mjs';
+import { loadManifest } from './lib/deployManifest.mjs';
+import { readRepoPosts } from './lib/repoBlog.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
@@ -83,6 +88,18 @@ async function hypheningLivePosts() {
   return posts;
 }
 
+/**
+ * Posts already on a site whose blog lives in its repo (repo_file), read from
+ * the repo's posts file, so the writer can avoid duplicates and link to them.
+ * Dr. Divya's site has 338; the prompt lists up to 400 titles.
+ */
+async function repoLivePosts(repoPath) {
+  if (!repoPath || !existsSync(repoPath)) return [];
+  const { manifest } = await loadManifest(repoPath);
+  if (manifest?.blog?.type !== 'repo_file') return [];
+  try { return await readRepoPosts(repoPath, manifest.blog); } catch { return []; }
+}
+
 const slugify = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 const normTitle = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -98,6 +115,7 @@ function buildPrompt(job, livePosts) {
   const o = config.onboarding;
   const prefs = config.preferences;
   const healthcare = p.blog_compliance_profile === 'healthcare';
+  const geminiCover = !!process.env.GEMINI_API_KEY;
 
   return [
     `You are writing ONE blog post for **${c.name}** (client_id ${c.id}), for their blog at ${p.blog_site_url || c.website_url || 'their website'}.`,
@@ -127,11 +145,13 @@ function buildPrompt(job, livePosts) {
     '7. `blog-seo-check`: title, meta title (60 chars max), meta description (155 chars max), one H1, logical H2s, slug, alt text.',
     '8. `blog-geo`: answer-first sections and a short FAQ from real questions people ask.',
     `9. \`blog-schema\`: BlogPosting JSON-LD${healthcare ? ' (with the reviewer if given)' : ''}; FAQPage only if the FAQ is real.`,
-    '10. Cover: one Unsplash photo URL (https://images.unsplash.com/photo-...?w=1200&q=80) that fits the post, not used by a live post below, with alt text.',
+    geminiCover
+      ? `10. Cover: an image model draws it from your \`cover_prompt\`: one or two sentences naming a concrete scene or object that fits the post (no text in the image, no real people${healthcare ? ', and for this clinic no patients, faces, skin close-ups or before/after' : ''}). Also give one Unsplash photo URL (https://images.unsplash.com/photo-...?w=1200&q=80) as a fallback, not used by a live post below, and alt text that describes the cover.`
+      : '10. Cover: one Unsplash photo URL (https://images.unsplash.com/photo-...?w=1200&q=80) that fits the post, not used by a live post below, with alt text.',
     p.blog_audio_enabled ? '11. Audio: a spoken summary of the post, 180-230 words (the narrator refuses anything over two minutes), plain sentences, no headings or URLs.' : '',
     '',
     '## Live posts (for duplicates and internal links)',
-    livePosts.length ? livePosts.map(l => `- ${l.title} — ${l.url}`).join('\n') : `(none listed: fetch ${p.blog_site_url || c.website_url} yourself to find them)`,
+    livePosts.length ? livePosts.slice(0, 400).map(l => `- ${l.title} — ${l.url}`).join('\n') + (livePosts.length > 400 ? `\n(and ${livePosts.length - 400} older posts)` : '') : `(none listed: fetch ${p.blog_site_url || c.website_url} yourself to find them)`,
     '',
     '## Output: write exactly these files in the current directory, then stop',
     '- `post.md`: the article only, starting with `# Title` and ending with `## FAQ` and then `## Sources` (a numbered list of Markdown links). No front matter, no notes.',
@@ -143,6 +163,7 @@ function buildPrompt(job, livePosts) {
       meta_keywords: 'comma, separated', category: 'string', tags: ['string'],
       internal_links: [{ url: 'https://...', anchor: 'string' }],
       cover_image_url: 'https://images.unsplash.com/...', cover_alt: 'string',
+      ...(geminiCover ? { cover_prompt: 'the scene for the image model' } : {}),
       schema_json: { '@context': 'https://schema.org', '@type': 'BlogPosting' },
       evidence: { serp_urls: ['https://...'], sources_checked: 0, closest_live_posts: ['string'], angle: 'string', skills_run: ['blog-brief'] },
       blockers: ['only what 007 must check or fix before publishing: an unverified claim, a source you could not open, a missing fact; empty if none'],
@@ -232,7 +253,9 @@ async function runJob(job) {
 
   const dir = await mkdtemp(path.join(os.tmpdir(), 'blog-run-'));
   try {
-    const livePosts = config.pipeline.blog_publish_target === 'hyphening_webhook' ? await hypheningLivePosts() : [];
+    const target = config.pipeline.blog_publish_target;
+    const livePosts = target === 'hyphening_webhook' ? await hypheningLivePosts()
+      : target === 'repo_file' ? await repoLivePosts(config.pipeline.repo_path) : [];
     await writeFile(path.join(dir, 'prompt.md'), buildPrompt(job, livePosts), 'utf8');
 
     // Only what writing a post needs: search, fetch, the plugin's skills, and
@@ -264,8 +287,34 @@ async function runJob(job) {
     });
     if (quality.note) blockers.push(quality.note);
     else if (quality.score < bar) blockers.push(`quality score ${quality.score} is below the bar of ${bar}`);
-    const coverProblem = await checkCover(meta.cover_image_url, livePosts);
-    if (coverProblem) blockers.push(coverProblem);
+    // Gemini first; the Unsplash pick only when there is no key or it fails.
+    let coverUrl = meta.cover_image_url;
+    let generated = false;
+    if (process.env.GEMINI_API_KEY && meta.cover_prompt) {
+      await log(job.run_id, 'Drawing the cover with Gemini...');
+      const img = await generateCover(coverPrompt(meta.cover_prompt, {
+        healthcare: config.pipeline.blog_compliance_profile === 'healthcare',
+        brand: config.onboarding?.brand_positioning || '',
+      }));
+      if (img.buf) {
+        const stored = await hook('attach_blog_cover', {
+          run_id: job.run_id, image_base64: img.buf.toString('base64'), cover_alt: meta.cover_alt, source: `gemini:${img.model}`,
+        }).catch((err) => ({ success: false, summary: err.message }));
+        if (stored?.data?.cover_image_url) {
+          coverUrl = stored.data.cover_image_url;
+          generated = true;
+          await log(job.run_id, `Cover drawn by ${img.model}.`);
+        } else {
+          await log(job.run_id, `Cover not stored (${stored?.summary || 'no reply'}); using the Unsplash pick.`);
+        }
+      } else {
+        await log(job.run_id, `${img.problem}; using the Unsplash pick.`);
+      }
+    }
+    if (!generated) {
+      const coverProblem = await checkCover(coverUrl, livePosts);
+      if (coverProblem) blockers.push(coverProblem);
+    }
     const dup = livePosts.find(l => normTitle(l.title) === normTitle(meta.title));
     if (dup) blockers.push(`same title as a live post: ${dup.url}`);
     if ((meta.meta_title || '').length > 60) blockers.push(`meta title is ${meta.meta_title.length} characters (max 60)`);
@@ -276,7 +325,7 @@ async function runJob(job) {
       title: meta.title, slug, excerpt: meta.excerpt, content: body,
       category: meta.category, tags: meta.tags, meta_title: meta.meta_title, meta_description: meta.meta_description,
       meta_keywords: meta.meta_keywords, internal_links: meta.internal_links,
-      cover_image_url: meta.cover_image_url, cover_alt: meta.cover_alt, schema_json: meta.schema_json,
+      cover_image_url: coverUrl, cover_alt: meta.cover_alt, schema_json: meta.schema_json,
       quality_score: quality.score, blockers,
       evidence: {
         ...(meta.evidence || {}), quality_issues: quality.issues || [], duration_seconds: Math.round((Date.now() - started) / 1000),

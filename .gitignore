@@ -24,3 +24,4 @@ frontend/android/local.properties
 
 # Local claude-seo skills source
 temp_claude_seo/
+public/blog-covers/
