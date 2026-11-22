@@ -9,6 +9,7 @@
 
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { validateRepoBlog } from './repoBlog.mjs';
 
 export const MANIFEST_FILE = 'hyphening.deploy.json';
 export const DEPLOY_TYPES = ['git_push', 'ssh_pull_build', 'ssh_rsync_static', 'cms_api', 'handoff'];
@@ -66,6 +67,7 @@ export function validateManifest(m) {
   }
   if (m.rollback !== undefined && m.rollback !== 'git_revert') errors.push('rollback must be "git_revert"');
   if (m.blog !== undefined && !BLOG_TYPES.includes(m.blog?.type)) errors.push(`blog.type must be one of ${BLOG_TYPES.join(', ')}`);
+  if (m.blog?.type === 'repo_file') errors.push(...validateRepoBlog(m.blog));
 
   const f = m.seo_fixes;
   if (f !== undefined) {

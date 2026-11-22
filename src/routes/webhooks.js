@@ -23,6 +23,9 @@ import {
   submitBlogDraft,
   failBlogRun,
   attachBlogAudio,
+  attachBlogCover,
+  claimBlogPublishes,
+  finishBlogPublish,
   reviewBlogRun,
 } from '../services/blogRuns.js';
 import {
@@ -60,7 +63,8 @@ export const KNOWN_EVENTS = [
   'create_blog_post', 'update_blog_post', 'create_seo_audit', 'claim_seo_runs',
   'seo_run_log', 'report_competitors',
   'claim_ads_runs', 'create_ads_audit', 'ads_run_log',
-  'claim_blog_runs', 'submit_blog_draft', 'fail_blog_run', 'attach_blog_audio',
+  'claim_blog_runs', 'submit_blog_draft', 'fail_blog_run', 'attach_blog_audio', 'attach_blog_cover',
+  'claim_blog_publishes', 'finish_blog_publish',
   'add_blog_topics', 'blog_run_log',
   'queue_blog_runs', 'list_blog_runs', 'get_blog_run', 'review_blog_run', 'retry_blog_run',
   'queue_seo_night', 'queue_seo_fixes', 'seo_night_summary',
@@ -273,6 +277,9 @@ export function executeEvent(eventType, payload) {
       case 'submit_blog_draft': return submitBlogDraft(payload);
       case 'fail_blog_run': return failBlogRun(payload);
       case 'attach_blog_audio': return attachBlogAudio(payload);
+      case 'attach_blog_cover': return attachBlogCover(payload);
+      case 'claim_blog_publishes': { const publishes = claimBlogPublishes(payload?.worker); return { success: true, summary: `Claimed ${publishes.length} post(s) to publish`, data: { publishes } }; }
+      case 'finish_blog_publish': return finishBlogPublish(payload);
       case 'add_blog_topics': return handleAddBlogTopics(payload);
       case 'blog_run_log': return handleBlogRunLog(payload);
       case 'queue_blog_runs': return handleQueueBlogRuns(payload);

@@ -42,6 +42,8 @@ const WORKERS = {
   seo: { cmd: 'node', args: ['scripts/seo_worker.mjs', '--once'] },
   ads: { cmd: 'node', args: ['plugins/hyphening-ads/scripts/ads_worker.mjs', '--once'] },
   blog: { cmd: 'node', args: ['scripts/blog_worker.mjs', '--once'] },
+  // Approved posts for sites whose blog lives in their repo (Dr. Divya's).
+  blog_publish: { cmd: 'node', args: ['scripts/blog_publish_worker.mjs', '--once'] },
   seo_fix: { cmd: 'node', args: ['scripts/seo_fix_worker.mjs', '--once'] },
   deploy: { cmd: 'node', args: ['scripts/deploy_worker.mjs', '--once'] },
   outreach: { cmd: 'node', args: ['scripts/outreach_worker.mjs', '--once'] },
@@ -79,7 +81,7 @@ function runWorker(kind, { sweep = false } = {}) {
 
 // plugins: two updates at once would both rewrite installed_plugins.json.
 // ig: it drains the whole queue, so a second click while it runs is already covered.
-const SINGLE_RUN = new Set(['blog', 'seo_fix', 'deploy', 'outreach', 'plugins', 'ig']);
+const SINGLE_RUN = new Set(['blog', 'blog_publish', 'seo_fix', 'deploy', 'outreach', 'plugins', 'ig']);
 const running = new Map(); // kind -> how many are running
 
 let stopping = false;
@@ -132,6 +134,7 @@ function connect() {
     runWorker('seo');
     runWorker('ads');
     runWorker('blog');
+    runWorker('blog_publish');
     runWorker('seo_fix');
     runWorker('deploy');
     runWorker('outreach');
