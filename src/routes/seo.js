@@ -22,6 +22,10 @@ import { gapStatusByCompetitor } from '../services/backlinkGap.js';
 // below and sent to the dashboard, rather than mirrored into the frontend.
 const UNAVAILABLE_SKILLS = new Map([
   ['image_gen', 'Requires the nanobanana MCP image tool, which is not configured'],
+  // Shown so it is not forgotten, but off: no client is a Shopify store yet, and
+  // the skill needs the store's crawler signature (.shopify-env) to be worth
+  // more than a capped audit. Remove this line when the first one is onboarded.
+  ['shopify', 'Turned off: no Shopify client yet. It also needs the store\'s crawler access signature'],
   // 'google' was unblocked 2026-08-04: the worker reports tier 0, so PageSpeed,
   // CrUX and CrUX History return real field data. Search Console, Indexing and
   // GA4 still need a service account; the worker's prompt has the skill say so
@@ -167,6 +171,25 @@ export function unavailableReason(agentType, clientId = null) {
       return 'The worker reports DataForSEO as unreachable — check credentials and account balance';
     }
     return 'Requires DataForSEO. No run has reported on it yet; run any other audit once to register the worker\'s capabilities.';
+  }
+
+  // bing is per client too: the key belongs to the installation, but each site
+  // has to be verified under it in Bing Webmaster Tools. The worker's probe
+  // (scripts/lib/bing.mjs) reports both after every run for this client.
+  if (agentType === 'bing') {
+    const bing = latestCapability(
+      clientId, caps => (caps?.bing && typeof caps.bing.available === 'boolean' ? caps.bing : undefined),
+    );
+    if (!bing) return 'Needs a Bing Webmaster API key. No run has reported on it yet; run any other audit once for this client.';
+    if (!bing.available) {
+      return bing.reason === 'missing'
+        ? 'Needs a Bing Webmaster API key: add BING_WEBMASTER_API_KEY to ~/.claude/settings.json env on the Mac'
+        : bing.reason === 'auth'
+          ? 'Bing rejected the Webmaster API key. Check it in Bing Webmaster Tools'
+          : 'The worker could not reach Bing Webmaster Tools on its last run';
+    }
+    if (!bing.verified) return 'This site is not verified in Bing Webmaster Tools under our API key. Add and verify it there';
+    return null;
   }
 
   // drift is per client, not per installation: a baseline is a snapshot of one

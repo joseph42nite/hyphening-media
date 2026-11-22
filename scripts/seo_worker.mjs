@@ -31,6 +31,7 @@ import { hook, API } from './lib/hook.mjs';
 import { firstJsonObject, runClaude } from './lib/proc.mjs';
 import { probe as probeDataForSeo } from './lib/dataforseo.mjs';
 import { ensureDriftBaseline } from './lib/drift.mjs';
+import { probe as probeBing } from './lib/bing.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Explicit path, not dotenv's cwd-relative default: cron's working directory
@@ -70,6 +71,9 @@ function commandFor(job) {
   // seo-drift has three sub-commands; the card's job is comparing against the
   // baseline the worker captures (lib/drift.mjs).
   if (job.audit_type === 'drift') return 'drift compare';
+  // seo-bing's sub-commands; the card reads the link profile. `submit` pushes
+  // URLs to IndexNow, an action rather than an audit, so no card runs it.
+  if (job.audit_type === 'bing') return `bing links ${job.url}`;
   return job.audit_type.replace(/_/g, '-');
 }
 
@@ -119,11 +123,21 @@ function gapInstructions(job) {
   ].join('\n');
 }
 
+/** What a Bing run returns. Read-only: nothing is submitted to IndexNow. */
+function bingInstructions() {
+  return [
+    'Read-only run: use `links` (and `compare` only if asked). Do NOT run `submit`, `submit-batch` or `verify-indexnow`; nothing is sent to IndexNow from this card.',
+    'Report what Bing Webmaster Tools returns: linking domains and pages, counts, the strongest and the most suspect links, and anything Bing flags. Bing feeds Microsoft Copilot answers, so note what would help the site get cited there.',
+    'If the API says the key is invalid or the site is not verified, say so in data_availability and do not fall back to guessed link data.',
+  ].join('\n');
+}
+
 function buildPrompt(job) {
   return [
     `Use the \`/seo ${commandFor(job)}\` command for **${job.client_name}** (client_id ${job.client_id}).`,
     `Target URL: ${job.url}`,
     job.audit_type === 'backlink_gap' ? gapInstructions(job) : '',
+    job.audit_type === 'bing' ? bingInstructions() : '',
     job.is_competitor ? 'This is a COMPETITOR research run, not an audit of our own client — do not use any of our own Search Console/GA4 property data for it.' : '',
     !job.is_competitor && job.gsc_property ? `Search Console property: ${job.gsc_property}` : '',
     !job.is_competitor && job.gsc_property ? `Before writing the brief, run \`python3 -W ignore ~/.claude/plugins/cache/agricidaniel-claude-seo/claude-seo/*/scripts/gsc_query.py --property ${job.gsc_property} --days 90 --limit 50 --json\` and use its rows as real Search Console data. If the command errors or returns no rows, say so explicitly in data_availability — do not silently skip it.` : '',
@@ -215,9 +229,12 @@ async function runJob(job) {
     const { balance, ...dataforseo } = await probeDataForSeo();
     // Drift baselines belong to our own clients' sites, never a competitor's.
     const drift_baseline = job.is_competitor ? undefined : await ensureDriftBaseline(job.url);
+    // Whether the Bing key works and this client's site is verified under it:
+    // src/routes/seo.js unlocks the Bing card per client on this.
+    const bing = job.is_competitor ? undefined : await probeBing(job.url);
     const payload = {
       ...parsed,
-      report_json: { ...report, capabilities: { ...(report.capabilities || {}), dataforseo, ...(drift_baseline && { drift_baseline }) } },
+      report_json: { ...report, capabilities: { ...(report.capabilities || {}), dataforseo, ...(drift_baseline && { drift_baseline }), ...(bing && { bing }) } },
       run_id: job.run_id,
       client_id: job.client_id,
       audit_type: job.audit_type,

@@ -17,7 +17,7 @@ import {
   getRun,
 } from '../services/agentRuns.js';
 
-// Mirrors the CHECK constraint on seo_audits.audit_type (migration 117). Kept
+// Mirrors the CHECK constraint on seo_audits.audit_type (migration 123). Kept
 // here so a bad value is rejected with a readable message instead of surfacing
 // as a SqliteError, and so normaliseAuditType can tell "needs rewriting" from
 // "genuinely unknown". Keep in sync with the migration.
@@ -25,7 +25,7 @@ const VALID_AUDIT_TYPES = new Set([
   'full', 'page', 'technical', 'content', 'content_brief', 'schema', 'sitemap',
   'images', 'geo', 'local', 'maps', 'hreflang', 'google', 'backlinks', 'cluster',
   'sxo', 'drift', 'ecommerce', 'flow', 'competitor_pages', 'plan', 'programmatic',
-  'dataforseo', 'image_gen', 'backlink_gap'
+  'dataforseo', 'image_gen', 'backlink_gap', 'bing', 'shopify'
 ]);
 
 // Skill names that do not reduce to a valid audit type by prefix-stripping

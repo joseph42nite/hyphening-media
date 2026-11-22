@@ -18,6 +18,7 @@ const configured = db.prepare('SELECT audit_type FROM agent_run_config').all().m
 describe('SEO audit types', () => {
   it('knows every configured audit type', () => {
     expect(configured).toContain('backlink_gap');
+    expect(configured).toEqual(expect.arrayContaining(['bing', 'shopify']));
   });
 
   it.each(configured)('%s is accepted by the webhook and the seo_audits table', (type) => {
