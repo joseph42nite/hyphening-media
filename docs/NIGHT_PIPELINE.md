@@ -78,10 +78,12 @@ results to rooms) without being the thing that starts the work.
    (SEO runs show `night:server`). Fleet switches, budget caps and in-flight
    checks are unchanged, and a second start the same night adds nothing, so a
    bot still on `start` is harmless. The webhooks stay for manual starts.
-   After deploy, Tanner (01:20) and Boothroyd (03:35) run `seo-runs.mjs status`
-   and Leiter (01:05) runs `blog-runs.mjs list queued,running`, and only
-   report. Change the routines only after the deploy, or nothing is queued
-   that night.
+   Deployed 23 Nov 2026. The same day the three routines became report-only
+   ("Report night blog drafts" 01:05, "Report night SEO audits" 01:20,
+   "Report night SEO fixes" 03:35): Leiter runs `blog-runs.mjs list
+   queued,running 1`, Tanner and Boothroyd run `seo-runs.mjs status`. They
+   were edited in `~/.openmausbot/routines.json` with OpenMausBot quit (the
+   running app rewrites that file); backup `routines.json.bak-20261123-night-report`.
 2. **launchd keeps the connector running.** A `com.hyphening.mac-connector`
    LaunchAgent (plist kept in `scripts/launchd/`) with `KeepAlive`, at about
    50 MB instead of the bots. **Open question:** why the connector runs only
