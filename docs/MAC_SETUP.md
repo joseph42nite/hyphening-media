@@ -97,7 +97,8 @@ The server's full list is in `.env.example`.
 | Job | Started by | Schedule |
 |---|---|---|
 | Mac connector (`scripts/mac_connector.mjs`) | Q (OpenMausBot) | 11:00–18:00 and 00:55–05:30 IST |
-| Night SEO audits, fixes, blog drafts, reviews, briefs, health checks | OpenMausBot routines | See NIGHT_PIPELINE.md |
+| Night SEO audits, fixes, blog drafts (queued) | the server's scheduler | 01:15, 03:30, 01:00 IST |
+| Night reports, reviews, briefs, health checks | OpenMausBot routines | See NIGHT_PIPELINE.md |
 | agent-setup backup | launchd `com.hyphening.agent-setup-backup` | 04:30 daily |
 | Night deploy signal | the server's scheduler | 00:30 IST |
 

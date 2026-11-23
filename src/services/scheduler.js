@@ -11,6 +11,34 @@ import { getMode } from './automationMode.js';
 import { runMonthEnd } from './seoMonthly.js';
 import { runMonthlyKeywords } from './keywordPlan.js';
 import { pushRunSignal } from './macConnector.js';
+import { handleQueueBlogRuns, handleQueueSeoNight, handleQueueSeoFixes } from '../webhooks/agentPipelines.js';
+
+/**
+ * The night queues, started by the server (IST). Until Nov 2026 the bots
+ * started these from OpenMausBot routines (Leiter, Tanner, Boothroyd), so a
+ * closed OpenMausBot meant nothing was queued at all (22-23 Nov). Each job
+ * calls the same handler as the bots' webhook, so the fleet switches, budget
+ * caps and in-flight checks are unchanged, then wakes the Mac's worker. If
+ * the Mac is offline the work waits and the connector's catch-up and sweeps
+ * claim it. The bots now only report (seo-runs.mjs status, blog-runs.mjs list).
+ * See docs/NIGHT_PIPELINE.md.
+ */
+export const NIGHT_JOBS = [
+  { name: 'blog drafts', cron: '0 1 * * *', run: handleQueueBlogRuns },
+  { name: 'SEO audits', cron: '15 1 * * *', run: handleQueueSeoNight },
+  { name: 'SEO fixes', cron: '30 3 * * *', run: handleQueueSeoFixes },
+];
+
+export function runNightJob(job) {
+  try {
+    const res = job.run({ by: 'server' });
+    console.log(`[SCHEDULER] Night ${job.name}: ${res.summary}`);
+    return res;
+  } catch (err) {
+    console.error(`[SCHEDULER] Night ${job.name} failed:`, err.message);
+    return null;
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,10 +95,13 @@ export function initScheduler() {
     runWeeklyAdsSweep();
   });
 
-  // The night blog pipeline has no timer here on purpose: Leiter's 01:00 IST
-  // routine in OpenMausBot starts it (queue_blog_runs webhook), so the night
-  // is run, and visible, by the bots. The Blog fleet's Auto/Manual switch
-  // still decides whether that start queues anything.
+  // Night queues: blog drafts, SEO audits, SEO fixes (NIGHT_JOBS below).
+  for (const job of NIGHT_JOBS) {
+    cron.schedule(job.cron, () => {
+      if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') return;
+      runNightJob(job);
+    }, { timezone: 'Asia/Kolkata' });
+  }
 
   // Month-end SEO report — 06:00 IST on the 3rd, for the month before. Not the
   // 1st: Search Console's final numbers lag 2-3 days. Plain API calls, no AI.

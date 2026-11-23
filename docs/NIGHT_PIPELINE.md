@@ -11,9 +11,9 @@ in [MAC_SETUP.md](MAC_SETUP.md).
 | 00:30 | Night deploys | Server cron (`src/services/scheduler.js`) | Signals the Mac; `deploy_worker` pushes and deploys every batch 007 pressed **Deploy** on. The server hands out deploys only between 00:30 and 03:00. |
 | 00:45 | Health check | Q | `scripts/health-check.sh --write` |
 | 00:55 | Mac connector on | Q | `scripts/mac_connector.mjs` dials the portal; on connect it runs every worker once (catch-up), then sweeps every 10 minutes |
-| 01:00 | Night blog drafts | Leiter | `scripts/blog-runs.mjs start` → `queue_blog_runs` |
-| 01:15 | Night SEO audits | Tanner | `scripts/seo-runs.mjs start` → `queue_seo_night`: every SEO-on client's cards past their cadence (`dueSkills` in `src/services/seoNight.js`) |
-| 03:30 | Night SEO fixes | Boothroyd | `scripts/seo-runs.mjs fix` → `queue_seo_fixes`: one fix batch per client with a site repo |
+| 01:00 | Night blog drafts | Server cron | `queueBlogRuns` (Blog fleet on Auto), then wakes the blog worker. Leiter reports at 01:05 (`blog-runs.mjs list queued,running`). |
+| 01:15 | Night SEO audits | Server cron | `queueNightAudits`: every SEO-on client's cards past their cadence (`dueSkills` in `src/services/seoNight.js`), then wakes the SEO worker. Tanner reports at 01:20 (`seo-runs.mjs status`). |
+| 03:30 | Night SEO fixes | Server cron | `queueSeoFixes`: one fix batch per client with a site repo, then wakes the fix worker. Boothroyd reports at 03:35 (`seo-runs.mjs status`). |
 | 05:30 | Mac connector off | Q | `pkill -f scripts/mac_connector.mjs` |
 | 06:30 | Review night drafts | Vesper | |
 | 07:30 | Start-of-day brief | Moneypenny | |
@@ -29,9 +29,12 @@ deploy window.
 
 ## When it doesn't run
 
-Every step except the 00:30 signal is started by an OpenMausBot routine. If
-OpenMausBot isn't running, **nothing runs and nothing says so**: the connector
-stays off, deploys stay queued, no audits are queued, and no fixes are made.
+The server queues the night's work itself (00:30 deploys, 01:00 blog, 01:15
+audits, 03:30 fixes; `NIGHT_JOBS` in `src/services/scheduler.js`). The work
+only *runs* while the Mac connector is on, and Q starts that at 00:55. So if
+OpenMausBot isn't running, the work is queued but waits: nothing runs that
+night, and the bots post no reports. It all starts as soon as the connector
+next connects (deploys only inside 00:30–03:00).
 
 How to tell:
 
@@ -43,8 +46,9 @@ How to tell:
 - `~/Library/Logs/openmausbot/server.log` ends in `exited`, with no
   `[Scheduled routine ...]` lines since.
 
-Fix: open OpenMausBot. Anything missed runs the next night. A deploy can't be
-pushed during the day; for audits, press **Run** on the stale cards.
+Fix: open OpenMausBot. At 11:00 Q starts the connector and the queued audits,
+fixes and drafts run then. A deploy can't be pushed during the day; it goes out
+the next night.
 
 ### Incident, 22–23 Nov 2026
 
@@ -62,18 +66,22 @@ the night run counts as due.
 
 ## Plan: the night runs without OpenMausBot
 
-**Not started; waiting for approval.** OpenMausBot is ~1.2 GB of RAM and a
+**In progress.** OpenMausBot is ~1.2 GB of RAM and a
 single point of failure. None of the night steps need a bot: each is one shell
 command or one webhook call. The bots can keep their reporting (posting
 results to rooms) without being the thing that starts the work.
 
-1. **Server starts its own night queues.** Add crons to `scheduler.js` that
-   call `queueBlogRuns` at 01:00, `queueNightAudits` at 01:15 and
-   `queueSeoFixes` at 03:30, the same way the 00:30 deploy signal works. They
-   are safe to run alongside the bots during the switch: a skill already in
-   flight isn't queued twice, and a client with an open fix batch is skipped.
-   Then point Tanner, Boothroyd and Leiter's routines at the summary commands
-   (`seo-runs.mjs status`) instead of `start`/`fix`.
+1. **Done: the server starts its own night queues.** `NIGHT_JOBS` in
+   `src/services/scheduler.js` runs the bots' own webhook handlers
+   (`handleQueueBlogRuns`, `handleQueueSeoNight`, `handleQueueSeoFixes`) at
+   01:00, 01:15 and 03:30 IST on the first PM2 process, marked `by: 'server'`
+   (SEO runs show `night:server`). Fleet switches, budget caps and in-flight
+   checks are unchanged, and a second start the same night adds nothing, so a
+   bot still on `start` is harmless. The webhooks stay for manual starts.
+   After deploy, Tanner (01:20) and Boothroyd (03:35) run `seo-runs.mjs status`
+   and Leiter (01:05) runs `blog-runs.mjs list queued,running`, and only
+   report. Change the routines only after the deploy, or nothing is queued
+   that night.
 2. **launchd keeps the connector running.** A `com.hyphening.mac-connector`
    LaunchAgent (plist kept in `scripts/launchd/`) with `KeepAlive`, at about
    50 MB instead of the bots. **Open question:** why the connector runs only
@@ -98,7 +106,7 @@ results to rooms) without being the thing that starts the work.
    Moneypenny's brief, Q's Monday plugin review) still needs it open, but a
    closed app no longer stops deploys, audits or fixes.
 
-Order: 4 is done. Then 1, then 2 (after the window question is answered),
+Order: 4 and 1 are done. Then 2 (after the window question is answered),
 then 3.
 
 Known limit: the server's 00:30 deploy signal (`pushRunSignal`) only reaches
