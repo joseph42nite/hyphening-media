@@ -79,11 +79,16 @@ export default function PluginVersionsPanel({ monitor, showToast, isAdmin = true
   };
 
   if (!data) return null;
-  const shown = data.plugins.filter(p => p.behind || p.live_job || (p.last_job && ['failed', 'rolled_back'].includes(p.last_job.status)) || p.status_stale);
+  // A stale version report alone doesn't open the card: the Mac connector only
+  // runs in its 00:55 and 11:00 IST windows, so the report is stale most of the
+  // day and the card kept coming back with nothing to do. It shows on the line.
+  const shown = data.plugins.filter(p => p.behind || p.live_job || (p.last_job && ['failed', 'rolled_back'].includes(p.last_job.status)));
   if (!shown.length) {
+    const reported = data.plugins.map(p => p.status_reported_at).filter(Boolean).sort().pop();
     return (
       <p style={{ ...muted, margin: '0 0 12px' }}>
         Plugins up to date: {data.plugins.map(p => `${p.plugin} ${p.installed_version || '?'}`).join(' · ')}
+        {data.plugins.some(p => p.status_stale) && ` (Mac last reported ${reported ? when(reported) : 'never'})`}
       </p>
     );
   }
