@@ -15,6 +15,7 @@
  */
 
 import { WebSocketServer } from 'ws';
+import db from '../../database.js';
 
 let macSocket = null;
 // When the connector last connected or dropped. Starts as the server's own
@@ -46,15 +47,58 @@ export function attachMacConnector(httpServer) {
     macSocket = socket;
     changedAt = new Date();
     console.log('[MAC CONNECTOR] Connected.');
+    const sessionId = logSession('open');
+    // The connector pings every 20 s (scripts/mac_connector.mjs).
+    socket.on('ping', () => logSession('seen', sessionId));
 
     socket.on('close', () => {
       if (macSocket === socket) { macSocket = null; changedAt = new Date(); }
+      logSession('close', sessionId);
       console.log('[MAC CONNECTOR] Disconnected.');
     });
     socket.on('error', (err) => console.error('[MAC CONNECTOR] Socket error:', err.message));
   });
 
   return wss;
+}
+
+/**
+ * mac_connector_sessions (migration 124): when the Mac was connected, readable
+ * from every cluster process. Best-effort; a failed write never drops the socket.
+ */
+function logSession(event, id = null) {
+  try {
+    if (event === 'open') return db.prepare('INSERT INTO mac_connector_sessions DEFAULT VALUES').run().lastInsertRowid;
+    if (!id) return null;
+    const end = event === 'close' ? ", disconnected_at = datetime('now')" : '';
+    db.prepare(`UPDATE mac_connector_sessions SET last_seen_at = datetime('now')${end} WHERE id = ?`).run(id);
+  } catch (err) {
+    console.error('[MAC CONNECTOR] Session log failed:', err.message);
+  }
+  return id;
+}
+
+/**
+ * The deploy window (00:30-03:00 IST) of the most recent night that has
+ * finished, and whether the Mac was connected at any point in it. Every night
+ * step (deploys, SEO audits at 01:15, blog drafts at 01:00) runs through the
+ * connector, so a night it never connected is a night nothing ran.
+ */
+export function lastNightConnection(now = new Date()) {
+  const IST_MS = 330 * 60000;
+  const ist = new Date(now.getTime() + IST_MS);
+  const day = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate());
+  let end = new Date(day + 3 * 3600000 - IST_MS);
+  if (end > now) end = new Date(end.getTime() - 86400000);
+  const start = new Date(end.getTime() - 150 * 60000);
+  const sql = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+  const seen = db.prepare(`
+    SELECT 1 FROM mac_connector_sessions
+    WHERE connected_at <= ? AND COALESCE(disconnected_at, last_seen_at) >= ? LIMIT 1
+  `).get(sql(end), sql(start));
+  // Nothing to judge before the table has a row older than that night.
+  const tracked = db.prepare('SELECT 1 FROM mac_connector_sessions WHERE connected_at <= ? LIMIT 1').get(sql(start));
+  return { window_start: start.toISOString(), window_end: end.toISOString(), connected: !!seen, tracked: !!tracked };
 }
 
 /**

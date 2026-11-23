@@ -89,6 +89,21 @@ describe('night audits', () => {
   });
 });
 
+describe('cadence grace at night', () => {
+  it('a card a few minutes short of its cadence runs tonight; one a day short waits', () => {
+    setMode('seo', 'auto');
+    const id = makeClient();
+    // Last week's run finished at 01:17; tonight's check is at 01:15.
+    db.prepare(`INSERT INTO seo_audits (client_id, audit_type, url, health_score, created_at)
+      VALUES (?, 'backlinks', 'https://example.test/', 60, datetime('now', '-7 days', '+2 minutes'))`).run(id);
+    // A 30-day card a day short of its cadence.
+    audit(id, 'content', 29);
+    const types = night.dueSkills(id).map(d => d.audit_type);
+    expect(types).toContain('backlinks');
+    expect(types).not.toContain('content');
+  });
+});
+
 describe('disabled cards are never run at night', () => {
   it('e-commerce only for e-commerce clients; local only with a phone on file', () => {
     setMode('seo', 'auto');

@@ -100,6 +100,12 @@ function overBudget(clientId) {
   return spent >= budget.monthly_budget_usd;
 }
 
+// A night run finishes a minute or two after 01:15, so a week later a 7-day
+// card is a few minutes short of 7 days at 01:15 and was skipped, slipping to
+// 8 days and reading STALE all the next day (Dr. Divya, 22 Nov 2026). A card
+// due within this many hours of the night run counts as due tonight.
+export const NIGHT_GRACE_HOURS = 6;
+
 /**
  * A client's overdue skills, most overdue first (never run counts as most).
  * The same gates as the Run button: unavailable or unhealthy skills and runs
@@ -121,7 +127,7 @@ export function dueSkills(clientId) {
       const ageDays = r.last_run ? (now - new Date(`${r.last_run.replace(' ', 'T')}Z`).getTime()) / 86400000 : Infinity;
       return { ...r, overdue_days: ageDays - r.stale_after_days };
     })
-    .filter((r) => r.overdue_days >= 0)
+    .filter((r) => r.overdue_days >= -NIGHT_GRACE_HOURS / 24)
     .filter((r) => !unavailableReason(r.audit_type, clientId))
     .sort((a, b) => b.overdue_days - a.overdue_days);
 }
