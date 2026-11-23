@@ -57,7 +57,7 @@ export default function SeoNightPanel({ showToast, clientId, clientName, onSelec
           scope="seo"
           showToast={showToast}
           onChange={load}
-          confirmText="Turn the SEO fleet to AUTO? Tanner's 01:15 routine will run each SEO-on client's overdue skills, and Boothroyd's 03:30 routine will commit safe fixes to a branch. Nothing goes live until you press Deploy here."
+          confirmText="Turn the SEO fleet to AUTO? At 01:15 IST the server will queue each SEO-on client's overdue skills, and at 03:30 safe fixes will be committed to a branch. Nothing goes live until you press Deploy here."
         />
       </div>
 
@@ -66,25 +66,19 @@ export default function SeoNightPanel({ showToast, clientId, clientName, onSelec
           <strong>Nothing ran last night.</strong> The Mac never connected between{' '}
           {new Date(report.last_night.window_start).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} and{' '}
           {new Date(report.last_night.window_end).toLocaleTimeString('en-IN', { timeStyle: 'short' })}, so queued deploys,
-          night SEO audits, fixes and blog drafts all waited. Usually OpenMausBot was closed (Q starts the connector at 00:55):
-          open it on the Mac. Deploys go out tonight; press Run on stale cards to refresh them now.
+          night SEO audits, fixes and blog drafts all waited. The Mac was probably off, asleep or logged out (launchd keeps the
+          connector running otherwise). Audits, fixes and drafts run as soon as it reconnects; deploys go out tonight.
         </div>
       )}
 
-      {report.connector && !report.connector.online && (() => {
-        // Q runs the connector 00:55-05:30 and 11:00-18:00 IST; off between those is normal.
-        const ist = new Date(Date.now() + 330 * 60000);
-        const m = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-        const inWindow = (m >= 55 && m < 330) || (m >= 660 && m < 1080);
-        return (
-          <div style={{ ...card, borderColor: inWindow ? '#ef4444' : '#facc15', color: inWindow ? '#fca5a5' : '#fde68a', fontSize: '0.85rem', marginBottom: '10px' }}>
-            <strong>Mac connector offline</strong> since {new Date(report.connector.since).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
-            {' '}{inWindow
-              ? 'It should be running now: deploys, night fixes and blog drafts are waiting. Check the Mac is on and awake.'
-              : 'That is normal outside 00:55–05:30 and 11:00–18:00 IST. A Deploy pressed now starts when it next connects (Q starts it at 00:55 and 11:00).'}
-          </div>
-        );
-      })()}
+      {/* launchd keeps the connector running all day (scripts/launchd/install-mac-connector.sh), so offline is never normal. */}
+      {report.connector && !report.connector.online && (
+        <div style={{ ...card, borderColor: '#ef4444', color: '#fca5a5', fontSize: '0.85rem', marginBottom: '10px' }}>
+          <strong>Mac connector offline</strong> since {new Date(report.connector.since).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
+          {' '}Anything queued (deploys, audits, fixes, blog drafts, Run presses) waits until it reconnects. Check the Mac is on, awake and logged in;
+          launchd restarts the connector by itself.
+        </div>
+      )}
 
       {waiting.length > 0 && (
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px', fontSize: '0.8rem' }}>

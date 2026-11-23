@@ -54,10 +54,31 @@ const WORKERS = {
   ig: { cmd: 'node', args: ['scripts/ig_worker.mjs', '--once'] },
 };
 
+// Workers start only inside these IST windows, the hours Q used to run the
+// whole connector: 11:00-18:00 and 00:55-05:30. launchd now keeps the
+// connector itself connected all day (scripts/launchd/install-mac-connector.sh),
+// so the portal always sees the Mac; a signal outside a window waits, and the
+// window opening starts everything queued. A worker already running when a
+// window closes finishes its pass, as it did when Q stopped the connector.
+const WINDOWS_IST = [[0 * 60 + 55, 5 * 60 + 30], [11 * 60, 18 * 60]]; // [start, end) minutes after midnight
+function inWindow(now = new Date()) {
+  const ist = new Date(now.getTime() + 330 * 60000);
+  const m = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  return WINDOWS_IST.some(([s, e]) => m >= s && m < e);
+}
+
+function runAll(opts) {
+  for (const kind of Object.keys(WORKERS)) runWorker(kind, opts);
+}
+
 function runWorker(kind, { sweep = false } = {}) {
   const spec = WORKERS[kind];
   if (!spec) {
     console.error(`[MAC CONNECTOR] Unknown run kind: ${kind}`);
+    return;
+  }
+  if (!inWindow()) {
+    if (!sweep) console.log(`[MAC CONNECTOR] ${kind}: outside 00:55-05:30 / 11:00-18:00 IST, starts when the next window opens.`);
     return;
   }
   // The blog worker drains the whole queue and can run for hours, so a second
@@ -96,8 +117,19 @@ const SWEEP_MS = 10 * 60 * 1000;
 let connected = false;
 setInterval(() => {
   if (!connected) return;
-  for (const kind of Object.keys(WORKERS)) runWorker(kind, { sweep: true });
+  runAll({ sweep: true });
 }, SWEEP_MS);
+
+// A window opening (00:55, 11:00) is a catch-up, same as connecting.
+let wasInWindow = inWindow();
+setInterval(() => {
+  const now = inWindow();
+  if (now && !wasInWindow && connected) {
+    console.log('[MAC CONNECTOR] Window open, catching up...');
+    runAll({ sweep: true });
+  }
+  wasInWindow = now;
+}, 60 * 1000);
 
 // Heartbeat: a socket killed while the laptop slept (or by a server restart)
 // never fires 'close' on this side, so ping regularly and terminate on a
@@ -130,16 +162,9 @@ function connect() {
   socket.on('open', () => {
     console.log('[MAC CONNECTOR] Connected to Ops Center.');
     connected = true;
-    // Catch up anything queued while we were offline.
-    runWorker('seo');
-    runWorker('ads');
-    runWorker('blog');
-    runWorker('blog_publish');
-    runWorker('seo_fix');
-    runWorker('deploy');
-    runWorker('outreach');
-    runWorker('plugins');
-    runWorker('ig');
+    // Catch up anything queued while we were offline (inside a window only).
+    if (inWindow()) runAll();
+    else console.log('[MAC CONNECTOR] Outside 00:55-05:30 / 11:00-18:00 IST; workers start when the next window opens.');
   });
 
   socket.on('message', (data) => {
