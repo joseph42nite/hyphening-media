@@ -10,31 +10,35 @@ in [MAC_SETUP.md](MAC_SETUP.md).
 |---|---|---|---|
 | 00:30 | Night deploys | Server cron (`src/services/scheduler.js`) | Signals the Mac; `deploy_worker` pushes and deploys every batch 007 pressed **Deploy** on. The server hands out deploys only between 00:30 and 03:00. |
 | 00:45 | Health check | Q | `scripts/health-check.sh --write` |
-| 00:55 | Mac connector on | Q | `scripts/mac_connector.mjs` dials the portal; on connect it runs every worker once (catch-up), then sweeps every 10 minutes |
+| 00:55 | Night window opens | Mac connector | The connector (kept running by launchd, connected all day) starts every worker once (catch-up), then sweeps every 10 minutes |
 | 01:00 | Night blog drafts | Server cron | `queueBlogRuns` (Blog fleet on Auto), then wakes the blog worker. Leiter reports at 01:05 (`blog-runs.mjs list queued,running`). |
 | 01:15 | Night SEO audits | Server cron | `queueNightAudits`: every SEO-on client's cards past their cadence (`dueSkills` in `src/services/seoNight.js`), then wakes the SEO worker. Tanner reports at 01:20 (`seo-runs.mjs status`). |
 | 03:30 | Night SEO fixes | Server cron | `queueSeoFixes`: one fix batch per client with a site repo, then wakes the fix worker. Boothroyd reports at 03:35 (`seo-runs.mjs status`). |
-| 05:30 | Mac connector off | Q | `pkill -f scripts/mac_connector.mjs` |
+| 05:30 | Night window closes | Mac connector | No new workers start; one already running finishes its pass |
 | 06:30 | Review night drafts | Vesper | |
 | 07:30 | Start-of-day brief | Moneypenny | |
 
-Day: health check 10:55, connector 11:00–18:00, plugin review Mondays 09:00
+Day: health check 10:55, worker window 11:00–18:00, plugin review Mondays 09:00
 (Q), outreach prospects Sundays 02:00 (Boothroyd). Every routine's exact prompt
 is in `~/agent-setup/openmausbot/routines/`.
 
-**The 00:30 deploy depends on the 00:55 connector.** The 00:30 signal goes to
-nobody, because the connector isn't on yet. The deploy actually starts at
-about 00:55, from the connector's catch-up pass, which is still inside the
-deploy window.
+**Worker windows.** launchd (`com.hyphening.mac-connector`, installed by
+`scripts/launchd/install-mac-connector.sh`) keeps the connector connected all
+day, but it starts workers only inside 00:55–05:30 and 11:00–18:00 IST
+(`WINDOWS_IST` in `scripts/mac_connector.mjs`), the hours Q used to run it.
+A signal or Run press outside a window waits; the window opening starts
+everything queued. So the 00:30 deploy signal is ignored, and the deploy
+starts at 00:55, still inside the 00:30–03:00 deploy window.
 
 ## When it doesn't run
 
 The server queues the night's work itself (00:30 deploys, 01:00 blog, 01:15
 audits, 03:30 fixes; `NIGHT_JOBS` in `src/services/scheduler.js`). The work
-only *runs* while the Mac connector is on, and Q starts that at 00:55. So if
-OpenMausBot isn't running, the work is queued but waits: nothing runs that
-night, and the bots post no reports. It all starts as soon as the connector
-next connects (deploys only inside 00:30–03:00).
+runs on the Mac through the connector, which launchd keeps running whether
+or not OpenMausBot is open. If OpenMausBot is closed, the work still runs; only
+the bots' reports are missing. What stops the night now is the Mac itself
+being off, asleep or logged out. The work then waits and starts at the next
+window after the connector reconnects (deploys only inside 00:30–03:00).
 
 How to tell:
 
@@ -42,13 +46,14 @@ How to tell:
 - SEO Monitor: "no SEO skills ran last night", a deploy still "queued for
   tonight" the next morning, and the plugins line saying the Mac last reported
   hours ago.
-- `pgrep -x OpenMausBot` prints nothing.
-- `~/Library/Logs/openmausbot/server.log` ends in `exited`, with no
-  `[Scheduled routine ...]` lines since.
+- `launchctl print gui/$(id -u)/com.hyphening.mac-connector | grep state`
+  isn't `running`.
+- `~/Library/Logs/hyphening-mac-connector.log` has no `Connected to Ops Center`
+  since the evening before.
 
-Fix: open OpenMausBot. At 11:00 Q starts the connector and the queued audits,
-fixes and drafts run then. A deploy can't be pushed during the day; it goes out
-the next night.
+Fix: wake or log in to the Mac; the connector reconnects by itself. If launchd
+lost the job, rerun `bash scripts/launchd/install-mac-connector.sh`. Audits,
+fixes and drafts run in the next window; a deploy goes out the next night.
 
 ### Incident, 22–23 Nov 2026
 
@@ -78,19 +83,22 @@ results to rooms) without being the thing that starts the work.
    (SEO runs show `night:server`). Fleet switches, budget caps and in-flight
    checks are unchanged, and a second start the same night adds nothing, so a
    bot still on `start` is harmless. The webhooks stay for manual starts.
-   After deploy, Tanner (01:20) and Boothroyd (03:35) run `seo-runs.mjs status`
-   and Leiter (01:05) runs `blog-runs.mjs list queued,running`, and only
-   report. Change the routines only after the deploy, or nothing is queued
-   that night.
-2. **launchd keeps the connector running.** A `com.hyphening.mac-connector`
-   LaunchAgent (plist kept in `scripts/launchd/`) with `KeepAlive`, at about
-   50 MB instead of the bots. **Open question:** why the connector runs only
-   in the 11:00–18:00 and 00:55–05:30 windows. The commit that added it
-   (`c561ca0`) calls it "the scheduled window" without saying why; it was
-   possibly to keep the Mac free for other work, or to limit Claude-usage
-   contention. If the windows matter, the connector should keep
-   them itself (connected all day, starting workers only inside the windows)
-   so the timing no longer depends on Q.
+   Deployed 23 Nov 2026. The same day the three routines became report-only
+   ("Report night blog drafts" 01:05, "Report night SEO audits" 01:20,
+   "Report night SEO fixes" 03:35): Leiter runs `blog-runs.mjs list
+   queued,running 1`, Tanner and Boothroyd run `seo-runs.mjs status`. They
+   were edited in `~/.openmausbot/routines.json` with OpenMausBot quit (the
+   running app rewrites that file); backup `routines.json.bak-20261123-night-report`.
+2. **Done: launchd keeps the connector running.** `com.hyphening.mac-connector`
+   (written by `scripts/launchd/install-mac-connector.sh`, which pins the
+   current `node` and a PATH with `~/.local/bin`) starts at login and restarts
+   the connector within seconds of it exiting. It runs as `ProcessType
+   Standard`: `Background` throttles every worker it starts. The windows stay
+   (007, 23 Nov 2026), now kept by the connector itself. Q's four routines
+   (Start/Stop Hyphening Mac Connector, day and night) are disabled in
+   OpenMausBot; backup `routines.json.bak-20261123-connector-launchd`. A Run
+   pressed outside a window: the Blog Monitor can still say "the Mac is
+   writing it now", because the server only knows the Mac is connected.
 3. **launchd runs the health checks** at 00:45 and 10:55, writing the vault
    notes as now.
 4. **Done (dashboard only, no Telegram).** Every connector connection is
@@ -102,15 +110,15 @@ results to rooms) without being the thing that starts the work.
    Monitor shows a red "Nothing ran last night" banner above the totals. The
    banner stays off until the table has a session from before that night, so
    it doesn't fire on the first night after the deploy.
-5. **Then OpenMausBot is optional.** The bots' day work (Vesper's reviews,
-   Moneypenny's brief, Q's Monday plugin review) still needs it open, but a
-   closed app no longer stops deploys, audits or fixes.
+5. **OpenMausBot is optional for the night.** The bots' day work (Vesper's
+   reviews, Moneypenny's brief, Q's Monday plugin review), their night reports
+   and the health checks still need it open, but a closed app no longer stops
+   deploys, audits or fixes.
 
-Order: 4 and 1 are done. Then 2 (after the window question is answered),
-then 3.
+Order: 4, 1 and 2 are done. 3 is left.
 
 Known limit: the server's 00:30 deploy signal (`pushRunSignal`) only reaches
 the connector if its socket is in the same PM2 process as the scheduler. That
-doesn't matter today: the connector starts at 00:55 and its catch-up pass and
-10-minute sweeps start the deploy worker anyway.
+doesn't matter: the 00:55 window opening and the 10-minute sweeps start the
+deploy worker anyway.
 Update this doc and `~/agent-setup/openmausbot/routines` as each step lands.

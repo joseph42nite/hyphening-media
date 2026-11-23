@@ -43,7 +43,7 @@ export const PLUGINS = {
 
 const VERDICTS = ['safe', 'test_first', 'wait', 'breaks'];
 export const STATUS_STALE_MINUTES = 60;
-// The night pipelines (connector 00:55-05:30, deploys from 00:30, the 06:30
+// The night pipelines (queued 01:00-03:30, deploys from 00:30, the 06:30
 // draft review) read plugin files; an update in that window would swap them
 // mid-run.
 export const NIGHT_HOLD_IST = { start: '00:30', end: '06:45' };

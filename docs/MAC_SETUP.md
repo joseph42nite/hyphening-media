@@ -26,7 +26,7 @@ Last checked against the running Mac: 23 Nov 2026 (Intel x86_64, macOS 15.8, 8 G
 | App | Why | Notes |
 |---|---|---|
 | **Claude Code** CLI (`~/.local/bin/claude`) and the Claude desktop app | Every worker shells out to `claude` | Sign in with the Max account. Was 2.1.310. |
-| **OpenMausBot** | The bots (Q, Tanner, Boothroyd, Leiter, Vesper, Moneypenny, M, MausBot) and their routines, which start the night pipeline | Restore from `agent-setup`. **Must stay open** until the plan in NIGHT_PIPELINE.md is done; if it quits, nothing runs at night. |
+| **OpenMausBot** | The bots (Q, Tanner, Boothroyd, Leiter, Vesper, Moneypenny, M, MausBot): night reports, reviews, briefs, health checks | Restore from `agent-setup`. The night work itself no longer needs it (server queues, launchd connector). |
 | **Docker Desktop** | Kokoro TTS container for blog narration; the F16s local stack | Kokoro starts Docker itself when audio renders. |
 | **Google Chrome** | Browser the bots and Claude in Chrome drive | |
 | **Antigravity** | Draws blog covers overnight (`COVERS_VIA_ANTIGRAVITY`) | |
@@ -96,13 +96,13 @@ The server's full list is in `.env.example`.
 
 | Job | Started by | Schedule |
 |---|---|---|
-| Mac connector (`scripts/mac_connector.mjs`) | Q (OpenMausBot) | 11:00–18:00 and 00:55–05:30 IST |
+| Mac connector (`scripts/mac_connector.mjs`) | launchd `com.hyphening.mac-connector` | Always connected; starts workers 11:00–18:00 and 00:55–05:30 IST |
 | Night SEO audits, fixes, blog drafts (queued) | the server's scheduler | 01:15, 03:30, 01:00 IST |
 | Night reports, reviews, briefs, health checks | OpenMausBot routines | See NIGHT_PIPELINE.md |
 | agent-setup backup | launchd `com.hyphening.agent-setup-backup` | 04:30 daily |
 | Night deploy signal | the server's scheduler | 00:30 IST |
 
-To restore the launchd backup job, follow step 7 of `~/agent-setup/README.md`.
+Install the connector job with `bash scripts/launchd/install-mac-connector.sh` (rerun it after switching Node versions; `uninstall` removes it). Log: `~/Library/Logs/hyphening-mac-connector.log`. To restore the launchd backup job, follow step 7 of `~/agent-setup/README.md`.
 
 ## 7. Check it works
 
@@ -112,7 +112,7 @@ cd ~/Projects/hyphening-media && bash scripts/health-check.sh
 
 Everything should read OK apart from per-client onboarding warnings. Then:
 
-- start the connector by hand once (`node scripts/mac_connector.mjs`) and check the SEO Monitor's plugins line shows a fresh "last reported" time;
+- install the connector job (above), then check the SEO Monitor has no "Mac connector offline" banner and, inside a window, the plugins line shows a fresh "last reported" time;
 - run one cheap SEO card (sitemap) for Hyphening Media and confirm it takes more than a minute and has crawl data;
 - check OpenMausBot's Routines page lists every routine in `~/agent-setup/openmausbot/routines/` as enabled.
 
