@@ -1,4 +1,12 @@
 #!/bin/bash
+# NOT IN USE (23 Nov 2026). A launchd job can't read or write the vault on the
+# external Mac Valhalla drive (EPERM: macOS privacy protection), and the
+# workers need it: the health check, blog narration's audio queue, the
+# healthcare compliance note and the night report. Q starts the connector
+# again. Install this only after giving the `node` it pins Full Disk Access
+# (System Settings > Privacy & Security), and disable Q's four connector
+# routines when you do. See docs/NIGHT_PIPELINE.md.
+#
 # Keeps the Mac connector (scripts/mac_connector.mjs) running under launchd:
 # started at login, restarted within seconds if it exits. It replaces Q's
 # 11:00/18:00 and 00:55/05:30 start and stop routines in OpenMausBot, so the
