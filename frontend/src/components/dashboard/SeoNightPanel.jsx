@@ -61,6 +61,16 @@ export default function SeoNightPanel({ showToast, clientId, clientName, onSelec
         />
       </div>
 
+      {report.last_night?.tracked && !report.last_night.connected && (
+        <div style={{ ...card, borderColor: '#ef4444', color: '#fca5a5', fontSize: '0.85rem', marginBottom: '10px' }}>
+          <strong>Nothing ran last night.</strong> The Mac never connected between{' '}
+          {new Date(report.last_night.window_start).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} and{' '}
+          {new Date(report.last_night.window_end).toLocaleTimeString('en-IN', { timeStyle: 'short' })}, so queued deploys,
+          night SEO audits, fixes and blog drafts all waited. Usually OpenMausBot was closed (Q starts the connector at 00:55):
+          open it on the Mac. Deploys go out tonight; press Run on stale cards to refresh them now.
+        </div>
+      )}
+
       {report.connector && !report.connector.online && (() => {
         // Q runs the connector 00:55-05:30 and 11:00-18:00 IST; off between those is normal.
         const ist = new Date(Date.now() + 330 * 60000);

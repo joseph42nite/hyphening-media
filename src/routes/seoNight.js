@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAction } from '../services/auditLogger.js';
-import { connectorStatus } from '../services/macConnector.js';
+import { connectorStatus, lastNightConnection } from '../services/macConnector.js';
 import { nightReport, requestDeploy, DEPLOY_WINDOW_IST, discardBatch, approveFixTonight, ignoreRecommendation } from '../services/seoNight.js';
 
 const router = Router();
@@ -16,7 +16,7 @@ router.use(authenticate);
 /** GET /api/seo-night/report — per SEO-on client: last night's runs, fixes, needs-007 and failures. */
 router.get('/report', authorize('admin', 'api_readonly'), (req, res) => {
   try {
-    res.json({ ...nightReport(), connector: connectorStatus() });
+    res.json({ ...nightReport(), connector: connectorStatus(), last_night: lastNightConnection() });
   } catch (err) {
     console.error('[SEO NIGHT] Report error:', err);
     res.status(500).json({ error: 'Internal server error' });

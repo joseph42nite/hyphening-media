@@ -35,6 +35,7 @@ stays off, deploys stay queued, no audits are queued, and no fixes are made.
 
 How to tell:
 
+- SEO Monitor: a red "Nothing ran last night" banner (from 24 Nov 2026).
 - SEO Monitor: "no SEO skills ran last night", a deploy still "queued for
   tonight" the next morning, and the plugins line saying the Mac last reported
   hours ago.
@@ -84,14 +85,24 @@ results to rooms) without being the thing that starts the work.
    so the timing no longer depends on Q.
 3. **launchd runs the health checks** at 00:45 and 10:55, writing the vault
    notes as now.
-4. **An alert when the Mac is missing.** If the connector isn't connected by
-   01:00 IST, the server sends a Telegram message to the admin chat
-   (`TELEGRAM_ADMIN_CHAT_ID` already exists). Last night would have been
-   caught at 01:00, not discovered the next morning.
+4. **Done (dashboard only, no Telegram).** Every connector connection is
+   recorded in `mac_connector_sessions` (migration 124), and its
+   `last_seen_at` moves on each 20 s heartbeat. The table works across the PM2
+   cluster, where the socket lives in only one process. `lastNightConnection()`
+   in `src/services/macConnector.js` checks whether the Mac was connected at any
+   point in the last finished 00:30–03:00 IST window. If it wasn't, the SEO
+   Monitor shows a red "Nothing ran last night" banner above the totals. The
+   banner stays off until the table has a session from before that night, so
+   it doesn't fire on the first night after the deploy.
 5. **Then OpenMausBot is optional.** The bots' day work (Vesper's reviews,
    Moneypenny's brief, Q's Monday plugin review) still needs it open, but a
    closed app no longer stops deploys, audits or fixes.
 
-Order: 4 first, since it's small and catches the failure whatever else
-changes. Then 1, then 2 (after the window question is answered), then 3.
+Order: 4 is done. Then 1, then 2 (after the window question is answered),
+then 3.
+
+Known limit: the server's 00:30 deploy signal (`pushRunSignal`) only reaches
+the connector if its socket is in the same PM2 process as the scheduler. That
+doesn't matter today: the connector starts at 00:55 and its catch-up pass and
+10-minute sweeps start the deploy worker anyway.
 Update this doc and `~/agent-setup/openmausbot/routines` as each step lands.
