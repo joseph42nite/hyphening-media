@@ -177,7 +177,18 @@ describe('which site GA4 traffic counts', () => {
     };
     const result = await fillMonthlyReport(id, '2026-10', { sources });
     expect(row(id, '2026-10').website_traffic).toBeNull();
-    expect(result.notes.join(' ')).toMatch(/GA4 has no sessions for main\.test/);
+    expect(result.notes.join(' ')).toMatch(/GA4 has no sessions for main\.test in 2026-10 \(the property only has sessions for other-agency\.biz 10\)/);
+  });
+
+  it('says the property is empty when GA4 has no sessions from any site', async () => {
+    const id = makeClient({ gsc: 'https://main.test/' });
+    const sources = { ...fakeSources(), getSessionMonths: async () => [] };
+    const result = await fillMonthlyReport(id, '2026-10', { sources });
+    expect(row(id, '2026-10').website_traffic).toBeNull();
+    const note = result.notes.find(n => n.startsWith('GA4'));
+    expect(note).toMatch(/^GA4 property \S+ is empty for 2026-10 \(no sessions from any site/);
+    // The dashboard's short label is the text before any colon, so details must not hold one.
+    expect(note).not.toContain(':');
   });
 });
 
