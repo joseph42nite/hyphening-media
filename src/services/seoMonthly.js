@@ -113,14 +113,33 @@ async function searchConsoleFigures(property, month, sources) {
 /**
  * GA4 sessions for the report's site in that month, or throws. One property
  * can carry other sites too (a landing page, another site sharing the tag,
- * localhost), so only that host is counted. Nothing for it → null, not a
- * total of whatever else is in the property.
+ * localhost), so only that host is counted. Nothing for it → sessions null,
+ * not a total of whatever else is in the property; `others` then lists the
+ * hosts the property did see, biggest first, so the note can tell an empty
+ * property (tag missing or sending elsewhere) from a host mismatch.
  */
 async function ga4Sessions(propertyId, host, month, sources) {
   const rows = (await sources.getSessionMonths(propertyId, monthRange(month))).filter(r => r.month === month);
   const own = rows.filter(r => (r.host || '').toLowerCase().replace(/^www\./, '') === host);
-  if (!own.length) return null;
-  return own.reduce((sum, r) => sum + r.sessions, 0);
+  if (own.length) return { sessions: own.reduce((sum, r) => sum + r.sessions, 0), others: [] };
+  const byHost = new Map();
+  for (const r of rows) byHost.set(r.host || '(not set)', (byHost.get(r.host || '(not set)') || 0) + r.sessions);
+  const others = [...byHost].sort((a, b) => b[1] - a[1]).map(([h, n]) => `${h} ${n}`);
+  return { sessions: null, others };
+}
+
+/**
+ * The note for a month with no sessions for the site. Details go in brackets
+ * and contain no colon: the dashboard shows the text before the first colon
+ * with a trailing bracket removed as the short label.
+ */
+function ga4EmptyNote(propertyId, host, month, others) {
+  const site = host || 'the client site';
+  if (!others.length) {
+    return `GA4 property ${propertyId} is empty for ${month} (no sessions from any site, so the tag on ${site} is missing or sends to a different property).`;
+  }
+  const shown = others.slice(0, 5).join(', ') + (others.length > 5 ? `, and ${others.length - 5} more` : '');
+  return `GA4 has no sessions for ${site} in ${month} (the property only has sessions for ${shown}).`;
 }
 
 function countFixesLive(clientId, month) {
@@ -166,9 +185,13 @@ export async function fillMonthlyReport(clientId, month, { sources = defaultSour
   } else {
     try {
       const host = reportHost(client);
-      const sessions = host ? await ga4Sessions(client.ga4_property_id, host, month, sources) : null;
-      if (sessions == null) notes.push(`GA4 has no sessions for ${host || 'the client site'} in ${month}.`);
-      else found.website_traffic = sessions;
+      if (!host) {
+        notes.push('GA4 not used (no Search Console property or website saved, so the site is unknown).');
+      } else {
+        const { sessions, others } = await ga4Sessions(client.ga4_property_id, host, month, sources);
+        if (sessions == null) notes.push(ga4EmptyNote(client.ga4_property_id, host, month, others));
+        else found.website_traffic = sessions;
+      }
     } catch (err) {
       notes.push(`GA4 failed: ${err.message}`);
     }
