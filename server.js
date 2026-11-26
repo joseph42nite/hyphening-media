@@ -59,6 +59,8 @@ import pluginRoutes from './src/routes/plugins.js';
 import manualTaskRoutes from './src/routes/manualTasks.js';
 import outreachRoutes from './src/routes/outreach.js';
 import reelLabRoutes from './src/routes/reelLab.js';
+import growthRoutes from './src/routes/growth.js';
+import outboundEventRoutes from './src/routes/outboundEvents.js';
 import { DUPLICATE_POST_REDIRECTS } from './src/data/blogDuplicateRedirects.js';
 
 // Import services
@@ -338,6 +340,8 @@ app.use('/api/plugins', pluginRoutes);
 app.use('/api/manual-tasks', manualTaskRoutes);
 app.use('/api/outreach', outreachRoutes);
 app.use('/api/reel-lab', reelLabRoutes);
+app.use('/api/clients', growthRoutes);      // Client Brain, cold outbound, monitor cards
+app.use('/api/outbound', outboundEventRoutes); // sending and booking tools post events (x-outbound-key)
 app.use('/api/approval', approvalRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/notifications', notificationRoutes);

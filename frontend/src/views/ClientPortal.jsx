@@ -11,6 +11,8 @@ import logoImg from '../assets/logo.png';
 import SEOHead from '../components/SEOHead.jsx';
 import PortalBlogReviews from '../components/PortalBlogReviews.jsx';
 import GoogleAccessCard from '../components/GoogleAccessCard.jsx';
+import BrainEditor from '../components/BrainEditor.jsx';
+import OutboundSetupForm from '../components/OutboundSetupForm.jsx';
 import { formatWatchSeconds } from '../components/dashboard/contentFormHelper.js';
 
 const PRESET_REASON_OPTIONS = [
@@ -1241,6 +1243,7 @@ export default function ClientPortal({ showToast }) {
   const [isVerified, setIsVerified] = useState(false);
   const [clientName, setClientName] = useState('');
   const [clientType, setClientType] = useState('marketing');
+  const [outboundEnabled, setOutboundEnabled] = useState(false);
   
   // Dashboard data state
   const [activeTab, setActiveTab] = useState('overview');
@@ -1480,6 +1483,7 @@ export default function ClientPortal({ showToast }) {
         setPinRequired(false);
         setClientName(data.client_name);
         setClientType(data.client_type || 'marketing');
+        setOutboundEnabled(!!data.outbound_enabled);
         
         if (data.available_months && data.available_months.length > 0) {
           setAvailablePortalMonths(data.available_months);
@@ -3492,6 +3496,13 @@ export default function ClientPortal({ showToast }) {
             </div>
 
             <GoogleAccessCard basePath={`/api/portal/${token}/google-access`} variant="portal" showToast={showToast} />
+
+            <BrainEditor basePath={`/api/portal/${token}/brain`} variant="portal" showToast={showToast} />
+
+            {outboundEnabled && (
+              <OutboundSetupForm settingsPath={`/api/portal/${token}/outbound-setup`}
+                customersPath={`/api/portal/${token}/outbound-setup/customers`} variant="portal" showToast={showToast} />
+            )}
 
             {/* Audience & Positioning */}
             <div className="portal-bento-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>

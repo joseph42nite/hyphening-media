@@ -3,6 +3,8 @@ import { Plus, Trash2, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
 import { API_BASE } from '../../api.js';
 import ClientBlogPipelineSection from './ClientBlogPipelineSection.jsx';
 import GoogleAccessCard from '../GoogleAccessCard.jsx';
+import BrainEditor from '../BrainEditor.jsx';
+import OutboundSetupForm from '../OutboundSetupForm.jsx';
 
 const EMPTY_VENUE_FIELDS = {
   venue_name: '', venue_address: '', venue_city: '', venue_map_link: '',
@@ -66,7 +68,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
   const [editingVenueId, setEditingVenueId] = useState(null);
   const [clientFormData, setClientFormData] = useState({
     name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
-    parent_id: '', website_url: '', is_ecommerce: false, instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
+    parent_id: '', website_url: '', is_ecommerce: false, client_group: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
     google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: '',
     ...EMPTY_VENUE_FIELDS
   });
@@ -116,6 +118,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
         parent_id: client.parent_id || '',
         website_url: client.website_url || '',
         is_ecommerce: !!client.is_ecommerce,
+        client_group: client.client_group || '',
         instagram_url: client.instagram_url || '',
         youtube_url: client.youtube_url || '',
         gsc_property: client.gsc_property || '',
@@ -138,7 +141,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
       setEditingVenueId(null);
       setClientFormData({
         name: '', client_type: 'marketing', contact_person: '', contact_email: '', contact_phone: '',
-        parent_id: '', website_url: '', is_ecommerce: false, instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
+        parent_id: '', website_url: '', is_ecommerce: false, client_group: '', instagram_url: '', youtube_url: '', gsc_property: '', ga4_property_id: '',
         google_ads_customer_id: '', google_ads_login_customer_id: '', meta_ads_account_id: '',
         ...EMPTY_VENUE_FIELDS
       });
@@ -477,6 +480,7 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
             { field: 'blog_enabled', label: 'Blog' },
             { field: 'seo_enabled', label: 'SEO' },
             { field: 'ads_enabled', label: 'Ads' },
+            ...(['marketing', 'both'].includes(client.client_type) ? [{ field: 'outbound_enabled', label: 'Outbound' }] : []),
           ].map(({ field, label }) => (
             <div key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span className={`badge badge-${client[field] ? 'success' : 'muted'}`} style={{ minWidth: '28px', textAlign: 'center' }}>
@@ -718,6 +722,22 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
                 </select>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   Yes turns on the e-commerce SEO skill (product schema, Shopping, marketplaces) for this client.
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Client group</label>
+                <select className="form-control" style={{ maxWidth: '320px' }} value={clientFormData.client_group}
+                  onChange={e => setClientFormData({ ...clientFormData, client_group: e.target.value })}>
+                  <option value="">Not set</option>
+                  <option value="healthcare">Healthcare (regulated)</option>
+                  <option value="b2b_saas">B2B software</option>
+                  <option value="b2b_services">B2B services</option>
+                  <option value="consumer_local">Local consumer business</option>
+                  <option value="ecommerce">E-commerce</option>
+                </select>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Decides which marketing cards fit. Healthcare clients never get cold outbound.
                 </span>
               </div>
 
@@ -988,6 +1008,18 @@ export default function ClientsTab({ auth, clients, fetchClients, venues = [], f
             </div>
 
             <ClientBlogPipelineSection client={onboardingClient} showToast={showToast} />
+
+            {['marketing', 'both'].includes(onboardingClient.client_type) && (
+              <BrainEditor basePath={`/api/clients/${onboardingClient.id}/brain`} variant="admin" showToast={showToast} />
+            )}
+            {onboardingClient.outbound_enabled ? (
+              <OutboundSetupForm settingsPath={`/api/clients/${onboardingClient.id}/outbound/settings`}
+                customersPath={`/api/clients/${onboardingClient.id}/outbound/suppression`} variant="admin" showToast={showToast} />
+            ) : ['marketing', 'both'].includes(onboardingClient.client_type) && (
+              <p style={{ margin: '12px 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Switch Outbound on for this client to add its cold email setup here.
+              </p>
+            )}
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
               <button type="button" className="btn btn-secondary" onClick={copyKickoffPrompt}>

@@ -39,6 +39,7 @@ import {
 import { claimOutreachRuns, submitOutreachResults, failOutreachRun, outreachSummaryText } from '../services/outreach.js';
 import { claimReelLabRuns, submitReelLabResult, failReelLabRun, appendReelLabLog } from '../services/reelLab.js';
 import { claimPluginUpdates, reportPluginStatus, reportPluginReview, pluginUpdateLog, finishPluginUpdate, pluginSummaryLines } from '../services/plugins.js';
+import { claimGrowthRuns, growthRunLog, submitGrowthResult, failGrowthRun, outboundSummaryLines } from '../services/growth.js';
 import {
   handleClaimBlogRuns,
   handleAddBlogTopics,
@@ -71,7 +72,8 @@ export const KNOWN_EVENTS = [
   'claim_seo_fix_batches', 'submit_seo_triage', 'submit_seo_fix_batch', 'claim_seo_deploys', 'finish_seo_deploy',
   'queue_outreach_runs', 'claim_outreach_runs', 'submit_outreach_results', 'fail_outreach_run', 'outreach_summary',
   'claim_plugin_updates', 'report_plugin_status', 'report_plugin_review', 'plugin_update_log', 'finish_plugin_update',
-  'claim_reel_lab_runs', 'submit_reel_lab_result', 'fail_reel_lab_run', 'reel_lab_log'
+  'claim_reel_lab_runs', 'submit_reel_lab_result', 'fail_reel_lab_run', 'reel_lab_log',
+  'claim_growth_runs', 'growth_run_log', 'submit_growth_result', 'fail_growth_run'
 ];
 
 const router = Router();
@@ -293,8 +295,10 @@ export function executeEvent(eventType, payload) {
         // Manual tasks ride along so the morning brief shows the hand work waiting too.
         const manual = manualSummaryLines();
         const plugins = pluginSummaryLines();
+        const outbound = outboundSummaryLines();
         const text = [nightSummaryText(), ...(manual.length ? ['Manual tasks (SEO and ads, Manual tasks tab):', ...manual] : []),
-          ...(plugins.length ? ['Plugins behind (Update & test in the SEO or Ads Monitor):', ...plugins] : [])].join('\n');
+          ...(plugins.length ? ['Plugins behind (Update & test in the SEO or Ads Monitor):', ...plugins] : []),
+          ...(outbound.length ? ['Cold outbound (Outbound tab):', ...outbound] : [])].join('\n');
         return { success: true, summary: text, data: { text } };
       }
       case 'claim_seo_fix_batches': { const batches = claimSeoFixBatches(payload?.worker); return { success: true, summary: `Claimed ${batches.length} fix batch(es)`, data: { batches } }; }
@@ -322,6 +326,13 @@ export function executeEvent(eventType, payload) {
       case 'submit_reel_lab_result': return submitReelLabResult(payload);
       case 'fail_reel_lab_run': return failReelLabRun(payload);
       case 'reel_lab_log': return appendReelLabLog(payload);
+      case 'claim_growth_runs': {
+        const runs = claimGrowthRuns(payload?.worker, parseInt(payload?.limit, 10) || 3);
+        return { success: true, summary: `Claimed ${runs.length} growth run(s)`, data: { runs } };
+      }
+      case 'growth_run_log': return growthRunLog(payload);
+      case 'submit_growth_result': return submitGrowthResult(payload);
+      case 'fail_growth_run': return failGrowthRun(payload);
       default:
         return { success: false, summary: `Unknown event type: ${eventType}` };
     }

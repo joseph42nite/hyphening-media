@@ -52,6 +52,8 @@ const WORKERS = {
   plugins: { cmd: 'node', args: ['scripts/plugin_update_worker.mjs', '--once'] },
   // Reel Lab: the Script Tracker's "From viral reel" and "Improve hooks".
   ig: { cmd: 'node', args: ['scripts/ig_worker.mjs', '--once'] },
+  // Client Brain and Outbound monitor cards (marketing-skills plugin).
+  growth: { cmd: 'node', args: ['scripts/growth_worker.mjs', '--once'] },
 };
 
 // Workers start only inside these IST windows, the hours Q used to run the
@@ -102,7 +104,7 @@ function runWorker(kind, { sweep = false } = {}) {
 
 // plugins: two updates at once would both rewrite installed_plugins.json.
 // ig: it drains the whole queue, so a second click while it runs is already covered.
-const SINGLE_RUN = new Set(['blog', 'blog_publish', 'seo_fix', 'deploy', 'outreach', 'plugins', 'ig']);
+const SINGLE_RUN = new Set(['blog', 'blog_publish', 'seo_fix', 'deploy', 'outreach', 'plugins', 'ig', 'growth']);
 const running = new Map(); // kind -> how many are running
 
 let stopping = false;

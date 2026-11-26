@@ -16,6 +16,8 @@ import {
 } from '../services/blogPipeline.js';
 import { getGoogleAccess, checkGoogleAccess, markGbpInviteSent } from '../services/googleAccess.js';
 
+const CLIENT_GROUPS = ['healthcare', 'b2b_saas', 'b2b_services', 'consumer_local', 'ecommerce'];
+
 const router = Router();
 
 // Apply auth to all client routes
@@ -206,7 +208,9 @@ router.patch('/:id', authorize('admin'), (req, res) => {
       'gsc_property', 'ga4_property_id',
       'google_ads_customer_id', 'google_ads_login_customer_id', 'meta_ads_account_id',
       // Sells online: unlocks the SEO Monitor's e-commerce skill (seo.js unavailableReason).
-      'is_ecommerce'
+      'is_ecommerce',
+      // Which marketing cards fit (src/services/growth.js): healthcare never gets cold outbound.
+      'client_group'
       // Pipeline kill switches (blog_enabled/seo_enabled/ads_enabled) are
       // deliberately NOT in this generic allow-list — they go only through
       // PATCH /:id/flags below, so every toggle hits one audited code path.
@@ -222,6 +226,10 @@ router.patch('/:id', authorize('admin'), (req, res) => {
           val = val && !isNaN(parseInt(val)) ? parseInt(val) : null;
         }
         if (field === 'is_ecommerce') val = val ? 1 : 0;
+        if (field === 'client_group') {
+          if (val === '' || val == null) val = null;
+          else if (!CLIENT_GROUPS.includes(val)) return res.status(400).json({ error: `client_group must be one of ${CLIENT_GROUPS.join(', ')}` });
+        }
         updates[field] = val;
         diff[field] = { from: client[field], to: val };
       }
@@ -401,10 +409,12 @@ router.patch('/:id/portal', authorize('admin'), (req, res) => {
  */
 router.patch('/:id/flags', authorize('admin'), (req, res) => {
   try {
-    const client = db.prepare('SELECT id, blog_enabled, seo_enabled, ads_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
+    const client = db.prepare('SELECT id, blog_enabled, seo_enabled, ads_enabled, outbound_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
-    const flagFields = ['blog_enabled', 'seo_enabled', 'ads_enabled'];
+    // outbound_enabled: the Outbound monitor (src/services/growth.js) and the
+    // Outbound setup step of onboarding.
+    const flagFields = ['blog_enabled', 'seo_enabled', 'ads_enabled', 'outbound_enabled'];
     const updates = {};
     const diff = {};
 
@@ -435,7 +445,7 @@ router.patch('/:id/flags', authorize('admin'), (req, res) => {
       ip: req.ip,
     });
 
-    const updated = db.prepare('SELECT id, blog_enabled, seo_enabled, ads_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
+    const updated = db.prepare('SELECT id, blog_enabled, seo_enabled, ads_enabled, outbound_enabled FROM crm_clients WHERE id = ?').get(req.params.id);
     res.json({ success: true, ...updated });
   } catch (err) {
     console.error('[CLIENTS] Toggle flags error:', err);
