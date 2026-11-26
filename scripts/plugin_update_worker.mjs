@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Plugin update worker: keeps the Ops Center's view of claude-seo,
- * claude-blog and claude-ads current, and carries out the Update & test
+ * claude-blog, claude-ads and marketing-skills current, and carries out the Update & test
  * button in the SEO and Ads Monitors (src/services/plugins.js).
  *
  * Each pass:
@@ -298,6 +298,20 @@ export async function smokeCheck(job, root) {
       const j = lastJson(out);
       const v = Number(j?.break_even_cpa);
       return Math.abs(v - 40) < 1.01 ? { ok: true, detail: `ads-math gave break-even CPA ${v}` } : { ok: false, detail: `ads-math gave ${j ? JSON.stringify(j) : tail(out, 200)}` };
+    }
+    if (job.plugin === 'marketing-skills') {
+      // Instructions only (no scripts): check the cold-email skill still loads
+      // and still gives its subject-line rule (2.14.28: "2-4 words, lowercase").
+      const out = await runClaude({
+        bin: CLAUDE_BIN, model: MODEL, cwd: dir, allowedTools: 'Skill,Read,Glob,Grep', timeoutMs: 10 * MIN,
+        prompt: 'Use the `cold-email` skill from the marketing-skills plugin. According to that skill, at most how many words '
+          + 'should a cold email subject line have? Answer with one line of JSON as the last line: {"ok": true, "max_words": <number>, "skill_used": "<name>"}',
+      });
+      const j = lastJson(out);
+      const n = Number(j?.max_words);
+      return j?.skill_used === 'cold-email' && n >= 2 && n <= 8
+        ? { ok: true, detail: `cold-email loaded (subject lines up to ${n} words)` }
+        : { ok: false, detail: `cold-email gave ${j ? JSON.stringify(j) : tail(out, 200)}` };
     }
     // claude-seo: the technical card on our own site, with the runtime in use.
     const out = await runClaude({

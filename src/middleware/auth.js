@@ -34,6 +34,8 @@ const API_READONLY_ALLOWED = [
   /^GET \/api\/clients\/(\d+)\/ads\/audits\/\d+$/,
   /^GET \/api\/clients\/(\d+)\/ads\/agents\/status$/,
   /^GET \/api\/clients\/(\d+)\/ads\/recommendations$/,
+  // Plugin versions and Q's reviews: Q checks the verdict before installing or updating a plugin.
+  /^GET \/api\/plugins\/?$/,
 ];
 
 /**

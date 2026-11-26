@@ -18,6 +18,8 @@ import { PREFERENCE_FIELDS, validatePreferenceInput } from '../services/blogPipe
 import { serializeRun, clientApproveBlogRun, rejectBlogRun } from '../services/blogRuns.js';
 import { markdownToHtml } from '../services/markdown.js';
 import { getGoogleAccess, checkGoogleAccess, markGbpInviteSent } from '../services/googleAccess.js';
+import { BRAIN_SECTIONS, getBrain, saveBrain } from '../services/clientBrain.js';
+import { getOutboundSettings, saveOutboundSettings, listSuppression, addSuppression, MAILBOX_PROVIDERS, SENDING_TOOLS, BOOKING_METHODS, DATA_SOURCES, DEFAULT_EXCLUDED } from '../services/coldOutbound.js';
 
 const router = Router();
 
@@ -282,6 +284,7 @@ router.get('/:token/overview', portalAuth, (req, res) => {
     res.json({
       client_name: req.portalClient.name,
       client_type: req.portalClient.client_type,
+      outbound_enabled: !!req.portalClient.outbound_enabled,
       upcoming_posts: upcomingPosts,
       lead_alerts_enabled: req.portalClient.lead_alerts_enabled,
       content: contentStats,
@@ -1305,6 +1308,86 @@ router.put('/:token/onboarding', portalAuth, (req, res) => {
     res.json({ success: true, ...updated });
   } catch (err) {
     console.error('[PORTAL] Save onboarding error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * The client's Brain (src/services/clientBrain.js): what they sell, to whom,
+ * and the claims they can back up. Every marketing run reads it. The client
+ * edits sections and claims; learnings are ours, shown read-only.
+ */
+router.get('/:token/brain', portalAuth, (req, res) => {
+  try {
+    res.json({ brain: getBrain(req.portalClient.id), sections: BRAIN_SECTIONS });
+  } catch (err) {
+    console.error('[PORTAL] Get brain error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/:token/brain', portalAuth, (req, res) => {
+  try {
+    const r = saveBrain(req.portalClient.id, { sections: req.body?.sections, claims: req.body?.claims }, { by: 'client portal' });
+    if (r.status !== 200) return res.status(r.status).json({ error: r.error });
+    if (!r.unchanged) logAction({ action: 'client_brain_save', entityType: 'client_brain', entityId: req.portalClient.id, diff: { version: r.brain.version, by: 'client portal' }, ip: req.ip });
+    res.json({ success: true, brain: r.brain });
+  } catch (err) {
+    console.error('[PORTAL] Save brain error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Outbound setup (src/services/coldOutbound.js), only while outbound is
+ * switched on for this client: who the emails come from, the sending
+ * domains, the offer, how prospects book, who answers replies, and the
+ * existing customers we must never email.
+ */
+const outboundOn = (req, res) => {
+  if (req.portalClient.outbound_enabled) return true;
+  res.status(404).json({ error: 'Outbound is not switched on for this account' });
+  return false;
+};
+
+router.get('/:token/outbound-setup', portalAuth, (req, res) => {
+  try {
+    if (!outboundOn(req, res)) return;
+    const entries = listSuppression(req.portalClient.id);
+    res.json({
+      settings: getOutboundSettings(req.portalClient.id), website_url: req.portalClient.website_url,
+      do_not_contact: { count: entries.length, customers: entries.filter((e) => e.reason === 'customer').length },
+      options: { mailbox_providers: MAILBOX_PROVIDERS, sending_tools: SENDING_TOOLS, booking_methods: BOOKING_METHODS, data_sources: DATA_SOURCES, default_excluded: DEFAULT_EXCLUDED },
+    });
+  } catch (err) {
+    console.error('[PORTAL] Get outbound setup error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/:token/outbound-setup', portalAuth, (req, res) => {
+  try {
+    if (!outboundOn(req, res)) return;
+    const r = saveOutboundSettings(req.portalClient.id, req.body || {}, 'client portal');
+    if (r.status !== 200) return res.status(r.status).json({ error: r.error });
+    logAction({ action: 'outbound_settings_save', entityType: 'outbound_settings', entityId: req.portalClient.id, diff: { keys: Object.keys(req.body || {}), by: 'client portal' }, ip: req.ip });
+    res.json({ success: true, settings: r.settings });
+  } catch (err) {
+    console.error('[PORTAL] Save outbound setup error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** Existing customers' emails or domains, so they never get a cold email. */
+router.post('/:token/outbound-setup/customers', portalAuth, (req, res) => {
+  try {
+    if (!outboundOn(req, res)) return;
+    const r = addSuppression(req.portalClient.id, req.body?.entries, { reason: 'customer', source: 'client portal' });
+    if (r.status !== 200) return res.status(r.status).json({ error: r.error });
+    if (r.added) logAction({ action: 'outbound_suppression_add', entityType: 'outbound_suppression', entityId: req.portalClient.id, diff: { added: r.added, by: 'client portal' }, ip: req.ip });
+    res.json({ success: true, added: r.added, rejected: r.rejected });
+  } catch (err) {
+    console.error('[PORTAL] Add customers error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

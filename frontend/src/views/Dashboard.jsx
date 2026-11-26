@@ -5,8 +5,7 @@ import logoImg from '../assets/logo.png';
 import {
   Users, Folder, Calendar, Shield, LogOut, FileSpreadsheet,
   X, MessageSquare, FileText, Bell, BellOff, Cpu, Megaphone, Menu, UserPlus, Award, ClipboardCheck,
-  ClipboardList,
-} from 'lucide-react';
+  ClipboardList, Send } from 'lucide-react';
 
 import LeadsTab from '../components/dashboard/LeadsTab.jsx';
 import TasksTab from '../components/dashboard/TasksTab.jsx';
@@ -23,6 +22,7 @@ import CaseStudiesTab from '../components/dashboard/CaseStudiesTab.jsx';
 import ClientsTab from '../components/dashboard/ClientsTab.jsx';
 import SeoMonitorTab from '../components/dashboard/SeoMonitorTab.jsx';
 import AdsMonitorTab from '../components/dashboard/AdsMonitorTab.jsx';
+import OutboundTab from '../components/dashboard/OutboundTab.jsx';
 import ManualTasksTab from '../components/dashboard/ManualTasksTab.jsx';
 import { CONTENT_FORM_DEFAULTS, buildContentPayload, buildContentFormState } from '../components/dashboard/contentFormHelper.js';
 
@@ -1008,6 +1008,13 @@ export default function Dashboard({ auth, setAuth, showToast }) {
           </button>
         )}
 
+        {/* Outbound — Client Brain and cold outbound for marketing clients */}
+        {(isAdmin || isSMM) && (
+          <button onClick={() => handleTabClick('outbound')} className={`btn ${activeTab === 'outbound' ? 'btn-primary' : 'btn-secondary'}`}>
+            <Send size={16} /> Outbound
+          </button>
+        )}
+
         {/* Manual tasks — SEO and ads findings a person has to do */}
         {(isAdmin || isSMM) && (
           <button onClick={() => handleTabClick('manual')} className={`btn ${activeTab === 'manual' ? 'btn-primary' : 'btn-secondary'}`} style={{ position: 'relative', overflow: 'visible' }} title={tabCounts.manual ? `${tabCounts.manual} manual task(s) open` : undefined}>
@@ -1254,6 +1261,10 @@ export default function Dashboard({ auth, setAuth, showToast }) {
         {/* MANUAL TASKS TAB */}
         {activeTab === 'manual' && (isAdmin || isSMM) && (
           <ManualTasksTab clients={clients} showToast={showToast} isAdmin={isAdmin} />
+        )}
+
+        {activeTab === 'outbound' && (isAdmin || isSMM) && (
+          <OutboundTab auth={auth} clients={clients} showToast={showToast} />
         )}
 
         {/* ADS MONITOR TAB */}

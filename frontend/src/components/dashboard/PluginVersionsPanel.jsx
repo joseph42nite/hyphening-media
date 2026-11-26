@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api, card, muted, label } from './blogMonitorShared.js';
 
 /**
- * The open-source plugins a monitor runs on (claude-seo and claude-blog in the
- * SEO Monitor, claude-ads in the Ads Monitor): installed vs latest, Q's weekly
+ * The open-source plugins a monitor runs on (claude-seo, claude-blog and
+ * marketing-skills in the SEO Monitor, claude-ads in the Ads Monitor;
+ * marketing-skills shows as "not installed yet" until it is): installed vs latest, Q's weekly
  * review, and one Update & test button. The Mac's plugin_update_worker does
  * the update, checks our skills are still there, rebuilds, runs one smoke
  * check, and rolls back on any failure. Server side: src/routes/plugins.js.
@@ -86,7 +87,8 @@ export default function PluginVersionsPanel({ monitor, showToast, isAdmin = true
     const reported = data.plugins.map(p => p.status_reported_at).filter(Boolean).sort().pop();
     return (
       <p style={{ ...muted, margin: '0 0 12px' }}>
-        Plugins up to date: {data.plugins.map(p => `${p.plugin} ${p.installed_version || '?'}`).join(' · ')}
+        Plugins up to date: {data.plugins.filter(p => !p.not_installed).map(p => `${p.plugin} ${p.installed_version || '?'}`).join(' · ')}
+        {data.plugins.filter(p => p.not_installed).map(p => ` · ${p.plugin} not installed yet${p.latest_version ? ` (latest ${p.latest_version}${p.review_current && p.review_verdict ? `, Q: ${VERDICT[p.review_verdict]?.text}` : ', not reviewed yet'})` : ''}`).join('')}
         {data.plugins.some(p => p.status_stale) && ` (Mac last reported ${reported ? when(reported) : 'never'})`}
       </p>
     );
@@ -113,6 +115,7 @@ export default function PluginVersionsPanel({ monitor, showToast, isAdmin = true
                   {p.behind && <> → <strong style={{ color: '#facc15' }}>{p.latest_version}</strong></>}
                 </span>
                 {!p.behind && p.installed_version && <span style={pill('#4ade80')}>Up to date</span>}
+                {p.not_installed && <span style={pill('var(--text-muted)')}>Not installed yet{p.latest_version ? ` · latest ${p.latest_version}` : ''}</span>}
                 {p.behind && p.review_current && v && <span style={pill(v.color)} title={p.reviewed_at ? `Reviewed by ${p.reviewed_by} ${when(p.reviewed_at)}` : ''}>Q: {v.text}</span>}
                 {p.behind && !p.review_current && <span style={pill('var(--text-muted)')}>Not reviewed yet</span>}
                 {j && <span style={pill(j.color)}>{j.text}{job.to_version && job.status === 'updated' ? ` ${job.to_version}` : ''}</span>}
