@@ -1,6 +1,7 @@
 /**
  * The open-source Claude Code plugins our monitors run on (claude-seo,
- * claude-blog, claude-ads), and the Update button for them.
+ * claude-blog, claude-ads, and marketing-skills for the planned monitors),
+ * and the Update button for them.
  *
  *   Mac plugin_update_worker → report_plugin_status (installed + latest, hourly)
  *   Q's weekly routine       → report_plugin_review  (safe / test first / wait / breaks)
@@ -39,6 +40,16 @@ export const PLUGINS = {
     label: 'Ads Monitor',
     monitors: ['ads'],
   },
+  // coreyhaines31/marketingskills: the skills behind the planned Client Brain
+  // and the Outbound, Conversion and Lifecycle monitors. Tracked (and reviewed
+  // by Q) before it is installed, so a release is safety-checked before first use.
+  'marketing-skills': {
+    repo: 'coreyhaines31/marketingskills',
+    install_id: 'marketing-skills@marketingskills',
+    marketplace: 'marketingskills',
+    label: 'Marketing skills',
+    monitors: ['seo'],
+  },
 };
 
 const VERDICTS = ['safe', 'test_first', 'wait', 'breaks'];
@@ -54,9 +65,13 @@ const REQUIRED_SCRIPTS = {
   'claude-seo': ['scripts/gsc_query.py', 'scripts/ga4_report.py', 'scripts/commoncrawl_graph.py', 'scripts/verify_backlinks.py', 'scripts/drift_baseline.py', 'scripts/claude-seo'],
   'claude-blog': ['scripts/quality_gate.py'],
   'claude-ads': [],
+  'marketing-skills': [],
 };
 // The blog worker's prompt names these (scripts/blog_worker.mjs).
 const BLOG_SKILLS = ['blog-write', 'blog-brief', 'blog-outline', 'blog-seo-check', 'blog-factcheck', 'blog-geo', 'blog-schema', 'blog-cannibalization'];
+// What the Client Brain and the Outbound monitor will call first. Grows as the
+// Conversion and Lifecycle monitors get cards.
+const MARKETING_SKILLS = ['product-marketing', 'customer-research', 'competitor-profiling', 'prospecting', 'cold-email', 'revops', 'sales-enablement'];
 
 const str = (v, n) => (v == null || v === '' ? null : String(v).slice(0, n));
 const isPlugin = (p) => Object.prototype.hasOwnProperty.call(PLUGINS, p);
@@ -82,6 +97,7 @@ export function requiredSkills(plugin) {
     return db.prepare("SELECT DISTINCT skill_name FROM ads_agent_config WHERE skill_name IS NOT NULL AND skill_name != ''").all().map((r) => r.skill_name).sort();
   }
   if (plugin === 'claude-blog') return [...BLOG_SKILLS];
+  if (plugin === 'marketing-skills') return [...MARKETING_SKILLS];
   return [];
 }
 
@@ -126,6 +142,7 @@ function driftUrls() {
 /** Why the button is off, or null when it may be pressed. */
 export function updateBlocker(row, liveJob) {
   if (liveJob) return liveJob.status === 'queued' ? 'An update is already queued' : 'An update is running';
+  if (!row.installed_version && row.status_reported_at) return 'Not installed on the Mac yet';
   if (!row.installed_version) return 'The Mac has not reported the installed version yet';
   if (!row.latest_version) return 'The latest release is not known yet';
   if (!olderThan(row.installed_version, row.latest_version)) return 'Up to date';
@@ -154,6 +171,8 @@ function shape(row) {
     ...PLUGINS[row.plugin],
     new_skills: parseList(row.new_skills),
     behind: olderThan(row.installed_version, row.latest_version),
+    // The Mac has reported, and Claude Code has no install of it.
+    not_installed: !row.installed_version && !!row.status_reported_at,
     review_current: !!row.reviewed_version && semver(row.reviewed_version) === semver(row.latest_version),
     status_stale: statusAge == null || statusAge > STATUS_STALE_MINUTES * 3,
     blocker: updateBlocker(row, live),

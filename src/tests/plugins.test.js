@@ -56,6 +56,7 @@ describe('from report to update', () => {
       { plugin: 'claude-seo', installed_version: '2.4.2', installed_sha: 'aaa', latest_version: 'v2.6.2', latest_sha: 'bbb' },
       { plugin: 'claude-blog', installed_version: '2.3.2', latest_version: '2.3.2' },
       { plugin: 'claude-ads', installed_version: '2.1.0', latest_version: null },
+      { plugin: 'marketing-skills', installed_version: null, latest_version: '2.14.28' },
       { plugin: 'not-ours', installed_version: '1.0.0' },
     ] });
     expect(r.success).toBe(true);
@@ -65,6 +66,19 @@ describe('from report to update', () => {
     expect(seo.behind).toBe(true);
     expect(seo.latest_version).toBe('2.6.2');
     expect(p.listPlugins({ monitor: 'ads' }).plugins.map(x => x.plugin)).toEqual(['claude-ads']);
+  });
+
+  it('tracks marketing-skills before it is installed, and never offers to update it', () => {
+    const ms = p.listPlugins({ monitor: 'seo' }).plugins.find(x => x.plugin === 'marketing-skills');
+    expect(ms.repo).toBe('coreyhaines31/marketingskills');
+    expect(ms.not_installed).toBe(true);
+    expect(ms.behind).toBe(false);
+    expect(ms.latest_version).toBe('2.14.28');
+    expect(ms.blocker).toBe('Not installed on the Mac yet');
+    expect(p.requestPluginUpdate('marketing-skills', admin).status).toBe(409);
+    expect(p.requiredSkills('marketing-skills')).toContain('cold-email');
+    const r = executeEvent('report_plugin_review', { plugin: 'marketing-skills', version: '2.14.28', verdict: 'safe', summary: 'first review' });
+    expect(r.success).toBe(true);
   });
 
   it('keeps the button off until Q has reviewed that exact release', () => {
